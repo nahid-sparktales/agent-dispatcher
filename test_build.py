@@ -7,9 +7,12 @@ absolute local path leaked in, and that the docs do not contradict the catalog.
 """
 import collections
 import json
+import os
 import pathlib
 import re
+import subprocess
 import sys
+import tempfile
 
 import build
 
@@ -108,6 +111,97 @@ def validate(value, spec, path, errors):
                 errors.append(f"{path}: '{key}' is not a field of this object")
             elif isinstance(extra, dict):
                 validate(v, extra, f"{path}.{key}", errors)
+
+
+
+def run_hook(config_dir, project_dir, session_id=None, cwd=None):
+    """Run the real hook the way the runtime does: JSON on stdin, config dir in the env.
+
+    Everything else about the hook is checked by reading its text, which cannot catch a
+    generator edit that silently did not apply, a printf whose escaping is wrong, or arming
+    logic that lets a cloned repository switch the dispatcher on. Those only show up when the
+    script actually runs.
+    """
+    payload = {}
+    if session_id is not None:
+        payload["session_id"] = session_id
+    if cwd is not None:
+        payload["cwd"] = cwd
+    env = dict(os.environ, CLAUDE_CONFIG_DIR=str(config_dir))
+    env.pop("CLAUDE_SESSION_ID", None)
+    out = subprocess.run(["bash", str(build.HOOKS / "agent-dispatcher-activate.sh")],
+                         input=json.dumps(payload), capture_output=True, text=True,
+                         cwd=str(project_dir), env=env)
+    return out.returncode, out.stdout
+
+
+def hook_behaviour(ids):
+    """The arm/silence matrix, executed rather than read."""
+    with tempfile.TemporaryDirectory() as tmp:
+        root = pathlib.Path(tmp)
+        cfg, proj, other = root / "config", root / "project", root / "other"
+        for d in (cfg, proj, other):
+            d.mkdir()
+
+        code, out = run_hook(cfg, proj, "s-1", str(proj))
+        check("a clean install arms nothing", code == 0 and out == "", repr(out[:80]))
+
+        (cfg / ".agent-dispatcher-active").touch()
+        code, out = run_hook(cfg, proj, "s-1", str(proj))
+        check("arming everywhere injects the preamble",
+              "AGENT DISPATCHER ACTIVE" in out, repr(out[:80]))
+        check("the injected preamble carries the role index",
+              set(re.findall(r"^- `([a-z0-9-]+)`", out, re.M)) == ids,
+              "the roles the hook prints are not the roles that exist")
+        check("the injected preamble has no unreplaced placeholder",
+              "{" not in out.replace("${", ""), "a generator placeholder reached the output")
+
+        # The failure that started this: a printf whose escaping is wrong renders its own
+        # escape sequences instead of newlines, and every text-level check still passes.
+        check("the stop guidance renders, rather than printing its escapes",
+              "/agent-dispatcher off" in out and "\\n" not in out,
+              "literal escape sequences in the hook output")
+        check("the stop guidance fills in the real session id",
+              f"{cfg}/.agent-dispatcher-off/s-1" in out, "the session id was not substituted")
+        check("the stop guidance names all three scopes",
+              all(w in out for w in ("this session", "this project", "everywhere")),
+              "a scope is missing from the guidance")
+
+        silenced = cfg / ".agent-dispatcher-off"
+        silenced.mkdir()
+        (silenced / "s-1").touch()
+        code, out = run_hook(cfg, proj, "s-1", str(proj))
+        check("silencing a session beats arming everywhere", out == "", repr(out[:80]))
+        code, out = run_hook(cfg, proj, "s-2", str(proj))
+        check("silencing one session leaves the others armed", "AGENT DISPATCHER" in out)
+
+        (proj / ".agent-dispatcher-off").touch()
+        code, out = run_hook(cfg, proj, "s-2", str(proj))
+        check("silencing a project beats arming everywhere", out == "", repr(out[:80]))
+        code, out = run_hook(cfg, other, "s-2", str(other))
+        check("silencing one project leaves the others armed", "AGENT DISPATCHER" in out)
+        (proj / ".agent-dispatcher-off").unlink()
+        (cfg / ".agent-dispatcher-active").unlink()
+
+        # The security property the two-step allow-list exists for.
+        (proj / ".agent-dispatcher-on").touch()
+        code, out = run_hook(cfg, proj, "s-3", str(proj))
+        check("a cloned repository cannot arm itself", out == "",
+              "a flag file alone armed the dispatcher — the allow-list is not being enforced")
+        (cfg / ".agent-dispatcher-projects").write_text(str(other) + "\n")
+        code, out = run_hook(cfg, proj, "s-3", str(proj))
+        check("an allow-list entry for another project does not arm this one", out == "")
+        (cfg / ".agent-dispatcher-projects").write_text(str(proj) + "\n")
+        code, out = run_hook(cfg, proj, "s-3", str(proj))
+        check("a project armed by its own allow-list entry does arm", "AGENT DISPATCHER" in out)
+        code, out = run_hook(cfg, other, "s-3", str(other))
+        check("arming one project does not arm another", out == "")
+
+        # A payload with no session id still has to work; only the stop line changes.
+        code, out = run_hook(cfg, proj, None, str(proj))
+        check("a payload with no session id still arms", "AGENT DISPATCHER" in out)
+        check("and says the session id is missing rather than printing an empty path",
+              "did not carry" in out, repr(out[-400:]))
 
 
 def main():
@@ -222,6 +316,9 @@ def main():
     # The two artefacts billed without the agent choosing to read them.
     check("perpetual-mode preamble stays affordable", len(hook_out) < 12000,
           f"{len(hook_out)} bytes injected into every armed session")
+
+    print("\nthe hook, actually run")
+    hook_behaviour(ids)
     check("router stays affordable", len(router) < 34000, f"{len(router)} bytes")
     # CONTEXT.md is read on demand, but it defines a ~12k-token standard budget; reading it must
     # not eat that budget.

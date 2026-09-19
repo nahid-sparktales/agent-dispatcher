@@ -1,6 +1,6 @@
 {
   "name": "agent-dispatcher",
-  "version": "2.3.2",
+  "version": "2.3.3",
   "description": "Routes each request to one of 27 specialist agent roles, which load only the skills the work needs and verify what they claim.",
   "author": {
     "name": "nahid"

@@ -1,5 +1,35 @@
 # Changelog
 
+## 2.3.3 — 2026-09-19
+
+The SessionStart hook was checked by reading it. It is now checked by running it.
+
+### Added
+
+- **17 hook behaviour checks** in `test_build.py`, executing the real script against a temporary
+  config dir and project dir with a JSON payload on stdin, the way the runtime invokes it. They
+  cover the whole arm/silence matrix: a clean install arming nothing, global arming, session and
+  project silencing beating a global arm, one silence not affecting another session or project,
+  and the two-step allow-list.
+
+  Three of them exist because of specific failures that every text-level check passed happily
+  through:
+
+  - **The escaping one.** A `printf` whose escape is wrong renders `\n` literally instead of a
+    newline. The generator is valid Python, the shell script is valid bash, the drift check
+    passes because the file matches what the generator produces — and the injected preamble is
+    garbage. Caught now by asserting the rendered output contains no literal escape sequences.
+    Reintroducing that bug fails the suite.
+  - **The silent no-op.** An edit to the generator whose search string does not match leaves the
+    artifact unchanged, and drift *passes*, because nothing changed. The test suite was never
+    going to catch that on its own; running the output is what does.
+  - **The security one.** The two-step project allow-list is the reason a cloned repository
+    cannot switch your sessions into perpetual mode. That property had no test. Removing the
+    allow-list check from the generator now fails two checks by name.
+
+Each of the three was verified by reintroducing the defect and watching the suite go red, rather
+than by assuming the assertion covers it.
+
 ## 2.3.2 — 2026-09-19
 
 Perpetual mode was documented as a set of files to `touch`. It was always a set of commands.
