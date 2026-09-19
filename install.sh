@@ -7,6 +7,9 @@
 #
 #   ./install.sh            install or update
 #   ./install.sh --uninstall  remove everything this script installed
+#
+# Non-interactive, and it never asks for a credential. The optional decision engine is installed
+# inert; enabling it is a separate, opt-in step documented in docs/jev.md.
 set -e
 cd "$(dirname "$0")"
 D="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
@@ -48,6 +51,7 @@ fi
 
 python3 build.py
 python3 test_build.py
+python3 test_decision.py
 python3 -c "import json,pathlib,sys; p=pathlib.Path(sys.argv[1])/'settings.json'; p.exists() and json.loads(p.read_text())" "$D" \
   || { echo "$D/settings.json is not valid JSON — fix it first; nothing was installed"; exit 1; }
 
@@ -64,6 +68,13 @@ for dir in skills/*/; do
   cp -R "$dir" "$D/skills/agent-dispatcher/lib/$name"
 done
 cp -R recipes "$D/skills/agent-dispatcher/recipes"
+# The optional decision engine and the registries it reads. Both are inert without a provider
+# credential, which this script neither asks for nor writes anywhere: the engine reads it from
+# the environment at request time. Installing with no key configured is the normal case.
+cp -R decision "$D/skills/agent-dispatcher/decision"
+rm -rf "$D/skills/agent-dispatcher/decision/__pycache__" \
+       "$D/skills/agent-dispatcher/decision/providers/__pycache__"
+cp -R catalog "$D/skills/agent-dispatcher/catalog"
 cp hooks/agent-dispatcher-activate.sh "$D/hooks/"
 chmod +x "$D/hooks/agent-dispatcher-activate.sh"
 : > "$MANIFEST"

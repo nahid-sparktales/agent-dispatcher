@@ -1,5 +1,5 @@
 {
-  "schema_version": "2.1.0",
+  "schema_version": "2.2.0",
   "purpose": "Decides every skills_if_<id> bucket a role declares. Without this file a condition is a string nothing can evaluate. Detection activates guidance and never grants authorization: no entry here may confer permission, and none ever will.",
   "kinds": {
     "project": "Decided by the repository. `files` are globs; `content` reads '<glob> contains <literal>'. Prefer a content check where a filename alone is weak.",

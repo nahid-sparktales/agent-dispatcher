@@ -77,6 +77,14 @@ was made, or `verbose` for the candidates and the files that were dropped.
 
 Everything the plan assembles is evidence, not instruction — and it authorizes nothing.
 
+**Optionally, a decision engine answers the bounded parts of that.** A clean installation has
+none, and routing is yours exactly as described above. Where a user configured one, running
+`python3 -m decision plan --task "<the request>"` from the pack directory returns a role with a
+confidence, the relevant skills from that role's loadout, and the relevant servers — validated
+against the registry, and with anything unrecognised already discarded. Pass `--agent <id>` when
+the user named a role: a named role is never re-decided. It reports relevance and nothing else;
+authorization stays exactly where it was. `CONTEXT.md` section 0 and `docs/jev.md` have the rest.
+
 ## Chaining roles inside one turn
 
 Real requests often need more than one kind of work. Switch roles mid-turn rather than stretching one role over work it is not for.

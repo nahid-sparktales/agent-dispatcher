@@ -1,0 +1,2069 @@
+{
+  "schema_version": "1.0",
+  "purpose": "Routing cases for all 27 roles: obvious, near-neighbour, ambiguous and negative. `acceptable` exists because some tasks have more than one defensible owner; forcing a single gold label on those would measure the fixture, not the engine.",
+  "registry_version": "6698fc5a5674",
+  "cases": [
+    {
+      "id": "dispatcher-obvious-1",
+      "task": "Friday we cut the billing service over to the new payment provider. The schema change, the client rewrite, an independent pass over the authorization handling, and a smoke run before we flip traffic all have to happen in that order without colliding, and I want one answer at the end on whether we're go.",
+      "expected": "dispatcher",
+      "acceptable": [
+        "dispatcher"
+      ],
+      "not_routes": [
+        "implementer",
+        "generalist"
+      ],
+      "kind": "obvious",
+      "why": "Four separable workstreams with hard ordering plus independent verification, and accountability for the joint outcome \u2014 exactly the multi-agent case dispatcher exists for."
+    },
+    {
+      "id": "dispatcher-obvious-2",
+      "task": "The expense tool overhaul is four jobs this sprint: new storage layer, new screens, a rework of the nightly export, and someone other than each author signing off on each piece. Keep the handoffs straight and tell me at the end whether the whole thing actually holds together.",
+      "expected": "dispatcher",
+      "acceptable": [
+        "dispatcher"
+      ],
+      "not_routes": [
+        "implementer",
+        "planner"
+      ],
+      "kind": "obvious",
+      "why": "Distinct specialties, dependencies between them, and a requirement that verification comes from someone other than the author \u2014 genuine benefit from multiple agents."
+    },
+    {
+      "id": "dispatcher-near-neighbour-1",
+      "task": "The warehouse migration write-up is approved already: three tracks, two of them blocked on the first. Take it from here and get the tracks actually moving, checking each handoff as it lands, instead of producing another document.",
+      "expected": "dispatcher",
+      "acceptable": [
+        "dispatcher"
+      ],
+      "not_routes": [
+        "planner"
+      ],
+      "kind": "near-neighbour",
+      "why": "The near neighbour is planner, but the plan exists and the ask is execution and handoff ownership; planner is \"Not for: performing the implementation, ongoing team coordination\"."
+    },
+    {
+      "id": "dispatcher-near-neighbour-2",
+      "task": "Four things have to land in parallel for the 4.0 app release \u2014 the crash fix, the store metadata, the localization sweep, and an independent verification run \u2014 and they need different hands. Run them so they converge by Thursday and flag the moment one slips.",
+      "expected": "dispatcher",
+      "acceptable": [
+        "dispatcher"
+      ],
+      "not_routes": [
+        "generalist"
+      ],
+      "kind": "near-neighbour",
+      "why": "The near neighbour is generalist, but four parallel tracks needing different specialties exceed one agent; generalist is \"Not for: ... pretending to have expertise, tools, or access it lacks\"."
+    },
+    {
+      "id": "dispatcher-ambiguous-1",
+      "task": "We want a public status page live next month. Nobody's agreed what goes in the first cut, and after that there's backend work, a static site to build, and an on-call sign-off.",
+      "expected": "dispatcher",
+      "acceptable": [
+        "dispatcher",
+        "product-manager",
+        "planner"
+      ],
+      "not_routes": [
+        "implementer"
+      ],
+      "kind": "ambiguous",
+      "why": "Undecided first-version scope argues product-manager, unsequenced dependencies argue planner, but the goal spans several specialist tracks end to end, so dispatcher chaining them is the most defensible single owner."
+    },
+    {
+      "id": "dispatcher-negative-1",
+      "task": "Three small ones on the marketing site: the footer link 404s, swap the hero image for the new one, and bump the year in the copyright line.",
+      "expected": "generalist",
+      "acceptable": [
+        "generalist",
+        "implementer"
+      ],
+      "not_routes": [
+        "dispatcher"
+      ],
+      "kind": "negative",
+      "why": "Three items reads like parallel workstreams to a keyword matcher, but dispatcher is \"Not for: routine tasks that one agent can finish directly\"."
+    },
+    {
+      "id": "generalist-obvious-1",
+      "task": "I inherited a folder of half-working scripts from someone who left the team. Work out which ones still do anything, delete the dead ones, and leave a short note in the repo about what's left.",
+      "expected": "generalist",
+      "acceptable": [
+        "generalist"
+      ],
+      "not_routes": [
+        "dispatcher",
+        "explorer"
+      ],
+      "kind": "obvious",
+      "why": "Small, mixed-domain cleanup \u2014 read, decide, delete, write a note \u2014 that one agent finishes end to end without any specialist depth."
+    },
+    {
+      "id": "generalist-obvious-2",
+      "task": "Our command-line tool just prints \"config error\" and nothing else when the file is missing. Make it name the path it looked at and point at the sample, and fix the README where it still shows the old flag.",
+      "expected": "generalist",
+      "acceptable": [
+        "generalist",
+        "implementer"
+      ],
+      "not_routes": [
+        "dispatcher",
+        "documentation-writer"
+      ],
+      "kind": "obvious",
+      "why": "Tiny code change plus a docs touch-up in one pass; spans two domains but is far too small to split, which is generalist's lane."
+    },
+    {
+      "id": "generalist-near-neighbour-1",
+      "task": "Three chores before tomorrow's demo: bump the version string, regenerate the sample dataset, and confirm the container still builds. Nothing tricky, just get them done.",
+      "expected": "generalist",
+      "acceptable": [
+        "generalist"
+      ],
+      "not_routes": [
+        "dispatcher"
+      ],
+      "kind": "near-neighbour",
+      "why": "The near neighbour is dispatcher, tempted by three listed items, but dispatcher is \"Not for: routine tasks that one agent can finish directly\"."
+    },
+    {
+      "id": "generalist-near-neighbour-2",
+      "task": "I took over this repo yesterday. Give me the lay of the land \u2014 what it does, how the pieces hang together \u2014 and while you're in there get the dev server actually starting on my machine, it dies on a missing env var.",
+      "expected": "generalist",
+      "acceptable": [
+        "generalist"
+      ],
+      "not_routes": [
+        "explorer"
+      ],
+      "kind": "near-neighbour",
+      "why": "The near neighbour is explorer, but the ask ends in a working local setup and explorer is \"Not for: ... making code changes\"."
+    },
+    {
+      "id": "generalist-ambiguous-1",
+      "task": "The contact form on our marketing site stopped emailing us sometime last week and we only found out because a customer complained. Can you work out why and get it working again?",
+      "expected": "debugger",
+      "acceptable": [
+        "debugger",
+        "generalist"
+      ],
+      "not_routes": [
+        "dispatcher"
+      ],
+      "kind": "ambiguous",
+      "why": "An unexplained failure with a reproducible symptom is debugger territory, but the surface is tiny and self-contained enough that generalist end to end is equally defensible."
+    },
+    {
+      "id": "generalist-negative-1",
+      "task": "Small one \u2014 our checkout endpoint takes the account id straight from the query string, and if you change it you get back somebody else's saved cards. Have a look?",
+      "expected": "security-auditor",
+      "acceptable": [
+        "security-auditor",
+        "incident-responder"
+      ],
+      "not_routes": [
+        "generalist"
+      ],
+      "kind": "negative",
+      "why": "\"Small one, have a look\" reads as a catch-all chore, but it is a broken authorization boundary over sensitive data, and generalist is \"Not for: ... pretending to have expertise, tools, or access it lacks\"."
+    },
+    {
+      "id": "implementer-obvious-1",
+      "task": "Add a CSV download to the reports screen on the ops dashboard \u2014 same columns as the table, honoring whatever filters are set. The mock is signed off and the endpoint already returns everything we need.",
+      "expected": "implementer",
+      "acceptable": [
+        "implementer"
+      ],
+      "not_routes": [
+        "ui-ux-designer",
+        "planner"
+      ],
+      "kind": "obvious",
+      "why": "Authorized, well-specified build with the design and the data already settled \u2014 a focused change verified against the task."
+    },
+    {
+      "id": "implementer-obvious-2",
+      "task": "Our sync command needs a flag that prints what it would upload without touching the bucket. The behavior is spelled out in the ticket, go ahead and build it.",
+      "expected": "implementer",
+      "acceptable": [
+        "implementer"
+      ],
+      "not_routes": [
+        "planner",
+        "tester"
+      ],
+      "kind": "obvious",
+      "why": "Approved scope, single component, nothing uncertain \u2014 straight creation of software against a written spec."
+    },
+    {
+      "id": "implementer-near-neighbour-1",
+      "task": "The ticket already pins it down: our retry helper waits a flat one second and the vendor throttles us on the third attempt. Swap it for exponential backoff with jitter capped at thirty seconds and keep the existing call sites working.",
+      "expected": "implementer",
+      "acceptable": [
+        "implementer"
+      ],
+      "not_routes": [
+        "debugger"
+      ],
+      "kind": "near-neighbour",
+      "why": "The near neighbour is debugger, but the cause is already established in the ticket so no investigation remains; debugger is \"Not for: random trial-and-error edits, speculative rewrites\" of code that is already diagnosed."
+    },
+    {
+      "id": "implementer-near-neighbour-2",
+      "task": "The settings screen is fully specced \u2014 spacing, states, empty and error cases all marked up and approved. Get it into the iOS app, wired to the preferences store we already have.",
+      "expected": "implementer",
+      "acceptable": [
+        "implementer"
+      ],
+      "not_routes": [
+        "ui-ux-designer"
+      ],
+      "kind": "near-neighbour",
+      "why": "The near neighbour is ui-ux-designer, but every interaction decision is made and signed off; that role is \"Not for: generic decorative restyling, product requirements invented without context\", i.e. re-opening a settled spec."
+    },
+    {
+      "id": "implementer-ambiguous-1",
+      "task": "We need per-key throttling on the public API before launch \u2014 a hundred requests a minute. Nobody's settled whether that belongs at the gateway or inside the app.",
+      "expected": "architect",
+      "acceptable": [
+        "architect",
+        "implementer",
+        "planner"
+      ],
+      "not_routes": [
+        "tester"
+      ],
+      "kind": "ambiguous",
+      "why": "An open placement decision across execution boundaries argues architect, the change itself is small enough for implementer, and the launch dependency makes planner defensible."
+    },
+    {
+      "id": "implementer-negative-1",
+      "task": "All ninety route handlers still go through the deprecated request wrapper. Move them onto the new one \u2014 identical behavior, no feature changes, and it has to be shippable in pieces.",
+      "expected": "refactoring-migration-specialist",
+      "acceptable": [
+        "refactoring-migration-specialist"
+      ],
+      "not_routes": [
+        "implementer"
+      ],
+      "kind": "negative",
+      "why": "\"Change the code\" attracts implementer, but this is a staged contract transition preserving behavior, and implementer's lane is focused changes \u2014 it is \"Not for: ... broad redesign without need\"."
+    },
+    {
+      "id": "planner-obvious-1",
+      "task": "We have to move four hundred thousand accounts off the legacy identity provider without locking anyone out, and nobody's sure what depends on what. Before a line of code gets written, work out the order, what has to be true before each step, and how we'd know a step landed.",
+      "expected": "planner",
+      "acceptable": [
+        "planner"
+      ],
+      "not_routes": [
+        "implementer",
+        "dispatcher"
+      ],
+      "kind": "obvious",
+      "why": "Explicit request for sequencing with migration risk and per-step success conditions, and an explicit instruction not to build yet."
+    },
+    {
+      "id": "planner-obvious-2",
+      "task": "Offline mode is a six-week piece of work with a sync layer, a storage change and a migration for existing installs. Lay out how we get from here to there, what depends on what, and where the risky bits are \u2014 don't build any of it yet.",
+      "expected": "planner",
+      "acceptable": [
+        "planner"
+      ],
+      "not_routes": [
+        "implementer",
+        "architect"
+      ],
+      "kind": "obvious",
+      "why": "Material uncertainty and multiple dependencies with a stated no-implementation boundary \u2014 an executable sequence with checkpoints is the deliverable."
+    },
+    {
+      "id": "planner-near-neighbour-1",
+      "task": "The document splitting payments out of the monolith is approved \u2014 boundaries, contracts and data ownership are all settled. What we don't have is the order of operations, what can run in parallel, and where we'd be stuck if the second step slipped.",
+      "expected": "planner",
+      "acceptable": [
+        "planner"
+      ],
+      "not_routes": [
+        "architect"
+      ],
+      "kind": "near-neighbour",
+      "why": "The near neighbour is architect, but no structural decision is open; architect is \"Not for: routine implementation details\" and what remains is ordering and risk on already-chosen boundaries."
+    },
+    {
+      "id": "planner-near-neighbour-2",
+      "task": "Scope and the success metric for the paid tier are already agreed with leadership. What's missing is how two engineers get there in six weeks given the payments work has to land first.",
+      "expected": "planner",
+      "acceptable": [
+        "planner"
+      ],
+      "not_routes": [
+        "product-manager"
+      ],
+      "kind": "near-neighbour",
+      "why": "The near neighbour is product-manager, but what to build and why is settled; product-manager is \"Not for: ... detailed implementation sequencing alone\"."
+    },
+    {
+      "id": "planner-ambiguous-1",
+      "task": "Our build pipeline takes forty-five minutes and people have started merging without waiting for it. Work out what we should actually do about it and in what order.",
+      "expected": "planner",
+      "acceptable": [
+        "planner",
+        "performance-engineer",
+        "devops-release"
+      ],
+      "not_routes": [
+        "tester"
+      ],
+      "kind": "ambiguous",
+      "why": "An open set of options needing sequencing argues planner, measurable runtime improvement argues performance-engineer, and the surface being CI itself argues devops-release."
+    },
+    {
+      "id": "planner-negative-1",
+      "task": "Someone wants a short write-up before we change the copyright year in the footer to 2026. Honestly, just sort it out.",
+      "expected": "implementer",
+      "acceptable": [
+        "implementer",
+        "generalist"
+      ],
+      "not_routes": [
+        "planner"
+      ],
+      "kind": "negative",
+      "why": "A requested write-up before a change attracts planner, but planner is \"Not for: ... producing an elaborate plan for a trivial fix\"."
+    },
+    {
+      "id": "researcher-obvious-1",
+      "task": "Before we commit to it, find out whether Apple actually permits the background-refresh behavior we want and what the current review guidance says, with the sources so I can put them in front of the team.",
+      "expected": "researcher",
+      "acceptable": [
+        "researcher"
+      ],
+      "not_routes": [
+        "explorer",
+        "implementer"
+      ],
+      "kind": "obvious",
+      "why": "The evidence lives entirely outside the workspace in published guidance, and the deliverable is sourced findings for a decision."
+    },
+    {
+      "id": "researcher-obvious-2",
+      "task": "Three CDN vendors all claim sub-50ms response times in the EU. Go through what each one actually commits to in its documentation and service agreement and tell us where they genuinely differ.",
+      "expected": "researcher",
+      "acceptable": [
+        "researcher"
+      ],
+      "not_routes": [
+        "architect",
+        "data-analyst"
+      ],
+      "kind": "obvious",
+      "why": "Source comparison and claim verification across external documents \u2014 decision-ready findings, no code or dataset involved."
+    },
+    {
+      "id": "researcher-near-neighbour-1",
+      "task": "Our token refresh handling behaves differently from what the provider's SDK documentation implies and nobody here knows which is right. Go read the specification and the provider's changelog and tell us what each one actually says about reusing a refresh token.",
+      "expected": "researcher",
+      "acceptable": [
+        "researcher"
+      ],
+      "not_routes": [
+        "explorer"
+      ],
+      "kind": "near-neighbour",
+      "why": "The near neighbour is explorer, but the answer is in external standards and vendor changelogs; explorer is \"Not for: broad web research\"."
+    },
+    {
+      "id": "researcher-near-neighbour-2",
+      "task": "Before we pick a model for the summarizer, establish what the providers actually document about context limits, pricing tiers, and whether they commit to not training on traffic sent through the API. Sources, not recollection.",
+      "expected": "researcher",
+      "acceptable": [
+        "researcher"
+      ],
+      "not_routes": [
+        "ai-agent-engineer"
+      ],
+      "kind": "near-neighbour",
+      "why": "The near neighbour is ai-agent-engineer, but no prompt, routing or evaluation work is being asked for, and that role is \"Not for: ... guessing provider capabilities\" \u2014 the ask is to source them."
+    },
+    {
+      "id": "researcher-ambiguous-1",
+      "task": "Is it worth moving our product search off Elasticsearch onto something like Typesense? Nobody here has looked at either in two years.",
+      "expected": "researcher",
+      "acceptable": [
+        "researcher",
+        "architect"
+      ],
+      "not_routes": [
+        "implementer"
+      ],
+      "kind": "ambiguous",
+      "why": "The stated gap is missing external evidence, which favors researcher, but it is also a long-lived technical decision constrained by the existing system, which makes architect defensible."
+    },
+    {
+      "id": "researcher-negative-1",
+      "task": "Nobody can tell me where the discount actually gets applied in the checkout code. Go and find out and point me at the real files.",
+      "expected": "explorer",
+      "acceptable": [
+        "explorer"
+      ],
+      "not_routes": [
+        "researcher"
+      ],
+      "kind": "negative",
+      "why": "\"Find out\" attracts researcher, but researcher is \"Not for: ... local code mapping alone\" \u2014 locating behavior inside the workspace is explorer's job."
+    },
+    {
+      "id": "reviewer-obvious-1",
+      "task": "The contractor's nine-hundred-line permissions rework is up. I want an honest read on whether it's safe to merge and what's actually wrong with it, pointed at the specific code \u2014 not a rubber stamp.",
+      "expected": "reviewer",
+      "acceptable": [
+        "reviewer"
+      ],
+      "not_routes": [
+        "implementer",
+        "tester"
+      ],
+      "kind": "obvious",
+      "why": "A completed artifact needing an independent, evidence-backed correctness and readiness judgment from someone who didn't write it."
+    },
+    {
+      "id": "reviewer-obvious-2",
+      "task": "We wrote the ingestion changes ourselves and we're far too close to them. Read the diff cold and tell us where it went past what the ticket asked for and what we've missed.",
+      "expected": "reviewer",
+      "acceptable": [
+        "reviewer"
+      ],
+      "not_routes": [
+        "implementer",
+        "data-engineer"
+      ],
+      "kind": "obvious",
+      "why": "Explicit ask for an outside scope-and-quality assessment of a finished change, with no fixing implied."
+    },
+    {
+      "id": "reviewer-near-neighbour-1",
+      "task": "QA already put the new onboarding flow through end to end and it behaves. What nobody has done is read how it's built and say whether we'll regret it in six months, or whether it quietly does more than the ticket asked for.",
+      "expected": "reviewer",
+      "acceptable": [
+        "reviewer"
+      ],
+      "not_routes": [
+        "tester"
+      ],
+      "kind": "near-neighbour",
+      "why": "The near neighbour is tester, but observable behavior is already verified; tester is \"Not for: ... a general code-style review\" of how the change is built or whether its scope crept."
+    },
+    {
+      "id": "reviewer-near-neighbour-2",
+      "task": "Two of our engineers disagree about whether this branch's approach to argument parsing is the right one. Give me evidence either way, and don't touch the branch while you're at it.",
+      "expected": "reviewer",
+      "acceptable": [
+        "reviewer"
+      ],
+      "not_routes": [
+        "implementer"
+      ],
+      "kind": "near-neighbour",
+      "why": "The near neighbour is implementer, but the deliverable is an independent verdict with the branch untouched, and implementer is \"Not for: independent approval of its own work\"."
+    },
+    {
+      "id": "reviewer-ambiguous-1",
+      "task": "The checkout redesign branch is finished. Tell me whether we can put it out on Friday.",
+      "expected": "reviewer",
+      "acceptable": [
+        "reviewer",
+        "tester",
+        "devops-release"
+      ],
+      "not_routes": [
+        "planner"
+      ],
+      "kind": "ambiguous",
+      "why": "\"Ready to merge\" as a judgment on the artifact favors reviewer, but acceptance-criteria verification argues tester and release readiness argues devops-release."
+    },
+    {
+      "id": "reviewer-negative-1",
+      "task": "Before the pentest next month, have someone go over how we sign and verify partner webhook payloads and where that shared secret ends up in our logs.",
+      "expected": "security-auditor",
+      "acceptable": [
+        "security-auditor"
+      ],
+      "not_routes": [
+        "reviewer"
+      ],
+      "kind": "negative",
+      "why": "\"Go over it and give an assessment\" reads as a general quality read, but signature verification, a trust boundary and secret handling are security-auditor's territory, and a generic read would miss those weakness classes."
+    },
+    {
+      "id": "tester-obvious-1",
+      "task": "Password reset has broken twice now and both times a customer told us before we noticed. Get it covered so the build tells us instead next time.",
+      "expected": "tester",
+      "acceptable": [
+        "tester"
+      ],
+      "not_routes": [
+        "debugger",
+        "implementer"
+      ],
+      "kind": "obvious",
+      "why": "Regression coverage for behavior that keeps silently breaking \u2014 observable-behavior checks are the deliverable."
+    },
+    {
+      "id": "tester-obvious-2",
+      "task": "Before we sign off invoicing, walk the acceptance criteria in the ticket against the running build and tell us exactly which ones don't hold, with steps we can follow.",
+      "expected": "tester",
+      "acceptable": [
+        "tester"
+      ],
+      "not_routes": [
+        "reviewer",
+        "implementer"
+      ],
+      "kind": "obvious",
+      "why": "Independent functional verification against written acceptance criteria, reporting reproducible failures rather than fixing them."
+    },
+    {
+      "id": "tester-near-neighbour-1",
+      "task": "The transform change has already been read line by line and approved. Nobody has actually run it against the cases in the ticket, including the two edge cases we argued about in the thread.",
+      "expected": "tester",
+      "acceptable": [
+        "tester"
+      ],
+      "not_routes": [
+        "reviewer"
+      ],
+      "kind": "near-neighbour",
+      "why": "The near neighbour is reviewer, which already happened; reviewer is \"Not for: ... treating an author's explanation as proof\" and a code read cannot produce executed evidence of behavior."
+    },
+    {
+      "id": "tester-near-neighbour-2",
+      "task": "Support keeps getting reports that the CSV import drops the last row, and nobody here can make it happen. We need a sequence support can follow that reproduces it every time \u2014 don't change any code yet.",
+      "expected": "tester",
+      "acceptable": [
+        "tester"
+      ],
+      "not_routes": [
+        "debugger"
+      ],
+      "kind": "near-neighbour",
+      "why": "The near neighbour is debugger, but the deliverable is a reproducible case with an explicit no-code-change boundary; debugger is \"Not for: random trial-and-error edits, speculative rewrites\" and its lane starts once a fix is wanted."
+    },
+    {
+      "id": "tester-ambiguous-1",
+      "task": "The nightly end-to-end run has been red for a week and everyone has started ignoring it. Sort it out.",
+      "expected": "debugger",
+      "acceptable": [
+        "debugger",
+        "tester",
+        "devops-release"
+      ],
+      "not_routes": [
+        "planner"
+      ],
+      "kind": "ambiguous",
+      "why": "A persistently failing suite needing root-cause work favors debugger, but if the checks themselves are wrong it is tester's, and if the runner or environment is at fault it is devops-release's."
+    },
+    {
+      "id": "tester-negative-1",
+      "task": "Set the suite up so it runs on every pull request and blocks the merge button when it comes back red.",
+      "expected": "devops-release",
+      "acceptable": [
+        "devops-release"
+      ],
+      "not_routes": [
+        "tester"
+      ],
+      "kind": "negative",
+      "why": "The word \"suite\" attracts tester, but nothing is being verified \u2014 this is CI wiring and merge gating, which is delivery pipeline work."
+    },
+    {
+      "id": "ai-agent-engineer-obvious-1",
+      "task": "Our ticket triage assistant keeps picking the wrong canned reply whenever a customer mentions two products in the same message. Rework how it decides and set up a scored run over a few hundred past tickets so we can tell whether it actually improved.",
+      "expected": "ai-agent-engineer",
+      "acceptable": [
+        "ai-agent-engineer"
+      ],
+      "not_routes": [],
+      "kind": "obvious",
+      "why": "Changing an AI system's decision behavior and measuring it against a graded example set is squarely the AI & Agent Engineer's work."
+    },
+    {
+      "id": "ai-agent-engineer-obvious-2",
+      "task": "The assistant in our command-line tool has six actions it can invoke and it calls the file-writing one with half the arguments missing. Tighten up how those actions are described to it and build a bank of example sessions we can replay after every change.",
+      "expected": "ai-agent-engineer",
+      "acceptable": [
+        "ai-agent-engineer"
+      ],
+      "not_routes": [],
+      "kind": "obvious",
+      "why": "Action definitions an AI chooses between, plus replayable behavioral checks, is AI & Agent Engineer territory, not generic feature work."
+    },
+    {
+      "id": "ai-agent-engineer-near-neighbour-1",
+      "task": "The onboarding helper in our web app re-asks for the workspace name the user already gave two messages earlier, and after a long session it starts contradicting its own earlier answers. Rework how it carries state across a conversation.",
+      "expected": "ai-agent-engineer",
+      "acceptable": [
+        "ai-agent-engineer"
+      ],
+      "not_routes": [
+        "implementer"
+      ],
+      "kind": "near-neighbour",
+      "why": "Looks like an ordinary code fix, but it is a rework of how an AI system retains conversational state; implementer is \"Not for: ... broad redesign without need\"."
+    },
+    {
+      "id": "ai-agent-engineer-near-neighbour-2",
+      "task": "Marketing wants us to swap the model behind our email draft generator for a cheaper one. Before we commit, set up a repeatable graded comparison over 300 real past drafts so we can see exactly what quality we would give up.",
+      "expected": "ai-agent-engineer",
+      "acceptable": [
+        "ai-agent-engineer"
+      ],
+      "not_routes": [
+        "tester"
+      ],
+      "kind": "near-neighbour",
+      "why": "Grading non-deterministic output quality is not pass/fail functional verification; tester is \"Not for: ... unsupported claims that a product is correct\", which is all a green suite would give here."
+    },
+    {
+      "id": "ai-agent-engineer-ambiguous-1",
+      "task": "Our internal helpdesk assistant answers from a folder of HR policy documents and it keeps quoting a leave policy that was replaced last year. Nobody is sure whether the old document is still being fed in or the assistant is just preferring it.",
+      "expected": "ai-agent-engineer",
+      "acceptable": [
+        "ai-agent-engineer",
+        "data-engineer",
+        "debugger"
+      ],
+      "kind": "ambiguous",
+      "not_routes": [],
+      "why": "Could be how the assistant selects source documents, the job that loads them, or a plain defect in the loading step \u2014 all three are defensible before anyone looks."
+    },
+    {
+      "id": "ai-agent-engineer-negative-1",
+      "task": "A customer pasted a forwarded support email into our assistant, and it followed the instructions buried in that email and sent another customer's order history to an outside address. We need this properly assessed before we let it near inboxes again.",
+      "expected": "security-auditor",
+      "acceptable": [
+        "security-auditor",
+        "ai-agent-engineer"
+      ],
+      "not_routes": [],
+      "kind": "negative",
+      "why": "Keyword-wise it is an assistant problem, but this is a trust-boundary and data-exposure assessment; the AI role is explicitly \"Not for: prompt-only security enforcement\"."
+    },
+    {
+      "id": "api-integration-engineer-obvious-1",
+      "task": "Our storefront and the shipping provider exchange events over HTTP callbacks, and when they post the same event twice we raise a second shipment. Build our side so a repeated post can never produce a duplicate.",
+      "expected": "api-integration-engineer",
+      "acceptable": [
+        "api-integration-engineer"
+      ],
+      "not_routes": [],
+      "kind": "obvious",
+      "why": "Exchange with an outside service where duplicate delivery must be made harmless is the API & Integration Engineer's core job."
+    },
+    {
+      "id": "api-integration-engineer-obvious-2",
+      "task": "Sales wants a contact created in our signup flow to show up in the CRM within a minute. Right now we silently lose records whenever their side starts refusing our calls, so wire our end up properly.",
+      "expected": "api-integration-engineer",
+      "acceptable": [
+        "api-integration-engineer"
+      ],
+      "not_routes": [],
+      "kind": "obvious",
+      "why": "A live outbound path to an external service with correct behavior under throttling belongs to the API & Integration Engineer."
+    },
+    {
+      "id": "api-integration-engineer-near-neighbour-1",
+      "task": "When a deal is marked closed in the CRM we need an invoice raised in the accounting system and the two kept in step. Today, if the accounting side times out halfway, we sometimes end up with two invoices and sometimes with none.",
+      "expected": "api-integration-engineer",
+      "acceptable": [
+        "api-integration-engineer",
+        "automation-operations"
+      ],
+      "not_routes": [],
+      "kind": "near-neighbour",
+      "why": "This needs a durable two-system exchange with safe re-sends built into the code, not an operator workflow; automation is \"Not for: ... blind retries of uncertain external actions\"."
+    },
+    {
+      "id": "api-integration-engineer-near-neighbour-2",
+      "task": "Our payment provider was down for twenty minutes this morning and every checkout attempt hung for forty seconds before giving up, which took the whole site with it. They are back now, but we want our side to give up fast and hold the request instead of hanging.",
+      "expected": "api-integration-engineer",
+      "acceptable": [
+        "api-integration-engineer"
+      ],
+      "not_routes": [
+        "incident-responder"
+      ],
+      "kind": "near-neighbour",
+      "why": "Service is already restored, so this is failure-handling work on the outbound call path; incident response is \"Not for: a defect that is not currently failing in production\"."
+    },
+    {
+      "id": "api-integration-engineer-ambiguous-1",
+      "task": "We lose some of the events the payments provider posts to us whenever traffic spikes, and finance ends up reconciling those charges by hand at month end. Make it stop.",
+      "expected": "api-integration-engineer",
+      "acceptable": [
+        "api-integration-engineer",
+        "data-engineer",
+        "devops-release"
+      ],
+      "not_routes": [],
+      "kind": "ambiguous",
+      "why": "Defensible as receive-path failure handling, as durable landing and reconciliation of the received records, or as capacity of the endpoint under load."
+    },
+    {
+      "id": "api-integration-engineer-negative-1",
+      "task": "The nightly run that pulls the vendor's product catalog and reshapes it into our warehouse tables falls over every time they add a new field, and the analytics team wakes up to stale tables.",
+      "expected": "data-engineer",
+      "acceptable": [
+        "data-engineer"
+      ],
+      "not_routes": [
+        "api-integration-engineer"
+      ],
+      "kind": "negative",
+      "why": "An outside service is involved, but the API role is explicitly \"Not for: ... a scheduled pipeline that lands and reshapes that data for downstream consumers\"."
+    },
+    {
+      "id": "architect-obvious-1",
+      "task": "We want payments and fulfillment to be releasable independently instead of shipping as one checkout deployment. Before anyone starts, we need agreement on where the split runs, what each side owns, and what has to cross between them.",
+      "expected": "architect",
+      "acceptable": [
+        "architect"
+      ],
+      "not_routes": [],
+      "kind": "obvious",
+      "why": "Deciding where components divide and what passes between them, with long-lived consequences, is the Architect's remit."
+    },
+    {
+      "id": "architect-obvious-2",
+      "task": "Three enterprise customers now require their records to stay inside their own region, and we are a single shared installation today. We need a considered answer for how per-customer separation and region placement should work across the product, including what we give up.",
+      "expected": "architect",
+      "acceptable": [
+        "architect"
+      ],
+      "not_routes": [],
+      "kind": "obvious",
+      "why": "A product-wide separation and placement decision with long-term consequences and explicit tradeoffs is Architect work."
+    },
+    {
+      "id": "architect-near-neighbour-1",
+      "task": "Leadership is asking whether our mobile app can let field staff keep working with no signal and sync later. The real question is what happens when two people edit the same job sheet offline and both come back online.",
+      "expected": "architect",
+      "acceptable": [
+        "architect"
+      ],
+      "not_routes": [
+        "product-manager"
+      ],
+      "kind": "near-neighbour",
+      "why": "Phrased as a product question, but the answer is a conflict-resolution and sync model decision; the product role is \"Not for: technical architecture ownership\"."
+    },
+    {
+      "id": "architect-near-neighbour-2",
+      "task": "Three teams each invented their own shape for the order events they publish, and every consumer now special-cases all three. We need one agreed shape going forward and a story for the events already in flight.",
+      "expected": "architect",
+      "acceptable": [
+        "architect"
+      ],
+      "not_routes": [
+        "implementer"
+      ],
+      "kind": "near-neighbour",
+      "why": "Settling a cross-team message contract plus compatibility for existing traffic is a boundary decision; implementer is \"Not for: ... broad redesign without need\"."
+    },
+    {
+      "id": "architect-ambiguous-1",
+      "task": "Every internal dashboard runs its charts straight off the live orders table and the site slows down whenever someone opens the finance board. We are weighing a read copy, a separate reporting store, or just reworking the worst queries.",
+      "expected": "architect",
+      "acceptable": [
+        "architect",
+        "database-engineer",
+        "performance-engineer"
+      ],
+      "not_routes": [],
+      "kind": "ambiguous",
+      "why": "The choice between a new storage tier and tuning what exists is defensible as a boundary decision, a storage decision, or a measured bottleneck fix."
+    },
+    {
+      "id": "architect-negative-1",
+      "task": "We have already settled on moving authentication to the new identity provider and the design is signed off. What we need now is the order of the work, what breaks if we do a step out of sequence, and how we confirm each step landed before the next one.",
+      "expected": "planner",
+      "acceptable": [
+        "planner"
+      ],
+      "not_routes": [
+        "architect"
+      ],
+      "kind": "negative",
+      "why": "The design decision is already made; what remains is sequencing with acceptance checks, and the Architect is \"Not for: routine implementation details\"."
+    },
+    {
+      "id": "data-engineer-obvious-1",
+      "task": "The nightly run that builds our revenue tables has been silently dropping refunds since the payment vendor renamed a field, so the last six weeks of numbers are wrong. Fix the transform step and rebuild the affected history.",
+      "expected": "data-engineer",
+      "acceptable": [
+        "data-engineer"
+      ],
+      "not_routes": [],
+      "kind": "obvious",
+      "why": "A broken scheduled transform plus a rebuild of already-produced output is exactly the Data Engineer's territory."
+    },
+    {
+      "id": "data-engineer-obvious-2",
+      "task": "One of our analysts has a notebook that stitches ad spend together with signups, and the whole company now depends on her running it by hand each morning. Get it running on its own schedule and landing in the warehouse.",
+      "expected": "data-engineer",
+      "acceptable": [
+        "data-engineer"
+      ],
+      "not_routes": [],
+      "kind": "obvious",
+      "why": "Promoting a hand-run notebook to a scheduled production job that lands output for others is Data Engineer work."
+    },
+    {
+      "id": "data-engineer-near-neighbour-1",
+      "task": "Weekly active users in our dashboard tripled on the 4th and nothing shipped that week \u2014 the new mobile SDK is sending each session twice and both copies are being counted. Fix it where the numbers are produced, not in the chart.",
+      "expected": "data-engineer",
+      "acceptable": [
+        "data-engineer"
+      ],
+      "not_routes": [
+        "data-analyst"
+      ],
+      "kind": "near-neighbour",
+      "why": "The ask is to correct the producing job, and the analyst role is \"Not for: ... repairing the job or pipeline that produced the data\"."
+    },
+    {
+      "id": "data-engineer-near-neighbour-2",
+      "task": "Our warehouse customer table ends up with two rows for the same person whenever an upstream record is edited twice within the same hour. The loading step needs to cope with that instead of us cleaning up afterwards.",
+      "expected": "data-engineer",
+      "acceptable": [
+        "data-engineer"
+      ],
+      "not_routes": [
+        "database-engineer"
+      ],
+      "kind": "near-neighbour",
+      "why": "The defect is in how the load handles repeated upstream edits; the storage role is \"Not for: ... reprocessing and backfilling rows through the pipeline that produces them\"."
+    },
+    {
+      "id": "data-engineer-ambiguous-1",
+      "task": "The warehouse orders table is missing three days of records after the loader ran out of memory over the weekend. It has not failed since, but we still do not know why it blew up and the gap is still there.",
+      "expected": "data-engineer",
+      "acceptable": [
+        "data-engineer",
+        "debugger"
+      ],
+      "not_routes": [],
+      "kind": "ambiguous",
+      "why": "Restoring the missing output is pipeline work, but the memory blowup is a code-level defect inside the job, which the Data Engineer's own limits push elsewhere."
+    },
+    {
+      "id": "data-engineer-negative-1",
+      "task": "Signups from paid channels look flat this quarter but revenue is well up, and the board meeting is Thursday. Someone needs to work out what is actually going on and how confident we can be about it.",
+      "expected": "data-analyst",
+      "acceptable": [
+        "data-analyst"
+      ],
+      "not_routes": [
+        "data-engineer"
+      ],
+      "kind": "negative",
+      "why": "Nothing is broken in the producing job; the Data Engineer is \"Not for: ... interpreting what the resulting numbers mean\"."
+    },
+    {
+      "id": "database-engineer-obvious-1",
+      "task": "We are adding per-organization roles to the internal admin tool, which means new tables and a new column on users. The users table has forty million rows in production and we cannot lock it while this rolls out.",
+      "expected": "database-engineer",
+      "acceptable": [
+        "database-engineer"
+      ],
+      "not_routes": [],
+      "kind": "obvious",
+      "why": "Storage structure changes rolled out safely against a large live table is the Database Engineer's core work."
+    },
+    {
+      "id": "database-engineer-obvious-2",
+      "task": "Two people booking the same seat at the same moment both succeed, because we check availability and then insert as separate steps. We want this to be impossible at the level where the data lives, not patched in the booking screen.",
+      "expected": "database-engineer",
+      "acceptable": [
+        "database-engineer"
+      ],
+      "not_routes": [],
+      "kind": "obvious",
+      "why": "Enforcing an invariant through transactional behavior and constraints in storage is Database Engineer territory."
+    },
+    {
+      "id": "database-engineer-near-neighbour-1",
+      "task": "We are breaking the single free-text address field on the customer record into street, city, region and postcode. Old services have to keep reading the original field until they are all updated.",
+      "expected": "database-engineer",
+      "acceptable": [
+        "database-engineer"
+      ],
+      "not_routes": [
+        "data-engineer"
+      ],
+      "kind": "near-neighbour",
+      "why": "A structure change with a backwards-compatible rollout; the Data Engineer is \"Not for: ... destination schema design and its migrations\"."
+    },
+    {
+      "id": "database-engineer-near-neighbour-2",
+      "task": "Our removed-customer flag is checked by hand in about forty different queries, one of them was missed, and deleted customers turned up in a client export. We want this enforced where the records live so no future query can forget it.",
+      "expected": "database-engineer",
+      "acceptable": [
+        "database-engineer"
+      ],
+      "not_routes": [
+        "implementer"
+      ],
+      "kind": "near-neighbour",
+      "why": "The ask is to move enforcement into storage access rules rather than patch the one query; implementer is \"Not for: ... broad redesign without need\"."
+    },
+    {
+      "id": "database-engineer-ambiguous-1",
+      "task": "During morning traffic spikes our web app starts erroring out because it cannot get a connection, and it clears up on its own within ten minutes. We cannot tell if it is the pool settings, one long-running report query holding on, or just an undersized instance.",
+      "expected": "database-engineer",
+      "acceptable": [
+        "database-engineer",
+        "performance-engineer",
+        "devops-release"
+      ],
+      "not_routes": [],
+      "kind": "ambiguous",
+      "why": "Connection exhaustion under load is equally defensible as a storage access question, a measured bottleneck, or an environment sizing and configuration matter."
+    },
+    {
+      "id": "database-engineer-negative-1",
+      "task": "Our checkout page takes four seconds to render, and it turns out the same customer record is being fetched eleven separate times while the page builds. We want it back under a second.",
+      "expected": "performance-engineer",
+      "acceptable": [
+        "performance-engineer"
+      ],
+      "not_routes": [
+        "database-engineer"
+      ],
+      "kind": "negative",
+      "why": "The storage is fine \u2014 this is repeated fetching in the render path, which needs before-and-after measurement, not a storage change."
+    },
+    {
+      "id": "debugger-obvious-1",
+      "task": "Our Android app closes itself for maybe one in twenty people when they rotate the phone on the payment step, and nobody here can make it happen on demand. I need to know what's actually going on and have it stopped for good.",
+      "expected": "debugger",
+      "acceptable": [
+        "debugger"
+      ],
+      "not_routes": [],
+      "kind": "obvious",
+      "why": "An intermittent, unreproduced failure with no known cause \u2014 reproduction, hypothesis testing and a fix backed by evidence is debugger's core territory."
+    },
+    {
+      "id": "debugger-obvious-2",
+      "task": "Since Tuesday our internal invoicing tool has been off by a cent on about two percent of records. Nothing is on fire, but I need to know where that cent goes and have it not come back.",
+      "expected": "debugger",
+      "acceptable": [
+        "debugger"
+      ],
+      "not_routes": [],
+      "kind": "obvious",
+      "why": "Wrong-but-quiet behaviour in a shipped tool with an unknown origin; the deliverable is the underlying cause plus proof it stays fixed."
+    },
+    {
+      "id": "debugger-near-neighbour-1",
+      "task": "Signups on our marketing site silently fail about once a day and nobody knows why; the last attempt just wrapped the call in a retry and it kept happening. Find what's actually wrong, fix that, and leave a test behind that would have caught it.",
+      "expected": "debugger",
+      "acceptable": [
+        "debugger"
+      ],
+      "not_routes": [
+        "implementer"
+      ],
+      "kind": "near-neighbour",
+      "why": "Looks like a code change, but no change is known yet \u2014 implementer builds an identified modification and is \"Not for: independent approval of its own work\", while this needs the cause found and the fix self-evidenced."
+    },
+    {
+      "id": "debugger-near-neighbour-2",
+      "task": "Search ranking went wrong somewhere in last week's forty commits and we can't tell which one did it. Pin down the change responsible and correct the behaviour.",
+      "expected": "debugger",
+      "acceptable": [
+        "debugger"
+      ],
+      "not_routes": [
+        "version-control"
+      ],
+      "kind": "near-neighbour",
+      "why": "History bisection smells like repository work, but version-control is \"Not for: locating or fixing the defect a commit introduced\" \u2014 the history is only the search space, the deliverable is the fixed behaviour."
+    },
+    {
+      "id": "debugger-ambiguous-1",
+      "task": "After we moved to the new HTTP client library, eleven tests in the payments module fail with timeouts. Work out whether it's our code or the upgrade and get the suite green again.",
+      "expected": "debugger",
+      "acceptable": [
+        "debugger",
+        "refactoring-migration-specialist"
+      ],
+      "not_routes": [],
+      "kind": "ambiguous",
+      "why": "Unknown-cause failures point at debugger; framed as finishing a dependency transition with behaviour preserved, the migration specialist is equally defensible."
+    },
+    {
+      "id": "debugger-negative-1",
+      "task": "Our payment webhook endpoint has been returning 500s for the last ten minutes and live orders are failing \u2014 customers are on the phone. Get it working again.",
+      "expected": "incident-responder",
+      "acceptable": [
+        "incident-responder"
+      ],
+      "not_routes": [
+        "debugger"
+      ],
+      "kind": "negative",
+      "why": "Crash-and-error wording baits debugger, but debugger is \"Not for: ... an outage still in progress, where mitigation comes before a complete causal explanation\"."
+    },
+    {
+      "id": "devops-release-obvious-1",
+      "task": "We ship the desktop client by hand off one engineer's laptop and no two builds come out the same. Get it producing an identical signed package from a clean checkout every time.",
+      "expected": "devops-release",
+      "acceptable": [
+        "devops-release"
+      ],
+      "not_routes": [],
+      "kind": "obvious",
+      "why": "Reproducible build and packaging work with no running failure \u2014 squarely delivery-workflow territory."
+    },
+    {
+      "id": "devops-release-obvious-2",
+      "task": "We're cutting 3.0 next Thursday. I want the promotion path out of staging, the tagging, and a tested way back to the previous version all in place and actually exercised before that date.",
+      "expected": "devops-release",
+      "acceptable": [
+        "devops-release"
+      ],
+      "not_routes": [],
+      "kind": "obvious",
+      "why": "Planned, authorized shipping work with recovery verified ahead of time."
+    },
+    {
+      "id": "devops-release-near-neighbour-1",
+      "task": "Staging runs a different runtime version and about half the config our production boxes have, so problems only surface after we ship. Nothing is broken right now \u2014 I want the two matched.",
+      "expected": "devops-release",
+      "acceptable": [
+        "devops-release"
+      ],
+      "not_routes": [
+        "incident-responder"
+      ],
+      "kind": "near-neighbour",
+      "why": "Production-shaped and operational, but incident-responder is \"Not for: a defect that is not currently failing in production\" \u2014 this is environment configuration, not stabilisation."
+    },
+    {
+      "id": "devops-release-near-neighbour-2",
+      "task": "Our nightly jobs all share one self-hosted runner that keeps filling its disk, so the queue backs up and half of them never start. The transforms themselves are fine \u2014 it's the runner and the scheduling setup that need sorting.",
+      "expected": "devops-release",
+      "acceptable": [
+        "devops-release"
+      ],
+      "not_routes": [
+        "data-engineer"
+      ],
+      "kind": "near-neighbour",
+      "why": "Sits right beside the pipeline owner, but data-engineer is \"Not for: ... the scheduler platform or CI itself\"; the transforms are explicitly healthy."
+    },
+    {
+      "id": "devops-release-ambiguous-1",
+      "task": "Every pull request waits fourteen minutes on our container image build and people have stopped running the full suite before pushing. Make that wait shorter.",
+      "expected": "devops-release",
+      "acceptable": [
+        "devops-release",
+        "performance-engineer"
+      ],
+      "not_routes": [],
+      "kind": "ambiguous",
+      "why": "Build and CI configuration is devops territory, but it is also a measurable throughput problem a performance specialist could own with before/after timings."
+    },
+    {
+      "id": "devops-release-negative-1",
+      "task": "Put together the customer-facing notes for 2.4 from the merged pull requests and ticket titles \u2014 what changed, what's fixed, and anything people have to do on their side.",
+      "expected": "documentation-writer",
+      "acceptable": [
+        "documentation-writer"
+      ],
+      "not_routes": [
+        "devops-release"
+      ],
+      "kind": "negative",
+      "why": "The word \"release\" baits devops, but no build, environment or deployment work is involved; documentation-writer explicitly covers release notes."
+    },
+    {
+      "id": "explorer-obvious-1",
+      "task": "I'm new to this repo and need to change how long a login lasts. There seem to be three different places that set it and I can't tell which one actually wins at runtime.",
+      "expected": "explorer",
+      "acceptable": [
+        "explorer"
+      ],
+      "not_routes": [],
+      "kind": "obvious",
+      "why": "Locating where behaviour is decided in an unfamiliar codebase, before any change is made."
+    },
+    {
+      "id": "explorer-obvious-2",
+      "task": "Before anyone touches pricing, give me the path a request takes from the public endpoint down to wherever the price is computed, plus everything else in the repo that reads that field.",
+      "expected": "explorer",
+      "acceptable": [
+        "explorer"
+      ],
+      "not_routes": [],
+      "kind": "obvious",
+      "why": "Execution-path mapping and call-site discovery handed to whoever makes the change next."
+    },
+    {
+      "id": "explorer-near-neighbour-1",
+      "task": "We inherited a Django service nobody here wrote. I need to know which parts of it handle the CSV import before I can scope the work \u2014 just point me at the code, nothing changed.",
+      "expected": "explorer",
+      "acceptable": [
+        "explorer"
+      ],
+      "not_routes": [
+        "researcher"
+      ],
+      "kind": "near-neighbour",
+      "why": "Investigation phrasing pulls toward researcher, but researcher is \"Not for: ... local code mapping alone\" \u2014 there is no external source to weigh here."
+    },
+    {
+      "id": "explorer-near-neighbour-2",
+      "task": "Someone will eventually swap our date-formatting helper for the ICU one. Right now I only need the full list of call sites across the web app and both workers, and which of them pass a timezone.",
+      "expected": "explorer",
+      "acceptable": [
+        "explorer"
+      ],
+      "not_routes": [
+        "refactoring-migration-specialist"
+      ],
+      "kind": "near-neighbour",
+      "why": "A migration is implied but not commissioned; refactoring-migration-specialist is \"Not for: unrequested rewrites\", and the deliverable is an inventory."
+    },
+    {
+      "id": "explorer-ambiguous-1",
+      "task": "Before I can write the onboarding guide I need to know how our five services actually call each other in this repo \u2014 the old diagram is two years stale and nobody trusts it.",
+      "expected": "explorer",
+      "acceptable": [
+        "explorer",
+        "documentation-writer"
+      ],
+      "not_routes": [],
+      "kind": "ambiguous",
+      "why": "The immediate ask is discovering real connections in the workspace, but the stated output is a guide, which documentation-writer legitimately owns."
+    },
+    {
+      "id": "explorer-negative-1",
+      "task": "Work out which of the three managed feature-flag vendors fits our self-hosting and pricing constraints, and tell me which one we should pick.",
+      "expected": "researcher",
+      "acceptable": [
+        "researcher"
+      ],
+      "not_routes": [
+        "explorer"
+      ],
+      "kind": "negative",
+      "why": "\"Find out which\" baits explorer, but explorer is \"Not for: broad web research\" \u2014 the evidence lives entirely outside the codebase."
+    },
+    {
+      "id": "incident-responder-obvious-1",
+      "task": "Checkout has been handing everyone a 503 for the last five minutes and nothing we know of changed. Get it serving again.",
+      "expected": "incident-responder",
+      "acceptable": [
+        "incident-responder"
+      ],
+      "not_routes": [],
+      "kind": "obvious",
+      "why": "Production is failing right now and time to restore beats a full explanation."
+    },
+    {
+      "id": "incident-responder-obvious-2",
+      "task": "The mobile API started timing out for most users right after this morning's config push and support is buried. Take the fastest safe route back to working and keep a record of what you touched and when.",
+      "expected": "incident-responder",
+      "acceptable": [
+        "incident-responder"
+      ],
+      "not_routes": [],
+      "kind": "obvious",
+      "why": "Active user-facing failure, smallest reversible mitigation, timestamped record \u2014 all incident-responder."
+    },
+    {
+      "id": "incident-responder-near-neighbour-1",
+      "task": "Queue workers stopped picking up jobs about fifteen minutes ago and the backlog is past 200k. I don't need the explanation yet \u2014 get jobs moving.",
+      "expected": "incident-responder",
+      "acceptable": [
+        "incident-responder"
+      ],
+      "not_routes": [
+        "debugger"
+      ],
+      "kind": "near-neighbour",
+      "why": "Reads like a defect hunt, but debugger is \"Not for: ... an outage still in progress, where mitigation comes before a complete causal explanation\"."
+    },
+    {
+      "id": "incident-responder-near-neighbour-2",
+      "task": "We're twenty minutes into rolling 4.2 out and error rates climb on every pod that takes it. Stop the bleeding now \u2014 we can sort the rollout process out afterwards.",
+      "expected": "incident-responder",
+      "acceptable": [
+        "incident-responder"
+      ],
+      "not_routes": [
+        "devops-release"
+      ],
+      "kind": "near-neighbour",
+      "why": "A rollout is the trigger, but devops-release is \"Not for: ... an outage in progress, where restoring service outranks the release process\"."
+    },
+    {
+      "id": "incident-responder-ambiguous-1",
+      "task": "The primary database is sitting at 98% of its connection limit and requests are failing for some people and not others. This is happening right now.",
+      "expected": "incident-responder",
+      "acceptable": [
+        "incident-responder",
+        "database-engineer",
+        "performance-engineer"
+      ],
+      "not_routes": [],
+      "kind": "ambiguous",
+      "why": "Live user-facing failure favours mitigation first, but connection-pool exhaustion is also defensibly the database owner's or a measurement-led resource problem owner's."
+    },
+    {
+      "id": "incident-responder-negative-1",
+      "task": "Write up Tuesday's four-hour outage for the status page and the internal timeline \u2014 what broke, when, and what we did. Everything's been stable since Wednesday.",
+      "expected": "documentation-writer",
+      "acceptable": [
+        "documentation-writer"
+      ],
+      "not_routes": [
+        "incident-responder"
+      ],
+      "kind": "negative",
+      "why": "Outage wording baits incident-responder, which is \"Not for: ... a postmortem write-up after recovery\"; the system is stable and the deliverable is prose."
+    },
+    {
+      "id": "performance-engineer-obvious-1",
+      "task": "Our search page takes about four seconds to put a first result on screen even when everything is warm, and our own team has stopped using it. Find where the time goes, cut it, and show me the same measurement on either side of the change.",
+      "expected": "performance-engineer",
+      "acceptable": [
+        "performance-engineer"
+      ],
+      "not_routes": [],
+      "kind": "obvious",
+      "why": "Correct but slow behaviour, with measurement demanded on both sides of the change."
+    },
+    {
+      "id": "performance-engineer-obvious-2",
+      "task": "Our CLI takes 2.3 seconds just to print --help, which makes tab completion feel broken. Work out what it's loading that it doesn't need and get that under 200 milliseconds.",
+      "expected": "performance-engineer",
+      "acceptable": [
+        "performance-engineer"
+      ],
+      "not_routes": [],
+      "kind": "obvious",
+      "why": "A measurable time budget with a target \u2014 locate the cost, remove it, prove the number moved."
+    },
+    {
+      "id": "performance-engineer-near-neighbour-1",
+      "task": "The orders list takes twelve seconds for accounts with a lot of history now that the table has grown. Before anybody starts adding indexes, I want to know which part of the request is actually eating the time.",
+      "expected": "performance-engineer",
+      "acceptable": [
+        "performance-engineer"
+      ],
+      "not_routes": [
+        "database-engineer"
+      ],
+      "kind": "near-neighbour",
+      "why": "Storage is the obvious suspect, but database-engineer is \"Not for: ... guessing at data distribution\" \u2014 indexing before the cost is located is exactly that guess; the ask is measurement first."
+    },
+    {
+      "id": "performance-engineer-near-neighbour-2",
+      "task": "Nothing is broken and there's nothing in the logs \u2014 the feed just stutters while you scroll it on mid-range Android phones. I want to know what's costing us frames and the worst of it dealt with.",
+      "expected": "performance-engineer",
+      "acceptable": [
+        "performance-engineer"
+      ],
+      "not_routes": [
+        "debugger"
+      ],
+      "kind": "near-neighbour",
+      "why": "Feels like a bug report, but debugger routes on \"a defect, crash, inconsistent behavior, or failing test\" and is \"Not for: ... speculative rewrites\" \u2014 nothing behaves incorrectly, it is a resource cost."
+    },
+    {
+      "id": "performance-engineer-ambiguous-1",
+      "task": "Our nightly ETL now runs nine hours and spills past the window the morning reports have to be ready by.",
+      "expected": "data-engineer",
+      "acceptable": [
+        "performance-engineer",
+        "data-engineer"
+      ],
+      "not_routes": [],
+      "kind": "ambiguous",
+      "why": "A scheduled job overrunning is the pipeline owner's by definition, and a measurable runtime target is the performance owner's; neither dominates without knowing whether the job needs reshaping or just speeding up."
+    },
+    {
+      "id": "performance-engineer-negative-1",
+      "task": "The dashboard feels slow to people even though pages come back in 300 milliseconds \u2014 I think the problem is that nothing on screen acknowledges the click while data is loading. Work out what should happen between the click and the data arriving.",
+      "expected": "ui-ux-designer",
+      "acceptable": [
+        "ui-ux-designer"
+      ],
+      "not_routes": [
+        "performance-engineer"
+      ],
+      "kind": "negative",
+      "why": "\"Slow\" and \"loading\" bait the measurement specialist, but the measurement already says the system is fast; this is interaction feedback design, and performance-engineer is \"Not for: speculative optimization\"."
+    },
+    {
+      "id": "refactoring-migration-specialist-obvious-1",
+      "task": "Our checkout module is one 3,000-line file with four near-identical payment branches that have drifted apart. Pull the shared path out into one implementation so customers see exactly the same flow they do today.",
+      "expected": "refactoring-migration-specialist",
+      "acceptable": [
+        "refactoring-migration-specialist"
+      ],
+      "not_routes": [],
+      "kind": "obvious",
+      "why": "Deliberate internal restructure with an explicit behaviour-preserving constraint and no new functionality."
+    },
+    {
+      "id": "refactoring-migration-specialist-obvious-2",
+      "task": "The charting library our 40 analytics dashboards use hit end of life and v4 changed its whole API surface. Move the dashboards over in stages so the charts keep rendering identically while we go.",
+      "expected": "refactoring-migration-specialist",
+      "acceptable": [
+        "refactoring-migration-specialist"
+      ],
+      "not_routes": [],
+      "kind": "obvious",
+      "why": "Dependency transition to a new contract, staged, with required behaviour held constant."
+    },
+    {
+      "id": "refactoring-migration-specialist-near-implementer-1",
+      "task": "Our iOS app has three copy-pasted networking clients, each with its own retry and caching quirks, and every new screen picks one at random. Consolidate them onto a single client so the existing screens behave exactly as they do now.",
+      "expected": "refactoring-migration-specialist",
+      "acceptable": [
+        "refactoring-migration-specialist"
+      ],
+      "not_routes": [
+        "implementer"
+      ],
+      "kind": "near-neighbour",
+      "why": "Looks like ordinary code work, but it is a cross-cutting structural consolidation with a no-behaviour-change contract; implementer is Not for 'broad redesign without need' and builds focused feature changes instead."
+    },
+    {
+      "id": "refactoring-migration-specialist-near-planner-1",
+      "task": "We've already signed off on dropping our homegrown job queue for the managed service, and the target design is written up. Carry the swap out in stages so no jobs are dropped while both are running.",
+      "expected": "refactoring-migration-specialist",
+      "acceptable": [
+        "refactoring-migration-specialist"
+      ],
+      "not_routes": [
+        "planner"
+      ],
+      "kind": "near-neighbour",
+      "why": "Staged sequencing makes this look like plan work, but the decision and design already exist and the ask is execution; planner is Not for 'performing the implementation'."
+    },
+    {
+      "id": "refactoring-migration-specialist-ambiguous-1",
+      "task": "Our batch service is still on Python 3.8 and half the libraries we want now require 3.11. Get us onto 3.11 without breaking the nightly jobs.",
+      "expected": "refactoring-migration-specialist",
+      "acceptable": [
+        "refactoring-migration-specialist",
+        "planner",
+        "devops-release"
+      ],
+      "not_routes": [],
+      "kind": "ambiguous",
+      "why": "A runtime uplift is a compatibility transition, but the sequencing case (planner) and the build/CI image work (devops-release) are both genuinely defensible owners."
+    },
+    {
+      "id": "refactoring-migration-specialist-negative-1",
+      "task": "We need to migrate 40 million rows from the old flat orders table into the new partitioned layout this weekend, with no write downtime and a way back if the cutover goes wrong.",
+      "expected": "database-engineer",
+      "acceptable": [
+        "database-engineer"
+      ],
+      "not_routes": [
+        "refactoring-migration-specialist"
+      ],
+      "kind": "negative",
+      "why": "The word 'migrate' baits the structural specialist, but this is schema, partitioning and rollback of live persisted data \u2014 database-engineer's territory."
+    },
+    {
+      "id": "security-auditor-obvious-1",
+      "task": "Before we open the new customer portal beyond the pilot accounts, go through how we issue sessions, handle password resets and check org membership, and tell us where someone could reach another company's records.",
+      "expected": "security-auditor",
+      "acceptable": [
+        "security-auditor"
+      ],
+      "not_routes": [],
+      "kind": "obvious",
+      "why": "Authentication, authorization and tenant isolation ahead of external exposure."
+    },
+    {
+      "id": "security-auditor-obvious-2",
+      "task": "Our internal assistant runs shell commands that come out of documents users upload to it. I want to know what someone could get it to do with a crafted file and what we should clamp down.",
+      "expected": "security-auditor",
+      "acceptable": [
+        "security-auditor"
+      ],
+      "not_routes": [],
+      "kind": "obvious",
+      "why": "Tool execution across an untrusted-input trust boundary, plus practical remediation."
+    },
+    {
+      "id": "security-auditor-near-reviewer-1",
+      "task": "Here's the pull request adding the attachment upload endpoint. Before it merges, go through it for ways a signed-in user could read or overwrite files belonging to someone else, and tell us what to change to close each one.",
+      "expected": "security-auditor",
+      "acceptable": [
+        "security-auditor"
+      ],
+      "not_routes": [
+        "reviewer"
+      ],
+      "kind": "near-neighbour",
+      "why": "It arrives as a pre-merge change assessment, but the lens is trust boundaries and the ask includes remediation; reviewer is Not for 'implementing fixes while reviewing' and does general correctness/readiness, not weakness hunting."
+    },
+    {
+      "id": "security-auditor-near-devops-1",
+      "task": "Our CI workflow runs build steps from forked pull requests, and the token it exposes has write access to every repo in the org. Work out what an outside contributor could actually pull off with that and what we should tighten.",
+      "expected": "security-auditor",
+      "acceptable": [
+        "security-auditor"
+      ],
+      "not_routes": [
+        "devops-release"
+      ],
+      "kind": "near-neighbour",
+      "why": "The artifact is pipeline config, which looks like devops-release, but the question is what an untrusted actor can reach with privileged credentials; devops-release is Not for 'credential collection' and owns building delivery workflows, not assessing who can abuse them."
+    },
+    {
+      "id": "security-auditor-ambiguous-1",
+      "task": "A customer wrote in saying the invoice PDFs they export contain reference numbers belonging to a different company. Figure out what's happening and make sure it can't happen again.",
+      "expected": "security-auditor",
+      "acceptable": [
+        "security-auditor",
+        "debugger",
+        "incident-responder"
+      ],
+      "not_routes": [],
+      "kind": "ambiguous",
+      "why": "Confirmed cross-tenant data exposure is a trust-boundary failure, but it is also a reproducible defect (debugger) and live customer data leaking right now (incident-responder)."
+    },
+    {
+      "id": "security-auditor-negative-1",
+      "task": "Since Friday's deploy, a handful of users get 'access denied' on the reports page even though their role clearly grants it, while everyone else is fine. Find out why and fix it.",
+      "expected": "debugger",
+      "acceptable": [
+        "debugger"
+      ],
+      "not_routes": [
+        "security-auditor"
+      ],
+      "kind": "negative",
+      "why": "Permission and access-denied wording baits the weakness review, but nothing is exposed \u2014 it is a post-deploy regression denying legitimate users, so root-cause investigation owns it."
+    },
+    {
+      "id": "version-control-obvious-1",
+      "task": "I pulled and reorganised my branch this morning and three days of my commits have vanished from the log \u2014 the work isn't in any branch I can find. Can you get it back?",
+      "expected": "version-control",
+      "acceptable": [
+        "version-control"
+      ],
+      "not_routes": [],
+      "kind": "obvious",
+      "why": "Lost committed work recovered from repository history."
+    },
+    {
+      "id": "version-control-obvious-2",
+      "task": "Our release branch and main have drifted badly after last week's bad merge: two fixes now exist twice with different content and one never made it across. Sort the branches out so main carries each change exactly once.",
+      "expected": "version-control",
+      "acceptable": [
+        "version-control"
+      ],
+      "not_routes": [],
+      "kind": "obvious",
+      "why": "Tangled merge and branch surgery to reconcile duplicated and missing history."
+    },
+    {
+      "id": "version-control-near-debugger-1",
+      "task": "A fix we definitely shipped to the ingestion service last month isn't in the code any more and its test disappeared with it. Tell me exactly where in the history it got dropped and what else went with it \u2014 don't change anything yet.",
+      "expected": "version-control",
+      "acceptable": [
+        "version-control"
+      ],
+      "not_routes": [
+        "debugger"
+      ],
+      "kind": "near-neighbour",
+      "why": "Missing behaviour reads as a defect, but the ask is reconstructing what changed between two points and nothing is to be edited; debugger is Not for 'speculative rewrites' and its remit ends in a fix with regression evidence, which nobody asked for."
+    },
+    {
+      "id": "version-control-near-incident-1",
+      "task": "Someone force-pushed over main forty minutes ago and wiped this morning's merges \u2014 the whole team is blocked and people are afraid to push. Get the branch back to what it was.",
+      "expected": "version-control",
+      "acceptable": [
+        "version-control"
+      ],
+      "not_routes": [
+        "incident-responder"
+      ],
+      "kind": "near-neighbour",
+      "why": "The urgency and 'everyone is blocked' framing suggests incident work, but nothing is serving traffic wrongly; incident-responder is Not for 'a defect that is not currently failing in production'."
+    },
+    {
+      "id": "version-control-ambiguous-1",
+      "task": "Our monorepo is 8GB because someone committed gigabytes of test fixtures years ago, and a fresh clone takes twenty minutes on a normal connection. Clean it up.",
+      "expected": "version-control",
+      "acceptable": [
+        "version-control",
+        "devops-release"
+      ],
+      "not_routes": [],
+      "kind": "ambiguous",
+      "why": "Rewriting history to drop large blobs is history surgery, but clone time in CI and developer setup is equally defensible as delivery-workflow work."
+    },
+    {
+      "id": "version-control-negative-1",
+      "task": "When two pull requests land within a minute of each other, our deploy job builds the wrong one \u2014 the artifact tagged for the second PR ends up containing the first one's code. Fix the pipeline so each build matches the change it claims.",
+      "expected": "devops-release",
+      "acceptable": [
+        "devops-release"
+      ],
+      "not_routes": [
+        "version-control"
+      ],
+      "kind": "negative",
+      "why": "Commits, merges and branches are all over the wording, but the history is fine \u2014 the checkout step in the delivery pipeline is wrong, which is devops-release's."
+    },
+    {
+      "id": "product-manager-obvious-1",
+      "task": "Sales and support both keep asking for \"better reporting\" in the admin console and every person means something different by it. Work out what we actually build first, which of them it serves, and how we'd tell afterwards that it helped.",
+      "expected": "product-manager",
+      "acceptable": [
+        "product-manager"
+      ],
+      "not_routes": [
+        "data-analyst",
+        "implementer"
+      ],
+      "kind": "obvious",
+      "why": "A vague internal ask has to be narrowed into what ships first, for whom, and what would count as it working \u2014 nothing here is analysis of existing data or a code change."
+    },
+    {
+      "id": "product-manager-obvious-2",
+      "task": "We have five ideas queued for the next mobile release and realistically room for one. Help us pick the one worth doing, say who it's really for, and what we'd watch afterwards to know it landed.",
+      "expected": "product-manager",
+      "acceptable": [
+        "product-manager"
+      ],
+      "not_routes": [
+        "planner",
+        "growth-marketing-strategist"
+      ],
+      "kind": "obvious",
+      "why": "Choosing between competing candidates and justifying the choice by audience and outcome is the decision of what to build, not sequencing or channel strategy."
+    },
+    {
+      "id": "product-manager-near-neighbour-1",
+      "task": "Two enterprise customers want to run our analytics workspace inside their own cloud accounts. We need to decide whether we take that on for the next release, which customers it's genuinely for, and what the thinnest version worth shipping looks like.",
+      "expected": "product-manager",
+      "acceptable": [
+        "product-manager"
+      ],
+      "not_routes": [
+        "architect"
+      ],
+      "kind": "near-neighbour",
+      "why": "Sounds like a deployment-boundary question, but the open question is whether to commit and to whom \u2014 the architect's Not for line excludes \"product prioritization\", and no technical decision is being asked for yet."
+    },
+    {
+      "id": "product-manager-near-neighbour-2",
+      "task": "Support, sales and both founders each sent a different wishlist for the billing revamp and the date is fixed. We need one agreed cut for the first release, the reasoning for what got left out, and a way to tell later whether it was the right cut.",
+      "expected": "product-manager",
+      "acceptable": [
+        "product-manager"
+      ],
+      "not_routes": [
+        "planner"
+      ],
+      "kind": "near-neighbour",
+      "why": "There is no settled goal to turn into executable steps yet; reconciling competing stakeholder wishlists is \"ongoing team coordination\" from the planner's Not for line, and the deliverable is the cut plus its rationale."
+    },
+    {
+      "id": "product-manager-ambiguous-1",
+      "task": "Trial teams stall at the workspace setup step and we can't tell whether the steps themselves are the problem or we're simply attracting teams this isn't built for. Decide what we change next.",
+      "expected": "product-manager",
+      "acceptable": [
+        "product-manager",
+        "data-analyst",
+        "ui-ux-designer"
+      ],
+      "not_routes": [
+        "implementer"
+      ],
+      "kind": "ambiguous",
+      "why": "The deliverable is a decision about what to change and for which audience, but the drop-off could equally be read from the funnel data or resolved as a flow rework, so all three are defensible owners."
+    },
+    {
+      "id": "product-manager-negative-1",
+      "task": "The cut for the checkout rework is signed off and agreed. Turn it into ordered work items with their dependencies, the migration risks, and what has to be true before each step can start.",
+      "expected": "planner",
+      "acceptable": [
+        "planner"
+      ],
+      "not_routes": [
+        "product-manager"
+      ],
+      "kind": "negative",
+      "why": "Release and scope language attracts a keyword matcher, but the what-and-for-whom is already settled; the product-manager's Not for line excludes \"detailed implementation sequencing alone\"."
+    },
+    {
+      "id": "ui-ux-designer-obvious-1",
+      "task": "Our signup walkthrough is four dense screens and most people quit on the second. Rework what each step asks for and shows, including the empty and error states, in enough detail that engineering can build straight from it.",
+      "expected": "ui-ux-designer",
+      "acceptable": [
+        "ui-ux-designer"
+      ],
+      "not_routes": [
+        "implementer",
+        "product-manager"
+      ],
+      "kind": "obvious",
+      "why": "The output is the reworked screens and their states, specified for handoff \u2014 the feature itself is already agreed and no code is being asked for."
+    },
+    {
+      "id": "ui-ux-designer-obvious-2",
+      "task": "Before we commit engineering time to the new expense approval area of our internal tool, we need the screen-by-screen walkthrough drawn out, with pending, rejected and bulk-selection states, and it should sit naturally beside the rest of the tool.",
+      "expected": "ui-ux-designer",
+      "acceptable": [
+        "ui-ux-designer"
+      ],
+      "not_routes": [
+        "implementer",
+        "planner"
+      ],
+      "kind": "obvious",
+      "why": "Screens, states and fit with the existing look are the requested artifact; nothing is being built or sequenced."
+    },
+    {
+      "id": "ui-ux-designer-near-neighbour-1",
+      "task": "The filter panel in our data explorer works fine technically, but people can't tell which filters are currently applied and keep re-running the same query. Sort out how applied and cleared states should read and behave across the panel before anyone touches the code.",
+      "expected": "ui-ux-designer",
+      "acceptable": [
+        "ui-ux-designer"
+      ],
+      "not_routes": [
+        "implementer"
+      ],
+      "kind": "near-neighbour",
+      "why": "It reads as a front-end ticket, but the request explicitly precedes the code change and reshapes how the control behaves \u2014 the implementer's Not for line excludes \"broad redesign without need\"."
+    },
+    {
+      "id": "ui-ux-designer-near-neighbour-2",
+      "task": "The three reporting screens we shipped last month have drifted apart \u2014 buttons, spacing and type sizes differ on each one. Go through them and give us the single version they should all match, with the rules written down so it doesn't drift again.",
+      "expected": "ui-ux-designer",
+      "acceptable": [
+        "ui-ux-designer"
+      ],
+      "not_routes": [
+        "reviewer"
+      ],
+      "kind": "near-neighbour",
+      "why": "An assessment of shipped screens looks reviewable, but the ask is to produce the corrected treatment and its rules, and the reviewer's Not for line excludes \"stylistic nitpicking\"."
+    },
+    {
+      "id": "ui-ux-designer-ambiguous-1",
+      "task": "When an upload fails in our web tool the messages come in three different tones, the icons don't match, and none of them says what the person should do next. Make the whole failure path read and look like one thing.",
+      "expected": "ui-ux-designer",
+      "acceptable": [
+        "ui-ux-designer",
+        "content-copywriter"
+      ],
+      "not_routes": [
+        "debugger"
+      ],
+      "kind": "ambiguous",
+      "why": "Half the problem is wording and half is the visual and behavioural treatment of the failure states, so either owner is defensible; nothing suggests the uploads are actually broken."
+    },
+    {
+      "id": "ui-ux-designer-negative-1",
+      "task": "Scrolling the transaction list on older Android handsets stutters badly and taps register a beat late. Make the list feel smooth again.",
+      "expected": "performance-engineer",
+      "acceptable": [
+        "performance-engineer"
+      ],
+      "not_routes": [
+        "ui-ux-designer"
+      ],
+      "kind": "negative",
+      "why": "\"Feel\" and \"list\" bait a UI match, but the fix is frame-time and responsiveness measured before and after; the ui-ux-designer's Not for line excludes \"generic decorative restyling\" and nothing about the layout is in question."
+    },
+    {
+      "id": "automation-operations-obvious-1",
+      "task": "Every weekday morning one of us hand-assembles a summary of yesterday's merged changes, today's meetings and anything still unanswered in the shared support mailbox, then posts it to the team channel. Can we get that arriving on its own?",
+      "expected": "automation-operations",
+      "acceptable": [
+        "automation-operations"
+      ],
+      "not_routes": [],
+      "kind": "obvious",
+      "why": "Repeatable administrative assembly across authorized services on a fixed cadence, with no code artifact or data product involved."
+    },
+    {
+      "id": "automation-operations-obvious-2",
+      "task": "When a deal flips to closed-won in our CRM, someone manually opens the kickoff doc, books a 30-minute slot with the account manager and sets three fields on the record. I want that to happen by itself, and to be safe if the trigger fires twice.",
+      "expected": "automation-operations",
+      "acceptable": [
+        "automation-operations"
+      ],
+      "not_routes": [],
+      "kind": "obvious",
+      "why": "Coordinated record updates and scheduling across services, where the stated risk is repeated side-effectful actions needing state checks."
+    },
+    {
+      "id": "automation-operations-near-1",
+      "task": "Each Friday I want a sweep of rollout toggles that have been at full traffic for over a month, a ticket opened for whoever owns each one and a nudge on their calendar. Nothing should actually be switched off by the sweep itself.",
+      "expected": "automation-operations",
+      "acceptable": [
+        "automation-operations"
+      ],
+      "not_routes": [
+        "devops-release"
+      ],
+      "kind": "near-neighbour",
+      "why": "Looks like release hygiene, but the deliverable is a recurring ticket-and-reminder workflow with an explicit no-change boundary; devops-release is \"Not for: unapproved production changes\" and no build, environment or deploy config is being touched."
+    },
+    {
+      "id": "automation-operations-near-2",
+      "task": "New hires should get the welcome note and an onboarding slot booked off the HR system without anyone doing it by hand. The part that matters is that a re-run never double-books the slot or sends the note twice.",
+      "expected": "automation-operations",
+      "acceptable": [
+        "automation-operations",
+        "api-integration-engineer"
+      ],
+      "not_routes": [],
+      "kind": "near-neighbour",
+      "why": "Sits next to connector work, but the job is a repeated administrative workflow whose whole requirement is checking state before acting; api-integration-engineer is \"Not for: ... blind retries of actions with external side effects\"."
+    },
+    {
+      "id": "automation-operations-ambiguous-1",
+      "task": "Every Monday someone hand-builds the leadership spreadsheet \u2014 last week's signups, cancellations and support volume, pulled out of two different systems \u2014 and mails it around. We'd like it to just show up.",
+      "expected": "automation-operations",
+      "acceptable": [
+        "automation-operations",
+        "data-engineer",
+        "data-analyst"
+      ],
+      "not_routes": [],
+      "kind": "ambiguous",
+      "why": "Defensibly a recurring service-to-service admin workflow, a scheduled transform job, or a metrics deliverable; the request never says whether the numbers or the delivery is the hard part."
+    },
+    {
+      "id": "automation-operations-negative-1",
+      "task": "Our nightly customer export started dropping rows after the upstream team added a column, and the last five days of output are wrong. Fix the transform and get the missed days reprocessed.",
+      "expected": "data-engineer",
+      "acceptable": [
+        "data-engineer"
+      ],
+      "not_routes": [
+        "automation-operations"
+      ],
+      "kind": "negative",
+      "why": "\"Nightly\" and \"runs on a schedule\" keyword-match an ops workflow, but this is a broken produced-data transform plus a backfill, which is squarely pipeline ownership."
+    },
+    {
+      "id": "content-copywriter-obvious-1",
+      "task": "Our pricing page describes all three tiers in nearly identical language and nobody can tell which one they should pick. Rewrite the hero and the three tier blurbs so the choice is obvious.",
+      "expected": "content-copywriter",
+      "acceptable": [
+        "content-copywriter"
+      ],
+      "not_routes": [],
+      "kind": "obvious",
+      "why": "Website copy aimed at a specific audience decision, with no strategy or product-scope question open."
+    },
+    {
+      "id": "content-copywriter-obvious-2",
+      "task": "I drafted an 800-word announcement for the new offline mode in the mobile app and it's a mess \u2014 the middle section rambles and the opening buries the point. Tighten it up for a developer audience.",
+      "expected": "content-copywriter",
+      "acceptable": [
+        "content-copywriter"
+      ],
+      "not_routes": [],
+      "kind": "obvious",
+      "why": "Substantive editing of an article for a named channel and audience."
+    },
+    {
+      "id": "content-copywriter-near-1",
+      "task": "Our per-release notes read like a list of commit subjects. For this one, rewrite them so customers understand why offline mode matters to them and actually go turn it on.",
+      "expected": "content-copywriter",
+      "acceptable": [
+        "content-copywriter"
+      ],
+      "not_routes": [
+        "documentation-writer"
+      ],
+      "kind": "near-neighbour",
+      "why": "Release notes are normally documentation territory, but the ask is persuasive, audience-matched framing of already-known facts; documentation-writer is \"Not for: ... marketing copy that disguises missing functionality\"."
+    },
+    {
+      "id": "content-copywriter-near-2",
+      "task": "The positioning brief for the new command-line tool is signed off \u2014 segment, promise and proof points are all decided. What we need now is the homepage sections, the store listing and three short ad variants written against it, for review before anything goes live.",
+      "expected": "content-copywriter",
+      "acceptable": [
+        "content-copywriter"
+      ],
+      "not_routes": [
+        "growth-marketing-strategist"
+      ],
+      "kind": "near-neighbour",
+      "why": "Strategy is already fixed and the remaining deliverable is drafted words awaiting approval; growth-marketing-strategist is \"Not for: ... autonomous spending and campaign publication\", so the asset drafting is not its lane here."
+    },
+    {
+      "id": "content-copywriter-ambiguous-1",
+      "task": "We're opening a free tier next month and nobody has agreed on how we describe it, who we tell first, or what we'd count as a good first week.",
+      "expected": "growth-marketing-strategist",
+      "acceptable": [
+        "growth-marketing-strategist",
+        "content-copywriter",
+        "product-manager"
+      ],
+      "not_routes": [],
+      "kind": "ambiguous",
+      "why": "Bundles positioning and launch sequencing (strategy), the words themselves (copy), and what the tier is for (product scope) with no brief to anchor it."
+    },
+    {
+      "id": "content-copywriter-negative-1",
+      "task": "Write the top-level readme and the first-run walkthrough for our command-line tool so a developer on a clean machine can install it and get a result in ten minutes.",
+      "expected": "documentation-writer",
+      "acceptable": [
+        "documentation-writer"
+      ],
+      "not_routes": [
+        "content-copywriter"
+      ],
+      "kind": "negative",
+      "why": "\"Write\" matches a writing role by keyword, but this is task-oriented instruction grounded in actual product behavior, not persuasive content."
+    },
+    {
+      "id": "data-analyst-obvious-1",
+      "task": "Trial-to-paid went from about 12% to 9% over the last two quarters. Break it down by signup source and plan size and tell me whether the drop is real or just mix shift.",
+      "expected": "data-analyst",
+      "acceptable": [
+        "data-analyst"
+      ],
+      "not_routes": [],
+      "kind": "obvious",
+      "why": "A trend question answered by segmenting an existing dataset, with the confound named up front."
+    },
+    {
+      "id": "data-analyst-obvious-2",
+      "task": "Finance wants to know whether accounts that came through self-serve behave differently in their first 90 days than the ones sales brought in \u2014 the events are all in the warehouse already.",
+      "expected": "data-analyst",
+      "acceptable": [
+        "data-analyst"
+      ],
+      "not_routes": [],
+      "kind": "obvious",
+      "why": "Cohort comparison over data that already exists; nothing is being built or repaired."
+    },
+    {
+      "id": "data-analyst-near-1",
+      "task": "The weekly active count on our dashboard and the one finance reports are about 8% apart. Work out which slice of accounts accounts for the gap and what each of the two is actually counting.",
+      "expected": "data-analyst",
+      "acceptable": [
+        "data-analyst"
+      ],
+      "not_routes": [
+        "data-engineer"
+      ],
+      "kind": "near-neighbour",
+      "why": "Close to pipeline work because the tables differ, but the deliverable is what the two figures mean and which one to report; data-engineer is \"Not for: ... interpreting what the resulting numbers mean\"."
+    },
+    {
+      "id": "data-analyst-near-2",
+      "task": "Before we commit to redesigning the onboarding checklist, I want to know how many accounts actually stall on step three and whether that differs by team size.",
+      "expected": "data-analyst",
+      "acceptable": [
+        "data-analyst"
+      ],
+      "not_routes": [
+        "product-manager"
+      ],
+      "kind": "near-neighbour",
+      "why": "It feeds a scope decision, but the request itself is a measurement over instrumented behavior; product-manager is \"Not for: ... inventing customer evidence\" \u2014 the evidence has to be computed first."
+    },
+    {
+      "id": "data-analyst-ambiguous-1",
+      "task": "Checkout completions in our funnel view dropped roughly 30% last Tuesday and stayed down. We can't tell if something broke, if a tracking change did it, or if it's real.",
+      "expected": "data-analyst",
+      "acceptable": [
+        "data-analyst",
+        "data-engineer",
+        "debugger"
+      ],
+      "not_routes": [],
+      "kind": "ambiguous",
+      "why": "Genuinely three-way: reading the data to characterize the drop, checking the collection path that produced it, or chasing a real product defect."
+    },
+    {
+      "id": "data-analyst-negative-1",
+      "task": "The usage figure on a customer's billing page doesn't match the one on the internal admin page for the same account, and it only happens for accounts that have sub-organizations. Find out why and fix it.",
+      "expected": "debugger",
+      "acceptable": [
+        "debugger"
+      ],
+      "not_routes": [
+        "data-analyst"
+      ],
+      "kind": "negative",
+      "why": "Reads like a numbers discrepancy, but there is a reproducible condition and a wrong value in the product \u2014 root-cause work, not analysis of a dataset."
+    },
+    {
+      "id": "documentation-writer-obvious-1",
+      "task": "New engineers keep asking the same questions in chat about getting the service running on a fresh laptop. Put together something they can follow start to finish without asking anyone.",
+      "expected": "documentation-writer",
+      "acceptable": [
+        "documentation-writer"
+      ],
+      "not_routes": [],
+      "kind": "obvious",
+      "why": "Task-oriented instructions for developers, grounded in how the project actually runs."
+    },
+    {
+      "id": "documentation-writer-obvious-2",
+      "task": "The payments endpoints page still shows the old auth header and never mentions the two error codes we added in spring. Get it matching what the service returns today.",
+      "expected": "documentation-writer",
+      "acceptable": [
+        "documentation-writer"
+      ],
+      "not_routes": [],
+      "kind": "obvious",
+      "why": "Reference material drifting from real behavior; correcting it against the product is the whole job."
+    },
+    {
+      "id": "documentation-writer-near-1",
+      "task": "Support keeps getting tickets because customers guess wrong about how our request limits work. We need a page that spells out exactly what happens at each threshold, what headers come back, and how the window resets.",
+      "expected": "documentation-writer",
+      "acceptable": [
+        "documentation-writer"
+      ],
+      "not_routes": [
+        "content-copywriter"
+      ],
+      "kind": "near-neighbour",
+      "why": "It is customer-facing prose, but every sentence must be verified against limiter behavior; content-copywriter is \"Not for: ... fabricating evidence\", and there is no audience-persuasion goal here."
+    },
+    {
+      "id": "documentation-writer-near-2",
+      "task": "Nobody on the team can explain what our webhooks do when a customer endpoint is down \u2014 how many attempts, what backoff, when we give up. Read through the service and turn the real behavior into something support can rely on.",
+      "expected": "documentation-writer",
+      "acceptable": [
+        "documentation-writer"
+      ],
+      "not_routes": [
+        "researcher",
+        "explorer"
+      ],
+      "kind": "near-neighbour",
+      "why": "Locating the retry logic is a step, not the deliverable \u2014 the output is a maintained, accurate explanation; researcher is \"Not for: ... local code mapping alone\", and explorer stops at finding where behavior lives."
+    },
+    {
+      "id": "documentation-writer-ambiguous-1",
+      "task": "Our repo readme, the quickstart page and the site all describe installing the tool differently, and the install flow changed again last week. Someone needs to work out what we should be saying and where.",
+      "expected": "documentation-writer",
+      "acceptable": [
+        "documentation-writer",
+        "content-copywriter"
+      ],
+      "not_routes": [],
+      "kind": "ambiguous",
+      "why": "Reconciling instructions against the real flow is documentation, but deciding the marketing-site wording and channel split is defensibly copy work."
+    },
+    {
+      "id": "documentation-writer-negative-1",
+      "task": "Before we commit either way, I want a written comparison of leaving ingestion on scheduled batches versus moving it onto a queue \u2014 what each costs us over the next couple of years and how it fits the rest of the stack.",
+      "expected": "architect",
+      "acceptable": [
+        "architect"
+      ],
+      "not_routes": [
+        "documentation-writer"
+      ],
+      "kind": "negative",
+      "why": "\"Written comparison\" keyword-matches a writing role, but the work is a cross-component technical decision with long-lived consequences."
+    },
+    {
+      "id": "growth-marketing-strategist-obvious-1",
+      "task": "People who try our developer tool convert fine, but almost nobody hears about it in the first place. Lay out where we should be putting effort next quarter and how we'd know six weeks in whether it's working.",
+      "expected": "growth-marketing-strategist",
+      "acceptable": [
+        "growth-marketing-strategist"
+      ],
+      "not_routes": [],
+      "kind": "obvious",
+      "why": "Acquisition planning with an explicit measurable check, no product scope or asset writing in question."
+    },
+    {
+      "id": "growth-marketing-strategist-obvious-2",
+      "task": "Two competitors just started pitching themselves at the exact buyer we go after, using nearly our words. Work out how we should be describing ourselves instead and what small test would show whether the new angle lands.",
+      "expected": "growth-marketing-strategist",
+      "acceptable": [
+        "growth-marketing-strategist"
+      ],
+      "not_routes": [],
+      "kind": "obvious",
+      "why": "Positioning against a changed market plus a practical test to validate it."
+    },
+    {
+      "id": "growth-marketing-strategist-near-1",
+      "task": "The site, the sales deck and the app listing each promise something different, and everyone writes their own tagline. We need to settle what we actually claim and who we're claiming it to before anyone writes another word.",
+      "expected": "growth-marketing-strategist",
+      "acceptable": [
+        "growth-marketing-strategist"
+      ],
+      "not_routes": [
+        "content-copywriter"
+      ],
+      "kind": "near-neighbour",
+      "why": "The output is the brief itself, not the words that follow it; content-copywriter is \"Not for: setting business strategy without a brief\"."
+    },
+    {
+      "id": "growth-marketing-strategist-near-2",
+      "task": "We want to run a two-week test on the pricing page's headline and offer to see if it moves trial starts. Someone needs to decide what the variants are, who sees them, and what result would count as a win.",
+      "expected": "growth-marketing-strategist",
+      "acceptable": [
+        "growth-marketing-strategist"
+      ],
+      "not_routes": [
+        "data-analyst"
+      ],
+      "kind": "near-neighbour",
+      "why": "This is designing the marketing experiment and its success bar, not reading its results; data-analyst is \"Not for: causal claims unsupported by the design\" \u2014 it works from a design rather than setting one."
+    },
+    {
+      "id": "growth-marketing-strategist-ambiguous-1",
+      "task": "Leadership wants self-serve signups doubled next quarter, and internally we're split on whether that means changing the price, fixing the first-run experience, or getting in front of more people.",
+      "expected": "growth-marketing-strategist",
+      "acceptable": [
+        "growth-marketing-strategist",
+        "product-manager",
+        "data-analyst"
+      ],
+      "not_routes": [],
+      "kind": "ambiguous",
+      "why": "Defensibly acquisition strategy, a product-scope decision about the first-run experience, or a measurement job to find where the funnel actually leaks."
+    },
+    {
+      "id": "growth-marketing-strategist-negative-1",
+      "task": "The hero image on our public site is 4MB and the landing page takes about eight seconds to become usable on a phone. Get it under two.",
+      "expected": "performance-engineer",
+      "acceptable": [
+        "performance-engineer"
+      ],
+      "not_routes": [
+        "growth-marketing-strategist"
+      ],
+      "kind": "negative",
+      "why": "\"Marketing site\" and \"landing page\" keyword-match the marketing role, but the task is a measured load-time improvement with a numeric target."
+    }
+  ]
+}

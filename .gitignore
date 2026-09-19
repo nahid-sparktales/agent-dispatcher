@@ -1,2 +1,3 @@
 locus-agent-templates.json
 __pycache__/
+.agent-dispatcher-decision.json

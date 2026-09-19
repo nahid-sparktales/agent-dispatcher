@@ -23,11 +23,13 @@ silently discard the change.
 ## Before opening a PR
 
 ```bash
-python3 build.py        # regenerate
-python3 test_build.py   # validate
+python3 build.py          # regenerate
+python3 test_build.py     # validate
+python3 test_decision.py  # the decision engine — deterministic, offline, no credential
 ```
 
-Both must pass. The build is a validator as much as a generator — it rejects an unknown category, a
+All three must pass. `test_decision.py` needs no network and no key: every external answer comes
+from a mock provider, so CI stays free and deterministic. The build is a validator as much as a generator — it rejects an unknown category, a
 loadout pointing at a skill that does not exist, a capability no skill provides, an unknown tool id,
 a missing referenced file, a verification skill that does not declare itself, more than five or more
 than 30KB of always-on skills per role, and two skills providing one capability in always-considered
@@ -42,6 +44,16 @@ nothing.
 Keep the loadout small. A normal task should reach for one to five skills; a role with six
 always-on skills is a role that loads everything and reads nothing.
 
+`summary`, `use_when`, `not_for` and `tags` are also the routing metadata the optional decision
+engine reads. `build.py` carries them into `catalog/loadouts.json`, and that is the whole of what
+it takes for a new role to become a candidate — there is no Jev prompt to update, and adding a
+second registry would be a bug. Write `not_for` precisely: it is the line that decides
+near-neighbour routing for the model as well as for a reader.
+
+Then add fixtures to `evals/decision/agents.json` — at least one obvious case and one
+near-neighbour case against whichever role yours is easiest to confuse with. `test_decision.py`
+fails if a role has no gold label anywhere, and validates every id against the registry.
+
 ## Adding a skill
 
 See [docs/adding-a-skill.md](docs/adding-a-skill.md). Procedural, not encyclopedic: numbered steps
@@ -50,6 +62,9 @@ in running order, a walkable checklist, failure handling, and what evidence to r
 Split two things when they have different activation conditions; merge them when they always fire
 together. Check `catalog/external-skills.json` first — if a maintained official skill already covers
 the capability, reference it there rather than writing a local duplicate.
+
+A registered skill is automatically eligible for decision-engine selection in every role whose
+loadout names it, from its canonical `description` and `not_for`. Nothing else to register.
 
 ## Adding an external skill or MCP
 

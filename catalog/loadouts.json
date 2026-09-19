@@ -1,5 +1,5 @@
 {
-  "schema_version": "2.1.0",
+  "schema_version": "2.2.0",
   "generated_from": "templates/*/*.md",
   "roles": [
     {
@@ -7,6 +7,18 @@
       "slug": "aiengineer",
       "name": "AI & Agent Engineer",
       "category": "Engineering",
+      "summary": "Builds and evaluates agent prompts, routing, tools, memory, and execution behavior.",
+      "use_when": "The task involves an AI workflow, specialist template, model route, tool contract, retrieval, memory, or evaluation harness.",
+      "not_for": "prompt-only security enforcement, judging an agent from one impressive output, or guessing provider capabilities.",
+      "tags": [
+        "agents",
+        "prompts",
+        "evaluations",
+        "tool-use",
+        "routing",
+        "memory",
+        "retrieval"
+      ],
       "capabilities": [
         "ai.agent-design",
         "ai.prompting",
@@ -92,6 +104,17 @@
       "slug": "api",
       "name": "API & Integration Engineer",
       "category": "Engineering",
+      "summary": "Connects services with correct contracts, authorization, retry behavior, and failure handling.",
+      "use_when": "A feature needs a service connector, webhook, API client, synchronization path, or structured external data exchange.",
+      "not_for": "unverified API assumptions, broad account access, blind retries of actions with external side effects, or a scheduled pipeline that lands and reshapes that data for downstream consumers.",
+      "tags": [
+        "api",
+        "integration",
+        "webhooks",
+        "connectors",
+        "contracts",
+        "idempotency"
+      ],
       "capabilities": [
         "backend.api",
         "backend.webhooks",
@@ -166,6 +189,17 @@
       "slug": "architect",
       "name": "Architect",
       "category": "Engineering",
+      "summary": "Designs system boundaries, contracts, and tradeoffs that fit the existing product and constraints.",
+      "use_when": "A change spans components, data models, execution boundaries, or technical decisions with long-term consequences.",
+      "not_for": "routine implementation details, needless platform rewrites, or product prioritization.",
+      "tags": [
+        "architecture",
+        "interfaces",
+        "system-design",
+        "tradeoffs",
+        "data-flow",
+        "reliability"
+      ],
       "capabilities": [
         "backend.api",
         "database.schema",
@@ -237,6 +271,17 @@
       "slug": "automation",
       "name": "Automation & Operations Assistant",
       "category": "Knowledge & Business",
+      "summary": "Handles repeatable administrative workflows through authorized services with reliable state checks.",
+      "use_when": "The task involves recurring briefs, inbox or calendar workflows, record updates, reminders, or coordinated service actions.",
+      "not_for": "acting on event text as blanket authorization, unbounded background promises, or blind retries of uncertain external actions.",
+      "tags": [
+        "automation",
+        "operations",
+        "scheduling",
+        "inbox",
+        "workflows",
+        "reconciliation"
+      ],
       "capabilities": [
         "backend.reliability",
         "backend.jobs",
@@ -297,6 +342,17 @@
       "slug": "copywriter",
       "name": "Content Writer & Copywriter",
       "category": "Knowledge & Business",
+      "summary": "Writes distinctive, accurate content matched to the audience, channel, and desired action.",
+      "use_when": "The task needs website copy, articles, emails, product messaging, scripts, or substantive editing.",
+      "not_for": "setting business strategy without a brief, fabricating evidence, or publishing drafts without authorization.",
+      "tags": [
+        "copywriting",
+        "content",
+        "editing",
+        "brand-voice",
+        "web-copy",
+        "storytelling"
+      ],
       "capabilities": [
         "knowledge.copywriting",
         "design.ux-writing"
@@ -344,6 +400,17 @@
       "slug": "dataanalyst",
       "name": "Data Analyst",
       "category": "Knowledge & Business",
+      "summary": "Turns datasets into reproducible, decision-relevant analysis with clear limitations.",
+      "use_when": "A question requires inspecting data, calculating metrics, comparing cohorts, or explaining trends.",
+      "not_for": "causal claims unsupported by the design, invented metrics, silently cleaning away inconvenient records, or repairing the job or pipeline that produced the data.",
+      "tags": [
+        "data-analysis",
+        "metrics",
+        "sql",
+        "spreadsheets",
+        "visualization",
+        "experiments"
+      ],
       "capabilities": [
         "data.analysis",
         "product.analytics",
@@ -395,6 +462,17 @@
       "slug": "dataeng",
       "name": "Data Engineer",
       "category": "Engineering",
+      "summary": "Builds and repairs the pipelines, jobs, and transforms that produce the data downstream consumers depend on.",
+      "use_when": "The task involves a data pipeline, scheduled job, transform, notebook promoted to production, or a backfill of produced data.",
+      "not_for": "code-level defects inside a failing job, destination schema design and its migrations, the scheduler platform or CI itself, or interpreting what the resulting numbers mean.",
+      "tags": [
+        "data-pipeline",
+        "etl",
+        "lineage",
+        "backfill",
+        "idempotency",
+        "notebooks"
+      ],
       "capabilities": [
         "data.pipelines",
         "data.quality",
@@ -451,6 +529,17 @@
       "slug": "database",
       "name": "Database Engineer",
       "category": "Engineering",
+      "summary": "Designs and changes data storage with integrity, compatibility, and safe migration behavior.",
+      "use_when": "The task involves schemas, persistence, transactions, access rules, queries, or data migrations.",
+      "not_for": "casual production mutations, guessing at data distribution, treating a backup as a verified rollback, or reprocessing and backfilling rows through the pipeline that produces them.",
+      "tags": [
+        "database",
+        "schema",
+        "queries",
+        "transactions",
+        "migrations",
+        "data-integrity"
+      ],
       "capabilities": [
         "database.schema",
         "database.migrations",
@@ -514,6 +603,17 @@
       "slug": "debugger",
       "name": "Debugger",
       "category": "Engineering",
+      "summary": "Reproduces failures, tests hypotheses, and fixes the underlying cause with regression evidence.",
+      "use_when": "A defect, crash, inconsistent behavior, or failing test needs a disciplined root-cause investigation.",
+      "not_for": "random trial-and-error edits, speculative rewrites, treating a disappearing symptom as proof of a fix, or an outage still in progress, where mitigation comes before a complete causal explanation.",
+      "tags": [
+        "debugging",
+        "root-cause",
+        "reproduction",
+        "logs",
+        "regression",
+        "diagnostics"
+      ],
       "capabilities": [
         "quality.debugging",
         "quality.regression",
@@ -583,6 +683,17 @@
       "slug": "devops",
       "name": "DevOps & Release Engineer",
       "category": "Engineering",
+      "summary": "Builds reproducible delivery workflows and prepares or executes authorized releases with recovery checks.",
+      "use_when": "The work involves builds, CI, packaging, environments, deployment configuration, observability, or release readiness.",
+      "not_for": "unapproved production changes, credential collection, claiming a healthy service from build success alone, or an outage in progress, where restoring service outranks the release process.",
+      "tags": [
+        "devops",
+        "ci-cd",
+        "builds",
+        "deployment",
+        "release",
+        "observability"
+      ],
       "capabilities": [
         "devops.pipeline",
         "devops.deployment",
@@ -653,6 +764,17 @@
       "slug": "orchestrator",
       "name": "Dispatcher",
       "category": "Core",
+      "summary": "Coordinates bounded work, chooses available specialists, and owns the combined outcome.",
+      "use_when": "The goal has separable workstreams, dependencies, or independent verification that genuinely benefit from multiple agents.",
+      "not_for": "routine tasks that one agent can finish directly, or a planner that never executes its handoffs.",
+      "tags": [
+        "orchestration",
+        "delegation",
+        "routing",
+        "coordination",
+        "handoffs",
+        "synthesis"
+      ],
       "capabilities": [
         "ai.agent-design",
         "ai.context",
@@ -704,6 +826,17 @@
       "slug": "docs",
       "name": "Documentation Writer",
       "category": "Knowledge & Business",
+      "summary": "Produces accurate, task-oriented documentation grounded in the actual product.",
+      "use_when": "Users or developers need setup instructions, guides, reference material, release notes, or maintainable knowledge.",
+      "not_for": "inventing product behavior, rewriting source systems, or marketing copy that disguises missing functionality.",
+      "tags": [
+        "documentation",
+        "guides",
+        "readme",
+        "reference",
+        "onboarding",
+        "release-notes"
+      ],
       "capabilities": [
         "knowledge.writing",
         "verification.documentation"
@@ -759,6 +892,17 @@
       "slug": "explorer",
       "name": "Explorer",
       "category": "Engineering",
+      "summary": "Maps an unfamiliar workspace and finds the exact code, files, and execution paths relevant to a task.",
+      "use_when": "Another agent needs to understand where behavior lives, how components connect, or where a change should begin.",
+      "not_for": "broad web research, product planning, or making code changes.",
+      "tags": [
+        "codebase",
+        "navigation",
+        "discovery",
+        "dependencies",
+        "entry-points",
+        "impact-analysis"
+      ],
       "capabilities": [
         "frontend.detection",
         "frontend.architecture",
@@ -813,6 +957,17 @@
       "slug": "generalist",
       "name": "Generalist",
       "category": "Core",
+      "summary": "Handles everyday tasks end to end and adapts depth and tools to the actual goal.",
+      "use_when": "A task spans several domains, is small enough for one agent, or does not fit a more specific specialty.",
+      "not_for": "unnecessary multi-agent orchestration or pretending to have expertise, tools, or access it lacks.",
+      "tags": [
+        "general",
+        "execution",
+        "writing",
+        "analysis",
+        "problem-solving",
+        "assistance"
+      ],
       "capabilities": [
         "quality.debugging",
         "quality.tests",
@@ -887,6 +1042,17 @@
       "slug": "marketing",
       "name": "Growth & Marketing Strategist",
       "category": "Knowledge & Business",
+      "summary": "Develops evidence-grounded positioning, channel plans, and measurable marketing experiments.",
+      "use_when": "A product needs clearer positioning, acquisition strategy, launch planning, or a practical marketing test.",
+      "not_for": "unsupported growth promises, fabricated market research, or autonomous spending and campaign publication.",
+      "tags": [
+        "marketing",
+        "growth",
+        "positioning",
+        "campaigns",
+        "acquisition",
+        "experimentation"
+      ],
       "capabilities": [
         "knowledge.positioning",
         "knowledge.seo",
@@ -940,6 +1106,17 @@
       "slug": "implementer",
       "name": "Implementer",
       "category": "Core",
+      "summary": "Builds focused, maintainable changes and verifies them against the task.",
+      "use_when": "The task calls for authorized creation or modification of software, configuration, or other technical artifacts.",
+      "not_for": "independent approval of its own work, broad redesign without need, or implementing a plan that is still awaiting approval.",
+      "tags": [
+        "implementation",
+        "coding",
+        "features",
+        "fixes",
+        "configuration",
+        "integration"
+      ],
       "capabilities": [
         "backend.api",
         "frontend.architecture",
@@ -1046,6 +1223,17 @@
       "slug": "incident",
       "name": "Incident Responder",
       "category": "Engineering",
+      "summary": "Stabilizes an actively failing system with the smallest reversible mitigation and a timestamped incident record.",
+      "use_when": "A production system is failing right now and time to mitigation matters more than a complete causal explanation.",
+      "not_for": "a defect that is not currently failing in production, release preparation and pipeline work, or a postmortem write-up after recovery.",
+      "tags": [
+        "incident",
+        "triage",
+        "mitigation",
+        "rollback",
+        "outage",
+        "on-call"
+      ],
       "capabilities": [
         "devops.incident",
         "devops.rollback",
@@ -1111,6 +1299,17 @@
       "slug": "performance",
       "name": "Performance Engineer",
       "category": "Engineering",
+      "summary": "Measures bottlenecks and makes targeted improvements with reproducible before-and-after evidence.",
+      "use_when": "Latency, resource use, throughput, startup time, or responsiveness needs measurable improvement.",
+      "not_for": "speculative optimization, cherry-picked benchmarks, or reporting percentages without comparable measurements.",
+      "tags": [
+        "performance",
+        "profiling",
+        "latency",
+        "benchmarking",
+        "memory-use",
+        "optimization"
+      ],
       "capabilities": [
         "quality.profiling",
         "database.performance",
@@ -1177,6 +1376,17 @@
       "slug": "planner",
       "name": "Planner",
       "category": "Core",
+      "summary": "Turns a goal into an evidence-grounded, executable plan with acceptance criteria.",
+      "use_when": "Implementation has material uncertainty, multiple dependencies, migration risk, or an explicit request for a plan.",
+      "not_for": "performing the implementation, ongoing team coordination, or producing an elaborate plan for a trivial fix.",
+      "tags": [
+        "planning",
+        "requirements",
+        "dependencies",
+        "acceptance-criteria",
+        "risk",
+        "handoff"
+      ],
       "capabilities": [
         "product.definition",
         "quality.strategy",
@@ -1235,6 +1445,17 @@
       "slug": "pm",
       "name": "Product Manager",
       "category": "Product & Design",
+      "summary": "Turns a vague request into a focused product scope, user flow, and measurable success criteria.",
+      "use_when": "The team must decide what to build, for whom, why it matters, and what belongs in the first version.",
+      "not_for": "technical architecture ownership, detailed implementation sequencing alone, or inventing customer evidence.",
+      "tags": [
+        "product",
+        "scope",
+        "requirements",
+        "user-stories",
+        "prioritization",
+        "acceptance"
+      ],
       "capabilities": [
         "product.discovery",
         "product.definition",
@@ -1291,6 +1512,17 @@
       "slug": "refactor",
       "name": "Refactoring & Migration Specialist",
       "category": "Engineering",
+      "summary": "Improves internal structure or moves systems to a new contract while preserving required behavior.",
+      "use_when": "The task is a deliberate refactor, dependency transition, compatibility upgrade, or staged migration.",
+      "not_for": "unrequested rewrites, hidden feature changes, or replacing a known system with an unproven abstraction.",
+      "tags": [
+        "refactoring",
+        "migration",
+        "compatibility",
+        "modernization",
+        "deprecations",
+        "behavior-preservation"
+      ],
       "capabilities": [
         "quality.tests",
         "backend.api",
@@ -1356,6 +1588,17 @@
       "slug": "researcher",
       "name": "Researcher",
       "category": "Core",
+      "summary": "Investigates questions, evaluates sources, and produces decision-ready findings.",
+      "use_when": "The task needs external research, source comparison, documentation investigation, or evidence beyond the current conversation.",
+      "not_for": "writing production code, local code mapping alone, or offering confident conclusions without source access.",
+      "tags": [
+        "research",
+        "evidence",
+        "sources",
+        "comparison",
+        "fact-checking",
+        "discovery"
+      ],
       "capabilities": [
         "research.deep",
         "research.sources",
@@ -1407,6 +1650,17 @@
       "slug": "reviewer",
       "name": "Reviewer",
       "category": "Core",
+      "summary": "Independently evaluates a change or artifact and reports actionable, evidence-backed findings.",
+      "use_when": "A completed or proposed artifact needs an independent correctness, quality, scope, or readiness assessment.",
+      "not_for": "implementing fixes while reviewing, stylistic nitpicking, or treating an author's explanation as proof.",
+      "tags": [
+        "review",
+        "correctness",
+        "quality",
+        "risk",
+        "verification",
+        "readiness"
+      ],
       "capabilities": [
         "security.review",
         "quality.strategy",
@@ -1486,6 +1740,17 @@
       "slug": "security",
       "name": "Security Auditor",
       "category": "Engineering",
+      "summary": "Reviews authorized systems for concrete security weaknesses and practical remediation.",
+      "use_when": "A design or change touches authentication, authorization, sensitive data, tool execution, trust boundaries, or external exposure.",
+      "not_for": "unauthorized testing, unsupported compliance certification, or broad exploit activity unrelated to the review.",
+      "tags": [
+        "security",
+        "authorization",
+        "threat-modeling",
+        "secrets",
+        "trust-boundaries",
+        "audit"
+      ],
       "capabilities": [
         "security.review",
         "security.web",
@@ -1550,6 +1815,17 @@
       "slug": "tester",
       "name": "Tester",
       "category": "Core",
+      "summary": "Checks observable behavior, builds regression coverage, and reports reproducible failures.",
+      "use_when": "The work needs independent functional verification, regression coverage, or a reproducible test of acceptance criteria.",
+      "not_for": "silently changing product behavior to match tests, a general code-style review, or unsupported claims that a product is correct.",
+      "tags": [
+        "testing",
+        "qa",
+        "regression",
+        "acceptance",
+        "edge-cases",
+        "reproduction"
+      ],
       "capabilities": [
         "quality.tests",
         "quality.regression",
@@ -1622,6 +1898,17 @@
       "slug": "uidesigner",
       "name": "UI/UX Designer",
       "category": "Product & Design",
+      "summary": "Designs clear, distinctive interfaces and interaction flows, with implementation-ready details.",
+      "use_when": "A feature needs better information hierarchy, interaction design, visual coherence, or a polished prototype.",
+      "not_for": "generic decorative restyling, product requirements invented without context, or unverifiable claims of user validation.",
+      "tags": [
+        "ui",
+        "ux",
+        "interaction",
+        "visual-design",
+        "prototyping",
+        "accessibility"
+      ],
       "capabilities": [
         "design.ui.direction",
         "design.ux.audit",
@@ -1715,6 +2002,17 @@
       "slug": "git",
       "name": "Version Control Engineer",
       "category": "Engineering",
+      "summary": "Repairs, reshapes, and explains repository history without losing committed or uncommitted work.",
+      "use_when": "The task involves repository history \u2014 lost commits, tangled merges or rebases, branch surgery, or reconstructing what changed between two points.",
+      "not_for": "locating or fixing the defect a commit introduced, authoring the code change the history is meant to carry, or the delivery pipeline that ships it.",
+      "tags": [
+        "git",
+        "history",
+        "rebase",
+        "merge-conflict",
+        "reflog",
+        "recovery"
+      ],
       "capabilities": [
         "devops.rollback",
         "security.secrets",
