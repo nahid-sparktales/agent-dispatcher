@@ -39,6 +39,7 @@ the description carries.
 | `verification` | as needed | The evidence required before this is done, fixed before the work rather than after. |
 | `budget` | as needed | Roughly how much context this should spend, and on what. |
 | `diagnostics` | as needed | What this plan could not establish, and what was degraded. |
+| `decision` | as needed | Which engine made the bounded choices above, and whether it fell back. |
 <!-- plan:end -->
 
 ## Adding a signal

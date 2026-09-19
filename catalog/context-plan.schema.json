@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/nahid-sparktales/agent-dispatcher/catalog/context-plan.schema.json",
-  "schema_version": "2.1.0",
+  "schema_version": "2.2.0",
   "title": "Context plan",
   "description": "What one agent needs in order to perform one task correctly. NOT an execution plan: it holds no steps, no ordering and no implementation decisions. The context engine owns this document; the specialist owns the steps. Most fields are optional on purpose \u2014 a trivial task's plan is three lines, and inventing the rest is the failure mode this schema exists to prevent.",
   "type": "object",
@@ -62,7 +62,7 @@
     "agent": {
       "type": "object",
       "title": "Which single role owns it, why, and the near-miss it beat",
-      "description": "Who owns the work. One role. A chain is one plan per hop, not one plan with several owners.",
+      "description": "Who owns the work. One role. A chain is one plan per hop, not one plan with several owners. `selected_by` and `confidence` record how the owner was chosen, so a route can be explained after the fact.",
       "required": [
         "id",
         "reason"
@@ -100,6 +100,22 @@
         "forced": {
           "type": "boolean",
           "description": "True when the user named the role (/agent-<slug>). Routing did not happen and must not be second-guessed."
+        },
+        "selected_by": {
+          "type": "string",
+          "description": "Who made this selection. `forced` \u2014 the user named it. `recipe` \u2014 a recipe fixed it. `jev` \u2014 a configured decision engine chose it. `default` \u2014 the dispatcher's own method. Provenance, not authority: none of these values grants anything.",
+          "enum": [
+            "forced",
+            "recipe",
+            "default",
+            "jev"
+          ]
+        },
+        "confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "The confidence the decision engine reported, when it reported one. For diagnostics, policy and evaluation \u2014 not for the execution prompt, and never to be narrated as certainty. Absent means no engine produced one, which is the normal case."
         }
       }
     },
@@ -158,6 +174,22 @@
           "substitutes_for": {
             "type": "string",
             "description": "The unavailable skill id this one stands in for."
+          },
+          "selected_by": {
+            "type": "string",
+            "description": "Who made this selection. `forced` \u2014 the user named it. `recipe` \u2014 a recipe fixed it. `jev` \u2014 a configured decision engine chose it. `default` \u2014 the dispatcher's own method. Provenance, not authority: none of these values grants anything.",
+            "enum": [
+              "forced",
+              "recipe",
+              "default",
+              "jev"
+            ]
+          },
+          "confidence": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "The confidence the decision engine reported, when it reported one. For diagnostics, policy and evaluation \u2014 not for the execution prompt, and never to be narrated as certainty. Absent means no engine produced one, which is the normal case."
           }
         }
       }
@@ -351,6 +383,22 @@
           "reason": {
             "type": "string",
             "description": "What it would be used for. An `absent` entry says instead which check cannot be performed."
+          },
+          "selected_by": {
+            "type": "string",
+            "description": "Who made this selection. `forced` \u2014 the user named it. `recipe` \u2014 a recipe fixed it. `jev` \u2014 a configured decision engine chose it. `default` \u2014 the dispatcher's own method. Provenance, not authority: none of these values grants anything.",
+            "enum": [
+              "forced",
+              "recipe",
+              "default",
+              "jev"
+            ]
+          },
+          "confidence": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "How relevant a decision engine judged this server, when one was asked. Relevance only: it says nothing about availability and nothing whatsoever about authorization."
           }
         }
       }
@@ -431,6 +479,33 @@
       "items": {
         "type": "string"
       }
+    },
+    "decision": {
+      "type": "object",
+      "title": "Which engine made the bounded choices above, and whether it fell back",
+      "description": "Present only when something other than the dispatcher's own method decided. Diagnostics, not instruction: the specialist's work is identical whichever engine answered.",
+      "additionalProperties": false,
+      "properties": {
+        "engine": {
+          "type": "string",
+          "description": "`default` or the id of the engine that answered, e.g. `jev`."
+        },
+        "provider": {
+          "type": "string",
+          "description": "The transport the engine used. Never a credential, and never the variable's value."
+        },
+        "model": {
+          "type": "string"
+        },
+        "fallback": {
+          "type": "boolean",
+          "description": "True when an engine was attempted and the default answered instead. `diagnostics` says why."
+        },
+        "registry_version": {
+          "type": "string",
+          "description": "A digest of the candidate registries, so a routing result can be reproduced after metadata changes."
+        }
+      }
     }
   },
   "$defs": {
@@ -468,9 +543,31 @@
           },
           "basis": {
             "type": "string",
-            "description": "The observation behind the status: \"the user asked for the edit\", \"plan mode is active\", \"a Bash call was denied this session\". Required whenever status is not `unknown`."
+            "description": "The observation behind the status: \"the user asked for the edit\", \"plan mode is active\", \"a Bash call was denied this session\". Required whenever status is not `unknown` \u2014 and now enforced, not only asserted."
           }
-        }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "status": {
+                  "enum": [
+                    "known",
+                    "unavailable"
+                  ]
+                }
+              },
+              "required": [
+                "status"
+              ]
+            },
+            "then": {
+              "required": [
+                "basis"
+              ]
+            }
+          }
+        ]
       }
     }
   }

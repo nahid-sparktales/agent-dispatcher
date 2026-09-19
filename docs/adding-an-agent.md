@@ -39,6 +39,21 @@ Then the body: ROLE, WHEN TO USE, WORKING METHOD (numbered), DELIVERABLE, DEFINI
 ROLE BOUNDARIES, TRAP, followed by tool posture, response style, mode and carrying context. Copy
 the shape from a sibling template; `templates/engineering/debugger.md` is a good model.
 
+## Routing metadata
+
+`summary`, `use_when`, `not_for` and `tags` do double duty. They are what a reader sees in the
+router and the README, and they are the only thing the optional decision engine is given to tell
+your role from the other 26 — `build.py` carries them into `catalog/loadouts.json`, which is the
+candidate registry. There is no second place to register a role, and adding one would be a bug.
+
+That makes `not_for` the highest-leverage line in the file. Written as territory a neighbouring
+role owns, it decides near-neighbour routing. Written as a list of bad habits ("no sloppy work"),
+it excludes nothing and helps neither a reader nor a model.
+
+Then add fixtures to `evals/decision/agents.json`: one obvious case, and one near-neighbour case
+against the role yours is easiest to confuse with. `test_decision.py` fails the build if a role
+has no gold label anywhere.
+
 ## Restraint
 
 A normal task should load one to five skills. `skills_core` with six entries is a role that loads

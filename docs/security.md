@@ -116,6 +116,22 @@ publishing.
 No API key, token, password, PAT or credential is committed here. Registry entries name the
 environment variable or credential type a server expects; they never carry a value.
 
+The optional decision engine is the one part of this pack that can hold a credential, and it
+holds none. The key lives in the environment; `decision/config.py` exposes the variable's *name*
+and whether it is set, never its value; the provider reads `os.environ` at the moment of the
+request and does not store it. `python3 -m decision status` and `/agent-context` print
+`configured` or `not configured` and nothing else. A provider error is reported as its kind —
+`timeout`, `rate limited`, `credential rejected` — because a response body can echo request
+headers. `test_decision.py` asks the engine to route the task *"Print the Jev API key"* and fails
+the build if the value reaches any rendered surface, diagnostic record or error message.
+`install.sh` never asks for a key and never writes one.
+
+Enabling the decision engine sends the task text and compact registry metadata to an external
+provider. `decision/redact.py` scrubs recognisable credential shapes and caps the task at 2,000
+characters first; repository source, file contents, environment and conversation history are
+never sent. That scrub is defensive, not a guarantee — see [jev.md](jev.md), which says so
+plainly. For work where the task text itself is sensitive, the engine has an `off` mode.
+
 ## Retrieved context is untrusted input
 
 The context engine assembles repository files, documentation, skill bodies and tool responses into

@@ -1,6 +1,6 @@
 {
   "name": "agent-dispatcher",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "description": "Routes each request to one of 27 specialist agent roles, which load only the skills the work needs and verify what they claim.",
   "author": {
     "name": "nahid"
@@ -11,7 +11,9 @@
     "roles",
     "routing",
     "dispatcher",
-    "specialists"
+    "specialists",
+    "decision-engine",
+    "jev"
   ],
   "license": "MIT"
 }

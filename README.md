@@ -10,6 +10,8 @@ when a handoff materially improves the outcome; simple tasks stay simple.
 
 ```text
 request
+  → decision engine          which role, which skills, which tools — default, or Jev if you
+                             configured it; a clean install never leaves the default
   → smallest suitable specialist
   → context plan             what that specialist needs, before what it will do
   → relevant skills          (1–5, by capability, not by what is installed)
@@ -22,12 +24,13 @@ request
   → result
 ```
 
-Six concepts, deliberately not collapsed into each other:
+Seven concepts, deliberately not collapsed into each other:
 
 **Agent** = responsibility · **Skill** = reusable method · **MCP/tool** = external capability ·
-**Recipe** = reusable workflow · **Permission** = authorization · **Verification** = evidence.
+**Recipe** = reusable workflow · **Permission** = authorization · **Verification** = evidence ·
+**Decision** = selecting what happens next.
 
-Knowledge is not capability, and capability is not authorization.
+Knowledge is not capability, capability is not authorization, and relevance is neither.
 
 ## Use
 
@@ -38,6 +41,8 @@ Knowledge is not capability, and capability is not authorization.
 /agent-context               show the context plan behind the current request
 /agent-context explain       ...and why this role, these skills, these tools
 /agent-context verbose       ...plus the candidates, the dropped files and the budget split
+/agent-decision              show the decision engine: mode, provider, credentials, status
+/agent-decision off|auto|required    switch it for this project
 ```
 
 Perpetual mode runs through a `SessionStart` hook. Scopes:
@@ -82,6 +87,14 @@ Everything lands under a single directory, `~/.claude/skills/agent-dispatcher/`,
 categories under its `lib/`. The pack never claims a top-level name like `security` or `design` in
 your skills directory, never overwrites a command file it did not write, and backs up
 `settings.json` before touching it.
+
+Installation is non-interactive and never asks for a credential. The optional decision engine
+installs inert; if you want it, that is a separate opt-in step you take afterwards:
+
+```bash
+export TYPESAFE_API_KEY="your-own-key"   # optional — see "Optional Jev decision engine"
+python3 -m decision status
+```
 
 # How the system works
 
@@ -133,6 +146,92 @@ whole thing — including what it could not establish.
 
 [docs/context-engine.md](docs/context-engine.md) · the procedure itself ships as
 [`CONTEXT.md`](skills/agent-dispatcher/CONTEXT.md) inside the skill.
+
+## Optional Jev decision engine
+
+`agent-dispatcher` includes a default decision path and needs nothing to use it. It can
+*optionally* use [Jev](https://typesafe.ai), a structured decision model, for three bounded
+choices: which role owns the task, which skills it loads, and which servers are relevant.
+
+```text
+Without Jev                         With Jev
+Task                                Task
+ ↓                                   ↓
+Default decision engine             Jev decision engine
+ ↓                                   ↓
+Agent + Skills + Tools              Agent + Skills + Tools
+ ↓                                   ↓
+Context Plan                        Context Plan
+```
+
+```text
+Both paths
+ ↓
+the same context engine
+ ↓
+the same permission enforcement
+ ↓
+the same specialist execution
+ ↓
+the same verification
+```
+
+The split is the point. **Claude** does the reasoning, planning, code, design and research.
+**Jev** answers a classification with a fixed candidate set, in a few hundred milliseconds. A
+decision engine improves the decision layer; it does not replace anything.
+
+**You supply your own key and you pay your own usage.** This repository ships no credential,
+proxies nothing through a maintainer account, and makes no call at all unless you configure one.
+
+```bash
+export TYPESAFE_API_KEY="your-own-key"   # or AI_GATEWAY_API_KEY, via Vercel AI Gateway
+python3 -m decision status
+```
+
+TypeSafe's own HTTP API is the default because it is the documented one — Vercel states that
+evaluation is available through the AI SDK only, which makes the gateway the less-supported route
+for a Python caller. Either way the key stays in your environment: it is never a config key, never
+written to a file by this pack, and never carried on an object that gets rendered, logged or
+serialised. `status` says `configured` or `not configured`, and that is all it will ever say.
+
+Three modes. `off` never calls it. `auto` — the default — uses it when it is configured and
+healthy, and falls back to the default engine on a timeout, an error, an id that does not
+resolve, or a confidence below the calibrated floor, recording that in diagnostics. `required`
+errors clearly instead of falling back, which is what makes controlled evaluation possible.
+With no key configured, `auto` is indistinguishable from `off`.
+
+**It decides relevance. It never decides authorization.** A decision result cannot grant a
+workspace write, a deployment, a database mutation, a message send or an OAuth scope. The
+runtime's permission layer is unchanged and never reads it — and `test_decision.py` fails the
+build if a decision payload ever grows a permission-shaped field, checking that against tasks
+like *"deploy to production"* with the relevant tool scored at 100%.
+
+Every id it returns is resolved against the canonical registry before it reaches a context plan;
+one that does not exist is discarded and recorded, never invented into a role. The transport
+refuses a non-https endpoint, refuses redirects (a 302 would replay the authorization header to
+whatever host it names), and refuses a credential a header cannot carry rather than letting the
+error quote it. No third-party package: five small JSON posts do not justify adding an AI
+framework to a repository whose whole promise is that it installs nothing.
+
+Measured over 162 routing fixtures covering all 27 roles, plus 24 skill and 20 tool cases
+(registry `89baa5fa0e0c`, 2026-09-19):
+
+| | Lexical baseline | Jev |
+| --- | --- | --- |
+| Agent top-1 | 23 / 162 | 138 / 162 |
+| Acceptable route | 28 / 162 | 150 / 162 |
+| Near-neighbour top-1 | 6 / 54 | 48 / 54 |
+| Skill precision / recall | 0.31 / 0.56 | 0.68 / 0.73 |
+| Tool precision / recall | 0.15 / 0.23 | 0.64 / 0.97 |
+| Median decision latency | 0 ms | 366 ms |
+
+The baseline there is a keyword floor, not what a real installation does — production hands
+routing to the model, which cannot be scored offline. Beating a keyword matcher is evidence that
+Jev is a serious candidate for these decisions, not proof it beats Claude at them. The evaluation
+exists to answer that honestly, and if a later run says the default path is better, that goes in
+the table too.
+
+[docs/jev.md](docs/jev.md) · setup, modes, privacy, cost, calibration and troubleshooting.
 
 ## MCPs and tools provide real capability
 
@@ -367,7 +466,11 @@ tags: git, history, rebase, merge, recovery
 ```
 
 Write `not_for` as territory another role owns. It is routing data, not a list of bad habits — it
-is what keeps near-miss roles out. Full guide: [docs/adding-an-agent.md](docs/adding-an-agent.md).
+is what keeps near-miss roles out, for a reader and for a decision model alike: `summary`,
+`use_when`, `not_for` and `tags` are exactly what the build carries into `catalog/loadouts.json`,
+which is the candidate registry. There is no second place to register a role. Add a routing fixture
+to `evals/decision/agents.json` while you are there — `test_decision.py` fails if a role has no
+gold label anywhere. Full guide: [docs/adding-an-agent.md](docs/adding-an-agent.md).
 
 # Adding a skill
 
@@ -383,7 +486,8 @@ skills/<category>/<id>/
 ```
 
 Keep discovery metadata compact and disclose deeper content progressively. A skill improves method;
-it does not redefine responsibility or authorization. Full guide:
+it does not redefine responsibility or authorization. Registering it is also all it takes to make it
+selectable by the decision engine, for every role whose loadout names it. Full guide:
 [docs/adding-a-skill.md](docs/adding-a-skill.md).
 
 # Repository layout
@@ -394,13 +498,22 @@ skills/<category>/<id>/SKILL.md       SOURCE — standard Agent Skill + manifest
 recipes/<id>.md                       SOURCE — workflow shapes
 catalog/mcp.json                      SOURCE — MCP registry
 catalog/external-skills.json          SOURCE — external skills with provenance
+catalog/signals.json                  SOURCE — how each conditional skill bucket is decided
+catalog/context-plan.schema.json      SOURCE — the shape of a context plan
 SKILL.template.md                     SOURCE — the router body
-docs/                                 architecture, skills, mcps, recipes, verification, security
+CONTEXT.template.md                   SOURCE — the context engine
+decision/                             SOURCE — the decision engine: contract, default and Jev
+                                               implementations, provider transports, CLI
+evals/decision/                       SOURCE — routing/skill/tool fixtures, the comparison
+                                               harness, and the offline measurement baseline
+docs/                                 architecture, skills, mcps, recipes, verification,
+                                      security, context-engine, jev
 adapters/claude-code/                 what is rendered where, and why
 adapters/locus/                       portable catalog export
 
 build.py                              indexes sources, generates and validates
 test_build.py                         validation suite
+test_decision.py                      decision-engine suite — deterministic, offline, free
 install.sh                            build, test, install, register
 
 skills/agent-dispatcher/              GENERATED — router, rendered roles, index
@@ -415,10 +528,27 @@ count in this README and in `docs/` is generated between markers for the same re
 
 # Evaluations
 
-`build.py` and `test_build.py` run on every install. The suite checks generated-versus-source
-agreement, generated-file drift, cross-reference resolution, standard `SKILL.md` frontmatter, body
-length bounds, credential and absolute-path scanning, registry completeness, and docs-versus-catalog
-counts.
+`build.py`, `test_build.py` and `test_decision.py` run on every install. The suites check
+generated-versus-source agreement, generated-file drift, cross-reference resolution, standard
+`SKILL.md` frontmatter, body length bounds, credential and absolute-path scanning, registry
+completeness, docs-versus-catalog counts, and — for the decision layer — mode behaviour,
+fallback on every provider failure mode, id validation, the permission boundary, and what a
+request is allowed to contain. None of it needs a network or a credential.
+
+`evals/decision/` is the first repeatable eval suite: 162 routing fixtures over all 27 roles with
+obvious, near-neighbour, ambiguous and negative cases, plus 24 skill and 20 tool cases scored for
+precision as well as recall — `irrelevant` ids are what make them measure precision rather than
+rewarding a system that selects everything.
+
+```bash
+python3 evals/decision/run.py                  # the offline baseline — free, no network
+python3 evals/decision/run.py --engine both    # add Jev; needs your own credential
+```
+
+It reports top-1 and acceptable-route rates per case kind, latency, failures, fallbacks, and
+observed accuracy per confidence band — that last table is what set the thresholds in
+`decision/config.py` instead of a guess. Results are local; nothing is sent anywhere. The measured
+comparison is in [docs/jev.md](docs/jev.md), including what it does **not** establish.
 
 Role files carry example tasks and boundary traps. Extending that into repeatable evals —
 happy-path, ambiguous task, missing tool, tool failure, permission boundary, adversarial
@@ -438,7 +568,8 @@ registries. Not affiliated with Locus. See [NOTICE](NOTICE).
 # Design principle
 
 ```text
-correct specialist
+correct decision
++ correct specialist
 + correct context
 + correct skill
 + correct tool

@@ -134,15 +134,28 @@ def main():
     check("router catalog == templates",
           set(re.findall(r"^### `([a-z0-9-]+)`", router, re.M)) == ids)
     cmds = sorted(build.CMDS.glob("agent-*.md"))
-    role_cmds = [c for c in cmds if c.name != "agent-context.md"]
-    check("one command per role, plus the inspector", len(role_cmds) == len(roles)
-          and (build.CMDS / "agent-context.md").exists(), f"{len(cmds)} files vs {len(roles)} roles")
+    # Two generated commands are not roles: the context-plan inspector, and the switch for the
+    # optional decision engine.
+    NON_ROLE_CMDS = ("agent-context.md", "agent-decision.md")
+    role_cmds = [c for c in cmds if c.name not in NON_ROLE_CMDS]
+    check("one command per role, plus the inspector and the decision switch",
+          len(role_cmds) == len(roles)
+          and all((build.CMDS / n).exists() for n in NON_ROLE_CMDS),
+          f"{len(cmds)} files vs {len(roles)} roles")
     for c in role_cmds:
         m = re.search(r"roles/([a-z0-9-]+)\.md", c.read_text())
         check(f"command {c.name} points at a real role", m and m.group(1) in ids)
     inspector = (build.CMDS / "agent-context.md").read_text()
     check("inspector sends the reader to CONTEXT.md", "CONTEXT.md" in inspector)
     check("inspector does not do the work", "Do not do the work." in inspector)
+    check("inspector names the decision engine", "decision engine" in inspector.lower())
+    check("inspector refuses to print a credential",
+          "never print a credential" in inspector.lower())
+    switch = (build.CMDS / "agent-decision.md").read_text()
+    check("the decision switch offers all three modes",
+          all(f"`{m}`" in switch for m in ("off", "auto", "required")))
+    check("the decision switch never asks for a credential in chat",
+          "Never ask the user to paste a credential" in switch)
     hook = (build.HOOKS / "agent-dispatcher-activate.sh").read_text()
     check("hook index == templates", set(re.findall(r"^- `([a-z0-9-]+)`", hook, re.M)) == ids)
     rendered = sorted((build.ADAPTER / "roles").glob("*.md"))
@@ -285,8 +298,47 @@ def main():
         body = (ROOT / f).read_text()
         check(f"{f} states the current role count", f"{len(roles)} specialist agent roles" in body,
               "its description is hand-written and nothing else checks it")
-    for doc in ("architecture.md", "security.md", "adding-a-skill.md", "context-engine.md"):
+    for doc in ("architecture.md", "security.md", "adding-a-skill.md", "context-engine.md",
+                "jev.md"):
         check(f"docs/{doc} exists", (ROOT / "docs" / doc).exists())
+
+    print("\ndecision layer agrees with the canonical registries")
+    sys.path.insert(0, str(ROOT))
+    from decision.registry import Registry
+    reg = Registry(root=build.CATALOG)
+    agents = reg.agent_candidates()
+    check("every decision candidate maps to a real role",
+          {c.id for c in agents} <= ids, "a candidate id has no template behind it")
+    check("every role but the dispatcher is a candidate",
+          {c.id for c in agents} == ids - {"dispatcher"},
+          str(sorted(ids - {"dispatcher"} - {c.id for c in agents})))
+    check("candidate ids are unique", len({c.id for c in agents}) == len(agents))
+    check("routing metadata reaches the registry the engine reads",
+          all(r.get("summary") and r.get("use_when") and r.get("not_for")
+              for r in json.loads((build.CATALOG / "loadouts.json").read_text())["roles"]),
+          "loadouts.json lost the lines that tell one role from another")
+    known_skills = {s["id"] for s in skills} | set(d["external"])
+    check("every decision skill candidate maps to a registered skill",
+          all(c.id in known_skills for r in ids for c in reg.skill_candidates(r)),
+          "a loadout names a skill the registries do not carry")
+    check("every decision tool candidate maps to a registered server",
+          {c.id for c in reg.tool_candidates()} == {s["id"] for s in mcp},
+          "the tool roster and catalog/mcp.json disagree")
+    check("the decision layer builds no registry of its own",
+          not list(build.CATALOG.glob("jev-*.json"))
+          and not list((ROOT / "decision").glob("*-registry.json")),
+          "a duplicated candidate registry appeared")
+    check("no decision candidate carries a permission or write posture",
+          not any(w in c.criteria.lower() for c in reg.tool_candidates()
+                  for w in ("permission", "authoriz", "risk:", "writes:")),
+          "permission-adjacent metadata reached a relevance model")
+    check("the decision layer needs no third-party package",
+          not any(line.startswith(("import ", "from ")) and
+                  line.split()[1].split(".")[0] in ("requests", "httpx", "openai", "anthropic",
+                                                    "ai", "pydantic", "aiohttp")
+                  for f in (ROOT / "decision").rglob("*.py")
+                  for line in f.read_text().splitlines()),
+          "something outside the standard library was imported")
 
     print()
     if FAILURES:

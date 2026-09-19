@@ -1,5 +1,106 @@
 # Changelog
 
+## 2.2.0 — 2026-09-19
+
+Decision Engine v1. Routing answered *who*; the context engine answered *what with*. This release
+names the layer that makes those bounded choices, and makes it swappable.
+
+```text
+request → decision engine → agent + skills + tools → context plan → context engine → specialist
+```
+
+The default path is unchanged. A clean installation needs no account, no key and no network, and
+behaves exactly as 2.1 did.
+
+### Added
+
+- **A generic Decision Engine contract** (`decision/`) — `choose_agent`, `choose_skills`,
+  `choose_tools`, plus `rank_context` and `evaluate_verification` declared for later. The context
+  engine consumes `AgentDecision`/`SkillDecision`/`ToolDecision` and cannot tell which engine
+  produced them, so a future reranker or local classifier arrives without reshaping anything above
+  it. Strongly typed inputs and outputs, standard library only, no new dependency.
+- **`DefaultDecisionEngine`** — the behaviour that already existed, expressed in the contract. It
+  does not route: `SKILL.md` and the model still do, as always. Skills come from the loadout's
+  `skills_core` and `skills_preferred`, tools from its `mcp_recommended`.
+- **`JevDecisionEngine`** — optional, for users who supply their own credentials. One typed
+  `choice` over the role roster with a confidence, one `noul` per candidate skill and per
+  registered server. Two requests per task, not thirty-two; one when the user named a role.
+  Providers for TypeSafe's documented HTTP API (default) and the Vercel AI Gateway, plus a mock.
+- **Three modes** — `off` (no credential, no request), `auto` (the default: use it when it is
+  there, fall back and record a diagnostic when it is not), `required` (fail clearly instead of
+  falling back, so evaluation is controlled). `AGENT_DISPATCHER_OFFLINE=1` forces the default
+  engine for local-only work.
+- **`/agent-decision`** and `python3 -m decision status | mode | plan` — inspect and switch. Never
+  prints a credential, never asks for one in chat.
+- **`evals/decision/`** — 162 routing fixtures across all 27 roles (obvious, near-neighbour,
+  ambiguous with multiple acceptable routes, and negative), 24 skill-selection and 20
+  tool-relevance fixtures scored for precision as well as recall, and a harness that compares
+  engines on identical inputs and reports observed accuracy per confidence band.
+- **`test_decision.py`** — mode behaviour, fallback on timeout / 401 / 429 / 529 / malformed body /
+  unknown id / low confidence, `required` erroring on each of those, forced-role precedence, the
+  permission boundary, what a request is allowed to contain, and provider wire handling. No
+  network, no credential, no cost.
+- **[docs/jev.md](docs/jev.md)** — architecture, setup, modes, what is actually sent, cost
+  responsibility, the permission boundary, the measured results and the calibration behind the
+  thresholds.
+
+### Changed
+
+- `catalog/loadouts.json` now carries each role's `summary`, `use_when`, `not_for` and `tags`.
+  That is the routing metadata, and it lives in the registry the build already generates so the
+  decision layer has one canonical candidate source and no registry of its own.
+- The context plan schema gains `selected_by` (`forced` · `recipe` · `default` · `jev`) and
+  `confidence` on agents, skills and tools, plus a `decision` block recording the engine, whether
+  it fell back, and the registry digest. Schema version 2.2.0.
+- `CONTEXT.md` gains section 0, the decision engine, and says in three places that relevance,
+  availability and authorization are three different facts.
+- `/agent-context` names the engine that answered, shows a fallback rather than hiding one, and
+  keeps the full candidate ranking behind `explain`.
+- `install.sh` installs the engine and the registries it reads, and runs `test_decision.py`. It
+  stays non-interactive and never asks for or writes a credential.
+
+### Measured
+
+162 routing fixtures against `jev-latest`, registry `89baa5fa0e0c`:
+
+| | Lexical baseline | Jev |
+| --- | --- | --- |
+| Agent top-1 | 23 / 162 | 138 / 162 |
+| Acceptable route | 28 / 162 | 150 / 162 |
+| Near-neighbour top-1 | 6 / 54 | 48 / 54 |
+| Skill precision / recall | 0.31 / 0.56 | 0.68 / 0.73 |
+| Tool precision / recall | 0.15 / 0.23 | 0.64 / 0.97 |
+| Median latency | 0 ms | 366 ms |
+
+The baseline is a keyword floor, not what a real installation does — production hands routing to
+the model, which cannot be scored offline. Confidence proved informative (0.98 observed accuracy
+above 0.90, collapsing to 0.38 below 0.70), so the thresholds in `decision/config.py` are derived
+from that table rather than guessed. No end-to-end comparison has been run.
+
+### Security
+
+- No credential is committed, embedded or shipped. The key lives in the environment; configuration
+  exposes the variable's name and whether it is set, never its value; the provider reads it at
+  request time and does not store it.
+- A decision cannot authorize. No type has a field that could carry one, `assert_no_authorization()`
+  raises if one appears, and the suite runs it against "deploy to production" and "delete the
+  production database" with the relevant tool at 100%.
+- A request carries the scrubbed, capped task text, detected technology names and compact registry
+  metadata. Not repository source, file contents, environment or conversation history.
+- Every id an external engine returns is validated against the registry before it reaches a plan,
+  and is character-filtered before being echoed into a diagnostic.
+- The transport refuses a credential a header cannot carry, refuses a non-https base URL, and
+  refuses redirects — urllib's default handler replays `Authorization` across hosts on a 302.
+  Exceptions from below the provider are replaced rather than wrapped, and `required`-mode
+  errors are raised `from None`, so no traceback can quote a request header.
+- The response is size-capped and read against a wall-clock deadline; `timeout` alone is
+  per socket read and does not bound the exchange.
+- The project config file can no longer set the diagnostics log path — a cloned repository
+  should not choose a file to create and append to — and a bad value in it is dropped rather
+  than raised.
+- The mock transport is not reachable from configuration. A test double a user can select is a
+  test double that can fabricate a plan and have it rendered as a real one.
+
 ## 2.1.0 — 2026-09-19
 
 Context Engine v1. Routing already answered *who does this work*; this release answers *what are

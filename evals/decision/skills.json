@@ -1,0 +1,617 @@
+{
+  "schema_version": "1.0",
+  "purpose": "Skill-selection cases. `irrelevant` is what makes these measure precision: a system that selects every skill has perfect recall and is useless.",
+  "registry_version": "6698fc5a5674",
+  "cases": [
+    {
+      "id": "ai-01",
+      "agent": "ai-agent-engineer",
+      "task": "Our support assistant forgets the order number a customer gave twenty turns earlier and asks for it again near the end of long chats.",
+      "stack": [
+        "Python",
+        "FastAPI",
+        "Redis"
+      ],
+      "required": [
+        "memory-design",
+        "context-engineering"
+      ],
+      "acceptable": [
+        "llm-observability"
+      ],
+      "irrelevant": [
+        "anthropic-skill-creator",
+        "mcp-design",
+        "structured-output",
+        "model-routing"
+      ],
+      "why": "State loss across a long conversation is a memory and context-window problem; output formatting, model choice and skill authoring are noise."
+    },
+    {
+      "id": "ai-02",
+      "agent": "ai-agent-engineer",
+      "task": "Move the summarization endpoint onto the newer Claude model tier and stop re-billing the 40k-token system preamble on every request.",
+      "stack": [
+        "TypeScript",
+        "Anthropic SDK",
+        "Claude"
+      ],
+      "required": [
+        "anthropic-claude-api",
+        "model-routing"
+      ],
+      "acceptable": [
+        "context-engineering",
+        "prompt-engineering"
+      ],
+      "irrelevant": [
+        "memory-design",
+        "retrieval-rag",
+        "agent-security",
+        "tool-design"
+      ],
+      "why": "Stack-conditional: anthropic-claude-api fires only because the detected SDK is Anthropic's \u2014 model ids and prompt caching are provider-specific facts that must not be answered from memory."
+    },
+    {
+      "id": "sec-01",
+      "agent": "security-auditor",
+      "task": "Our research assistant started obeying instructions buried inside web pages users paste in; one page told it to forward the summary to an outside address and it complied.",
+      "stack": [
+        "Node.js",
+        "Claude API",
+        "MCP tools"
+      ],
+      "required": [
+        "prompt-injection-defense",
+        "agent-security"
+      ],
+      "acceptable": [
+        "threat-modeling"
+      ],
+      "irrelevant": [
+        "owasp-web",
+        "secure-code-review",
+        "dependency-security",
+        "secrets-management"
+      ],
+      "why": "Hard case: 'web pages' plus 'security' pulls toward OWASP web review, but there is no browser injection and no code defect \u2014 untrusted content is crossing into the instruction channel."
+    },
+    {
+      "id": "api-01",
+      "agent": "api-integration-engineer",
+      "task": "Our payment webhook handler charges some customers twice when the provider redelivers an event after a timeout.",
+      "stack": [
+        "Node.js",
+        "Express",
+        "Stripe",
+        "Postgres"
+      ],
+      "required": [
+        "webhooks",
+        "idempotency-and-retries"
+      ],
+      "acceptable": [
+        "observability"
+      ],
+      "irrelevant": [
+        "caching",
+        "authentication",
+        "mcp-design",
+        "owasp-web",
+        "api-design"
+      ],
+      "why": "Duplicate side effects on redelivery is delivery semantics plus idempotency; auth, caching and contract design are unrelated to the failure."
+    },
+    {
+      "id": "arch-01",
+      "agent": "architect",
+      "task": "We want customers to export their whole workspace as a zip; exports can take twenty minutes and the team is arguing about whether this belongs in the request path.",
+      "stack": [
+        "Python",
+        "Django",
+        "Postgres",
+        "S3"
+      ],
+      "required": [
+        "background-jobs"
+      ],
+      "acceptable": [
+        "api-design",
+        "observability",
+        "idempotency-and-retries"
+      ],
+      "irrelevant": [
+        "competitive-analysis",
+        "deep-research",
+        "agent-design",
+        "mcp-design",
+        "caching"
+      ],
+      "why": "Long-running work behind a request is an execution-boundary decision; the research and agent-design skills in this loadout have nothing to do with it."
+    },
+    {
+      "id": "auto-01",
+      "agent": "automation-operations",
+      "task": "Every Monday, pull the week's closed tickets and post a summary to the team channel. Last week the run fired three times and posted duplicates after the API timed out.",
+      "stack": [
+        "Python",
+        "GitHub Actions",
+        "Slack API"
+      ],
+      "required": [
+        "idempotency-and-retries",
+        "github-actions"
+      ],
+      "acceptable": [
+        "background-jobs",
+        "api-contract-verification"
+      ],
+      "irrelevant": [
+        "prompt-injection-defense",
+        "agent-security",
+        "secrets-management",
+        "webhooks"
+      ],
+      "why": "Hard plus stack-conditional: the recurring-brief framing invites the agent-safety skills, but the real failure is a scheduled job retrying a non-idempotent post, and github-actions fires only because that is the detected scheduler."
+    },
+    {
+      "id": "copy-01",
+      "agent": "content-copywriter",
+      "task": "Rewrite the empty states and error messages in our onboarding flow; right now they say things like 'Error: invalid entity state.'",
+      "stack": [
+        "React",
+        "i18n JSON"
+      ],
+      "required": [
+        "ux-writing"
+      ],
+      "acceptable": [
+        "copywriting"
+      ],
+      "irrelevant": [
+        "seo",
+        "positioning",
+        "source-evaluation",
+        "anthropic-brand-guidelines"
+      ],
+      "why": "Interface microcopy, not marketing or search content; SEO and positioning would be pure noise on in-product strings."
+    },
+    {
+      "id": "da-01",
+      "agent": "data-analyst",
+      "task": "Signups look like they jumped 40% in March. Before we put that in the board deck, confirm whether it is real.",
+      "stack": [
+        "Postgres",
+        "dbt",
+        "Metabase"
+      ],
+      "required": [
+        "data-quality",
+        "data-analysis"
+      ],
+      "acceptable": [
+        "postgres",
+        "product-analytics"
+      ],
+      "irrelevant": [
+        "experimentation",
+        "source-evaluation"
+      ],
+      "why": "Hard case: the obvious read is 'analyze the growth', but a suspicious step-change is a data-quality question first \u2014 rule out a tracking or dedupe artifact before interpreting it. postgres fires on the detected warehouse."
+    },
+    {
+      "id": "de-01",
+      "agent": "data-engineer",
+      "task": "The nightly job that builds the revenue table silently produced half-empty rows for three days after an upstream column was renamed. It needs to fail loudly and be re-runnable for those dates.",
+      "stack": [
+        "Airflow",
+        "Python",
+        "Snowflake"
+      ],
+      "required": [
+        "data-pipelines",
+        "data-quality"
+      ],
+      "acceptable": [
+        "observability",
+        "idempotency-and-retries"
+      ],
+      "irrelevant": [
+        "postgres",
+        "background-jobs",
+        "test-design"
+      ],
+      "why": "A scheduled transform emitting bad rows is pipeline plus data-quality; postgres is a stack negative because the warehouse is Snowflake."
+    },
+    {
+      "id": "db-01",
+      "agent": "database-engineer",
+      "task": "We need to split the users.name column into first and last on a 200 million row table without taking the app down, and we need a way back if it goes wrong.",
+      "stack": [
+        "Postgres",
+        "Rails",
+        "pgbouncer"
+      ],
+      "required": [
+        "migrations",
+        "rollback"
+      ],
+      "acceptable": [
+        "postgres",
+        "data-integrity",
+        "database-migration-verification",
+        "schema-design"
+      ],
+      "irrelevant": [
+        "query-optimization",
+        "authorization",
+        "test-design"
+      ],
+      "why": "Zero-downtime column split on a live table is a staged migration with a verified rollback path; query tuning and access rules are not in play. postgres fires on the detected engine."
+    },
+    {
+      "id": "dbg-01",
+      "agent": "debugger",
+      "task": "Users report the settings page shows their old company name for about ten minutes after they change it, then it fixes itself. Only happens in production.",
+      "stack": [
+        "Next.js",
+        "Redis",
+        "Postgres",
+        "Fastly"
+      ],
+      "required": [
+        "caching",
+        "systematic-debugging"
+      ],
+      "acceptable": [
+        "browser-verification",
+        "regression-testing"
+      ],
+      "irrelevant": [
+        "performance-profiling",
+        "query-optimization",
+        "llm-observability",
+        "postgres"
+      ],
+      "why": "Hard case: 'slow to update' reads as a performance or query problem, but a symptom that self-heals on a fixed ten-minute window is a TTL \u2014 reproduce it, then look at the cache layer."
+    },
+    {
+      "id": "devops-01",
+      "agent": "devops-release",
+      "task": "Preview builds pass but the production deploy lands with the wrong environment variables, and we have no agreed way to back it out.",
+      "stack": [
+        "Next.js",
+        "Vercel",
+        "GitHub Actions"
+      ],
+      "required": [
+        "vercel-deploy-to-vercel",
+        "rollback"
+      ],
+      "acceptable": [
+        "deployment",
+        "secrets-management",
+        "github-actions",
+        "ci-cd",
+        "release-verification"
+      ],
+      "irrelevant": [
+        "technical-writing",
+        "docker",
+        "migrations"
+      ],
+      "why": "Stack-conditional: vercel-deploy-to-vercel and github-actions fire only because of the detected platform, and docker is wrong for the same reason \u2014 there is no container in this delivery path."
+    },
+    {
+      "id": "exp-01",
+      "agent": "explorer",
+      "task": "Before we touch the billing rewrite, find where invoice totals are actually computed and every code path that mutates them.",
+      "stack": [
+        "Ruby on Rails",
+        "Postgres",
+        "Sidekiq"
+      ],
+      "required": [
+        "stack-detection",
+        "component-architecture"
+      ],
+      "acceptable": [
+        "postgres",
+        "schema-design"
+      ],
+      "irrelevant": [
+        "documentation-verification",
+        "technical-writing"
+      ],
+      "why": "Mapping where behavior lives and how it connects; auditing existing docs and writing new prose are not the ask."
+    },
+    {
+      "id": "impl-01",
+      "agent": "implementer",
+      "task": "Build the team-invite modal from the approved design: email field, role dropdown, and a list of pending invites.",
+      "stack": [
+        "Next.js",
+        "Tailwind",
+        "shadcn/ui",
+        "TypeScript"
+      ],
+      "required": [
+        "shadcn-ui",
+        "tailwind"
+      ],
+      "acceptable": [
+        "component-architecture",
+        "nextjs-next-dev-loop",
+        "accessibility",
+        "design-to-code",
+        "responsive-design"
+      ],
+      "irrelevant": [
+        "postgres",
+        "schema-design",
+        "background-jobs",
+        "caching",
+        "owasp-web"
+      ],
+      "why": "Stack-conditional: shadcn-ui and tailwind fire purely on the detected component library and CSS framework; a different UI stack would select neither."
+    },
+    {
+      "id": "impl-02",
+      "agent": "implementer",
+      "task": "Add the resend-verification-email endpoint, and make sure a token can only be redeemed once and expires after an hour.",
+      "stack": [
+        "Node.js",
+        "Express",
+        "Postgres",
+        "SendGrid"
+      ],
+      "required": [
+        "authentication"
+      ],
+      "acceptable": [
+        "background-jobs",
+        "owasp-web",
+        "test-design",
+        "api-design"
+      ],
+      "irrelevant": [
+        "tailwind",
+        "shadcn-ui",
+        "responsive-design",
+        "browser-verification",
+        "design-to-code"
+      ],
+      "why": "Backend token lifecycle work: the React, Tailwind and browser skills in this loadout must not fire on a stack with no frontend in it."
+    },
+    {
+      "id": "inc-01",
+      "agent": "incident-responder",
+      "task": "Checkout has been returning 500s for eleven minutes; it started four minutes after last night's release went to full traffic.",
+      "stack": [
+        "Kubernetes",
+        "Go",
+        "Postgres"
+      ],
+      "required": [
+        "incident-response",
+        "rollback"
+      ],
+      "acceptable": [
+        "observability",
+        "deployment",
+        "release-verification"
+      ],
+      "irrelevant": [
+        "secrets-management",
+        "background-jobs",
+        "database-migration-verification",
+        "auth-security"
+      ],
+      "why": "Hard case: a live outage needs the smallest reversible mitigation first. The deploy correlation tempts a migration-verification detour, but nothing says a migration ran."
+    },
+    {
+      "id": "perf-01",
+      "agent": "performance-engineer",
+      "task": "The admin dashboard takes eight seconds to paint for accounts with more than a thousand projects, and is fine for small accounts.",
+      "stack": [
+        "React",
+        "Rails",
+        "Postgres"
+      ],
+      "required": [
+        "performance-profiling",
+        "query-optimization"
+      ],
+      "acceptable": [
+        "postgres",
+        "caching",
+        "observability"
+      ],
+      "irrelevant": [
+        "frontend-performance",
+        "migrations",
+        "schema-design",
+        "background-jobs"
+      ],
+      "why": "Hard case: 'takes eight seconds to paint' reads as a frontend problem, but cost scaling with row count points at the query layer \u2014 measure before touching the bundle."
+    },
+    {
+      "id": "pm-01",
+      "agent": "product-manager",
+      "task": "Sales keeps asking for SSO. Work out what we should actually ship first, for whom, and how we will know it worked.",
+      "stack": [
+        "B2B SaaS",
+        "Okta",
+        "SAML"
+      ],
+      "required": [
+        "product-discovery",
+        "prd-and-stories"
+      ],
+      "acceptable": [
+        "prioritization",
+        "competitive-analysis"
+      ],
+      "irrelevant": [
+        "ui-audit",
+        "positioning",
+        "experimentation",
+        "product-analytics"
+      ],
+      "why": "Scoping a vague enterprise ask into a first version with success criteria; the marketing and UI-audit skills in this loadout are unrelated."
+    },
+    {
+      "id": "refac-01",
+      "agent": "refactoring-migration-specialist",
+      "task": "We are on the App Router and want to adopt the new caching model without changing what any page renders.",
+      "stack": [
+        "Next.js",
+        "React",
+        "TypeScript"
+      ],
+      "required": [
+        "nextjs-next-cache-components-adoption"
+      ],
+      "acceptable": [
+        "vercel-react-best-practices",
+        "component-architecture",
+        "test-strategy",
+        "test-design"
+      ],
+      "irrelevant": [
+        "migrations",
+        "data-integrity",
+        "dependency-security",
+        "technical-writing"
+      ],
+      "why": "Stack-conditional and hard: the framework adoption skill fires only on the detected Next.js App Router, and 'migration' here is not a database migration."
+    },
+    {
+      "id": "rev-01",
+      "agent": "reviewer",
+      "task": "Review the PR that replaces our hand-rolled date parsing with a new npm package that brings in three transitive dependencies.",
+      "stack": [
+        "TypeScript",
+        "npm",
+        "Node.js"
+      ],
+      "required": [
+        "dependency-security"
+      ],
+      "acceptable": [
+        "test-strategy",
+        "api-design",
+        "secure-code-review"
+      ],
+      "irrelevant": [
+        "ui-audit",
+        "accessibility-verification",
+        "schema-design",
+        "browser-verification",
+        "performance-profiling"
+      ],
+      "why": "Hard case: 'review' pulls toward general secure-code-review, but the distinguishing risk of this specific change is the new supply-chain surface it adds."
+    },
+    {
+      "id": "test-01",
+      "agent": "tester",
+      "task": "Cover the signup-to-first-project flow end to end so it runs in CI on every pull request.",
+      "stack": [
+        "Playwright",
+        "TypeScript",
+        "Next.js"
+      ],
+      "required": [
+        "e2e-testing",
+        "microsoft-playwright-cli"
+      ],
+      "acceptable": [
+        "test-strategy",
+        "test-design",
+        "browser-verification"
+      ],
+      "irrelevant": [
+        "performance-profiling",
+        "agent-evals",
+        "systematic-debugging",
+        "api-contract-verification"
+      ],
+      "why": "Stack-conditional: microsoft-playwright-cli fires only because Playwright is the detected runner; with Cypress the same task should select neither."
+    },
+    {
+      "id": "test-02",
+      "agent": "tester",
+      "task": "A bug we fixed in February came back in the last release. Make sure this specific case cannot ship broken again.",
+      "stack": [
+        "Python",
+        "pytest",
+        "GitHub Actions"
+      ],
+      "required": [
+        "regression-testing"
+      ],
+      "acceptable": [
+        "test-design",
+        "systematic-debugging"
+      ],
+      "irrelevant": [
+        "e2e-testing",
+        "microsoft-playwright-cli",
+        "visual-verification",
+        "accessibility-verification",
+        "anthropic-webapp-testing"
+      ],
+      "why": "Hard case: a returning defect needs one pinned regression test, not a new browser-automation suite \u2014 and there is no browser anywhere in the stack."
+    },
+    {
+      "id": "ui-01",
+      "agent": "ui-ux-designer",
+      "task": "Our multi-step signup form works, but people abandon at step three: the steps are long and there is no sense of where you are.",
+      "stack": [
+        "React",
+        "Tailwind",
+        "Figma"
+      ],
+      "required": [
+        "ui-audit",
+        "frontend-design"
+      ],
+      "acceptable": [
+        "ux-writing",
+        "anthropic-frontend-design",
+        "community-frontend-ui-ux",
+        "accessibility"
+      ],
+      "irrelevant": [
+        "motion-design",
+        "design-to-code",
+        "shadcn-ui",
+        "visual-verification",
+        "vercel-react-best-practices"
+      ],
+      "why": "Hard case: drop-off at a step is an information-hierarchy and flow problem to audit first; animation polish and code handoff are premature, and the form already exists."
+    },
+    {
+      "id": "vc-01",
+      "agent": "version-control",
+      "task": "Someone committed a .env with live API keys about 200 commits back. The file was deleted in a later commit but it is still in history.",
+      "stack": [
+        "Git",
+        "GitHub"
+      ],
+      "required": [
+        "secrets-management"
+      ],
+      "acceptable": [
+        "github-actions",
+        "technical-writing"
+      ],
+      "irrelevant": [
+        "rollback",
+        "systematic-debugging",
+        "dependency-security"
+      ],
+      "why": "Hard case: it looks like history surgery, but the governing skill is credential handling and rotation. 'rollback' is about reverting a release, not rewriting history, and nothing here is a defect hunt."
+    }
+  ]
+}
