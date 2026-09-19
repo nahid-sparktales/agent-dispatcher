@@ -334,6 +334,7 @@ def install_script(install_block):
             """What a finished install leaves behind, minus the file copying."""
             script.parent.mkdir(exist_ok=True)
             script.write_text("#!/bin/bash\n")
+            (d / ".agent-dispatcher-installed").touch()
             (d / "settings.json").write_text(json.dumps(settings) + "\n")
             subprocess.run([sys.executable, "-c", install_block, str(d)], capture_output=True)
             return json.loads((d / "settings.json").read_text())

@@ -194,19 +194,18 @@ def main():
             out = plan(service, TASK)
             check(f"auto survives {label}", out["engine"] in ("default", "jev"),
                   f"engine was {out['engine']}")
-            if behaviour != "empty":
-                check(f"auto records the fallback after {label}",
-                      service.diag.fell_back or out.get("fallback"),
-                      "the fallback was not recorded in diagnostics")
-                # A fallback the inspector cannot see is how a broken configuration hides: the
-                # plan looks like an ordinary default route and nothing says otherwise.
-                check(f"the plan surfaces the fallback after {label}",
-                      out.get("fallback") and out.get("fallback_reason"),
-                      f"fallback={out.get('fallback')} reason={out.get('fallback_reason')}")
-                check(f"the {label} fallback reason names a kind, not a body",
-                      len(out.get("fallback_reason", "")) < 220
-                      and FAKE_KEY not in out.get("fallback_reason", ""),
-                      out.get("fallback_reason", ""))
+            check(f"auto records the fallback after {label}",
+                  service.diag.fell_back or out.get("fallback"),
+                  "the fallback was not recorded in diagnostics")
+            # A fallback the inspector cannot see is how a broken configuration hides: the
+            # plan looks like an ordinary default route and nothing says otherwise.
+            check(f"the plan surfaces the fallback after {label}",
+                  out.get("fallback") and out.get("fallback_reason"),
+                  f"fallback={out.get('fallback')} reason={out.get('fallback_reason')}")
+            check(f"the {label} fallback reason names a kind, not a body",
+                  len(out.get("fallback_reason", "")) < 220
+                  and FAKE_KEY not in out.get("fallback_reason", ""),
+                  out.get("fallback_reason", ""))
 
         prov = MockProvider(cfg, script=["unknown-candidate"])
         service = svc(registry, provider=prov, mode="auto")
@@ -262,7 +261,7 @@ def main():
 
     with env(TYPESAFE_API_KEY=FAKE_KEY):
         cfg = load_config(project_root=CFG)
-        for behaviour in ("timeout", "auth-error", "server-error", "rate-limit", "malformed"):
+        for behaviour in ("timeout", "auth-error", "server-error", "rate-limit", "malformed", "empty"):
             prov = MockProvider(cfg, script=[behaviour])
             try:
                 plan(svc(registry, provider=prov, mode="required"), TASK)

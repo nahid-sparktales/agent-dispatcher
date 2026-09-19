@@ -245,7 +245,17 @@ class DecisionService:
         notes = list(result.diagnostics)
         sel = result.selected
         if sel is None:
-            return dataclass_replace(result, diagnostics=tuple(notes)), ()
+            notes.append("decision engine returned no usable agent answer; routing fell back")
+            self.diag.record(DecisionRecord(
+                decision="agent-selection", engine=result.engine, provider=self.config.provider,
+                model=self.config.model, candidates=len(inp.candidates), fallback=True,
+                error="no-usable-answer", registry_version=self.registry.version))
+            if self.config.mode == "required":
+                raise DecisionError(
+                    "The Jev Decision Engine is set to `required` and returned no usable agent "
+                    "answer. Fix the provider response, or set the mode to `auto` to fall back "
+                    "to the default engine.")
+            return None, tuple(notes)
         if not self.registry.valid_agent(sel.id) or sel.id not in offered:
             notes.append(f"decision engine returned agent '{_safe_id(sel.id)}', which is not a "
                          f"candidate in this registry — discarded, and routing fell back")

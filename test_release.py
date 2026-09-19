@@ -4,6 +4,8 @@
 Run separately from install.sh so installation tests cannot recursively install themselves.
 No credentials or live provider requests are used.
 """
+import contextlib
+import io
 import json
 import os
 from pathlib import Path
@@ -16,6 +18,7 @@ from unittest.mock import patch
 import urllib.error
 
 from decision.config import Config, load
+from decision.cli import main as decision_cli
 from decision.providers.mock import HTTPMock
 from decision.providers.typesafe import ProviderError, TypeSafeProvider, endpoint
 
@@ -104,6 +107,35 @@ class TransportTests(unittest.TestCase):
         self.assertIn("could not reach", str(caught.exception))
 
 
+class DecisionResponseTests(unittest.TestCase):
+    def test_unusable_agent_answers_follow_the_mode_policy(self):
+        for answers in ({}, {"agent": None}, {"agent": {}}, {"agent": {"choice": 42}}):
+            for mode in ("auto", "required"):
+                with self.subTest(answers=answers, mode=mode), tempfile.TemporaryDirectory() as tmp:
+                    env = dict(clean_env(), TYPESAFE_API_KEY="synthetic-review-credential",
+                               AGENT_DISPATCHER_DECISION_SCOPES="agent")
+                    response = HTTPMock(body={"answers": answers})
+                    stdout, stderr = io.StringIO(), io.StringIO()
+                    with patch.dict(os.environ, env, clear=True), \
+                            patch("decision.providers.typesafe._OPENER.open", response), \
+                            contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+                        code = decision_cli(["--project", tmp, "--mode", mode, "plan",
+                                             "--task", "Review this repository", "--json"])
+                    self.assertEqual(len(response.requests), 1)
+                    if mode == "required":
+                        self.assertEqual(code, 2)
+                        self.assertEqual(stdout.getvalue(), "")
+                        self.assertIn("no usable agent answer", stderr.getvalue())
+                    else:
+                        self.assertEqual(code, 0, stderr.getvalue())
+                        result = json.loads(stdout.getvalue())
+                        self.assertIsNone(result["agent"])
+                        self.assertEqual(result["engine"], "default")
+                        self.assertTrue(result["fallback"])
+                        self.assertIn("no-usable-answer", result["fallback_reason"])
+                        self.assertTrue(result["decisions"][0]["fallback"])
+
+
 class InstallerTests(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
@@ -145,6 +177,39 @@ class InstallerTests(unittest.TestCase):
                 self.assertNotEqual(result.returncode, 0)
                 self.assertTrue(manifest.exists())
                 self.assertEqual(unrelated.read_text(), "preserve me")
+
+    def test_unrecorded_skill_and_hook_are_preserved(self):
+        for index, relative in enumerate(("skills/agent-dispatcher/SKILL.md",
+                                          "hooks/agent-dispatcher-activate.sh")):
+            for action, args in (("uninstall", ("--uninstall",)), ("install", ())):
+                with self.subTest(target=relative, action=action):
+                    self.config = self.root / f"unrecorded-{index}-{action}"
+                    self.config.mkdir()
+                    self.env["CLAUDE_CONFIG_DIR"] = str(self.config)
+                    target = self.config / relative
+                    target.parent.mkdir(parents=True)
+                    target.write_text("user-owned content")
+                    settings = self.config / "settings.json"
+                    settings.write_text('{"model": "preserve"}')
+                    before = {str(p.relative_to(self.config)): p.read_bytes()
+                              for p in self.config.rglob("*") if p.is_file()}
+                    result = self.run_installer(*args)
+                    self.assertNotEqual(result.returncode, 0, result.stdout)
+                    after = {str(p.relative_to(self.config)): p.read_bytes()
+                             for p in self.config.rglob("*") if p.is_file()}
+                    self.assertEqual(after, before)
+
+    def test_uninstall_without_manifest_preserves_hook_registration(self):
+        import shlex
+        script = self.config / "hooks/agent-dispatcher-activate.sh"
+        settings = self.config / "settings.json"
+        original = json.dumps({"hooks": {"SessionStart": [{"hooks": [
+            {"type": "command", "command": "bash " + shlex.quote(str(script))}]}]}})
+        settings.write_text(original)
+        result = self.run_installer("--uninstall")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(settings.read_text(), original)
+        self.assertFalse((self.config / "settings.json.bak-agent-dispatcher").exists())
 
     def test_symlinked_installation_targets_are_refused(self):
         elsewhere = self.root / "elsewhere"

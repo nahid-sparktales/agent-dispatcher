@@ -23,7 +23,8 @@ D="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
 D=$(python3 -c 'import os,sys; print(os.path.abspath(sys.argv[1]))' "$D")
 MANIFEST="$D/.agent-dispatcher-installed"
 
-# Remove only files a previous run of this script installed.
+# The manifest records command files and proves a prior manual installation owned the
+# fixed skill directory and hook path, including installations from older releases.
 uninstall_previous() {
   [ -f "$MANIFEST" ] || return 0
   while IFS= read -r f; do
@@ -69,6 +70,12 @@ try:
             if (p.parent != d / "commands" or not re.fullmatch(r"agent-[a-z0-9-]+\.md", p.name)
                     or p.is_symlink()):
                 raise ValueError("installed-file manifest has an unsafe entry")
+    elif any((d / rel).exists() for rel in
+             ("skills/agent-dispatcher", "hooks/agent-dispatcher-activate.sh")):
+        print("Existing dispatcher skill or hook has no installation manifest; nothing was changed. "
+              "Move the conflicting files aside before installing, or restore the original "
+              "manifest if this was a previous manual installation.", file=sys.stderr)
+        sys.exit(1)
 except (OSError, ValueError) as exc:
     print(f"Installation settings are not valid JSON or have an unsafe layout ({exc.__class__.__name__}); nothing was changed", file=sys.stderr)
     sys.exit(1)
@@ -77,6 +84,8 @@ except (OSError, ValueError) as exc:
 
 require_valid_settings
 if [ "${1:-}" = "--uninstall" ]; then
+  # Without a recorded installation, even a matching hook registration is not ours.
+  [ -f "$MANIFEST" ] || { echo "No recorded manual installation in $D; nothing was changed"; exit 0; }
   # Deregister before deleting. The other order leaves settings.json starting a hook script the
   # same run has already removed, and every later session errors on it.
   python3 - "$D" <<'PY'

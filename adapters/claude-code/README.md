@@ -35,6 +35,11 @@ Plugin (`.claude-plugin/plugin.json` + `marketplace.json`), or `./install.sh` fo
 into `~/.claude` with a manifest so uninstall removes only what it wrote. Running both
 double-installs the skill.
 
+The manual install manifest also records ownership of the fixed dispatcher skill and hook paths.
+If either path already exists without that manifest, installation and uninstall refuse to change
+it. Move conflicting files aside before installing, or restore the original manifest for a prior
+manual installation. Without a manifest and without either file, uninstall leaves settings alone.
+
 ## Adding another runtime
 
 Write a renderer beside this one. The canonical `templates/`, `skills/`, `recipes/` and `catalog/`
