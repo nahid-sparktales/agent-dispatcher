@@ -1,336 +1,197 @@
 # agent-dispatcher
 
-**Capability-aware specialist routing for Claude Code.**
+**Give each Claude Code task the specialist, context, and skills it needs.**
 
-Routes each request to one of 27 specialist roles, keeps the role focused on responsibility, and
-composes only the skills, tools and verification the job actually needs. Roles chain inside a turn
-when a handoff materially improves the outcome; simple tasks stay simple.
+Agent Dispatcher routes your request to a focused role, loads relevant guidance, and defines
+what evidence will count as done. Ask it to debug a failure, design an interface, review a
+change, or research a decision. It adapts to the work and keeps small tasks small.
 
 <!-- counts:start -->**27 roles · 79 local skills · 31 external skills · 8 recipes · 19 MCP servers · 50 detection signals**<!-- counts:end -->
 
-```text
-request
-  → decision engine          which role, which skills, which tools — default, or Jev if you
-                             configured it; a clean install never leaves the default
-  → smallest suitable specialist
-  → context plan             what that specialist needs, before what it will do
-  → relevant skills          (1–5, by capability, not by what is installed)
-  → project stack            detected from the repo; activates guidance, never permission
-  → workspace retrieval      the few files that matter, ranked, with provenance
-  → available MCPs/tools     within existing permission
-  → execution
-  → verification             evidence, not confidence
-  → review or handoff        only when warranted
-  → result
-```
+[Quick start](#quick-start) · [Usage](#usage) · [Catalog](#catalog) ·
+[Documentation](#documentation) · [Contributing](#contributing)
 
-Seven concepts, deliberately not collapsed into each other:
+## Why use it?
 
-**Agent** = responsibility · **Skill** = reusable method · **MCP/tool** = external capability ·
-**Recipe** = reusable workflow · **Permission** = authorization · **Verification** = evidence ·
-**Decision** = selecting what happens next.
+- **Match the method to the task.** A debugger reproduces the failure; a reviewer evaluates the
+  change; a designer works through the interface and interaction.
+- **Load context as needed.** Roles select a small set of skills, project files, and available
+  tools. Full skill instructions are read only when selected.
+- **Make verification explicit.** The role defines the evidence needed and reports which checks
+  actually ran, what passed, and what remains unverified.
+- **Keep control of routing.** Let the dispatcher choose, force a role yourself, or opt into
+  automatic activation for future sessions.
 
-Knowledge is not capability, capability is not authorization, and relevance is neither.
+Roles are working instructions Claude adopts within a session. It can chain roles or assign
+roles to subagents when the task calls for it. Installing the pack does not start a team of
+agents or connect external services.
 
-## Use
+## Quick start
 
-```text
-/agent-dispatcher            route this request and the rest of the session
-/agent-dispatcher status     what is armed, where, and whether the hook is installed
-/agent-context               show the context plan behind the current request
-/agent-context explain       ...and why this role, these skills, these tools
-/agent-context verbose       ...plus the candidates, the dropped files and the budget split
-/agent-decision              show the decision engine: mode, provider, credentials, status
-/agent-decision off|auto|required    switch it for this project
-```
+You need an installed, authenticated [Claude Code](https://code.claude.com/docs/en/overview)
+and Git. The included session hook uses Bash and standard Unix utilities. The manual installer,
+validation suites, and optional decision engine also use Python 3 with no third-party Python
+packages.
 
-Force a role directly with `/agent-uidesigner`, `/agent-debugger`, `/agent-reviewer` — 27
-commands, one per role. A forced role holds until you name another or say stop.
+### Install as a plugin
 
-When work fans out, each subagent is routed to the role that fits **its** assignment rather than
-inheriting the caller's, and a verifier never carries the role that produced the work.
-
-## Perpetual mode
-
-Ask for it. There is nothing to configure by hand.
-
-| | Say |
-| --- | --- |
-| Route every session, everywhere | `/agent-dispatcher on` |
-| Route every session in this project | `/agent-dispatcher on here` |
-| Stop — this session | `/agent-dispatcher off` |
-| Stop — this project | `/agent-dispatcher off here` |
-| Stop — everywhere | `/agent-dispatcher off everywhere` |
-| What is armed right now? | `/agent-dispatcher status` |
-
-Plain English works as well as the keywords — "always on", "just this repo", "stop the
-dispatcher". Bare `off` means *this session*, because that is what people mean when they say it
-mid-conversation; the wider scopes are spelled out so you cannot disarm everything by accident.
-
-**Silencing always beats arming.** `off here` wins over a global `on`, so one noisy repository
-never costs you the setting everywhere else.
-
-<details>
-<summary>What those commands actually write, if you would rather script it</summary>
-
-Perpetual mode runs through a `SessionStart` hook that reads four flag files:
-
-| Scope | Armed by | Silenced by |
-| --- | --- | --- |
-| Session | the command itself | `~/.claude/.agent-dispatcher-off/<session-id>` |
-| Project | `.agent-dispatcher-on` in the project **and** its absolute path in `~/.claude/.agent-dispatcher-projects` | `.agent-dispatcher-off` in the project |
-| Everywhere | `~/.claude/.agent-dispatcher-active` | delete that file |
-
-Arming a project takes two steps on purpose. A flag file alone would let any repository you
-clone switch your sessions into perpetual mode, so the allow-list lives in your own config
-directory where a `git clone` cannot reach it. Silencing stays repo-local, because it can only
-ever reduce behaviour — a hostile repo turning the dispatcher *off* is not a threat.
-
-Session silences are forgotten after a week. `/agent-dispatcher status` reports all of this,
-including the case that looks armed but is not: a project flag with no matching allow-list entry.
-
-</details>
-
-## Install
-
-> The repository is currently **private**, so these URLs resolve only for accounts with access.
-
-As a plugin — nothing is copied into your config, and it uninstalls cleanly:
+Run in your terminal:
 
 ```bash
 claude plugin marketplace add nahid-sparktales/agent-dispatcher
+claude plugin install agent-dispatcher@agent-dispatcher
 ```
 
-Then install `agent-dispatcher` from that marketplace. Or manually:
+Start a new Claude Code session in your project, then try:
+
+```text
+/agent-dispatcher:agent-dispatcher Find why the tests are failing, fix the cause, and verify the fix.
+```
+
+The dispatcher announces a role, such as `→ debugger`, reads its working instructions, and
+starts the task. To inspect the installation and activation state:
+
+```text
+/agent-dispatcher:agent-dispatcher status
+```
+
+Plugin commands use the `agent-dispatcher:` prefix, following
+[Claude Code's plugin namespacing](https://code.claude.com/docs/en/plugins).
+For example, the reviewer command is `/agent-dispatcher:agent-reviewer`.
+
+<details>
+<summary>Alternative: manual installation</summary>
+
+Run in your terminal:
 
 ```bash
-git clone https://github.com/nahid-sparktales/agent-dispatcher
+git clone https://github.com/nahid-sparktales/agent-dispatcher.git
 cd agent-dispatcher
 ./install.sh
 ```
 
-`./install.sh --uninstall` reverses it. Use one path or the other, not both.
+The installer builds and validates the pack, copies its skills into
+`~/.claude/skills/agent-dispatcher/`, adds role commands under `~/.claude/commands/`, and
+registers a `SessionStart` hook. It backs up an existing `settings.json` before adding the hook
+and skips command files it does not own. `CLAUDE_CONFIG_DIR` overrides the default config directory.
 
-Everything lands under a single directory, `~/.claude/skills/agent-dispatcher/`, with skill
-categories under its `lib/`. The pack never claims a top-level name like `security` or `design` in
-your skills directory, never overwrites a command file it did not write, and backs up
-`settings.json` before touching it.
-
-Installation is non-interactive and never asks for a credential. The optional decision engine
-installs inert; if you want it, that is a separate opt-in step you take afterwards:
-
-```bash
-export TYPESAFE_API_KEY="your-own-key"   # optional — see "Optional Jev decision engine"
-python3 -m decision status
-```
-
-# How the system works
-
-## Agents own outcomes
-
-Each role defines when to route to it, the neighbouring territory it cedes, its working method,
-deliverable, definition of done, boundaries, tool posture and verification expectations. A role is
-a stable operating contract, not an encyclopedia.
-
-## Skills own reusable methods
-
-79 focused skills — `frontend-design`, `accessibility`, `browser-verification`,
-`systematic-debugging`, `api-design`, `migrations`, `threat-modeling` — shared across roles. A
-designer uses `accessibility` to design, an implementer to build, a tester to check, a reviewer to
-read evidence.
-
-They load progressively: compact discovery metadata first, the full `SKILL.md` only once chosen,
-references and scripts only when a step calls for them. A local id is its own directory name, so
-`**/<id>/SKILL.md` finds it without reading any index.
-
-Project signals — `package.json`, `next.config.*`, `components.json`, `supabase/`, `Dockerfile`,
-`.github/workflows/`, `vercel.json` — activate conditional guidance. Detection never grants
-permission.
-
-The build enforces the restraint the design depends on: no role may carry more than five, or more
-than 30KB of, always-on skills, and two skills providing the same capability cannot both sit in
-tiers that load unconditionally.
-
-## The context engine decides what the specialist is given
-
-Routing picks who. The context engine picks what they work with, and it runs *before* any plan of
-action exists — those are two different documents:
-
-| | Context plan | Execution plan |
-| --- | --- | --- |
-| Question | What do I need to do this correctly? | What steps will I perform? |
-| Owner | The dispatcher, before the work | The specialist, during the work |
-
-It resolves the role, asks for capabilities rather than skills, decides the conditional buckets
-from real project signals, searches the workspace lexically and keeps the few results that matter
-with their provenance, resolves which servers are actually present, records what is genuinely known
-about authorization, fixes the verification contract before the work rather than after, and holds
-the whole thing to a budget. A rename gets no plan at all; the ceremony scales with the work.
-
-It claims nothing the runtime cannot support. There is no way to enumerate installed skills,
-configured servers, or the active permission mode, so a permission is `known` only with the
-observation behind it, and `unknown` is the common and correct answer. `/agent-context` renders the
-whole thing — including what it could not establish.
-
-[docs/context-engine.md](docs/context-engine.md) · the procedure itself ships as
-[`CONTEXT.md`](skills/agent-dispatcher/CONTEXT.md) inside the skill.
-
-## Optional Jev decision engine
-
-`agent-dispatcher` includes a default decision path and needs nothing to use it. It can
-*optionally* use [Jev](https://typesafe.ai), a structured decision model, for its bounded
-choices: which role owns the task, which skills that role loads, which servers are relevant.
-
-**It ships off on every decision, and the evaluation below is why.** Put on identical fixtures
-against Claude reading the dispatcher's own catalog, Jev matched or lost everywhere — decisively
-on routing, clearly on skill recall, and to a tie on tools. Quality is not the reason to switch
-it on. Latency and cost are: ~360 ms and a fraction of a cent against a full model turn.
+Start a new Claude Code session and use the shorter command names:
 
 ```text
-Without Jev                         With Jev
-Task                                Task
- ↓                                   ↓
-Default decision engine             Jev decision engine
- ↓                                   ↓
-Agent + Skills + Tools              Agent + Skills + Tools
- ↓                                   ↓
-Context Plan                        Context Plan
+/agent-dispatcher Find why the tests are failing, fix the cause, and verify the fix.
+/agent-dispatcher status
 ```
+
+Use one installation method at a time to avoid duplicate commands and hooks.
+
+</details>
+
+No additional API key is needed for normal dispatcher use. Claude Code's own access and usage
+requirements still apply. External skills and MCP servers are catalog references; the pack does
+not install them.
+
+## Usage
+
+The examples and catalogs below use the **manual-install command names**. For a plugin install,
+add `agent-dispatcher:` after the slash: `/agent-context` becomes
+`/agent-dispatcher:agent-context`.
+
+### Let the dispatcher choose
 
 ```text
-Both paths
- ↓
-the same context engine
- ↓
-the same permission enforcement
- ↓
-the same specialist execution
- ↓
-the same verification
+/agent-dispatcher Redesign the settings page, implement it, and check it on mobile.
+/agent-dispatcher Review this change for correctness and missing tests.
+/agent-dispatcher Compare the approaches already used in this repository and recommend one.
 ```
 
-The split is the point. **Claude** does the reasoning, planning, code, design and research.
-**Jev** answers a classification with a fixed candidate set, in a few hundred milliseconds. A
-decision engine improves the decision layer; it does not replace anything.
+Routing follows the requested deliverable. A UI task can move through designer, implementer,
+and tester; a label change goes straight to implementation. Trivial edits need no role or
+context plan. While active, the dispatcher re-routes when the kind of work changes.
 
-**You supply your own key and you pay your own usage.** This repository ships no credential,
-proxies nothing through a maintainer account, and makes no call at all unless you configure one.
+### Choose a role or inspect a decision
 
-```bash
-export TYPESAFE_API_KEY="your-own-key"
-export AGENT_DISPATCHER_DECISION_SCOPES=skills,tools   # nothing runs without this
-python3 -m decision status
-```
-
-One transport: TypeSafe's own HTTP API, the only route they publish a REST contract for.
-
-TypeSafe's own HTTP API is the default because it is the documented one — Vercel states that
-evaluation is available through the AI SDK only, which makes the gateway the less-supported route
-for a Python caller. Either way the key stays in your environment: it is never a config key, never
-written to a file by this pack, and never carried on an object that gets rendered, logged or
-serialised. `status` says `configured` or `not configured`, and that is all it will ever say.
-
-Modes decide *whether* it may answer; scopes decide *what it is asked*. `off` never calls it.
-`auto` — the default — uses it where a scope is enabled and falls back to the default engine on
-a timeout, an error, an id that does not resolve, or a confidence below the calibrated floor,
-recording that in diagnostics. `required` errors clearly instead of falling back, which is what
-makes controlled evaluation possible. All five scopes ship off, so `auto` out of the box is
-indistinguishable from `off`.
-
-**It decides relevance. It never decides authorization.** A decision result cannot grant a
-workspace write, a deployment, a database mutation, a message send or an OAuth scope. The
-runtime's permission layer is unchanged and never reads it — and `test_decision.py` fails the
-build if a decision payload ever grows a permission-shaped field, checking that against tasks
-like *"deploy to production"* with the relevant tool scored at 100%.
-
-Every id it returns is resolved against the canonical registry before it reaches a context plan;
-one that does not exist is discarded and recorded, never invented into a role. The transport
-refuses a non-https endpoint, refuses redirects (a 302 would replay the authorization header to
-whatever host it names), and refuses a credential a header cannot carry rather than letting the
-error quote it. No third-party package: five small JSON posts do not justify adding an AI
-framework to a repository whose whole promise is that it installs nothing.
-
-Measured over 162 routing fixtures covering all 27 roles, plus 24 skill and 20 tool cases
-(registry `89baa5fa0e0c`, 2026-09-19):
-
-| | Keyword baseline | Jev | Claude |
-| --- | --- | --- | --- |
-| Agent top-1 | 23 / 162 | 143 / 162 | **158 / 162** |
-| Acceptable route | 29 / 162 | 154 / 162 | **162 / 162** |
-| Near-neighbour top-1 | 6 / 54 | 49 / 54 | **53 / 54** |
-| Ambiguous top-1 | 3 / 27 | 17 / 27 | **25 / 27** |
-| Skill precision / recall | 0.31 / 0.56 | 0.68 / 0.71 | **0.74 / 0.90** |
-| Tool precision / recall | 0.15 / 0.23 | 0.65 / 0.97 | 0.69 / 0.95 |
-| Median decision latency | 0 ms | 358 ms | not comparable |
-
-The keyword baseline is a floor — what the numbers look like with no model at all, and roughly
-what selecting from a loadout instead of from the task gets you. Both engines crush it. Against
-each other, Claude wins routing outright, wins skill recall by a wide margin at slightly better
-precision, and ties on tools.
-
-That is the architecture working, not failing: it exists so each decision can use whichever
-mechanism the evidence supports, and here the evidence came back for the default path. The
-integration stays because the finding could change and because throughput is a real reason to
-want it — though be clear-eyed that inside a Claude Code session the dispatcher always *is*
-already running, so the turn Jev saves is not actually saved. Its case is for a standalone
-router, a pre-filter, or a batch job.
-
-What none of it establishes: whether a better decision produces better *work*. That needs
-end-to-end fixtures, which do not exist yet — and the Claude column is a reconstruction (a
-focused subagent per case, no competing work), which cuts against the conclusion rather than
-for it.
-
-[docs/jev.md](docs/jev.md) · setup, modes, privacy, cost, calibration and troubleshooting.
-
-## MCPs and tools provide real capability
-
-19 servers in the registry, every one verified against its vendor's own documentation and recorded
-with its write posture, risk, read-only path and — most importantly — what to do when it is absent.
-GitHub for repository state, Playwright for rendered behaviour, Context7 for current framework
-docs, Figma for design artifacts, Supabase for database state, Vercel and Cloudflare for
-deployment, Sentry/Datadog/Grafana for production evidence.
-
-**This repository installs none of them.** A configured server does not widen what an agent may do.
-
-## Recipes provide proven workflows
-
-<!-- recipes:start -->
-
-- **`build-production-ui`** — Design and implement an interface, then prove in a browser that it renders, responds and is reachable.
-- **`database-migration`** — Change a live schema without losing data, with the rollback rehearsed before it is needed.
-- **`debug-application`** — Reproduce, isolate, fix, and prove the fix with the original reproduction plus a regression test.
-- **`investigate-incident`** — Stabilize a system that is failing right now, then hand off the root cause.
-- **`research-technical-decision`** — Turn an open technical question into a decision with the evidence and the tradeoffs visible.
-- **`review-pull-request`** — Judge a change against its stated intent and the evidence supplied, and say plainly what was not checked.
-- **`security-review`** — Find real, reachable security problems and prove the remediation closed them — checked by someone who did not write the fix.
-- **`ship-feature`** — Get a feature from request to merged, with the smallest set of specialists the work actually needs.
-<!-- recipes:end -->
-
-Defaults, not pipelines. Every recipe names what to cut; the dispatcher shortens for small work and
-extends when risk warrants.
-
-## Verification is first-class
-
-The system keeps **created, executed, tested, reviewed, deployed** and **verified** apart. A
-migration file existing is not a migration that ran. A page compiling is not an interface that
-works. A deploy command returning 0 is not a healthy service.
-
-| Work | Evidence when available |
+| Command | Purpose |
 | --- | --- |
-| UI | Render + interact + responsive inspection |
-| Bug fix | Original reproduction + regression test that fails without the fix |
-| API | Contract tests + failure and auth-failure paths |
-| Database | Migration run on realistic data + integrity checks + rehearsed rollback |
-| Performance | Comparable before/after measurement, not one fast run |
-| Security | Re-test the affected boundary — and not by the author of the fix |
-| Deployment | Correct revision serving + health signals |
-| Documentation | Every command run, every link followed, every example executed |
-| Agent change | Representative eval suite |
+| `/agent-uidesigner` | Work as the UI/UX Designer. |
+| `/agent-debugger` | Work as the Debugger. |
+| `/agent-reviewer` | Work as the Reviewer. |
+| `/agent-context` | Show the current context plan. |
+| `/agent-context explain` | Explain the role, skills, and tools selected. |
+| `/agent-context verbose` | Include candidates, dropped files, and the context budget. |
+| `/agent-decision` | Show optional decision-engine configuration and status. |
 
-When verification cannot run, the report says so. "Source-level checks completed; rendered browser
-verification was unavailable" — never "UI verified". See [docs/verification.md](docs/verification.md).
+A directly selected role stays active until you choose another or stop the dispatcher.
 
-# The 27 roles
+### Activate automatically in future sessions
+
+Automatic activation is opt-in. These commands manage the settings for you:
+
+| Command | Effect |
+| --- | --- |
+| `/agent-dispatcher on here` | Activate in future sessions in this project. |
+| `/agent-dispatcher on` | Activate in future sessions across projects. |
+| `/agent-dispatcher off` | Stop routing for this session. |
+| `/agent-dispatcher off here` | Silence this project, including when global activation is on. |
+| `/agent-dispatcher off everywhere` | Disable global activation; individually armed projects remain armed. |
+| `/agent-dispatcher status` | Show activation flags and whether the hook is installed. |
+
+Project activation requires both a local flag and an allow-list entry in your Claude config
+directory. Cloning a repository with an activation flag is not enough to enable the dispatcher.
+Project and session silences take precedence over activation.
+
+### Uninstall
+
+For a plugin install:
+
+```bash
+claude plugin uninstall agent-dispatcher@agent-dispatcher
+```
+
+For a manual install, run from your clone:
+
+```bash
+./install.sh --uninstall
+```
+
+The manual uninstaller removes the installed pack, its recorded commands, and its hook
+registration. It leaves activation flags in place.
+
+## How it works
+
+```text
+Your request
+  → specialist role
+  → context plan: relevant skills, project files, available tools, verification
+  → execution
+  → evidence and result
+```
+
+A **role** owns the outcome. A **skill** supplies a reusable method. An **MCP server or tool**
+provides a capability. A **recipe** suggests a workflow across roles. The context plan assembles
+what the specialist needs before it plans the work.
+
+Project signals such as `package.json`, `Dockerfile`, or `components.json` help select relevant
+guidance. Missing skills or tools lead to documented fallbacks and explicit verification limits.
+The build caps always-on skills at five and 30 KB per role.
+
+These are instructions and validation rules, not a sandbox. **Authorization remains with the
+user and Claude Code's permission controls.** Detecting a stack, selecting a tool, or switching
+roles does not grant permission to use it.
+
+Verification is specific to the work: a bug fix needs the original reproduction and regression
+evidence; a UI change needs rendered interaction checks when a browser is available. A review
+of work produced in the same session is a self-check, even when another role performs it.
+See [verification expectations](docs/verification.md) and the
+[context engine](docs/context-engine.md).
+
+## Catalog
+
+Counts and catalog entries below are generated from the repository's canonical sources.
+External skills are referenced, not bundled. The MCP registry includes a workspace-tool entry
+and an unmaintained server recorded as a warning; its count is not a list of installed integrations.
+
+<details>
+<summary>Specialist roles and commands</summary>
 
 <!-- roles:start -->
 
@@ -383,39 +244,10 @@ verification was unavailable" — never "UI verified". See [docs/verification.md
 
 <!-- roles:end -->
 
-# Capability-aware routing
+</details>
 
-The dispatcher reasons about capabilities, not role names. For *"redesign and implement the
-settings page and make sure it works on mobile"* it identifies `design.ui.direction`,
-`frontend.architecture`, `design.responsive`, `verification.browser` and
-`verification.accessibility`, then routes `UI/UX Designer → Implementer → Tester`.
-
-A label change routes straight to Implementer. Multiple agents are justified by dependencies,
-independent verification or real specialist boundaries — never by task length.
-
-# Skill and MCP loadouts
-
-A role declares its loadout in frontmatter. This is discovery and routing metadata, not a
-permission grant:
-
-```yaml
-skills_core: anthropic-frontend-design, accessibility
-skills_preferred: responsive-design, design-systems
-skills_optional: motion-design, component-architecture
-skills_if_existing_ui: ui-audit
-skills_if_implementing_ui: design-to-code
-skills_if_tailwind: tailwind
-skills_if_shadcn: shadcn-ui
-mcp_recommended: workspace, playwright
-mcp_conditional: figma, axe-devtools, chrome-devtools
-recipes: build-production-ui
-verification: browser-verification, visual-verification, accessibility-verification
-```
-
-Generated into [`catalog/loadouts.json`](catalog/loadouts.json), which doubles as the dispatcher's
-capability registry.
-
-# Skills
+<details>
+<summary>Local skills by category</summary>
 
 <!-- skills:start -->
 
@@ -441,33 +273,32 @@ capability registry.
 
 <!-- skills:end -->
 
-Full table with triggers: [docs/skills.md](docs/skills.md).
+Read the [skill catalog](docs/skills.md) for triggers and loadouts.
 
-# Third-party skill trust
+</details>
 
-External skills are dependencies. 31 are referenced — from Anthropic, Vercel, Next.js, Microsoft
-Playwright and two community sources — and **none are vendored**. This repository records where
-each lives and never copies its contents or runs its installer.
+<details>
+<summary>Workflow recipes</summary>
 
-```text
-Official → Verified → Community → Local
-```
+<!-- recipes:start -->
 
-Each entry records source, repository, path, licence, version, verification date, trust level,
-whether it ships scripts, whether it uses the network, the tools it needs, and the fallback for
-when it is absent. Two licence findings worth knowing:
+- **`build-production-ui`** — Design and implement an interface, then prove in a browser that it renders, responds and is reachable.
+- **`database-migration`** — Change a live schema without losing data, with the rollback rehearsed before it is needed.
+- **`debug-application`** — Reproduce, isolate, fix, and prove the fix with the original reproduction plus a regression test.
+- **`investigate-incident`** — Stabilize a system that is failing right now, then hand off the root cause.
+- **`research-technical-decision`** — Turn an open technical question into a decision with the evidence and the tradeoffs visible.
+- **`review-pull-request`** — Judge a change against its stated intent and the evidence supplied, and say plainly what was not checked.
+- **`security-review`** — Find real, reachable security problems and prove the remediation closed them — checked by someone who did not write the fix.
+- **`ship-feature`** — Get a feature from request to merged, with the smallest set of specialists the work actually needs.
+<!-- recipes:end -->
 
-- The `frontend-design` skill in `anthropics/claude-code` sits under Anthropic's **Commercial
-  Terms**, not an open-source licence. The byte-identical copy in `anthropics/skills` carries
-  per-skill Apache-2.0 — that is the one cited here.
-- `vercel-labs/agent-skills` states MIT in its README and in four skills' frontmatter, but has no
-  LICENSE file at the repository root. Recorded as a caveat rather than assumed.
+Recipes are adaptable starting points. Each describes when to use it and what to omit for
+smaller tasks. See the [recipe guide](docs/recipes.md).
 
-Before enabling any skill that ships scripts: read them, identify filesystem, network and
-subprocess effects, and confirm it does not expand the agent's permissions. See
-[docs/security.md](docs/security.md).
+</details>
 
-# MCP registry
+<details>
+<summary>MCP and tool registry</summary>
 
 <!-- mcps:start -->
 
@@ -494,138 +325,88 @@ subprocess effects, and confirm it does not expand the agent's permissions. See
 | `workspace` | Read, search and edit files in the project, and run commands. | yes | medium |
 <!-- mcps:end -->
 
-Per-server detail, activation conditions and fallbacks: [docs/mcps.md](docs/mcps.md).
+See [MCP documentation](docs/mcps.md) for sources, activation conditions, and fallbacks.
 
-# Adding or editing a role
+</details>
 
-Canonical roles live in `templates/<category>/<id>.md`. Copy a sibling for the shape, then run
-`./install.sh`.
+External skill provenance, license notes, and fallback behavior are recorded in
+[`catalog/external-skills.json`](catalog/external-skills.json). Review dependencies that execute
+scripts before enabling them; see the [security guide](docs/security.md).
 
-```yaml
----
-id: version-control
-slug: git
-name: "Version Control Engineer"
-category: "Engineering"
-summary: "Repairs, reshapes, and explains repository history without losing work."
-use_when: "Git history, branches, merges, rebases, bisects, worktrees, or recovery are central."
-not_for: "Locating or fixing the defect a commit introduced, or authoring the change itself."
-tags: git, history, rebase, merge, recovery
----
-```
+## Optional decision engine
 
-Write `not_for` as territory another role owns. It is routing data, not a list of bad habits — it
-is what keeps near-miss roles out, for a reader and for a decision model alike: `summary`,
-`use_when`, `not_for` and `tags` are exactly what the build carries into `catalog/loadouts.json`,
-which is the candidate registry. There is no second place to register a role. Add a routing fixture
-to `evals/decision/agents.json` while you are there — `test_decision.py` fails if a role has no
-gold label anywhere. Full guide: [docs/adding-an-agent.md](docs/adding-an-agent.md).
+Claude handles routing by default. The pack also includes an opt-in Jev integration for selecting
+roles, skills, and tools from the catalog. **All Jev scopes ship disabled.** Normal use requires
+no Jev account, key, or configuration.
 
-# Adding a skill
+Enabling Jev sends task text, candidate metadata, and relevant routing context to TypeSafe's API
+using your own credential and billed usage. Task redaction is best-effort. See the
+[Jev guide](docs/jev.md) for setup, payload details, modes, fallback behavior, and evaluation results.
 
-A skill is narrower than an agent. `systematic-debugging`, `browser-verification`, `migrations`,
-`accessibility` — never something that recreates an entire engineer.
+The recorded comparison favors keeping the default path for routing and skill selection.
+These are selection benchmarks, not evidence of better completed work: the Claude results
+reconstruct the routing step in isolated cases, and end-to-end task evaluations are still missing.
 
-```text
-skills/<category>/<id>/
-  SKILL.md        standard Agent Skills frontmatter: name + description only
-  manifest.json   pack metadata, kept out of SKILL.md so the skill stays portable
-  references/     loaded only when a step calls for them
-  scripts/
-```
+## Documentation
 
-Keep discovery metadata compact and disclose deeper content progressively. A skill improves method;
-it does not redefine responsibility or authorization. Registering it is also all it takes to make it
-selectable by the decision engine, for every role whose loadout names it. Full guide:
-[docs/adding-a-skill.md](docs/adding-a-skill.md).
+| Guide | What it covers |
+| --- | --- |
+| [Architecture](docs/architecture.md) | Roles, skills, tools, recipes, and their boundaries. |
+| [Context engine](docs/context-engine.md) | Context selection, budgets, provenance, and inspection. |
+| [Skills](docs/skills.md) | Local and external skills, triggers, and loadouts. |
+| [MCPs](docs/mcps.md) | Tool registry, availability, risks, and fallbacks. |
+| [Recipes](docs/recipes.md) | Workflows and role handoffs. |
+| [Verification](docs/verification.md) | Required evidence and reporting limits. |
+| [Security](docs/security.md) | Permissions and dependency trust. |
+| [Decision-engine evaluations](evals/decision/README.md) | Fixtures, measurement methods, and known limits. |
+| [Claude Code adapter](adapters/claude-code/README.md) | Installation layout and generated files. |
+| [Changelog](CHANGELOG.md) | Release history. |
 
-# Repository layout
+## Contributing
+
+Bug reports, routing examples, documentation improvements, and focused contributions are welcome.
+Read [CONTRIBUTING.md](CONTRIBUTING.md) before editing: this repository keeps canonical sources
+separate from generated artifacts.
 
 ```text
-templates/<category>/<id>.md          SOURCE — one role per file, loadout in frontmatter
-skills/<category>/<id>/SKILL.md       SOURCE — standard Agent Skill + manifest.json sidecar
-recipes/<id>.md                       SOURCE — workflow shapes
-catalog/mcp.json                      SOURCE — MCP registry
-catalog/external-skills.json          SOURCE — external skills with provenance
-catalog/signals.json                  SOURCE — how each conditional skill bucket is decided
-catalog/context-plan.schema.json      SOURCE — the shape of a context plan
-SKILL.template.md                     SOURCE — the router body
-CONTEXT.template.md                   SOURCE — the context engine
-HOOK.template.sh                      SOURCE — the perpetual-mode SessionStart hook
-decision/                             SOURCE — the decision engine: contract, default and Jev
-                                               implementations, provider transports, CLI
-evals/decision/                       SOURCE — routing/skill/tool fixtures, the comparison
-                                               harness, and the offline measurement baseline
-docs/                                 architecture, skills, mcps, recipes, verification,
-                                      security, context-engine, jev
-adapters/claude-code/                 what is rendered where, and why
-adapters/locus/                       portable catalog export
-
-build.py                              indexes sources, generates and validates
-test_build.py                         validation suite
-test_decision.py                      decision-engine suite — deterministic, offline, free
-install.sh                            build, test, install, register
-
-skills/agent-dispatcher/              GENERATED — router, rendered roles, index
-commands/agent-*.md                   GENERATED — direct role commands
-hooks/                                GENERATED — SessionStart hook
-catalog/{skills,loadouts}.json        GENERATED — registries
+templates/                 Role definitions
+skills/<category>/<id>/    Local skills and manifests
+recipes/                   Workflow definitions
+catalog/                   Registries and schemas
+*.template.*               Dispatcher, context, and hook sources
+decision/                  Optional decision-engine implementation
+evals/decision/            Selection fixtures and evaluation harness
+docs/                      Detailed guides
+build.py                   Generator and validator
 ```
 
-**Edit canonical source; generate derived artifacts.** Never hand-edit a generated file — the test
-suite fails the build if you do, because the next build would silently discard it. Every table and
-count in this README and in `docs/` is generated between markers for the same reason.
-
-# Evaluations
-
-`build.py`, `test_build.py` and `test_decision.py` run on every install. The suites check
-generated-versus-source agreement, generated-file drift, cross-reference resolution, standard
-`SKILL.md` frontmatter, body length bounds, credential and absolute-path scanning, registry
-completeness, docs-versus-catalog counts, and — for the decision layer — mode behaviour,
-fallback on every provider failure mode, id validation, the permission boundary, and what a
-request is allowed to contain. None of it needs a network or a credential.
-
-`evals/decision/` is the first repeatable eval suite: 162 routing fixtures over all 27 roles with
-obvious, near-neighbour, ambiguous and negative cases, plus 24 skill and 20 tool cases scored for
-precision as well as recall — `irrelevant` ids are what make them measure precision rather than
-rewarding a system that selects everything.
+Edit source files, then run from the repository root:
 
 ```bash
-python3 evals/decision/run.py                  # the offline baseline — free, no network
-python3 evals/decision/run.py --engine both    # add Jev; needs your own credential
+python3 build.py
+python3 test_build.py
+python3 test_decision.py
 ```
 
-It reports top-1 and acceptable-route rates per case kind, latency, failures, fallbacks, and
-observed accuracy per confidence band — that last table is what set the thresholds in
-`decision/config.py` instead of a guess. Results are local; nothing is sent anywhere. The measured
-comparison is in [docs/jev.md](docs/jev.md), including what it does **not** establish.
+These checks run offline without provider credentials. They validate generated-file agreement,
+references, loadout limits, registry consistency, hook behavior, and decision-engine boundaries.
+The manual installer runs them before installation.
 
-Role files carry example tasks and boundary traps. Extending that into repeatable evals —
-happy-path, ambiguous task, missing tool, tool failure, permission boundary, adversarial
-instruction, overreach, underreach, verification, handoff — is the natural next step, comparing
-`generalist` vs `specialist` vs `specialist + skill` vs `multi-agent recipe` on task success, missed
-requirements, unsupported claims, verification completeness, unnecessary tool calls, context use and
-scope creep. More agents and more skills are not automatically better.
+To run the offline keyword baseline:
 
-# Provenance
-
-MIT. 24 of the roles began as the Locus Agent Template Pack v1.0.0 — an unlicensed, unattributed
-content pack generated for this repository's author — with that pack's runtime, mode, memory-scope
-and access-level vocabulary replaced by Claude Code's equivalents. `version-control`,
-`data-engineer` and `incident-responder` are original here, as are all local skills, recipes and
-registries. Not affiliated with Locus. See [NOTICE](NOTICE).
-
-# Design principle
-
-```text
-correct decision
-+ correct specialist
-+ correct context
-+ correct skill
-+ correct tool
-+ correct permission
-+ correct verification
+```bash
+python3 evals/decision/run.py
 ```
 
-The goal is not the largest agent or skill library. It is a dispatcher that assembles the smallest
-trustworthy capability stack for the requested outcome.
+The keyword baseline is a measurement floor; it does not run Claude's in-session routing.
+See [adding a role](docs/adding-an-agent.md) or [adding a skill](docs/adding-a-skill.md) to extend
+the catalog. Preserve generated regions between `<!-- name:start -->` and `<!-- name:end -->`
+markers in this README and the documentation.
+
+For vulnerabilities, follow [SECURITY.md](SECURITY.md).
+
+## License and provenance
+
+[MIT License](LICENSE). Role origins and adaptation history are documented in [NOTICE](NOTICE).
+Referenced third-party skills retain their own licenses. This project is not affiliated with
+or endorsed by Anthropic or Locus.
