@@ -15,10 +15,10 @@ Route each request to one specialist role, load that role, work as it. 27 roles.
 3. **`on`** / "always on" / "make this perpetual" — turn on perpetual mode, which re-arms the dispatcher at the start of every future session in every project:
 
    ```bash
-   D="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"; touch "$D/.agent-dispatcher-active"; grep -q agent-dispatcher-activate "$D/settings.json" && echo "armed + hook installed" || echo "armed BUT SessionStart hook missing"
+   D="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"; touch "$D/.agent-dispatcher-active"; if grep -q agent-dispatcher-activate "$D/settings.json" 2>/dev/null || grep -q '"agent-dispatcher@' "$D/plugins/installed_plugins.json" 2>/dev/null; then echo "armed + hook installed"; else echo "armed BUT no hook"; fi
    ```
 
-   Report what that printed. If the hook is missing, say so — the flag alone does nothing — and point at `install.sh` in the source repo. It takes effect in new sessions; this one is already active.
+   Report what that printed. The two greps cover both install paths — a manual install registers the hook in `settings.json`, a plugin install carries its own `hooks/hooks.json`. Only if it says **no hook**: the flag alone does nothing, so say so and point at the source repo's `install.sh` (or a plugin install — not both, they collide). It takes effect in new sessions; this one is already active.
 4. **`off`** / "stop dispatcher" / "normal mode" — stop routing, at the narrowest scope that matches what they asked for. Drop the role immediately either way; the flag files only stop the hook re-arming you later.
 
    - **This session** (the default reading, and the one that survives a compaction — the hook fires on `compact`, so without this a mid-session "stop" comes back):
@@ -42,7 +42,7 @@ For every user request while active:
 2. Pick the best-fit role for each kind of work the request contains — one role for most requests, a chain when it genuinely holds two (see **Chaining** below). Tie-break on the **deliverable**: a decision → `researcher`/`architect`, a diff → `implementer`, a verdict → `reviewer`, a repro + fix → `debugger`, a measured speedup → `performance-engineer`, a test suite → `tester`, a screen → `ui-ux-designer`, a schema or migration → `database-engineer`, a number or a chart → `data-analyst`, a map of where things live → `explorer`.
 3. Match against **Not for** as well as **Route here when** — that line is what keeps near-miss roles out.
 4. `dispatcher` is itself a role in the catalog: route there only when the user wants *multi-agent orchestration of separable workstreams*, not merely because this skill is active.
-5. Read `roles/<id>.md` (installed at `~/.claude/skills/agent-dispatcher/roles/<id>.md`) **before** acting. Follow its working method, deliverable, definition of done, boundaries, tool posture, and the mode line that fits the current turn.
+5. Read `roles/<id>.md` **before** acting — it sits next to this SKILL.md, at `~/.claude/skills/agent-dispatcher/roles/<id>.md` for a manual install or inside the plugin's own directory for a plugin install. Follow its working method, deliverable, definition of done, boundaries, tool posture, and the mode line that fits the current turn.
 6. Announce the route in one short line — `→ ui-ux-designer` — then do the work. No explanation of why unless asked. Scale the role's deliverable to the task: a small change reports the change and nothing else; the role's full deliverable is for work that earns it.
 7. **Re-route per request.** When the next request is a different kind of work, switch roles and announce again. Same kind of work → stay, no re-read, no re-announcement.
 8. Trivial turns — a one-line factual answer, a yes/no you can already answer without looking, a clarification, a typo fix, a rename, a one-line edit — need no role and no announcement. Just answer, or just do it. A question that needs a file read or a command to answer honestly is not trivial: look first.
@@ -66,10 +66,6 @@ Common chains — each runs only as far as the request goes: `planner → implem
 When `~/.claude/.agent-dispatcher-active` exists, a SessionStart hook arms the dispatcher at the start of every session with a compact role index, so the user never types the command. In that mode you route from the index and read `roles/<id>.md` before working as a role; read this SKILL.md only when you need the full catalog, the chaining rules, or a role's **Not for** line to break a tie.
 
 Perpetual mode is a routing default, not a mandate: a plain question still gets a plain answer.
-
-## Manually picking a role
-
-The user can always override routing — `/agent-dispatcher reviewer`, the generated per-role commands (`/agent-uidesigner`, `/agent-reviewer`, `/agent-tester`, …), or plain English ("stay in tester for this"). Honor it without arguing, even when you would have routed elsewhere, and stay in it — no re-routing, no chaining out. Mention a better-fitting role in one line only when the mismatch would materially change the answer; otherwise just do the work.
 
 ## Skills and commands outrank routing
 

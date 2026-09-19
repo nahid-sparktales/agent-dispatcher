@@ -6,13 +6,11 @@
 D="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
 [ -f "$D/.agent-dispatcher-active" ] || exit 0
 
+# Session ids are uuids, so a sed capture is exact. The payload's cwd can carry JSON escapes,
+# so $PWD (the project the session started in) is checked alongside it rather than trusted to it.
 payload=$(cat 2>/dev/null)
-read -r sid cwd <<EOF
-$(printf '%s' "$payload" | python3 -c 'import json,sys
-try: d = json.load(sys.stdin)
-except Exception: d = {}
-print(d.get("session_id", ""), d.get("cwd", ""))' 2>/dev/null)
-EOF
+sid=$(printf '%s' "$payload" | sed -n 's/.*"session_id"[[:space:]]*:[[:space:]]*"\([-0-9a-zA-Z_]*\)".*/\1/p')
+cwd=$(printf '%s' "$payload" | sed -n 's/.*"cwd"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
 
 # where this pack is installed: next to this hook (plugin) or under the config dir (manual)
 self=$(cd "$(dirname "$0")" && pwd)
@@ -23,6 +21,7 @@ else
 fi
 [ -n "$sid" ] && [ -f "$D/.agent-dispatcher-off/$sid" ] && exit 0
 [ -n "$cwd" ] && [ -f "$cwd/.agent-dispatcher-off" ] && exit 0
+[ -f "$PWD/.agent-dispatcher-off" ] && exit 0
 # forget session silences older than a week
 [ -d "$D/.agent-dispatcher-off" ] && find "$D/.agent-dispatcher-off" -type f -mtime +7 -delete 2>/dev/null
 

@@ -16,7 +16,7 @@ CMDS = ROOT / "commands"
 HOOKS = ROOT / "hooks"
 SKILL_DIR = "~/.claude/skills/agent-dispatcher"
 
-# Category order in the README; a role in any other category lands in "Other".
+# Category order in the README. A role must declare one of these.
 CATEGORIES = ["Core", "Engineering", "Product & Design", "Knowledge & Business"]
 
 
@@ -40,6 +40,8 @@ def parse(path):
     missing = {"id", "slug", "name", "category", "summary", "use_when", "not_for", "tags"} - set(role)
     if missing:
         raise SystemExit(f"{path}: frontmatter missing {sorted(missing)}")
+    if role["category"] not in CATEGORIES:
+        raise SystemExit(f"{path}: unknown category {role['category']!r} — one of {CATEGORIES}")
     if role["id"] != path.stem:
         raise SystemExit(f"{path}: id '{role['id']}' does not match the filename")
     role["tags"] = [t.strip() for t in role["tags"].split(",") if t.strip()]
@@ -106,13 +108,11 @@ def write_hook(roles):
 D="${{CLAUDE_CONFIG_DIR:-$HOME/.claude}}"
 [ -f "$D/.agent-dispatcher-active" ] || exit 0
 
+# Session ids are uuids, so a sed capture is exact. The payload's cwd can carry JSON escapes,
+# so $PWD (the project the session started in) is checked alongside it rather than trusted to it.
 payload=$(cat 2>/dev/null)
-read -r sid cwd <<EOF
-$(printf '%s' "$payload" | python3 -c 'import json,sys
-try: d = json.load(sys.stdin)
-except Exception: d = {{}}
-print(d.get("session_id", ""), d.get("cwd", ""))' 2>/dev/null)
-EOF
+sid=$(printf '%s' "$payload" | sed -n 's/.*"session_id"[[:space:]]*:[[:space:]]*"\\([-0-9a-zA-Z_]*\\)".*/\\1/p')
+cwd=$(printf '%s' "$payload" | sed -n 's/.*"cwd"[[:space:]]*:[[:space:]]*"\\([^"]*\\)".*/\\1/p')
 
 # where this pack is installed: next to this hook (plugin) or under the config dir (manual)
 self=$(cd "$(dirname "$0")" && pwd)
@@ -123,6 +123,7 @@ else
 fi
 [ -n "$sid" ] && [ -f "$D/.agent-dispatcher-off/$sid" ] && exit 0
 [ -n "$cwd" ] && [ -f "$cwd/.agent-dispatcher-off" ] && exit 0
+[ -f "$PWD/.agent-dispatcher-off" ] && exit 0
 # forget session silences older than a week
 [ -d "$D/.agent-dispatcher-off" ] && find "$D/.agent-dispatcher-off" -type f -mtime +7 -delete 2>/dev/null
 
@@ -178,8 +179,8 @@ def write_readme(roles):
     if a not in txt or b not in txt:
         return
     out = []
-    for cat in CATEGORIES + ["Other"]:
-        rows = [r for r in roles if (r["category"] if r["category"] in CATEGORIES else "Other") == cat]
+    for cat in CATEGORIES:
+        rows = [r for r in roles if r["category"] == cat]
         if not rows:
             continue
         out += [f"### {cat}", "", "| Command | Role | What it does |", "| --- | --- | --- |"]

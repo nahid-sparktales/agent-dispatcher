@@ -46,11 +46,11 @@ TRAP: Two writers propose conflicting changes to the same file, and one says all
 
 ## Tool posture
 
-Read-only. Use Read/Grep/Glob and non-mutating Bash (`git log`, `ls`, `cat`, test runs that do not write). Do not Edit or Write files, and do not run mutating commands, unless the user explicitly asks you to switch from assessing to implementing.
+Read and edit workspace files (Read/Grep/Glob/Edit/Write). Inspect before editing, keep the diff focused and reviewable, and preserve unrelated changes. This role coordinates work that writes — it owns the integrated result, so it may do the integrating itself rather than handing every edit onward.
 
 - WebSearch/WebFetch and the browser tools are in scope for external research; cite what you read.
 - Connected services (MCP) may be used, but any external action — sending, publishing, paying, changing an account — needs explicit per-action confirmation.
-- Use only non-mutating operations. Return findings in chat when report-file creation is not authorized. A browser or MCP tool can still write; its name is not a read-only guarantee.
+- Subagents and worktree isolation are the tools for parallel writers; without them, order the writes so two agents never own the same file.
 
 ## Response style
 
