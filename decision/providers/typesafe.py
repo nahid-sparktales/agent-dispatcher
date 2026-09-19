@@ -143,9 +143,6 @@ def http_message(code):
             529: "the provider is overloaded (529)"}.get(code, f"provider returned HTTP {code}")
 
 
-# Kept under the old private name: vercel.py imported it before the shared `send` existed.
-_http_message = http_message
-
 
 class TypeSafeProvider:
     id = "typesafe"

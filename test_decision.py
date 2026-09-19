@@ -26,7 +26,7 @@ from decision.default import DefaultDecisionEngine                    # noqa: E4
 from decision.engine import (DecisionService, Diagnostics, assert_no_authorization,  # noqa: E402
                              plan)
 from decision.jev import JevDecisionEngine                            # noqa: E402
-from decision.providers import TypeSafeProvider, VercelGatewayProvider  # noqa: E402
+from decision.providers import TypeSafeProvider                        # noqa: E402
 from decision.providers.mock import HTTPMock, MockProvider            # noqa: E402
 from decision.redact import scrub, task_state                         # noqa: E402
 from decision.types import (AgentDecisionInput, DecisionError,  # noqa: E402
@@ -484,28 +484,9 @@ def main():
         except Exception as exc:                                      # noqa: BLE001
             check("typesafe reports an unreachable provider", "reach" in str(exc), str(exc))
 
-    with env(AI_GATEWAY_API_KEY=FAKE_KEY, TYPESAFE_API_KEY=None):
-        cfg = load_config(project_root=CFG, provider="vercel")
-        ok = HTTPMock(body={"answers": {"tool::github": {"type": "boolean", "probability": 0.8}},
-                            "usage": {"inputTokens": 12, "outputTokens": 1}})
-        out = VercelGatewayProvider(cfg, opener=ok).evaluate(
-            {"task": "x"}, {"tool::github": {"type": "noul", "instructions": "?"}})
-        req = ok.requests[0]
-        check("the gateway route carries the model header",
-              req.headers.get("Ai-model-id") == "typesafe-ai/jev",
-              str(dict(req.headers)))
-        check("the gateway route carries the protocol versions",
-              req.headers.get("Ai-evaluation-model-specification-version") == "4"
-              and req.headers.get("Ai-gateway-protocol-version") == "0.0.1",
-              str(dict(req.headers)))
-        check("noul is translated to the gateway's boolean on the way out",
-              json.loads(req.data)["questions"]["tool::github"]["type"] == "boolean", req.data)
-        check("the gateway's boolean is translated back to noul",
-              out["answers"]["tool::github"] == {"type": "noul", "noul": 0.8}, str(out))
-        check("the gateway's camelCase usage is normalised",
-              out["usage"]["input_tokens"] == 12, str(out["usage"]))
-        check("the gateway uses its own credential variable",
-              cfg.credential_env == "AI_GATEWAY_API_KEY" and cfg.has_credential())
+    check("only a transport with a published contract is reachable",
+          sorted(config_providers()) == ["typesafe"],
+          "a provider without a documented REST contract is selectable")
 
     # ---------------------------------------------------------------- config
     print("\nconfiguration")
@@ -649,6 +630,11 @@ def main():
 
 
 # ------------------------------------------------------------------ helpers
+
+def config_providers():
+    from decision.config import PROVIDERS
+    return PROVIDERS
+
 
 def _no_redirects():
     """The shared opener must not follow a redirect: urllib copies Authorization across hosts."""

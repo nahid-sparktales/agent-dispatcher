@@ -1,5 +1,30 @@
 # Changelog
 
+## 2.3.1 — 2026-09-19
+
+Two deletions, both because Jev is off by default and carrying weight for a disabled feature is
+the wrong trade.
+
+### Removed
+
+- **The Vercel AI Gateway transport.** Vercel documents evaluation as available through their
+  TypeScript SDK only, so it targeted an endpoint with no published REST contract, and with no
+  gateway account it was never verified against a live provider — unit tests against a mock
+  were the whole of its coverage. An unverifiable integration that handles a credential is the
+  weakest thing to carry for a feature nobody should currently enable. TypeSafe's own HTTP API
+  is now the only transport, and it is the only one either of them publishes a contract for.
+  `decision/providers/` remains the seam if another route is worth adding.
+- **93 lines of `docs/jev.md`.** The architecture, permission-boundary, credential-handling and
+  results sections earn their space. The setup and troubleshooting depth did not, for a document
+  that tells you not to enable the thing it documents.
+
+### Changed
+
+- README and `docs/jev.md` now say plainly that inside a Claude Code session the dispatcher
+  always *is* already running, so the model turn Jev saves is not actually saved. Its remaining
+  case — latency and cost — is for a standalone router, a pre-filter or a batch job, not for the
+  path this pack ships on. That was implied before and is now stated.
+
 ## 2.3.0 — 2026-09-19
 
 Finished the comparison and let it decide. Jev now installs inert.

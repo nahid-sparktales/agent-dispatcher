@@ -1,19 +1,25 @@
 """Transports for the Jev engine.
 
 `JevDecisionEngine` knows about decisions; a provider knows about one wire format. The split
-exists so a second route — or a direct SDK, if this pack ever grows dependencies — arrives
-without touching the engine or anything above it.
+exists so a second route — a direct SDK, another gateway — arrives without touching the engine
+or anything above it.
 
-Every provider takes the credential out of `os.environ` at send time. None of them accepts one
-as an argument, stores one on `self`, or puts one anywhere an exception, a log line or a
-serialised record could reach.
+One transport ships: TypeSafe's own HTTP API, which is the only route they publish a REST
+contract for. A Vercel AI Gateway transport lived here briefly and was removed: Vercel
+documents evaluation as available through their TypeScript SDK only, so it targeted an
+undocumented endpoint, and it could never be verified against a live account. Carrying an
+unverifiable integration for a feature that is off by default was the wrong trade. The seam it
+used is still here for whoever needs it next.
+
+The transport takes the credential out of `os.environ` at send time. It does not accept one as
+an argument, store one on `self`, or put one anywhere an exception, a log line or a serialised
+record could reach.
 """
 from .typesafe import TypeSafeProvider
-from .vercel import VercelGatewayProvider
 
 # The mock transport is intentionally not here. It is importable from `decision.providers.mock`
 # by code that wants it, and unreachable from configuration — see the note in config.py.
-PROVIDERS = {"typesafe": TypeSafeProvider, "vercel": VercelGatewayProvider}
+PROVIDERS = {"typesafe": TypeSafeProvider}
 
 
 def get(config, **kw):
@@ -23,4 +29,4 @@ def get(config, **kw):
     return cls(config, **kw)
 
 
-__all__ = ["get", "PROVIDERS", "TypeSafeProvider", "VercelGatewayProvider"]
+__all__ = ["get", "PROVIDERS", "TypeSafeProvider"]

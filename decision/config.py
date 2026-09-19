@@ -64,21 +64,14 @@ DEFAULT_SCOPES = {"agent": False, "skills": False, "tools": False,
 DEFAULT_THRESHOLDS = {"agent_confidence": 0.8, "skill_relevance": 0.6, "tool_relevance": 0.6}
 
 PROVIDERS = {
-    # Documented, language-agnostic HTTP API. The default, because this pack is Python and
-    # TypeSafe publishes the REST contract; https://docs.typesafe.ai/api
+    # TypeSafe's own HTTP API, and the only route they publish a REST contract for:
+    # https://docs.typesafe.ai/api. A Python caller has no better option, and an unpublished
+    # one is not an option at all for something that carries a credential.
     "typesafe": {"credential_env": "TYPESAFE_API_KEY",
                  "base_url_env": "TYPESAFE_BASE_URL",
                  "base_url": "https://api.typesafe.ai",
                  "model": "jev-latest",
                  "label": "TypeSafe (direct)"},
-    # Vercel documents evaluation through the AI SDK only, so the raw endpoint below is
-    # best-effort rather than a published REST contract. Offered for accounts that already
-    # bill through the gateway; docs/jev.md says plainly that it is the less-supported route.
-    "vercel": {"credential_env": "AI_GATEWAY_API_KEY",
-               "base_url_env": "AI_GATEWAY_BASE_URL",
-               "base_url": "https://ai-gateway.vercel.sh",
-               "model": "typesafe-ai/jev",
-               "label": "Vercel AI Gateway"},
 }
 
 # Deliberately absent from PROVIDERS: the mock transport. A test double that configuration can

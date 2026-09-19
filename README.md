@@ -156,9 +156,7 @@ choices: which role owns the task, which skills that role loads, which servers a
 **It ships off on every decision, and the evaluation below is why.** Put on identical fixtures
 against Claude reading the dispatcher's own catalog, Jev matched or lost everywhere — decisively
 on routing, clearly on skill recall, and to a tie on tools. Quality is not the reason to switch
-it on. Latency and cost are: ~360 ms and a fraction of a cent against a full model turn, which
-is a real trade at volume or under a latency budget, and no trade at all in a session where the
-dispatcher is already running.
+it on. Latency and cost are: ~360 ms and a fraction of a cent against a full model turn.
 
 ```text
 Without Jev                         With Jev
@@ -191,9 +189,12 @@ decision engine improves the decision layer; it does not replace anything.
 proxies nothing through a maintainer account, and makes no call at all unless you configure one.
 
 ```bash
-export TYPESAFE_API_KEY="your-own-key"   # or AI_GATEWAY_API_KEY, via Vercel AI Gateway
+export TYPESAFE_API_KEY="your-own-key"
+export AGENT_DISPATCHER_DECISION_SCOPES=skills,tools   # nothing runs without this
 python3 -m decision status
 ```
+
+One transport: TypeSafe's own HTTP API, the only route they publish a REST contract for.
 
 TypeSafe's own HTTP API is the default because it is the documented one — Vercel states that
 evaluation is available through the AI SDK only, which makes the gateway the less-supported route
@@ -201,15 +202,12 @@ for a Python caller. Either way the key stays in your environment: it is never a
 written to a file by this pack, and never carried on an object that gets rendered, logged or
 serialised. `status` says `configured` or `not configured`, and that is all it will ever say.
 
-Three modes. `off` never calls it. `auto` — the default — uses it when it is configured and
-healthy, and falls back to the default engine on a timeout, an error, an id that does not
-resolve, or a confidence below the calibrated floor, recording that in diagnostics. `required`
-errors clearly instead of falling back, which is what makes controlled evaluation possible.
-With no key configured, or no scope enabled, `auto` is indistinguishable from `off`.
-
-```bash
-AGENT_DISPATCHER_DECISION_SCOPES=skills,tools   # choose the decisions to hand over
-```
+Modes decide *whether* it may answer; scopes decide *what it is asked*. `off` never calls it.
+`auto` — the default — uses it where a scope is enabled and falls back to the default engine on
+a timeout, an error, an id that does not resolve, or a confidence below the calibrated floor,
+recording that in diagnostics. `required` errors clearly instead of falling back, which is what
+makes controlled evaluation possible. All five scopes ship off, so `auto` out of the box is
+indistinguishable from `off`.
 
 **It decides relevance. It never decides authorization.** A decision result cannot grant a
 workspace write, a deployment, a database mutation, a message send or an OAuth scope. The
@@ -245,7 +243,9 @@ precision, and ties on tools.
 That is the architecture working, not failing: it exists so each decision can use whichever
 mechanism the evidence supports, and here the evidence came back for the default path. The
 integration stays because the finding could change and because throughput is a real reason to
-want it.
+want it — though be clear-eyed that inside a Claude Code session the dispatcher always *is*
+already running, so the turn Jev saves is not actually saved. Its case is for a standalone
+router, a pre-filter, or a batch job.
 
 What none of it establishes: whether a better decision produces better *work*. That needs
 end-to-end fixtures, which do not exist yet — and the Claude column is a reconstruction (a
