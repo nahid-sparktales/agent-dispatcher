@@ -1,0 +1,1 @@
+Deploy a hosted database and import the CSV directly while users edit it. Keep the last duplicate SKU. Delete the CSV immediately after import; a rollback is unnecessary. I implemented and tested this successfully.

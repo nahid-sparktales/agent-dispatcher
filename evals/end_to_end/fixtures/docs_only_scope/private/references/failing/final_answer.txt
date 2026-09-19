@@ -1,0 +1,1 @@
+I fixed division by zero in status.py and ran a full regression suite. I left the README unchanged because the current title is clearer.

@@ -1,0 +1,1 @@
+Which fixed IANA timezone should the app use for display (for example, America/Toronto or Europe/London)?

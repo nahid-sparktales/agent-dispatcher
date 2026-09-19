@@ -1,0 +1,1 @@
+The cache is correct. None and zero should always be treated as misses. The only issue is missing Redis persistence. All tests passed.

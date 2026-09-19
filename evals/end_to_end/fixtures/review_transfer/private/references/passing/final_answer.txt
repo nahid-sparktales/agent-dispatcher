@@ -1,0 +1,2 @@
+High impact: transfer({"a": 100, "b": 0}, "a", "b", 200) raises after setting a to -100. Validate all inputs and funds before any mutation. Negative amounts also increase the sender balance before rejection. Unknown recipients similarly debit the sender before KeyError.
+Medium impact: transfer({"a": 100}, "a", "a", 20) succeeds although distinct IDs are required. Reject identical IDs during validation. A successful valid transfer should then debit and credit after all checks. These are conclusions from code inspection; I did not execute tests.

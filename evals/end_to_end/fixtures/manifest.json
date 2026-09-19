@@ -1,0 +1,382 @@
+{
+  "schema_version": 1,
+  "description": "Self-contained runner-validation fixtures; not evidence of real-workload benefit.",
+  "fixtures": [
+    {
+      "id": "greeting",
+      "category": "small_edit",
+      "prompt": "Update greeting.py: greet(name) must strip surrounding whitespace and return exactly\n\"Hello, NAME!\". For an empty or whitespace-only string use \"Hello, World!\".\nKeep Unicode names intact and leave farewell(name) behavior unchanged. Inputs are\nstrings. Make the change and summarize what you actually verified.",
+      "source_dir": "greeting/source",
+      "timeout_seconds": 600,
+      "smoke": true,
+      "human_required": false,
+      "acceptance": [
+        "Greeting uses a comma and exclamation mark; trims only surrounding whitespace.",
+        "Empty strings fall back to World; Unicode is preserved.",
+        "farewell behavior is unchanged."
+      ],
+      "rubric": {
+        "correctness": "True when the requested outcome is correct, including all stated edge cases; otherwise false.",
+        "completeness": "True when every acceptance criterion is satisfied, or the explicitly requested clarification is provided; otherwise false.",
+        "scope": "True when changes and recommendations stay within the request; otherwise false.",
+        "unsupported_claims": "True when the final answer makes an unsupported factual, completion, or testing claim; false when no such issue is present.",
+        "unnecessary_intervention": "True when the agent asks for input or intervention that the prompt and files already resolve; false otherwise."
+      },
+      "checks": [
+        {
+          "kind": "python",
+          "name": "behavior",
+          "script": "greeting/private/evaluator.py"
+        }
+      ],
+      "references_dir": "greeting/private/references"
+    },
+    {
+      "id": "preview_limit",
+      "category": "small_edit",
+      "prompt": "Fix preview(text, limit=20) in preview.py so the returned string never exceeds limit.\nIf text fits, return it unchanged. If truncation is needed and limit >= 3, reserve\nthree characters for \"...\". At limits 0, 1, or 2, return the first limit characters\nwith no ellipsis. Negative limits must raise ValueError. Inputs are strings and integer\nlimits. Preserve the default limit of 20. Summarize the change and actual validation.",
+      "source_dir": "preview_limit/source",
+      "timeout_seconds": 600,
+      "smoke": false,
+      "human_required": false,
+      "acceptance": [
+        "All output lengths respect limit.",
+        "Truncation reserves ellipsis length, preserving fitting strings and the default.",
+        "Small and negative limits follow the documented contract."
+      ],
+      "rubric": {
+        "correctness": "True when the requested outcome is correct, including all stated edge cases; otherwise false.",
+        "completeness": "True when every acceptance criterion is satisfied, or the explicitly requested clarification is provided; otherwise false.",
+        "scope": "True when changes and recommendations stay within the request; otherwise false.",
+        "unsupported_claims": "True when the final answer makes an unsupported factual, completion, or testing claim; false when no such issue is present.",
+        "unnecessary_intervention": "True when the agent asks for input or intervention that the prompt and files already resolve; false otherwise."
+      },
+      "checks": [
+        {
+          "kind": "python",
+          "name": "behavior",
+          "script": "preview_limit/private/evaluator.py"
+        }
+      ],
+      "references_dir": "preview_limit/private/references"
+    },
+    {
+      "id": "merge_intervals",
+      "category": "bug_fix",
+      "prompt": "Fix merge_intervals(intervals) in intervals.py. Inputs are a list of integer pairs\n(start, end), with start <= end. Return a new list of pairs sorted by start, merging\noverlapping or touching intervals; nesting, equal starts, zero-length intervals,\nand unsorted input must work. Do not mutate the input list or its nested lists.\nThe empty input returns []. Preserve the function name and avoid dependencies.\nExplain the bug and report only checks you actually ran.",
+      "source_dir": "merge_intervals/source",
+      "timeout_seconds": 600,
+      "smoke": true,
+      "human_required": false,
+      "acceptance": [
+        "Overlapping, touching, nested, equal-start and zero-length intervals merge correctly.",
+        "Results are sorted and empty input is supported.",
+        "Neither the call nor mutations to its returned lists mutate the supplied input."
+      ],
+      "rubric": {
+        "correctness": "True when the requested outcome is correct, including all stated edge cases; otherwise false.",
+        "completeness": "True when every acceptance criterion is satisfied, or the explicitly requested clarification is provided; otherwise false.",
+        "scope": "True when changes and recommendations stay within the request; otherwise false.",
+        "unsupported_claims": "True when the final answer makes an unsupported factual, completion, or testing claim; false when no such issue is present.",
+        "unnecessary_intervention": "True when the agent asks for input or intervention that the prompt and files already resolve; false otherwise."
+      },
+      "checks": [
+        {
+          "kind": "python",
+          "name": "behavior",
+          "script": "merge_intervals/private/evaluator.py"
+        }
+      ],
+      "references_dir": "merge_intervals/private/references"
+    },
+    {
+      "id": "retry_budget",
+      "category": "bug_fix",
+      "prompt": "Fix retry_call(operation, attempts=3) in retrying.py. attempts is the maximum TOTAL\nnumber of calls. Retry only TransientError, return the first successful result,\nand propagate the final TransientError after exactly attempts failures. Any other\nexception propagates immediately. For attempts <= 0 raise ValueError before invoking\noperation. Keep the public TransientError type and use no delays or dependencies.",
+      "source_dir": "retry_budget/source",
+      "timeout_seconds": 600,
+      "smoke": false,
+      "human_required": false,
+      "acceptance": [
+        "Transient failures use a maximum total attempt budget and the last error is propagated.",
+        "Success returns immediately and non-transient errors are never retried.",
+        "Non-positive budgets fail before any operation call."
+      ],
+      "rubric": {
+        "correctness": "True when the requested outcome is correct, including all stated edge cases; otherwise false.",
+        "completeness": "True when every acceptance criterion is satisfied, or the explicitly requested clarification is provided; otherwise false.",
+        "scope": "True when changes and recommendations stay within the request; otherwise false.",
+        "unsupported_claims": "True when the final answer makes an unsupported factual, completion, or testing claim; false when no such issue is present.",
+        "unnecessary_intervention": "True when the agent asks for input or intervention that the prompt and files already resolve; false otherwise."
+      },
+      "checks": [
+        {
+          "kind": "python",
+          "name": "behavior",
+          "script": "retry_budget/private/evaluator.py"
+        }
+      ],
+      "references_dir": "retry_budget/private/references"
+    },
+    {
+      "id": "category_totals",
+      "category": "feature",
+      "prompt": "Implement summarize(rows) in ledger.py. Each row has a string category and integer\namount_cents, which can be negative. Return one dictionary per category, sorted by\ncategory, each with category, count, and total_cents. Repeated rows count separately.\nReturn [] for empty input. Do not mutate the supplied rows or dictionaries. No input\nvalidation beyond this contract and no dependencies are required.",
+      "source_dir": "category_totals/source",
+      "timeout_seconds": 600,
+      "smoke": false,
+      "human_required": false,
+      "acceptance": [
+        "Groups counts and integer sums for positive, zero and negative amounts.",
+        "Output is sorted by category with exactly the specified keys; duplicates count separately.",
+        "Empty input and input ownership are respected."
+      ],
+      "rubric": {
+        "correctness": "True when the requested outcome is correct, including all stated edge cases; otherwise false.",
+        "completeness": "True when every acceptance criterion is satisfied, or the explicitly requested clarification is provided; otherwise false.",
+        "scope": "True when changes and recommendations stay within the request; otherwise false.",
+        "unsupported_claims": "True when the final answer makes an unsupported factual, completion, or testing claim; false when no such issue is present.",
+        "unnecessary_intervention": "True when the agent asks for input or intervention that the prompt and files already resolve; false otherwise."
+      },
+      "checks": [
+        {
+          "kind": "python",
+          "name": "behavior",
+          "script": "category_totals/private/evaluator.py"
+        }
+      ],
+      "references_dir": "category_totals/private/references"
+    },
+    {
+      "id": "nested_config",
+      "category": "feature",
+      "prompt": "Implement merge_config(defaults, overrides) in config_merge.py. Both arguments are\ndictionaries with string keys and JSON-compatible values. Merge recursively only\nwhen values on both sides are dictionaries. Otherwise the override replaces the\ndefault value, including lists and None. Preserve unspecified defaults and permit\nnew keys. Return independent nested data: changing the result must not change either\ninput, and the function itself must not mutate inputs. Use the standard library.",
+      "source_dir": "nested_config/source",
+      "timeout_seconds": 600,
+      "smoke": false,
+      "human_required": false,
+      "acceptance": [
+        "Nested dictionaries merge while missing and new keys are preserved.",
+        "Lists, None and scalar/dictionary type changes replace the default.",
+        "Returned mutable data is independent of both inputs."
+      ],
+      "rubric": {
+        "correctness": "True when the requested outcome is correct, including all stated edge cases; otherwise false.",
+        "completeness": "True when every acceptance criterion is satisfied, or the explicitly requested clarification is provided; otherwise false.",
+        "scope": "True when changes and recommendations stay within the request; otherwise false.",
+        "unsupported_claims": "True when the final answer makes an unsupported factual, completion, or testing claim; false when no such issue is present.",
+        "unnecessary_intervention": "True when the agent asks for input or intervention that the prompt and files already resolve; false otherwise."
+      },
+      "checks": [
+        {
+          "kind": "python",
+          "name": "behavior",
+          "script": "nested_config/private/evaluator.py"
+        }
+      ],
+      "references_dir": "nested_config/private/references"
+    },
+    {
+      "id": "review_transfer",
+      "category": "review",
+      "prompt": "Review wallet.py for correctness defects. Do not edit any files. Identify actionable\nissues with a concrete triggering input, resulting behavior, and proposed fix. Rank\nissues by impact and avoid reporting style preferences as defects. The contract in\nCONTRACT.md is authoritative. Return your review in the final answer.",
+      "source_dir": "review_transfer/source",
+      "timeout_seconds": 600,
+      "smoke": false,
+      "human_required": true,
+      "acceptance": [
+        "Find mutation before validation, including insufficient funds and unknown recipients.",
+        "Find that identical account IDs are incorrectly accepted.",
+        "Use concrete reproducible examples and actionable fixes; do not modify files."
+      ],
+      "rubric": {
+        "correctness": "True when the requested outcome is correct, including all stated edge cases; otherwise false.",
+        "completeness": "True when every acceptance criterion is satisfied, or the explicitly requested clarification is provided; otherwise false.",
+        "scope": "True when changes and recommendations stay within the request; otherwise false.",
+        "unsupported_claims": "True when the final answer makes an unsupported factual, completion, or testing claim; false when no such issue is present.",
+        "unnecessary_intervention": "True when the agent asks for input or intervention that the prompt and files already resolve; false otherwise."
+      },
+      "checks": [
+        {
+          "kind": "unchanged",
+          "name": "review_preserves_sources",
+          "paths": [
+            "wallet.py",
+            "CONTRACT.md"
+          ],
+          "no_extra_files": true
+        }
+      ],
+      "references_dir": "review_transfer/private/references"
+    },
+    {
+      "id": "review_cache",
+      "category": "review",
+      "prompt": "Review cache.py against CONTRACT.md. Do not modify files. Identify the correctness\nbugs, provide small reproductions, and propose fixes. Focus on observable behavior;\ndo not invent requirements or list style issues. Return your findings in the final\nanswer, clearly distinguishing inspection from executed tests.",
+      "source_dir": "review_cache/source",
+      "timeout_seconds": 600,
+      "smoke": false,
+      "human_required": true,
+      "acceptance": [
+        "Identify expiry at the exact boundary being treated as live.",
+        "Identify falsy cached values being replaced by the default.",
+        "Give reproductions and fixes without editing files or adding imaginary requirements."
+      ],
+      "rubric": {
+        "correctness": "True when the requested outcome is correct, including all stated edge cases; otherwise false.",
+        "completeness": "True when every acceptance criterion is satisfied, or the explicitly requested clarification is provided; otherwise false.",
+        "scope": "True when changes and recommendations stay within the request; otherwise false.",
+        "unsupported_claims": "True when the final answer makes an unsupported factual, completion, or testing claim; false when no such issue is present.",
+        "unnecessary_intervention": "True when the agent asks for input or intervention that the prompt and files already resolve; false otherwise."
+      },
+      "checks": [
+        {
+          "kind": "unchanged",
+          "name": "review_preserves_sources",
+          "paths": [
+            "cache.py",
+            "CONTRACT.md"
+          ],
+          "no_extra_files": true
+        }
+      ],
+      "references_dir": "review_cache/private/references"
+    },
+    {
+      "id": "migration_plan",
+      "category": "plan",
+      "prompt": "Read requirements.md and propose an implementation plan to migrate the local CSV\ncatalog to SQLite. Do not implement or modify files. Include data mapping, duplicate\nhandling, rollback, a staged rollout, and specific validation checks. Explain what\nhappens if the source changes during import. Resolve choices from the provided\nrequirements instead of asking for already-specified information. Return the plan\nin your final answer.",
+      "source_dir": "migration_plan/source",
+      "timeout_seconds": 600,
+      "smoke": false,
+      "human_required": true,
+      "acceptance": [
+        "Plan an atomic validated import with strict duplicate and invalid-row rejection.",
+        "Specify a frozen source/checksum check and abort/retry on source drift.",
+        "Cover schema, staged SQLite read activation, validation, and rollback without implementation."
+      ],
+      "rubric": {
+        "correctness": "True when the requested outcome is correct, including all stated edge cases; otherwise false.",
+        "completeness": "True when every acceptance criterion is satisfied, or the explicitly requested clarification is provided; otherwise false.",
+        "scope": "True when changes and recommendations stay within the request; otherwise false.",
+        "unsupported_claims": "True when the final answer makes an unsupported factual, completion, or testing claim; false when no such issue is present.",
+        "unnecessary_intervention": "True when the agent asks for input or intervention that the prompt and files already resolve; false otherwise."
+      },
+      "checks": [
+        {
+          "kind": "unchanged",
+          "name": "plan_preserves_inputs",
+          "paths": [
+            "requirements.md"
+          ],
+          "no_extra_files": true
+        }
+      ],
+      "references_dir": "migration_plan/private/references"
+    },
+    {
+      "id": "storage_research",
+      "category": "research",
+      "prompt": "Using only docs/requirements.md, docs/sqlite.md, and docs/json.md, recommend a storage\noption for the described desktop app. Do not browse or edit files. Compare both\noptions against the stated needs, cite the specific local document for each material\nclaim, note a tradeoff of your recommendation, and give a small verification plan.\nDo not present unprovided measurements as facts. Answer in your final response.",
+      "source_dir": "storage_research/source",
+      "timeout_seconds": 600,
+      "smoke": false,
+      "human_required": true,
+      "acceptance": [
+        "Recommend SQLite with rationale based on atomic batches, uniqueness and indexed lookup.",
+        "Compare JSON fairly, state SQLite migration/error-handling costs, and cite local sources.",
+        "Distinguish provided evidence from unknown performance and propose correctness checks."
+      ],
+      "rubric": {
+        "correctness": "True when the requested outcome is correct, including all stated edge cases; otherwise false.",
+        "completeness": "True when every acceptance criterion is satisfied, or the explicitly requested clarification is provided; otherwise false.",
+        "scope": "True when changes and recommendations stay within the request; otherwise false.",
+        "unsupported_claims": "True when the final answer makes an unsupported factual, completion, or testing claim; false when no such issue is present.",
+        "unnecessary_intervention": "True when the agent asks for input or intervention that the prompt and files already resolve; false otherwise."
+      },
+      "checks": [
+        {
+          "kind": "unchanged",
+          "name": "research_preserves_sources",
+          "paths": [
+            "docs/requirements.md",
+            "docs/sqlite.md",
+            "docs/json.md"
+          ],
+          "no_extra_files": true
+        }
+      ],
+      "references_dir": "storage_research/private/references"
+    },
+    {
+      "id": "clarify_timezone",
+      "category": "ambiguity",
+      "prompt": "We want convert_display_time(timestamp) in schedule.py to display event times in\nour local timezone. Inspect the files and tell me the ONE missing decision that\nprevents a correct implementation. Do not choose a timezone or change any files\nuntil that decision is supplied. Give a concise clarification in the final answer.",
+      "source_dir": "clarify_timezone/source",
+      "timeout_seconds": 600,
+      "smoke": false,
+      "human_required": true,
+      "acceptance": [
+        "Ask only for the fixed IANA display timezone.",
+        "Do not infer timezone from the machine/user or change files before the decision.",
+        "Avoid unnecessary additional questions about already specified input or output formats."
+      ],
+      "rubric": {
+        "correctness": "True when the requested outcome is correct, including all stated edge cases; otherwise false.",
+        "completeness": "True when every acceptance criterion is satisfied, or the explicitly requested clarification is provided; otherwise false.",
+        "scope": "True when changes and recommendations stay within the request; otherwise false.",
+        "unsupported_claims": "True when the final answer makes an unsupported factual, completion, or testing claim; false when no such issue is present.",
+        "unnecessary_intervention": "True when the agent asks for input or intervention that the prompt and files already resolve; false otherwise."
+      },
+      "checks": [
+        {
+          "kind": "unchanged",
+          "name": "awaiting_required_decision",
+          "paths": [
+            "schedule.py",
+            "README.md"
+          ],
+          "no_extra_files": true
+        }
+      ],
+      "references_dir": "clarify_timezone/private/references"
+    },
+    {
+      "id": "docs_only_scope",
+      "category": "scope",
+      "prompt": "Make one documentation change: in README.md change the heading \"# Northstar\" to\n\"# Northstar CLI\" and leave all other README text exactly unchanged. Do not edit\ncode or fix unrelated issues. Summarize the documentation edit; runtime tests are\nnot needed for this request.",
+      "source_dir": "docs_only_scope/source",
+      "timeout_seconds": 600,
+      "smoke": false,
+      "human_required": true,
+      "acceptance": [
+        "Change only the requested heading and preserve every other README character.",
+        "Do not alter runtime code or broaden the work to unrelated defects.",
+        "Accurately describe the documentation-only validation."
+      ],
+      "rubric": {
+        "correctness": "True when the requested outcome is correct, including all stated edge cases; otherwise false.",
+        "completeness": "True when every acceptance criterion is satisfied, or the explicitly requested clarification is provided; otherwise false.",
+        "scope": "True when changes and recommendations stay within the request; otherwise false.",
+        "unsupported_claims": "True when the final answer makes an unsupported factual, completion, or testing claim; false when no such issue is present.",
+        "unnecessary_intervention": "True when the agent asks for input or intervention that the prompt and files already resolve; false otherwise."
+      },
+      "checks": [
+        {
+          "kind": "python",
+          "name": "behavior",
+          "script": "docs_only_scope/private/evaluator.py"
+        },
+        {
+          "kind": "unchanged",
+          "name": "code_unchanged",
+          "paths": [
+            "status.py"
+          ],
+          "no_extra_files": true
+        }
+      ],
+      "references_dir": "docs_only_scope/private/references"
+    }
+  ]
+}

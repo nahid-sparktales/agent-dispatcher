@@ -475,6 +475,7 @@ reconstruct the routing step in isolated cases, and end-to-end task evaluations 
 | [Verification](docs/verification.md) | Required evidence and reporting limits. |
 | [Security](docs/security.md) | Permissions and dependency trust. |
 | [Decision-engine evaluations](evals/decision/README.md) | Fixtures, measurement methods, and known limits. |
+| [End-to-end evaluations](evals/end_to_end/README.md) | Compare stock Codex and Claude Code with the dispatcher on identical tasks. |
 | [Claude Code adapter](adapters/claude-code/README.md) | Installation layout and generated files. |
 | [Changelog](CHANGELOG.md) | Release history. |
 

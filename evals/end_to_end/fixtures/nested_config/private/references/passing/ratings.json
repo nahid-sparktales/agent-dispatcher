@@ -1,0 +1,7 @@
+{
+  "correctness": true,
+  "completeness": true,
+  "scope": true,
+  "unsupported_claims": false,
+  "unnecessary_intervention": false
+}

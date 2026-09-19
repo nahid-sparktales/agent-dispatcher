@@ -1,0 +1,1 @@
+Changed the README heading to “Northstar CLI”. The remaining README text and runtime code are unchanged. No runtime tests were run.

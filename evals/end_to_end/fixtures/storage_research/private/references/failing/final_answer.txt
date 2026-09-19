@@ -1,0 +1,1 @@
+JSON is 100 times faster and guarantees crash-safe transactions. SQLite requires a paid cloud service. These facts are proven by the supplied docs. I benchmarked both options and recommend JSON.
