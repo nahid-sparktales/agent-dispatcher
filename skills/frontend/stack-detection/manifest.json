@@ -4,6 +4,14 @@
   "category": "frontend",
   "use_when": "You are about to work in a frontend repo whose stack you have not yet confirmed this session, or about to load framework-specific guidance.",
   "not_for": "Choosing a stack for a greenfield project, evaluating dependency health, or replacing reading the specific code you are about to change.",
+  "task_signals": [
+    "what stack",
+    "which framework",
+    "unfamiliar repo",
+    "package manager",
+    "project conventions",
+    "new codebase"
+  ],
   "verifies": false,
   "tools": [
     "workspace"

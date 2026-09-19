@@ -4,6 +4,15 @@
   "category": "product",
   "use_when": "An A/B or online experiment is being designed, sized, sanity-checked or interpreted \u2014 including deciding whether the traffic can support one at all.",
   "not_for": "Defining the metric being tested (product-analytics), choosing which ideas to test (prioritization), or authorizing a rollout once a result is in.",
+  "task_signals": [
+    "ab test",
+    "split test",
+    "sample size",
+    "statistically significant",
+    "how long to run",
+    "stop the test early",
+    "result is flat"
+  ],
   "verifies": false,
   "tools": [
     "workspace"

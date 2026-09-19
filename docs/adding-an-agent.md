@@ -31,6 +31,7 @@ mcp_recommended: workspace
 mcp_conditional: sentry, datadog, grafana
 recipes: investigate-incident
 verification: release-verification
+retrieval_hints: recent deploy records, alerting config, runbooks   # 2-6 artifact kinds it reads first
 ---
 ```
 
@@ -53,6 +54,8 @@ Give a role a skill because its work needs it, not because the skill is good.
 - Anything named in `verification` is a skill whose manifest declares `verifies: true`.
 - Every capability is provided by at least one skill.
 - Ids and slugs are unique across all roles.
+- Every `skills_if_<condition>` bucket resolves to a signal in `catalog/signals.json`.
+- `retrieval_hints` is present and non-empty.
 
 Run `python3 build.py` then `python3 test_build.py`. The build regenerates the router, the role
 rendering, the command, the hook index and the registries; the test suite checks they agree.
@@ -63,12 +66,24 @@ Runtime-specific syntax, the loadout block's prose (generated), and detailed spe
 that belongs in a skill. The role keeps enough method to be useful with **no** optional skill
 installed — that is the floor, and it is deliberate.
 
-## Conditions worth reusing
+## Retrieval hints
 
-`react`, `nextjs`, `tailwind`, `shadcn`, `ui_task`, `security_sensitive`, `postgres`, `supabase`,
-`docker`, `vercel`, `browser_available`, `notebook`. Prefer conditions detectable from the
-repository — `package.json`, `components.json`, `wrangler.toml`, `Dockerfile`,
-`.github/workflows/`, `vercel.json`, `supabase/`.
+Two to six kinds of workspace artifact this role reads *first* — they seed the context engine's
+search before the task's own nouns do. Derive them from the role's own WORKING METHOD: a debugger
+opens the failing module, its tests and what changed recently; a version-control role opens the
+reflog. A hint list that would fit any role is useless.
+
+## Conditions
+
+Every `skills_if_<condition>` bucket must be defined in
+[`catalog/signals.json`](../catalog/signals.json), which says how the condition is decided —
+`project` (file globs and `<glob> contains <literal>` checks), `task` (phrases in the request), or
+`runtime` (what the environment provides). The build refuses an undefined bucket, and refuses a
+signal no role uses.
+
+Reuse an existing signal where one fits; `docs/context-engine.md` lists them all. Prefer `project`
+over `task` where the repository can settle it, and prefer a content check over a filename where
+the filename alone is weak.
 
 Detection activates knowledge. It never grants permission: `vercel.json` means load deployment
 guidance, not that the agent may deploy.

@@ -17,6 +17,7 @@ mcp_recommended: workspace
 mcp_conditional: github, context7
 recipes: database-migration
 verification: api-contract-verification, database-migration-verification
+retrieval_hints: old and new api surfaces, call sites and consumers, dependency manifests, characterization tests, compatibility shims, generated artifacts
 ---
 
 # Refactoring & Migration Specialist

@@ -14,6 +14,7 @@ skills_optional: competitive-analysis, experimentation, positioning
 skills_if_ui_task: ui-audit
 mcp_recommended: workspace
 mcp_conditional: linear, notion, github
+retrieval_hints: existing product briefs, requirements and acceptance criteria, user research notes, roadmap and issue tracker, current feature behavior, usage metrics or analytics
 ---
 
 # Product Manager

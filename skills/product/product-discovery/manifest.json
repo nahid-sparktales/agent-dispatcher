@@ -4,6 +4,14 @@
   "category": "product",
   "use_when": "A request arrives phrased as a solution, or a plan rests on a belief about users that nobody has checked, and the question is whether the problem is real.",
   "not_for": "Writing the scope once the problem is settled (prd-and-stories), ranking work already understood (prioritization), or contacting users without approval.",
+  "task_signals": [
+    "worth building",
+    "customer asked for",
+    "do users need this",
+    "nobody validated this",
+    "why are we building",
+    "users keep complaining"
+  ],
   "verifies": false,
   "tools": [
     "workspace",

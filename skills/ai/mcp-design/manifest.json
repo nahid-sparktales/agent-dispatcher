@@ -4,6 +4,14 @@
   "category": "ai",
   "use_when": "An MCP server is being written, an internal system is being wrapped as one, or a third-party server is being assessed before it is wired into a project.",
   "not_for": "Designing the signature, parameters and error text of an individual tool (tool-design), constraining model output to a schema (structured-output), or authorizing the installation and configuration of any server.",
+  "task_signals": [
+    "mcp server",
+    "build an mcp",
+    "wrap api as mcp",
+    "mcp transport",
+    "third party mcp",
+    "mcp credentials"
+  ],
   "verifies": false,
   "tools": [
     "workspace",

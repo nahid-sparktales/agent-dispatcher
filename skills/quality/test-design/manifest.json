@@ -4,6 +4,14 @@
   "category": "quality",
   "use_when": "Unit or integration tests are being written or repaired \u2014 new coverage, pinning a reported bug, or a suite that stays green while the behaviour is wrong.",
   "not_for": "Choosing what to cover and at which level (test-strategy), end-to-end browser journeys (e2e-testing), and concluding that a shipped change is verified (browser-verification, api-contract-verification).",
+  "task_signals": [
+    "write unit tests",
+    "integration tests",
+    "add tests",
+    "mock this",
+    "green but broken",
+    "test this function"
+  ],
   "verifies": false,
   "tools": [
     "workspace"

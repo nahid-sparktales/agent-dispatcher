@@ -4,6 +4,15 @@
   "category": "security",
   "use_when": "A credential is added, moved, shared or due for rotation, or one has turned up in code, history, logs or a client bundle.",
   "not_for": "Deciding what a valid credential may access (authorization), auth flow weaknesses (auth-security), dependency advisories, and executing a revocation or a history rewrite without the owner's decision.",
+  "task_signals": [
+    "hardcoded api key",
+    "secret committed",
+    "rotate credentials",
+    "leaked token",
+    "key in logs",
+    "env file",
+    "secret in bundle"
+  ],
   "verifies": false,
   "tools": [
     "workspace",

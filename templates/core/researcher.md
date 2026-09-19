@@ -15,6 +15,7 @@ skills_if_claude_api: anthropic-claude-api
 mcp_recommended: context7
 mcp_conditional: github
 recipes: research-technical-decision
+retrieval_hints: workspace files with local facts, primary source documents, current version and changelog, authorized connected records, prior research notes
 ---
 
 # Researcher

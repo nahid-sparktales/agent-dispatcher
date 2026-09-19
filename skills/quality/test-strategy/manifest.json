@@ -4,6 +4,14 @@
   "category": "quality",
   "use_when": "Coverage has to be planned or defended \u2014 before writing a batch of tests, when a suite is slow and nobody can say what it buys, or after a bug escaped and nothing caught it.",
   "not_for": "Writing the tests themselves (test-design, e2e-testing), and proving a specific finished change works (browser-verification, api-contract-verification).",
+  "task_signals": [
+    "test plan",
+    "what should we test",
+    "coverage gaps",
+    "testing approach",
+    "tests missed it",
+    "how much testing"
+  ],
   "verifies": false,
   "tools": [
     "workspace",

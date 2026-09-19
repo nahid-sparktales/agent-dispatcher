@@ -4,6 +4,15 @@
   "category": "knowledge",
   "use_when": "A page is written or revised to be found in search, search traffic drops, a page is missing from results, or someone asks which query to target.",
   "not_for": "Writing the copy itself (copywriting), page-speed and Core Web Vitals work (frontend-performance), paid search, social distribution, or pages deliberately kept out of search.",
+  "task_signals": [
+    "rank for",
+    "search traffic dropped",
+    "not showing in google",
+    "keyword to target",
+    "meta description",
+    "seo audit",
+    "get indexed"
+  ],
   "verifies": false,
   "tools": [
     "workspace",

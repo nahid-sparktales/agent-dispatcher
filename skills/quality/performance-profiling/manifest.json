@@ -4,6 +4,15 @@
   "category": "quality",
   "use_when": "Something is slow, or an optimization is about to be written from a hunch rather than from a measurement.",
   "not_for": "Correctness or crash investigation (systematic-debugging), capacity planning, or micro-tuning code with no measured user impact.",
+  "task_signals": [
+    "its slow",
+    "profile this",
+    "p95 latency",
+    "bottleneck",
+    "speed this up",
+    "high memory usage",
+    "optimize performance"
+  ],
   "verifies": false,
   "tools": [
     "workspace"

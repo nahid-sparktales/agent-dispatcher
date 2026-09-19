@@ -4,6 +4,14 @@
   "category": "backend",
   "use_when": "An operation with an external side effect has to survive being repeated, a caller needs a retry policy, or duplicate effects have appeared and must be prevented.",
   "not_for": "Webhook receipt and delivery mechanics (webhooks), endpoint and error shape design (api-design), database transaction or locking design, and picking a queue technology.",
+  "task_signals": [
+    "charged twice",
+    "idempotency key",
+    "safe to retry",
+    "duplicate side effects",
+    "exponential backoff",
+    "timed out but maybe succeeded"
+  ],
   "verifies": false,
   "tools": [
     "workspace"

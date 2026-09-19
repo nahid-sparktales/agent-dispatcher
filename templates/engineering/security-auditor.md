@@ -17,6 +17,7 @@ skills_if_agent_system: prompt-injection-defense, agent-security
 mcp_recommended: github
 mcp_conditional: cloudflare
 recipes: security-review, review-pull-request
+retrieval_hints: authentication and authorization code, input handling boundaries, secret and credential config, dependency manifests, external entry points, tool permission definitions
 ---
 
 # Security Auditor

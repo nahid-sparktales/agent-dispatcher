@@ -4,6 +4,15 @@
   "category": "knowledge",
   "use_when": "Documentation is about to be called correct, current or ready to publish, or a setup guide, quickstart or onboarding path fails at an unidentified step.",
   "not_for": "Judging whether the writing is clear or well structured (technical-writing), and standing in for the project's own test suite (test-strategy).",
+  "task_signals": [
+    "docs still accurate",
+    "setup guide fails",
+    "readme is stale",
+    "quickstart broken",
+    "broken links",
+    "onboarding fails",
+    "verify the docs"
+  ],
   "verifies": true,
   "tools": [
     "workspace",

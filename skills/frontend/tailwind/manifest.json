@@ -4,6 +4,15 @@
   "category": "frontend",
   "use_when": "Writing or editing Tailwind utility classes in a project that already uses Tailwind.",
   "not_for": "Deciding whether to adopt Tailwind, visual design direction (design skills), or checking what actually rendered (browser-verification).",
+  "task_signals": [
+    "tailwind",
+    "utility classes",
+    "arbitrary value",
+    "class conflict",
+    "dark mode classes",
+    "tailwind config",
+    "cn helper"
+  ],
   "verifies": false,
   "tools": [
     "workspace",

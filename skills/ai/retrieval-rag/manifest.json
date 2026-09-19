@@ -4,6 +4,14 @@
   "category": "ai",
   "use_when": "A retrieval-backed system returns wrong or thin answers, or an index is being designed, chunked, embedded or rebuilt.",
   "not_for": "Prompt and output quality once the right passage is already in context, agent memory design (memory-design), model selection (model-routing), and choosing a vector database product.",
+  "task_signals": [
+    "rag",
+    "chunking",
+    "embeddings",
+    "vector search",
+    "retrieval misses",
+    "hallucinating from docs"
+  ],
   "verifies": false,
   "tools": [
     "workspace",

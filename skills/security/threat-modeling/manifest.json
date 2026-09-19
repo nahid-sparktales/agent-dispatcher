@@ -4,6 +4,14 @@
   "category": "security",
   "use_when": "A system's shape is being designed or changed \u2014 new service, integration, tenancy model, uploads, payments or auth \u2014 and someone needs to know which few things are actually worth defending.",
   "not_for": "Finding defects in existing code (secure-code-review), enumerating web bug classes in a codebase (owasp-web), compliance questionnaires, or responding to a live incident.",
+  "task_signals": [
+    "threat model",
+    "is this design safe",
+    "trust boundaries",
+    "new integration",
+    "what could go wrong",
+    "before we build"
+  ],
   "verifies": false,
   "tools": [
     "workspace"

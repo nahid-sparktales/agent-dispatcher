@@ -4,6 +4,15 @@
   "category": "backend",
   "use_when": "A credential is issued, accepted, refreshed or revoked \u2014 login, logout, sessions, tokens, API keys, or an OAuth/OIDC integration.",
   "not_for": "Deciding what an authenticated caller may do (authorization), the login screen's design and copy, or secret storage and rotation policy at the infrastructure level.",
+  "task_signals": [
+    "add login",
+    "jwt token",
+    "session cookie",
+    "oauth sign in",
+    "refresh token",
+    "who is the user",
+    "api keys"
+  ],
   "verifies": false,
   "tools": [
     "workspace",

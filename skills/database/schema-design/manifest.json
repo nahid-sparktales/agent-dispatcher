@@ -4,6 +4,15 @@
   "category": "database",
   "use_when": "New tables are being designed, ORM models or migration DDL are under review, or a defect traces back to the data model permitting a state that should be impossible.",
   "not_for": "Tuning a slow statement (query-optimization), engine-specific types, indexes and features (postgres), or writing and running the migration that ships the change.",
+  "task_signals": [
+    "design the tables",
+    "data model",
+    "new table",
+    "normalize",
+    "foreign key",
+    "orm models",
+    "nullable column"
+  ],
   "verifies": false,
   "tools": [
     "workspace"

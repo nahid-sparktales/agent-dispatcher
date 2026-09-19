@@ -18,6 +18,7 @@ mcp_recommended: github
 mcp_conditional: vercel, cloudflare, sentry
 recipes: investigate-incident
 verification: release-verification
+retrieval_hints: ci workflow files, build and packaging config, deployment manifests, environment config and secret refs, release and rollback scripts, health check definitions
 ---
 
 # DevOps & Release Engineer

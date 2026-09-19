@@ -17,6 +17,7 @@ skills_if_postgres: postgres
 mcp_recommended: workspace, sentry
 mcp_conditional: chrome-devtools, datadog, grafana
 recipes: debug-application
+retrieval_hints: benchmark and load scripts, profiling output, hot path code, query and index definitions, caching layers, performance budgets
 ---
 
 # Performance Engineer

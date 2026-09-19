@@ -31,6 +31,7 @@ description: One or two sentences that say what this does AND when it fires, in 
   "category": "quality",                 // must match the parent directory
   "use_when": "The trigger, one sentence.",
   "not_for": "The neighbouring skill this one cedes — what keeps near-misses out.",
+  "task_signals": ["blank screen", "does it render"],  // 3-7 short phrases a USER would write
   "verifies": true,                      // true only for procedures that prove work
   "tools": ["playwright", "workspace"],  // ids from catalog/mcp.json — availability, not permission
   "references": ["references/driving-the-browser.md"],
@@ -39,7 +40,19 @@ description: One or two sentences that say what this does AND when it fires, in 
 }
 ```
 
-`build.py` fails if an id, category, capability, tool id or referenced file does not line up.
+`build.py` fails if an id, category, capability, tool id or referenced file does not line up, and
+if `task_signals` is missing or empty.
+
+### Writing `task_signals`
+
+These are the lexical half of discovery: matched against a request, never read as prose. Three to
+seven phrases, lowercase, at most five words each.
+
+Write them in the vocabulary of the **request**, not of the skill — `"blank screen"`, not
+`"rendered-output verification"`. Make them *discriminate*: read the `not_for` line of every
+sibling in the same category and drop any phrase that would fire for one of them instead.
+`test_build.py` rejects a phrase shared by more than two skills, because a signal that fires
+everywhere routes nothing.
 
 ## The body
 

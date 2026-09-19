@@ -13,6 +13,7 @@ skills_preferred: systematic-debugging, dependency-security
 skills_optional: rollback
 skills_if_github_actions: github-actions
 mcp_recommended: workspace, github
+retrieval_hints: git log and reflog, working tree status, stash and dangling objects, remote tracking refs, branch and tag refs
 ---
 
 # Version Control Engineer

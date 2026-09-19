@@ -7,7 +7,10 @@ What `build.py` renders, and why these paths are what they are.
 | `templates/<cat>/<id>.md` | `skills/agent-dispatcher/roles/<id>.md` | ships inside the skill so one install carries it |
 | — | `skills/agent-dispatcher/SKILL.md` | Claude Code auto-discovers `skills/*/SKILL.md` |
 | — | `skills/agent-dispatcher/INDEX.md` | level-1 discovery, read on demand |
+| `CONTEXT.template.md` + `catalog/context-plan.schema.json` | `skills/agent-dispatcher/CONTEXT.md` | the context engine, read on demand |
+| `catalog/signals.json` | `skills/agent-dispatcher/SIGNALS.md` | rendered in because an install never receives `catalog/`; split from `CONTEXT.md` for the same reason `INDEX.md` is split from `SKILL.md` |
 | `templates/` | `commands/agent-<slug>.md` | Claude Code auto-discovers `commands/*.md` |
+| — | `commands/agent-context.md` | the inspector; generated because the build clears `commands/agent-*.md` |
 | — | `hooks/agent-dispatcher-activate.sh`, `hooks/hooks.json` | `hooks/hooks.json` is auto-loaded |
 
 The root paths are fixed by Claude Code's plugin auto-discovery, not by preference. That is the

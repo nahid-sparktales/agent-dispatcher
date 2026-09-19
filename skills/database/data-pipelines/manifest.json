@@ -4,6 +4,15 @@
   "category": "database",
   "use_when": "A batch or streaming pipeline, scheduled transform or ingestion job is being built, repaired or backfilled, or a run dropped, duplicated or reshaped rows.",
   "not_for": "Destination schema design (schema-design) and its migrations (migrations), the standing assertions that guard produced data (data-quality), or interpreting what the resulting numbers mean.",
+  "task_signals": [
+    "etl job",
+    "pipeline failed",
+    "backfill",
+    "rerun duplicated rows",
+    "ingestion job",
+    "late events",
+    "scheduled transform"
+  ],
   "verifies": false,
   "tools": [
     "workspace",

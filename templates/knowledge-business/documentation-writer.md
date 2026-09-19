@@ -15,6 +15,7 @@ skills_if_public_docs_site: seo
 mcp_recommended: workspace, github
 mcp_conditional: context7, notion
 verification: documentation-verification
+retrieval_hints: existing docs pages, readme and changelog, source code being documented, config and env samples, cli and api entry points, docs navigation index
 ---
 
 # Documentation Writer

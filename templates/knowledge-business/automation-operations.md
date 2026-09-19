@@ -16,6 +16,7 @@ skills_if_github_actions: github-actions
 mcp_recommended: workspace
 mcp_conditional: linear, notion, slack, google-workspace
 verification: api-contract-verification
+retrieval_hints: existing automation scripts, schedule and cron definitions, connected service config, state or dedup store, prior run logs, recipient and record lists
 ---
 
 # Automation & Operations Assistant

@@ -18,6 +18,7 @@ mcp_recommended: workspace
 mcp_conditional: github, sentry, playwright
 recipes: debug-application
 verification: browser-verification, api-contract-verification
+retrieval_hints: failing module, its tests, recent changes to it, error and log sites, reproduction scripts, related state or persistence
 ---
 
 # Debugger

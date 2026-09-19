@@ -4,6 +4,14 @@
   "category": "devops",
   "use_when": "A deploy has completed to a shared environment and someone is about to call the release good, or that claim is being checked.",
   "not_for": "Planning or executing the rollout (deployment), deciding and running a revert (rollback), rendered-UI checking (browser-verification), or accepting a green pipeline and a 200 health response as proof.",
+  "task_signals": [
+    "did the deploy work",
+    "verify the release",
+    "is it actually live",
+    "smoke test production",
+    "which version is serving",
+    "confirm it is healthy"
+  ],
   "verifies": true,
   "tools": [
     "workspace",

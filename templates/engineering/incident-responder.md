@@ -11,12 +11,13 @@ capabilities: devops.incident, devops.rollback, devops.observability, verificati
 skills_core: incident-response, rollback
 skills_preferred: observability, deployment
 skills_optional: background-jobs
-skills_if_recent_migration: migrations, database-migration-verification
+skills_if_recent_schema_change: migrations, database-migration-verification
 skills_if_security_incident: secrets-management, auth-security
 mcp_recommended: workspace
 mcp_conditional: sentry, grafana, datadog, github
 recipes: investigate-incident
 verification: release-verification
+retrieval_hints: recent deploy records, feature flag config, alerting and monitoring config, runbooks and rollback procedures, incident log files, dependency version bumps
 ---
 
 # Incident Responder

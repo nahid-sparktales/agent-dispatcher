@@ -4,6 +4,14 @@
   "category": "product",
   "use_when": "A settled problem needs a written scope others can build and check against \u2014 a brief, PRD, epic or stories \u2014 or a ticket is too vague to estimate or verify.",
   "not_for": "Deciding whether the problem is real (product-discovery), ranking what to build first (prioritization), or choosing the implementation.",
+  "task_signals": [
+    "write a prd",
+    "user stories",
+    "acceptance criteria",
+    "spec this out",
+    "ticket too vague",
+    "write the epic"
+  ],
   "verifies": false,
   "tools": [
     "workspace",

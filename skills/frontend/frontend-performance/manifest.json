@@ -4,6 +4,15 @@
   "category": "frontend",
   "use_when": "A page is reported slow, a Core Web Vital or bundle size is named, or a change is about to be described as a performance improvement.",
   "not_for": "Backend, query or API latency; framework selection; and it does not replace rendered verification after the optimization lands.",
+  "task_signals": [
+    "page is slow",
+    "lcp",
+    "bundle size",
+    "lighthouse score",
+    "core web vitals",
+    "layout shift",
+    "slow first load"
+  ],
   "verifies": false,
   "tools": [
     "playwright",

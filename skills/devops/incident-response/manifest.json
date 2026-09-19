@@ -4,6 +4,15 @@
   "category": "devops",
   "use_when": "Production is failing or degraded right now and stopping the ongoing harm matters more than a complete causal explanation.",
   "not_for": "A defect that is not currently failing in production (systematic-debugging), the root-cause investigation after recovery, release preparation and pipeline work, and the postmortem write-up.",
+  "task_signals": [
+    "production is down",
+    "site is down",
+    "outage right now",
+    "users are affected",
+    "prod degraded",
+    "got paged",
+    "everything is 500ing"
+  ],
   "verifies": false,
   "tools": [
     "workspace",

@@ -20,6 +20,7 @@ mcp_recommended: workspace, github
 mcp_conditional: playwright, axe-devtools
 recipes: review-pull-request, security-review
 verification: api-contract-verification, browser-verification, documentation-verification
+retrieval_hints: the changed diff, acceptance criteria, dependencies of changed code, existing verification evidence, ci or test output
 ---
 
 # Reviewer

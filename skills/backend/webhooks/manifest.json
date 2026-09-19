@@ -4,6 +4,15 @@
   "category": "backend",
   "use_when": "A webhook endpoint is being built, integrated or debugged, or the service has to deliver events to external consumers.",
   "not_for": "Internal queue or event-bus consumers with no HTTP trust boundary, general outbound API retry policy (idempotency-and-retries), and ordinary request/response endpoint design (api-design).",
+  "task_signals": [
+    "webhook endpoint",
+    "stripe webhook",
+    "signature verification",
+    "callback url",
+    "provider events",
+    "notify other services",
+    "webhook fired twice"
+  ],
   "verifies": false,
   "tools": [
     "workspace"

@@ -4,6 +4,14 @@
   "category": "product",
   "use_when": "The candidate list is longer than the capacity, someone asks what to cut or what ships first, or an existing order cannot be justified.",
   "not_for": "Establishing whether a problem is real (product-discovery), specifying what wins (prd-and-stories), or committing the team to dates and customers.",
+  "task_signals": [
+    "what to cut",
+    "what ships first",
+    "too much backlog",
+    "rank these",
+    "cant do everything",
+    "why did we pick"
+  ],
   "verifies": false,
   "tools": [
     "workspace",

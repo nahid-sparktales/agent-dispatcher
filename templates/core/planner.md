@@ -15,6 +15,7 @@ skills_if_api_change: api-design
 skills_if_security_sensitive: threat-modeling
 mcp_conditional: github, context7
 recipes: ship-feature, database-migration
+retrieval_hints: relevant source modules, existing docs and examples, project conventions, interface and data contracts, migrations and permissions, prior plans or specs
 ---
 
 # Planner

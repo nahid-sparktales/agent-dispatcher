@@ -4,6 +4,14 @@
   "category": "ai",
   "use_when": "A prompt, model, tool definition or retrieval change is about to be called an improvement, agent behaviour must not silently regress, or a production failure needs to become a case that cannot come back.",
   "not_for": "Tracing or explaining what a single run did (llm-observability), red-teaming injection resistance (prompt-injection-defense), and testing deterministic code, which is tests.",
+  "task_signals": [
+    "evals",
+    "eval suite",
+    "did this improve",
+    "seems better",
+    "agent regression",
+    "llm as judge"
+  ],
   "verifies": true,
   "tools": [
     "workspace",

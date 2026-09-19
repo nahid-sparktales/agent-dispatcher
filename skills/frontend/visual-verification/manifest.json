@@ -4,6 +4,15 @@
   "category": "frontend",
   "use_when": "A change affects appearance and is about to be called done, or a screenshot-comparison result is about to be trusted as proof.",
   "not_for": "A single rendered check of one change (browser-verification), judging whether a design is good (ui-audit), or behaviour with no visual surface.",
+  "task_signals": [
+    "visual regression",
+    "screenshot comparison",
+    "across viewports",
+    "light and dark",
+    "baseline screenshots",
+    "still looks correct",
+    "every breakpoint"
+  ],
   "verifies": true,
   "tools": [
     "playwright",

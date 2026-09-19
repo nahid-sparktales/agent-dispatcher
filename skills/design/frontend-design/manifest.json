@@ -4,6 +4,14 @@
   "category": "design",
   "use_when": "A new or reshaped UI surface needs a visual direction decided \u2014 hierarchy, type, colour, spacing, density \u2014 and no design system already decides it.",
   "not_for": "Critiquing an interface that already exists (ui-audit), working inside an established design system (design-systems), or proving a change renders and works (browser-verification).",
+  "task_signals": [
+    "looks generic",
+    "feels templated",
+    "visual direction",
+    "make it look good",
+    "style from scratch",
+    "new landing page"
+  ],
   "verifies": false,
   "tools": [
     "workspace",

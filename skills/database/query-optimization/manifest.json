@@ -4,6 +4,14 @@
   "category": "database",
   "use_when": "A specific statement is slow and the database is the suspect, a query plan needs interpreting, or an index is being proposed without evidence.",
   "not_for": "Deciding table and constraint structure (schema-design), engine feature reference (postgres), or system-wide performance work before the database has been shown to be the bottleneck.",
+  "task_signals": [
+    "slow query",
+    "explain plan",
+    "should i add an index",
+    "query times out",
+    "endpoint is slow",
+    "report takes forever"
+  ],
   "verifies": false,
   "tools": [
     "workspace",

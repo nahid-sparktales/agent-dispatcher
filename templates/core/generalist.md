@@ -19,6 +19,7 @@ mcp_recommended: workspace
 mcp_conditional: github, context7
 recipes: ship-feature, debug-application
 verification: browser-verification, documentation-verification
+retrieval_hints: files the request names, readily available context, sources or commands to verify
 ---
 
 # Generalist

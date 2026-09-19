@@ -4,6 +4,14 @@
   "category": "ai",
   "use_when": "An agent ingests content it did not author \u2014 retrieval, browsing, email, files, MCP tool results, subagent output \u2014 and also holds tools that can act.",
   "not_for": "Authentication and authorization design, secret and credential management, general input validation of user-supplied data, and building the eval suite that holds the regression cases (agent-evals).",
+  "task_signals": [
+    "prompt injection",
+    "jailbreak",
+    "untrusted content",
+    "agent reads web pages",
+    "data exfiltration",
+    "is my agent safe"
+  ],
   "verifies": false,
   "tools": [
     "workspace"

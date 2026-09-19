@@ -19,6 +19,7 @@ mcp_recommended: context7, github
 mcp_conditional: supabase, cloudflare
 recipes: ship-feature
 verification: api-contract-verification
+retrieval_hints: integration client modules, webhook receivers, auth scopes and secret config, retry and idempotency code, contract and sandbox tests, integration setup docs
 ---
 
 # API & Integration Engineer

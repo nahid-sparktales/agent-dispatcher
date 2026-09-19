@@ -4,6 +4,14 @@
   "category": "ai",
   "use_when": "A prompt, agent or session loads substantial material, quality decays as context grows, or context has to be trimmed, summarized or split between inlining and retrieval.",
   "not_for": "Wording and measuring the prompt itself (prompt-engineering), scoping an agent's job and tools (agent-design), and choosing retrieval or vector-store infrastructure.",
+  "task_signals": [
+    "context window",
+    "too much context",
+    "running out of context",
+    "context rot",
+    "compaction",
+    "inline or retrieve"
+  ],
   "verifies": false,
   "tools": [
     "workspace"

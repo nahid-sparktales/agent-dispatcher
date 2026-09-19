@@ -4,6 +4,14 @@
   "category": "product",
   "use_when": "A product metric, funnel or dashboard number is being defined, disputed, or about to be instrumented \u2014 including before tracking is added to a feature.",
   "not_for": "Deciding what to build next (prioritization), designing or reading an A/B test (experimentation), or analysing a dataset whose definitions are already settled.",
+  "task_signals": [
+    "how do we measure",
+    "funnel drop off",
+    "retention rate",
+    "dashboards disagree",
+    "add tracking",
+    "define the metric"
+  ],
   "verifies": false,
   "tools": [
     "workspace"

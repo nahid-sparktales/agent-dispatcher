@@ -4,6 +4,14 @@
   "category": "ai",
   "use_when": "An agent must carry facts, preferences or decisions past the current context, or an existing memory store has become noisy, contradictory or wrongly scoped.",
   "not_for": "Retrieval over a document corpus (retrieval-rag), context-window packing and prompt construction, model selection (model-routing), and raw transcript logging.",
+  "task_signals": [
+    "agent forgets",
+    "remember across sessions",
+    "persistent memory",
+    "stale memories",
+    "memory leaking between users",
+    "store user preferences"
+  ],
   "verifies": false,
   "tools": [
     "workspace"

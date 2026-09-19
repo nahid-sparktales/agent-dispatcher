@@ -16,6 +16,7 @@ skills_if_postgres: postgres
 mcp_conditional: postgres-community, supabase, context7
 recipes: database-migration
 verification: database-migration-verification
+retrieval_hints: schema definitions, migration history, data access and query code, constraints and access rules, fixtures and seed data
 ---
 
 # Database Engineer

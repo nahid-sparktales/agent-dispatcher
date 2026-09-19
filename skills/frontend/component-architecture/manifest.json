@@ -4,6 +4,15 @@
   "category": "frontend",
   "use_when": "A component is being added, has grown props or responsibilities, or a structure is under review for whether it will hold.",
   "not_for": "Visual design and layout judgement, styling-system work (tailwind), or restructuring code the current task did not ask you to touch.",
+  "task_signals": [
+    "split this component",
+    "too many props",
+    "where should state live",
+    "prop drilling",
+    "component is huge",
+    "lift state up",
+    "restructure this component"
+  ],
   "verifies": false,
   "tools": [
     "workspace"

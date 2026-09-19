@@ -13,6 +13,7 @@ skills_preferred: seo, source-evaluation
 skills_optional: technical-writing, anthropic-brand-guidelines
 skills_if_ui_copy: ux-writing
 mcp_recommended: workspace
+retrieval_hints: existing copy and drafts, brand voice guide, product feature descriptions, approved claims and proof points
 ---
 
 # Content Writer & Copywriter

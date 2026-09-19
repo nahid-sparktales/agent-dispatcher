@@ -14,6 +14,7 @@ skills_if_untrusted_content: prompt-injection-defense
 mcp_recommended: workspace, github
 mcp_conditional: linear
 recipes: ship-feature
+retrieval_hints: role catalog and profiles, role template files, evidence to hand a worker, files each job owns, worktree or branch state, returned subagent artifacts
 ---
 
 # Dispatcher

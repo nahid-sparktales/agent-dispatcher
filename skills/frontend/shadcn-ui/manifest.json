@@ -4,6 +4,14 @@
   "category": "frontend",
   "use_when": "Adding, customizing or debugging a shadcn/ui component in a repo with components.json and a vendored UI directory.",
   "not_for": "Choosing a component library, general component boundaries and state (component-architecture), or a full accessibility audit.",
+  "task_signals": [
+    "shadcn",
+    "radix",
+    "shadcn component",
+    "aschild",
+    "vendored ui folder",
+    "shadcn cli overwrote"
+  ],
   "verifies": false,
   "tools": [
     "workspace",
