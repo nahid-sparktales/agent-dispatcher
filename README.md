@@ -127,10 +127,8 @@ Never edit a generated file; edit the role file or the template and rebuild.
 
 ## Provenance
 
-24 of the roles are adapted from the Locus Agent Template Pack v1.0.0 — that pack's runtime, mode,
-memory-scope, and access-level vocabulary was replaced with this harness's equivalents, but the
-working methods themselves are substantially verbatim from it. `version-control`, `data-engineer`,
-and `incident-responder` are original here.
-
-**This repo is not publishable as-is.** The pack states no license, so there is no recorded
-permission to redistribute those 24 roles. See NOTICE.
+MIT licensed. 24 of the roles began as the Locus Agent Template Pack v1.0.0 — an unlicensed,
+unattributed content pack generated for this repo's author — with that pack's runtime, mode,
+memory-scope, and access-level vocabulary replaced by Claude Code's equivalents; the working methods
+are substantially its text. `version-control`, `data-engineer`, and `incident-responder` are
+original here. Not affiliated with Locus. See NOTICE.

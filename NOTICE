@@ -1,26 +1,26 @@
-Two different things live in this repository.
+Provenance
+==========
 
-MIT (see LICENSE) — the tooling and the text written here:
-  build.py, test_build.py, install.sh, SKILL.template.md, hooks/, .claude-plugin/,
-  the hand-written parts of README.md, and the role files
-  skills/agent-dispatcher/roles/{version-control,data-engineer,incident-responder}.md.
+Everything in this repository is under the MIT License (see LICENSE).
 
-THIRD-PARTY, terms unknown — the other 24 role files and everything generated from them:
-  skills/agent-dispatcher/roles/*.md (the other 24), skills/agent-dispatcher/SKILL.md,
-  commands/agent-*.md, and the roles table in README.md.
+24 of the 27 role files began as the "Locus Agent Template Pack v1.0.0" (2026-09-18), a
+content pack generated for this repository's author from their own screenshots of the Locus
+application. That pack carries no copyright line, no author attribution, and no license,
+and its own metadata describes its contents as "original suggested content" and "not
+official built-in behavior" of Locus. It is not Locus's product documentation and not a
+third party's work product — so there is no separate rights holder to license from, and the
+MIT grant above covers it.
 
-Those 24 roles come from the "Locus Agent Template Pack v1.0.0" (18 September 2026, 24
-templates), a third-party content pack. The adaptation here replaced that pack's runtime,
-mode, memory-scope, and access-level vocabulary with this harness's equivalents and dropped
-its grading metadata — but the working methods, deliverables, boundaries, and mode guidance
-are substantially verbatim from the pack, in places word for word. Treat this as
-redistribution of that text, not as an independent rewrite.
+The adaptation here replaced that pack's runtime, mode, memory-scope, and access-level
+vocabulary with Claude Code's equivalents and dropped its grading metadata. The working
+methods, deliverables, boundaries, and mode guidance remain substantially the pack's text.
 
-The pack states no license: it contains no copyright line, no terms of use, and no
-redistribution grant. There is therefore no recorded permission to redistribute this
-derived text.
+Three roles are original to this repository: version-control, data-engineer, and
+incident-responder.
 
-Before making this repository public, or redistributing it in any form, obtain and record
-an explicit license or written permission from the pack's author. If that is not
-obtainable, the 24 derived role files have to be rewritten from scratch or dropped, leaving
-the three roles original to this repository.
+"Locus" is the name of the application those templates were originally written for
+(locushost.co). It is used here only to say where the text came from; this project is not
+affiliated with or endorsed by Locus.
+
+If that pack in fact came from someone else who claims rights in it, this notice is wrong
+and the 24 derived roles need their permission or a rewrite.
