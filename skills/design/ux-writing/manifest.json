@@ -2,13 +2,13 @@
   "id": "ux-writing",
   "capability": "design.ux-writing",
   "category": "design",
-  "use_when": "Interface strings are being written, reviewed or repaired — labels, errors, empty states, confirmations, form hints — or a control's wording is causing hesitation.",
+  "use_when": "Interface strings are being written, reviewed or repaired \u2014 labels, errors, empty states, confirmations, form hints \u2014 or a control's wording is causing hesitation.",
   "not_for": "Marketing and landing-page copy, documentation and release notes, or deciding layout and visual treatment (ui-design).",
   "verifies": false,
-  "provides": ["interface-copy", "error-messages", "empty-states", "confirmation-copy"],
-  "tools": ["workspace"],
+  "tools": [
+    "workspace"
+  ],
   "references": [],
   "scripts": [],
-  "provenance": "local",
-  "tags": ["copy", "microcopy", "labels", "errors", "empty-state", "confirmation", "content-design"]
+  "provenance": "local"
 }

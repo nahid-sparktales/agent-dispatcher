@@ -5,10 +5,11 @@
   "use_when": "A credential is added, moved, shared or due for rotation, or one has turned up in code, history, logs or a client bundle.",
   "not_for": "Deciding what a valid credential may access (authorization), auth flow weaknesses (auth-security), dependency advisories, and executing a revocation or a history rewrite without the owner's decision.",
   "verifies": false,
-  "provides": ["secret-inventory", "leak-response", "rotation-plan", "log-redaction-review"],
-  "tools": ["workspace", "github"],
+  "tools": [
+    "workspace",
+    "github"
+  ],
   "references": [],
   "scripts": [],
-  "provenance": "local",
-  "tags": ["secrets", "credentials", "rotation", "leak", "git-history", "logging", "env-vars", "incident"]
+  "provenance": "local"
 }

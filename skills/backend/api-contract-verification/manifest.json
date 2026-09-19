@@ -5,10 +5,11 @@
   "use_when": "An endpoint, API client or third-party integration is about to be reported as working, or someone asks whether an integration is actually verified.",
   "not_for": "Load and performance testing, rendered UI verification (browser-verification), and authoring a project's general test strategy.",
   "verifies": true,
-  "provides": ["executed-call", "failure-path-check", "auth-failure-check", "contract-test"],
-  "tools": ["workspace", "context7"],
+  "tools": [
+    "workspace",
+    "context7"
+  ],
   "references": [],
   "scripts": [],
-  "provenance": "local",
-  "tags": ["api", "integration", "contract", "http", "verification", "failure-paths", "contract-test"]
+  "provenance": "local"
 }

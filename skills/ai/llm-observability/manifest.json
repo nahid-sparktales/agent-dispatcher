@@ -5,10 +5,11 @@
   "use_when": "An agent fails in ways that will not reproduce, cost or latency is unaccounted for, or failure modes must be found before evals can be written.",
   "not_for": "Deciding whether an output is correct or whether a change is an improvement (agent-evals), hardening against injected instructions (prompt-injection-defense), and general application monitoring.",
   "verifies": false,
-  "provides": ["run-tracing", "token-and-latency-accounting", "failure-clustering"],
-  "tools": ["workspace", "context7"],
+  "tools": [
+    "workspace",
+    "context7"
+  ],
   "references": [],
   "scripts": [],
-  "provenance": "local",
-  "tags": ["tracing", "spans", "tokens", "cost", "latency", "failure-analysis", "agents"]
+  "provenance": "local"
 }

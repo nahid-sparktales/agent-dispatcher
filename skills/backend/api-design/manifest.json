@@ -5,10 +5,11 @@
   "use_when": "An HTTP endpoint is being added or reshaped, a response or error shape has to be decided, or a change to a published API has to be judged for breakage.",
   "not_for": "Choosing between REST, GraphQL and RPC (architecture), database schema design, webhook delivery contracts (webhooks), or making a POST safe to repeat (idempotency-and-retries).",
   "verifies": false,
-  "provides": ["resource-model", "error-contract", "pagination-contract", "compatibility-review", "openapi-description"],
-  "tools": ["workspace", "context7"],
+  "tools": [
+    "workspace",
+    "context7"
+  ],
   "references": [],
   "scripts": [],
-  "provenance": "local",
-  "tags": ["http", "rest", "openapi", "status-codes", "pagination", "versioning", "backward-compatibility"]
+  "provenance": "local"
 }

@@ -5,10 +5,12 @@
   "use_when": "The project already has design tokens, a component library or a shared theme, and UI is being added or changed inside it.",
   "not_for": "Establishing a visual direction where no system exists (frontend-design), or judging an interface's usability (ui-audit).",
   "verifies": false,
-  "provides": ["token-reuse", "component-reuse", "extend-versus-add-decision", "system-gap-report"],
-  "tools": ["workspace", "figma", "context7"],
+  "tools": [
+    "workspace",
+    "figma",
+    "context7"
+  ],
   "references": [],
   "scripts": [],
-  "provenance": "local",
-  "tags": ["design-system", "tokens", "components", "variants", "theming", "conventions"]
+  "provenance": "local"
 }

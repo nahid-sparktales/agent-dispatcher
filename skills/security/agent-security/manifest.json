@@ -5,10 +5,10 @@
   "use_when": "An agent or subagent is being granted tools, credentials or MCP access, is about to reach a shared or production system, or acted beyond what the requester could have done.",
   "not_for": "The detailed ingestion trust boundary for untrusted content (prompt-injection-defense), scoping what an agent is for (agent-design), building the MCP server itself (mcp-design), and granting any permission the user has not already given.",
   "verifies": false,
-  "provides": ["authority-map", "confused-deputy-review", "gate-classification", "blast-radius-review", "agent-abuse-test"],
-  "tools": ["workspace"],
+  "tools": [
+    "workspace"
+  ],
   "references": [],
   "scripts": [],
-  "provenance": "local",
-  "tags": ["agents", "tool-permissions", "confused-deputy", "least-privilege", "subagents", "egress", "audit-log", "blast-radius"]
+  "provenance": "local"
 }

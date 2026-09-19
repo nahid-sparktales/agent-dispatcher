@@ -2,13 +2,16 @@
   "id": "competitive-analysis",
   "capability": "knowledge.competitive",
   "category": "knowledge",
-  "use_when": "A choice between real alternatives — library, service, vendor, build versus buy — has to be defended, or someone arrives with a comparison table and a conclusion.",
+  "use_when": "A choice between real alternatives \u2014 library, service, vendor, build versus buy \u2014 has to be defended, or someone arrives with a comparison table and a conclusion.",
   "not_for": "General investigation method (deep-research), judging an individual source (source-evaluation), or writing positioning and marketing copy.",
   "verifies": false,
-  "provides": ["evaluation-criteria", "candidate-set", "evidence-marked-comparison", "recommendation-with-flip-condition"],
-  "tools": ["workspace", "github", "context7", "playwright"],
+  "tools": [
+    "workspace",
+    "github",
+    "context7",
+    "playwright"
+  ],
   "references": [],
   "scripts": [],
-  "provenance": "local",
-  "tags": ["comparison", "evaluation", "vendor", "build-vs-buy", "criteria", "tradeoffs"]
+  "provenance": "local"
 }

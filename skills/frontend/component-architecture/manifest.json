@@ -5,10 +5,10 @@
   "use_when": "A component is being added, has grown props or responsibilities, or a structure is under review for whether it will hold.",
   "not_for": "Visual design and layout judgement, styling-system work (tailwind), or restructuring code the current task did not ask you to touch.",
   "verifies": false,
-  "provides": ["component-boundaries", "state-placement", "prop-design", "split-criteria"],
-  "tools": ["workspace"],
+  "tools": [
+    "workspace"
+  ],
   "references": [],
   "scripts": [],
-  "provenance": "local",
-  "tags": ["frontend", "components", "state", "props", "composition", "refactoring"]
+  "provenance": "local"
 }

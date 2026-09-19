@@ -5,10 +5,11 @@
   "use_when": "A delivery pipeline is being designed or restructured, something broken reached an environment through a passing pipeline, or a stage is claiming more than it actually ran.",
   "not_for": "Provider-specific workflow syntax (github-actions), image authoring (docker), writing the tests themselves (test-design, test-strategy), or an outage in progress where restoring service comes first.",
   "verifies": false,
-  "provides": ["pipeline-stage-design", "gate-policy", "artifact-promotion", "release-verification-placement", "rollback-design"],
-  "tools": ["workspace", "github"],
+  "tools": [
+    "workspace",
+    "github"
+  ],
   "references": [],
   "scripts": [],
-  "provenance": "local",
-  "tags": ["ci-cd", "pipeline", "gates", "promotion", "deployment", "rollback", "release"]
+  "provenance": "local"
 }

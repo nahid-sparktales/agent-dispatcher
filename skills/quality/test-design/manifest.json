@@ -2,13 +2,13 @@
   "id": "test-design",
   "capability": "quality.tests",
   "category": "quality",
-  "use_when": "Unit or integration tests are being written or repaired — new coverage, pinning a reported bug, or a suite that stays green while the behaviour is wrong.",
+  "use_when": "Unit or integration tests are being written or repaired \u2014 new coverage, pinning a reported bug, or a suite that stays green while the behaviour is wrong.",
   "not_for": "Choosing what to cover and at which level (test-strategy), end-to-end browser journeys (e2e-testing), and concluding that a shipped change is verified (browser-verification, api-contract-verification).",
   "verifies": false,
-  "provides": ["unit-test-design", "integration-test-design", "test-double-choice", "determinism-check"],
-  "tools": ["workspace"],
+  "tools": [
+    "workspace"
+  ],
   "references": [],
   "scripts": [],
-  "provenance": "local",
-  "tags": ["testing", "unit-tests", "integration-tests", "boundaries", "mocks", "fixtures", "determinism", "flake"]
+  "provenance": "local"
 }

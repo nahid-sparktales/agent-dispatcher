@@ -5,10 +5,10 @@
   "use_when": "An agent must carry facts, preferences or decisions past the current context, or an existing memory store has become noisy, contradictory or wrongly scoped.",
   "not_for": "Retrieval over a document corpus (retrieval-rag), context-window packing and prompt construction, model selection (model-routing), and raw transcript logging.",
   "verifies": false,
-  "provides": ["memory-taxonomy", "memory-scoping", "staleness-detection", "retirement-policy"],
-  "tools": ["workspace"],
+  "tools": [
+    "workspace"
+  ],
   "references": [],
   "scripts": [],
-  "provenance": "local",
-  "tags": ["memory", "agents", "persistence", "scoping", "staleness", "retirement", "context"]
+  "provenance": "local"
 }

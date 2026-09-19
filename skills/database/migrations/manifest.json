@@ -5,10 +5,11 @@
   "use_when": "A schema or data migration is being written, reviewed or sequenced against a database that holds real data and has live readers.",
   "not_for": "Greenfield schema design, query tuning with no DDL, or proving after the fact that a migration did what it claimed (database-migration-verification).",
   "verifies": false,
-  "provides": ["migration-plan", "expand-contract-sequencing", "lock-analysis", "backfill-plan", "rollback-plan"],
-  "tools": ["workspace", "supabase"],
+  "tools": [
+    "workspace",
+    "supabase"
+  ],
   "references": [],
   "scripts": [],
-  "provenance": "local",
-  "tags": ["database", "migration", "schema", "ddl", "locks", "backfill", "rollback", "zero-downtime"]
+  "provenance": "local"
 }

@@ -5,10 +5,11 @@
   "use_when": "Writing or editing Tailwind utility classes in a project that already uses Tailwind.",
   "not_for": "Deciding whether to adopt Tailwind, visual design direction (design skills), or checking what actually rendered (browser-verification).",
   "verifies": false,
-  "provides": ["token-discipline", "class-conflict-resolution", "dark-mode-strategy"],
-  "tools": ["workspace", "context7"],
+  "tools": [
+    "workspace",
+    "context7"
+  ],
   "references": [],
   "scripts": [],
-  "provenance": "local",
-  "tags": ["frontend", "tailwind", "css", "design-tokens", "dark-mode", "utility-classes"]
+  "provenance": "local"
 }

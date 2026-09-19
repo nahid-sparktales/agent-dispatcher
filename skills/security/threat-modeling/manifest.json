@@ -2,13 +2,13 @@
   "id": "threat-modeling",
   "capability": "security.threat-modeling",
   "category": "security",
-  "use_when": "A system's shape is being designed or changed — new service, integration, tenancy model, uploads, payments or auth — and someone needs to know which few things are actually worth defending.",
+  "use_when": "A system's shape is being designed or changed \u2014 new service, integration, tenancy model, uploads, payments or auth \u2014 and someone needs to know which few things are actually worth defending.",
   "not_for": "Finding defects in existing code (secure-code-review), enumerating web bug classes in a codebase (owasp-web), compliance questionnaires, or responding to a live incident.",
   "verifies": false,
-  "provides": ["trust-boundary-map", "asset-inventory", "attacker-capabilities", "threat-list", "accepted-risks"],
-  "tools": ["workspace"],
+  "tools": [
+    "workspace"
+  ],
   "references": [],
   "scripts": [],
-  "provenance": "local",
-  "tags": ["threat-model", "trust-boundary", "attack-surface", "stride", "risk", "design-review", "security"]
+  "provenance": "local"
 }

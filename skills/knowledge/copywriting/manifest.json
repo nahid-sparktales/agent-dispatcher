@@ -2,13 +2,13 @@
   "id": "copywriting",
   "capability": "knowledge.copywriting",
   "category": "knowledge",
-  "use_when": "Copy aimed at an audience outside the product is being written or rewritten — landing page, product messaging, email, ad, announcement — or an existing draft's claims need auditing before it ships.",
+  "use_when": "Copy aimed at an audience outside the product is being written or rewritten \u2014 landing page, product messaging, email, ad, announcement \u2014 or an existing draft's claims need auditing before it ships.",
   "not_for": "Interface strings inside the product (ux-writing), documentation (technical-writing), and publishing or sending anything, which stays with the user.",
   "verifies": false,
-  "provides": ["audience-brief", "objection-handling", "claims-audit", "brand-voice-match"],
-  "tools": ["workspace"],
+  "tools": [
+    "workspace"
+  ],
   "references": [],
   "scripts": [],
-  "provenance": "local",
-  "tags": ["copywriting", "marketing", "landing-page", "email", "messaging", "claims", "brand-voice"]
+  "provenance": "local"
 }

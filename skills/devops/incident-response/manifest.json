@@ -5,10 +5,11 @@
   "use_when": "Production is failing or degraded right now and stopping the ongoing harm matters more than a complete causal explanation.",
   "not_for": "A defect that is not currently failing in production (systematic-debugging), the root-cause investigation after recovery, release preparation and pipeline work, and the postmortem write-up.",
   "verifies": false,
-  "provides": ["blast-radius", "incident-log", "reversible-mitigation", "recovery-confirmation"],
-  "tools": ["workspace", "github"],
+  "tools": [
+    "workspace",
+    "github"
+  ],
   "references": [],
   "scripts": [],
-  "provenance": "local",
-  "tags": ["incident", "outage", "mitigation", "rollback", "triage", "on-call", "timeline"]
+  "provenance": "local"
 }

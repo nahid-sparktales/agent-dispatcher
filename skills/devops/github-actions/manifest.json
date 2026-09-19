@@ -5,10 +5,11 @@
   "use_when": "A GitHub Actions workflow is being added, changed or reviewed, or CI is slow, flaky, or reporting green when it should be red.",
   "not_for": "Provider-neutral pipeline and gate design (ci-cd), container image authoring (docker), writing the tests a workflow runs (test-design, e2e-testing), or authorizing a deployment.",
   "verifies": false,
-  "provides": ["workflow-review", "ci-permissions-scoping", "ci-cache-strategy", "ci-speed-analysis"],
-  "tools": ["workspace", "github"],
+  "tools": [
+    "workspace",
+    "github"
+  ],
   "references": [],
   "scripts": [],
-  "provenance": "local",
-  "tags": ["github-actions", "ci", "workflow", "permissions", "secrets", "matrix", "cache", "runners"]
+  "provenance": "local"
 }

@@ -5,10 +5,11 @@
   "use_when": "A specific statement is slow and the database is the suspect, a query plan needs interpreting, or an index is being proposed without evidence.",
   "not_for": "Deciding table and constraint structure (schema-design), engine feature reference (postgres), or system-wide performance work before the database has been shown to be the bottleneck.",
   "verifies": false,
-  "provides": ["query-plan-analysis", "index-recommendation", "before-after-measurement"],
-  "tools": ["workspace", "supabase"],
+  "tools": [
+    "workspace",
+    "supabase"
+  ],
   "references": [],
   "scripts": [],
-  "provenance": "local",
-  "tags": ["performance", "explain", "query-plan", "indexes", "measurement", "slow-query"]
+  "provenance": "local"
 }

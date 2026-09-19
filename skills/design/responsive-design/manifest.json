@@ -2,13 +2,14 @@
   "id": "responsive-design",
   "capability": "design.responsive",
   "category": "design",
-  "use_when": "A layout has to hold across viewport widths — building it, repairing an overflow or collapse at some size, or filling in the sizes a single-width design never specified.",
+  "use_when": "A layout has to hold across viewport widths \u2014 building it, repairing an overflow or collapse at some size, or filling in the sizes a single-width design never specified.",
   "not_for": "Proving the rendered result (browser-verification), semantics and assistive-technology behaviour (accessibility), or visual style direction.",
   "verifies": false,
-  "provides": ["breakpoint-strategy", "fluid-type-scale", "intrinsic-layout", "touch-target-sizing", "reflow-check"],
-  "tools": ["playwright", "workspace"],
+  "tools": [
+    "playwright",
+    "workspace"
+  ],
   "references": [],
   "scripts": [],
-  "provenance": "local",
-  "tags": ["responsive", "layout", "breakpoints", "viewport", "fluid-type", "touch-targets", "reflow", "css"]
+  "provenance": "local"
 }

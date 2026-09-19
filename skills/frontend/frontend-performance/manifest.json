@@ -5,10 +5,11 @@
   "use_when": "A page is reported slow, a Core Web Vital or bundle size is named, or a change is about to be described as a performance improvement.",
   "not_for": "Backend, query or API latency; framework selection; and it does not replace rendered verification after the optimization lands.",
   "verifies": false,
-  "provides": ["web-vitals-measurement", "bundle-analysis", "performance-diagnosis"],
-  "tools": ["playwright", "workspace"],
+  "tools": [
+    "playwright",
+    "workspace"
+  ],
   "references": [],
   "scripts": [],
-  "provenance": "local",
-  "tags": ["performance", "core-web-vitals", "lcp", "cls", "inp", "bundle-size", "measurement"]
+  "provenance": "local"
 }

@@ -5,10 +5,12 @@
   "use_when": "A design, mockup, Figma frame or screenshot is the source for a UI change, or an existing implementation is being compared against one.",
   "not_for": "Deciding what the design should be (ui-design), judging whether a design is good (design critique), or proving the built screen renders and works (browser-verification).",
   "verifies": false,
-  "provides": ["design-fidelity-mapping", "token-mapping", "state-coverage", "ambiguity-list"],
-  "tools": ["workspace", "figma", "playwright"],
+  "tools": [
+    "workspace",
+    "figma",
+    "playwright"
+  ],
   "references": [],
   "scripts": [],
-  "provenance": "local",
-  "tags": ["design-handoff", "figma", "fidelity", "tokens", "components", "implementation"]
+  "provenance": "local"
 }

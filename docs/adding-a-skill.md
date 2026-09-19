@@ -32,12 +32,10 @@ description: One or two sentences that say what this does AND when it fires, in 
   "use_when": "The trigger, one sentence.",
   "not_for": "The neighbouring skill this one cedes — what keeps near-misses out.",
   "verifies": true,                      // true only for procedures that prove work
-  "provides": ["rendered-check", "console-check"],
   "tools": ["playwright", "workspace"],  // ids from catalog/mcp.json — availability, not permission
   "references": ["references/driving-the-browser.md"],
   "scripts": [],
-  "provenance": "local",
-  "tags": ["browser", "rendering", "console"]
+  "provenance": "local"
 }
 ```
 

@@ -5,10 +5,12 @@
   "use_when": "A deploy has completed to a shared environment and someone is about to call the release good, or that claim is being checked.",
   "not_for": "Planning or executing the rollout (deployment), deciding and running a revert (rollback), rendered-UI checking (browser-verification), or accepting a green pipeline and a 200 health response as proof.",
   "verifies": true,
-  "provides": ["serving-revision-check", "rollout-completeness-check", "smoke-path-check", "baseline-comparison", "async-surface-check"],
-  "tools": ["workspace", "github", "vercel"],
+  "tools": [
+    "workspace",
+    "github",
+    "vercel"
+  ],
   "references": [],
   "scripts": [],
-  "provenance": "local",
-  "tags": ["devops", "deployment", "verification", "smoke-test", "health", "baseline", "evidence"]
+  "provenance": "local"
 }

@@ -5,10 +5,10 @@
   "use_when": "An operation with an external side effect has to survive being repeated, a caller needs a retry policy, or duplicate effects have appeared and must be prevented.",
   "not_for": "Webhook receipt and delivery mechanics (webhooks), endpoint and error shape design (api-design), database transaction or locking design, and picking a queue technology.",
   "verifies": false,
-  "provides": ["idempotency-key-design", "retry-policy", "reconciliation-procedure"],
-  "tools": ["workspace"],
+  "tools": [
+    "workspace"
+  ],
   "references": [],
   "scripts": [],
-  "provenance": "local",
-  "tags": ["idempotency", "retries", "backoff", "at-least-once", "duplicates", "reconciliation", "reliability"]
+  "provenance": "local"
 }

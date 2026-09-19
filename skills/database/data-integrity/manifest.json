@@ -5,24 +5,10 @@
   "use_when": "A rule about what must always be true of the data needs to be enforced in a live schema, or an invariant that was enforced has drifted.",
   "not_for": "Asserting freshness, volume or distribution of produced data (data-quality), designing the schema in the first place (schema-design), or repairing rows without authorization.",
   "verifies": false,
-  "provides": [
-    "invariant-audit",
-    "constraint-placement",
-    "reconciliation-queries",
-    "drift-detection"
-  ],
   "tools": [
     "workspace"
   ],
   "references": [],
   "scripts": [],
-  "provenance": "local",
-  "tags": [
-    "database",
-    "integrity",
-    "constraints",
-    "invariants",
-    "reconciliation",
-    "drift"
-  ]
+  "provenance": "local"
 }

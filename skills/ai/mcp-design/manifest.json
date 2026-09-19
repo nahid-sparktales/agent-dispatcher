@@ -5,10 +5,11 @@
   "use_when": "An MCP server is being written, an internal system is being wrapped as one, or a third-party server is being assessed before it is wired into a project.",
   "not_for": "Designing the signature, parameters and error text of an individual tool (tool-design), constraining model output to a schema (structured-output), or authorizing the installation and configuration of any server.",
   "verifies": false,
-  "provides": ["transport-choice", "capability-surface", "read-write-separation", "auth-scoping", "failure-semantics", "server-assessment"],
-  "tools": ["workspace", "context7"],
+  "tools": [
+    "workspace",
+    "context7"
+  ],
   "references": [],
   "scripts": [],
-  "provenance": "local",
-  "tags": ["mcp", "server", "transport", "stdio", "capabilities", "auth", "least-privilege", "integration"]
+  "provenance": "local"
 }

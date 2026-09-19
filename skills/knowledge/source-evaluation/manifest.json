@@ -2,13 +2,14 @@
   "id": "source-evaluation",
   "capability": "research.sources",
   "category": "knowledge",
-  "use_when": "A claim is about to be relied on, quoted or cited — or sources disagree, a number arrives without its method, or a 'widely reported' fact needs its origin traced.",
+  "use_when": "A claim is about to be relied on, quoted or cited \u2014 or sources disagree, a number arrives without its method, or a 'widely reported' fact needs its origin traced.",
   "not_for": "Running the overall investigation (deep-research), comparing named products on criteria (competitive-analysis), or facts verifiable directly in the workspace.",
   "verifies": false,
-  "provides": ["provenance-trace", "recency-check", "independence-check", "citation-format"],
-  "tools": ["workspace", "context7"],
+  "tools": [
+    "workspace",
+    "context7"
+  ],
   "references": [],
   "scripts": [],
-  "provenance": "local",
-  "tags": ["sources", "citation", "provenance", "recency", "corroboration", "evidence"]
+  "provenance": "local"
 }

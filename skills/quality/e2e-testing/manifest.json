@@ -5,10 +5,11 @@
   "use_when": "An automated end-to-end suite is being created, extended, triaged for flake, or pruned, or a case has to be placed at or below this level.",
   "not_for": "Manually confirming one change renders and works (browser-verification), unit and integration coverage (test-design), choosing overall coverage levels (test-strategy), and load or performance testing.",
   "verifies": false,
-  "provides": ["journey-selection", "selector-strategy", "test-isolation", "flake-triage"],
-  "tools": ["playwright", "workspace"],
+  "tools": [
+    "playwright",
+    "workspace"
+  ],
   "references": [],
   "scripts": [],
-  "provenance": "local",
-  "tags": ["e2e", "browser", "selectors", "flake", "isolation", "ci", "journeys"]
+  "provenance": "local"
 }

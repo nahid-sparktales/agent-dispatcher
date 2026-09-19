@@ -90,14 +90,6 @@
       "use_when": "UI is being built, changed or repaired and it has to be operable by keyboard and assistive technology \u2014 including turning an audit finding into an actual code change.",
       "not_for": "Proving the result holds (accessibility-verification), layout across viewports (responsive-design), or general visual critique.",
       "verifies": false,
-      "provides": [
-        "semantic-structure",
-        "keyboard-path",
-        "focus-management",
-        "accessible-naming",
-        "contrast-choice",
-        "live-region-design"
-      ],
       "tools": [
         "workspace",
         "context7"
@@ -105,16 +97,6 @@
       "references": [],
       "scripts": [],
       "provenance": "local",
-      "tags": [
-        "accessibility",
-        "a11y",
-        "wcag",
-        "keyboard",
-        "focus",
-        "aria",
-        "contrast",
-        "forms"
-      ],
       "name": "accessibility",
       "path": "skills/design/accessibility/SKILL.md",
       "summary": "UI is being built, changed or repaired and it has to be operable by keyboard and assistive technology \u2014 including turning an audit finding into an actual code change.",
@@ -127,13 +109,6 @@
       "use_when": "Someone is about to claim a screen or flow is accessible, keyboard-operable, screen-reader usable or WCAG-conformant, or an accessibility fix needs re-checking.",
       "not_for": "Making the fixes (accessibility), general rendered-UI checks (browser-verification), or authoring a conformance statement \u2014 which is a separate, authorized act.",
       "verifies": true,
-      "provides": [
-        "automated-a11y-scan",
-        "keyboard-pass",
-        "screen-reader-pass",
-        "zoom-reflow-check",
-        "contrast-measurement"
-      ],
       "tools": [
         "playwright",
         "workspace"
@@ -143,16 +118,6 @@
       ],
       "scripts": [],
       "provenance": "local",
-      "tags": [
-        "accessibility",
-        "a11y",
-        "wcag",
-        "verification",
-        "screen-reader",
-        "keyboard",
-        "axe",
-        "contrast"
-      ],
       "name": "accessibility-verification",
       "path": "skills/design/accessibility-verification/SKILL.md",
       "summary": "Someone is about to claim a screen or flow is accessible, keyboard-operable, screen-reader usable or WCAG-conformant, or an accessibility fix needs re-checking.",
@@ -165,13 +130,6 @@
       "use_when": "An agent or subagent is being scoped, granted tools, or reviewed after looping, over-reaching or reporting work it did not do.",
       "not_for": "Wording and measuring the prompt itself (prompt-engineering), deciding what occupies the window (context-engineering), and granting any permission the user has not already given.",
       "verifies": false,
-      "provides": [
-        "agent-boundary",
-        "tool-loadout",
-        "prohibition-list",
-        "evidence-contract",
-        "handoff-shape"
-      ],
       "tools": [
         "workspace",
         "context7"
@@ -179,15 +137,6 @@
       "references": [],
       "scripts": [],
       "provenance": "local",
-      "tags": [
-        "agent",
-        "subagent",
-        "tools",
-        "autonomy",
-        "boundaries",
-        "handoff",
-        "evidence"
-      ],
       "name": "agent-design",
       "path": "skills/ai/agent-design/SKILL.md",
       "summary": "An agent or subagent is being scoped, granted tools, or reviewed after looping, over-reaching or reporting work it did not do.",
@@ -200,12 +149,6 @@
       "use_when": "A prompt, model, tool definition or retrieval change is about to be called an improvement, agent behaviour must not silently regress, or a production failure needs to become a case that cannot come back.",
       "not_for": "Tracing or explaining what a single run did (llm-observability), red-teaming injection resistance (prompt-injection-defense), and testing deterministic code, which is tests.",
       "verifies": true,
-      "provides": [
-        "eval-suite",
-        "grader-design",
-        "baseline-comparison",
-        "regression-detection"
-      ],
       "tools": [
         "workspace",
         "context7"
@@ -213,15 +156,6 @@
       "references": [],
       "scripts": [],
       "provenance": "local",
-      "tags": [
-        "evals",
-        "graders",
-        "regression",
-        "baseline",
-        "llm",
-        "agents",
-        "verification"
-      ],
       "name": "agent-evals",
       "path": "skills/ai/agent-evals/SKILL.md",
       "summary": "A prompt, model, tool definition or retrieval change is about to be called an improvement, agent behaviour must not silently regress, or a production failure needs to become a case that cannot come back.",
@@ -234,29 +168,12 @@
       "use_when": "An agent or subagent is being granted tools, credentials or MCP access, is about to reach a shared or production system, or acted beyond what the requester could have done.",
       "not_for": "The detailed ingestion trust boundary for untrusted content (prompt-injection-defense), scoping what an agent is for (agent-design), building the MCP server itself (mcp-design), and granting any permission the user has not already given.",
       "verifies": false,
-      "provides": [
-        "authority-map",
-        "confused-deputy-review",
-        "gate-classification",
-        "blast-radius-review",
-        "agent-abuse-test"
-      ],
       "tools": [
         "workspace"
       ],
       "references": [],
       "scripts": [],
       "provenance": "local",
-      "tags": [
-        "agents",
-        "tool-permissions",
-        "confused-deputy",
-        "least-privilege",
-        "subagents",
-        "egress",
-        "audit-log",
-        "blast-radius"
-      ],
       "name": "agent-security",
       "path": "skills/security/agent-security/SKILL.md",
       "summary": "An agent or subagent is being granted tools, credentials or MCP access, is about to reach a shared or production system, or acted beyond what the requester could have done.",
@@ -269,12 +186,6 @@
       "use_when": "An endpoint, API client or third-party integration is about to be reported as working, or someone asks whether an integration is actually verified.",
       "not_for": "Load and performance testing, rendered UI verification (browser-verification), and authoring a project's general test strategy.",
       "verifies": true,
-      "provides": [
-        "executed-call",
-        "failure-path-check",
-        "auth-failure-check",
-        "contract-test"
-      ],
       "tools": [
         "workspace",
         "context7"
@@ -282,15 +193,6 @@
       "references": [],
       "scripts": [],
       "provenance": "local",
-      "tags": [
-        "api",
-        "integration",
-        "contract",
-        "http",
-        "verification",
-        "failure-paths",
-        "contract-test"
-      ],
       "name": "api-contract-verification",
       "path": "skills/backend/api-contract-verification/SKILL.md",
       "summary": "An endpoint, API client or third-party integration is about to be reported as working, or someone asks whether an integration is actually verified.",
@@ -303,13 +205,6 @@
       "use_when": "An HTTP endpoint is being added or reshaped, a response or error shape has to be decided, or a change to a published API has to be judged for breakage.",
       "not_for": "Choosing between REST, GraphQL and RPC (architecture), database schema design, webhook delivery contracts (webhooks), or making a POST safe to repeat (idempotency-and-retries).",
       "verifies": false,
-      "provides": [
-        "resource-model",
-        "error-contract",
-        "pagination-contract",
-        "compatibility-review",
-        "openapi-description"
-      ],
       "tools": [
         "workspace",
         "context7"
@@ -317,15 +212,6 @@
       "references": [],
       "scripts": [],
       "provenance": "local",
-      "tags": [
-        "http",
-        "rest",
-        "openapi",
-        "status-codes",
-        "pagination",
-        "versioning",
-        "backward-compatibility"
-      ],
       "name": "api-design",
       "path": "skills/backend/api-design/SKILL.md",
       "summary": "An HTTP endpoint is being added or reshaped, a response or error shape has to be decided, or a change to a published API has to be judged for breakage.",
@@ -338,13 +224,6 @@
       "use_when": "An existing auth path is reviewed, changed or doubted \u2014 sessions, tokens, reset and invite flows, impersonation, role elevation, MFA \u2014 or someone reports reaching another account's data.",
       "not_for": "Designing the login mechanism or session model in the first place (authentication), choosing the permission model (authorization), infrastructure IAM and network policy, and any testing against a system you were not told you may test.",
       "verifies": false,
-      "provides": [
-        "auth-surface-map",
-        "session-lifecycle-review",
-        "token-verification-review",
-        "escalation-test",
-        "recovery-flow-review"
-      ],
       "tools": [
         "workspace",
         "playwright"
@@ -352,16 +231,6 @@
       "references": [],
       "scripts": [],
       "provenance": "local",
-      "tags": [
-        "auth",
-        "session-fixation",
-        "jwt",
-        "privilege-escalation",
-        "idor",
-        "password-reset",
-        "mfa",
-        "account-takeover"
-      ],
       "name": "auth-security",
       "path": "skills/security/auth-security/SKILL.md",
       "summary": "An existing auth path is reviewed, changed or doubted \u2014 sessions, tokens, reset and invite flows, impersonation, role elevation, MFA \u2014 or someone reports reaching another account's data.",
@@ -374,12 +243,6 @@
       "use_when": "A credential is issued, accepted, refreshed or revoked \u2014 login, logout, sessions, tokens, API keys, or an OAuth/OIDC integration.",
       "not_for": "Deciding what an authenticated caller may do (authorization), the login screen's design and copy, or secret storage and rotation policy at the infrastructure level.",
       "verifies": false,
-      "provides": [
-        "session-design",
-        "token-validation",
-        "oauth-flow",
-        "credential-handling"
-      ],
       "tools": [
         "workspace",
         "context7"
@@ -387,18 +250,6 @@
       "references": [],
       "scripts": [],
       "provenance": "local",
-      "tags": [
-        "auth",
-        "authentication",
-        "session",
-        "cookie",
-        "jwt",
-        "token",
-        "oauth",
-        "oidc",
-        "login",
-        "refresh"
-      ],
       "name": "authentication",
       "path": "skills/backend/authentication/SKILL.md",
       "summary": "A credential is issued, accepted, refreshed or revoked \u2014 login, logout, sessions, tokens, API keys, or an OAuth/OIDC integration.",
@@ -411,28 +262,12 @@
       "use_when": "A rule of the form 'only X may do Y to Z' is added, changed or doubted \u2014 roles, permissions, per-owner or per-tenant scoping, admin paths.",
       "not_for": "Establishing who the caller is (authentication), UI affordances that merely hide controls, or infrastructure-level network and IAM policy, or investigating a live report that one caller reached another's data (auth-security).",
       "verifies": false,
-      "provides": [
-        "permission-model",
-        "enforcement-point",
-        "tenant-scoping",
-        "deny-by-default"
-      ],
       "tools": [
         "workspace"
       ],
       "references": [],
       "scripts": [],
       "provenance": "local",
-      "tags": [
-        "authorization",
-        "authz",
-        "permissions",
-        "rbac",
-        "abac",
-        "multi-tenant",
-        "access-control",
-        "idor"
-      ],
       "name": "authorization",
       "path": "skills/backend/authorization/SKILL.md",
       "summary": "A rule of the form 'only X may do Y to Z' is added, changed or doubted \u2014 roles, permissions, per-owner or per-tenant scoping, admin paths.",
@@ -445,12 +280,6 @@
       "use_when": "Work is being moved off a request path onto a queue or scheduler, or a job ran twice, never ran, ran out of order, or is stuck retrying.",
       "not_for": "Concurrency inside a single request, streaming topology design, or CI/cron pipeline configuration in the delivery system.",
       "verifies": false,
-      "provides": [
-        "job-design",
-        "idempotency-strategy",
-        "retry-policy",
-        "schedule-design"
-      ],
       "tools": [
         "workspace",
         "context7"
@@ -458,15 +287,6 @@
       "references": [],
       "scripts": [],
       "provenance": "local",
-      "tags": [
-        "queue",
-        "worker",
-        "cron",
-        "retry",
-        "idempotency",
-        "dead-letter",
-        "scheduling"
-      ],
       "name": "background-jobs",
       "path": "skills/backend/background-jobs/SKILL.md",
       "summary": "Work is being moved off a request path onto a queue or scheduler, or a job ran twice, never ran, ran out of order, or is stuck retrying.",
@@ -479,12 +299,6 @@
       "use_when": "A change touches rendered UI and someone is about to claim it works, or you are asked whether a screen actually functions.",
       "not_for": "Judging whether a design is good (ui-audit), covering a matrix of states x viewports x themes or comparing against a screenshot baseline (visual-verification), authoring test suites to keep (e2e-testing), or backend behaviour with no rendered surface.",
       "verifies": true,
-      "provides": [
-        "rendered-check",
-        "responsive-check",
-        "interaction-check",
-        "console-check"
-      ],
       "tools": [
         "playwright",
         "workspace"
@@ -494,14 +308,6 @@
       ],
       "scripts": [],
       "provenance": "local",
-      "tags": [
-        "browser",
-        "rendering",
-        "responsive",
-        "console",
-        "screenshot",
-        "verification"
-      ],
       "name": "browser-verification",
       "path": "skills/quality/browser-verification/SKILL.md",
       "summary": "A change touches rendered UI and someone is about to claim it works, or you are asked whether a screen actually functions.",
@@ -514,12 +320,6 @@
       "use_when": "A cache is about to be added to a read path, or existing cached data is stale, leaking across users, or being blamed for a bug.",
       "not_for": "Fixing the slow query or N+1 underneath (do that first), pure HTTP header tuning with no server-side store, or general performance profiling.",
       "verifies": false,
-      "provides": [
-        "cache-layer-choice",
-        "cache-key-design",
-        "invalidation-strategy",
-        "staleness-analysis"
-      ],
       "tools": [
         "workspace",
         "context7"
@@ -527,15 +327,6 @@
       "references": [],
       "scripts": [],
       "provenance": "local",
-      "tags": [
-        "cache",
-        "ttl",
-        "invalidation",
-        "redis",
-        "cdn",
-        "staleness",
-        "performance"
-      ],
       "name": "caching",
       "path": "skills/backend/caching/SKILL.md",
       "summary": "A cache is about to be added to a read path, or existing cached data is stale, leaking across users, or being blamed for a bug.",
@@ -548,13 +339,6 @@
       "use_when": "A delivery pipeline is being designed or restructured, something broken reached an environment through a passing pipeline, or a stage is claiming more than it actually ran.",
       "not_for": "Provider-specific workflow syntax (github-actions), image authoring (docker), writing the tests themselves (test-design, test-strategy), or an outage in progress where restoring service comes first.",
       "verifies": false,
-      "provides": [
-        "pipeline-stage-design",
-        "gate-policy",
-        "artifact-promotion",
-        "release-verification-placement",
-        "rollback-design"
-      ],
       "tools": [
         "workspace",
         "github"
@@ -562,15 +346,6 @@
       "references": [],
       "scripts": [],
       "provenance": "local",
-      "tags": [
-        "ci-cd",
-        "pipeline",
-        "gates",
-        "promotion",
-        "deployment",
-        "rollback",
-        "release"
-      ],
       "name": "ci-cd",
       "path": "skills/devops/ci-cd/SKILL.md",
       "summary": "A delivery pipeline is being designed or restructured, something broken reached an environment through a passing pipeline, or a stage is claiming more than it actually ran.",
@@ -583,12 +358,6 @@
       "use_when": "A choice between real alternatives \u2014 library, service, vendor, build versus buy \u2014 has to be defended, or someone arrives with a comparison table and a conclusion.",
       "not_for": "General investigation method (deep-research), judging an individual source (source-evaluation), or writing positioning and marketing copy.",
       "verifies": false,
-      "provides": [
-        "evaluation-criteria",
-        "candidate-set",
-        "evidence-marked-comparison",
-        "recommendation-with-flip-condition"
-      ],
       "tools": [
         "workspace",
         "github",
@@ -598,14 +367,6 @@
       "references": [],
       "scripts": [],
       "provenance": "local",
-      "tags": [
-        "comparison",
-        "evaluation",
-        "vendor",
-        "build-vs-buy",
-        "criteria",
-        "tradeoffs"
-      ],
       "name": "competitive-analysis",
       "path": "skills/knowledge/competitive-analysis/SKILL.md",
       "summary": "A choice between real alternatives \u2014 library, service, vendor, build versus buy \u2014 has to be defended, or someone arrives with a comparison table and a conclusion.",
@@ -618,26 +379,12 @@
       "use_when": "A component is being added, has grown props or responsibilities, or a structure is under review for whether it will hold.",
       "not_for": "Visual design and layout judgement, styling-system work (tailwind), or restructuring code the current task did not ask you to touch.",
       "verifies": false,
-      "provides": [
-        "component-boundaries",
-        "state-placement",
-        "prop-design",
-        "split-criteria"
-      ],
       "tools": [
         "workspace"
       ],
       "references": [],
       "scripts": [],
       "provenance": "local",
-      "tags": [
-        "frontend",
-        "components",
-        "state",
-        "props",
-        "composition",
-        "refactoring"
-      ],
       "name": "component-architecture",
       "path": "skills/frontend/component-architecture/SKILL.md",
       "summary": "A component is being added, has grown props or responsibilities, or a structure is under review for whether it will hold.",
@@ -650,27 +397,12 @@
       "use_when": "A prompt, agent or session loads substantial material, quality decays as context grows, or context has to be trimmed, summarized or split between inlining and retrieval.",
       "not_for": "Wording and measuring the prompt itself (prompt-engineering), scoping an agent's job and tools (agent-design), and choosing retrieval or vector-store infrastructure.",
       "verifies": false,
-      "provides": [
-        "context-budget",
-        "disclosure-index",
-        "retrieval-policy",
-        "compaction-procedure"
-      ],
       "tools": [
         "workspace"
       ],
       "references": [],
       "scripts": [],
       "provenance": "local",
-      "tags": [
-        "context",
-        "progressive-disclosure",
-        "retrieval",
-        "compaction",
-        "summarization",
-        "token-budget",
-        "provenance"
-      ],
       "name": "context-engineering",
       "path": "skills/ai/context-engineering/SKILL.md",
       "summary": "A prompt, agent or session loads substantial material, quality decays as context grows, or context has to be trimmed, summarized or split between inlining and retrieval.",
@@ -683,27 +415,12 @@
       "use_when": "Copy aimed at an audience outside the product is being written or rewritten \u2014 landing page, product messaging, email, ad, announcement \u2014 or an existing draft's claims need auditing before it ships.",
       "not_for": "Interface strings inside the product (ux-writing), documentation (technical-writing), and publishing or sending anything, which stays with the user.",
       "verifies": false,
-      "provides": [
-        "audience-brief",
-        "objection-handling",
-        "claims-audit",
-        "brand-voice-match"
-      ],
       "tools": [
         "workspace"
       ],
       "references": [],
       "scripts": [],
       "provenance": "local",
-      "tags": [
-        "copywriting",
-        "marketing",
-        "landing-page",
-        "email",
-        "messaging",
-        "claims",
-        "brand-voice"
-      ],
       "name": "copywriting",
       "path": "skills/knowledge/copywriting/SKILL.md",
       "summary": "Copy aimed at an audience outside the product is being written or rewritten \u2014 landing page, product messaging, email, ad, announcement \u2014 or an existing draft's claims need auditing before it ships.",
@@ -716,12 +433,6 @@
       "use_when": "A dataset has to answer a question, a reported number needs explaining or reconciling, or a finding from data is about to reach someone who will act on it.",
       "not_for": "Defining product metrics and their instrumentation (product-analytics), designing or sizing an experiment (experimentation), building or repairing the pipeline that produced the data (data-pipelines), or writing standing quality assertions (data-quality).",
       "verifies": false,
-      "provides": [
-        "dataset-profile",
-        "denominator-check",
-        "segment-analysis",
-        "reproducible-analysis"
-      ],
       "tools": [
         "workspace",
         "supabase"
@@ -729,15 +440,6 @@
       "references": [],
       "scripts": [],
       "provenance": "local",
-      "tags": [
-        "analysis",
-        "denominator",
-        "missing-data",
-        "confounding",
-        "causation",
-        "reproducibility",
-        "segmentation"
-      ],
       "name": "data-analysis",
       "path": "skills/knowledge/data-analysis/SKILL.md",
       "summary": "A dataset has to answer a question, a reported number needs explaining or reconciling, or a finding from data is about to reach someone who will act on it.",
@@ -750,26 +452,12 @@
       "use_when": "A rule about what must always be true of the data needs to be enforced in a live schema, or an invariant that was enforced has drifted.",
       "not_for": "Asserting freshness, volume or distribution of produced data (data-quality), designing the schema in the first place (schema-design), or repairing rows without authorization.",
       "verifies": false,
-      "provides": [
-        "invariant-audit",
-        "constraint-placement",
-        "reconciliation-queries",
-        "drift-detection"
-      ],
       "tools": [
         "workspace"
       ],
       "references": [],
       "scripts": [],
       "provenance": "local",
-      "tags": [
-        "database",
-        "integrity",
-        "constraints",
-        "invariants",
-        "reconciliation",
-        "drift"
-      ],
       "name": "data-integrity",
       "path": "skills/database/data-integrity/SKILL.md",
       "summary": "A rule about what must always be true of the data needs to be enforced in a live schema, or an invariant that was enforced has drifted.",
@@ -782,14 +470,6 @@
       "use_when": "A batch or streaming pipeline, scheduled transform or ingestion job is being built, repaired or backfilled, or a run dropped, duplicated or reshaped rows.",
       "not_for": "Destination schema design (schema-design) and its migrations (migrations), the standing assertions that guard produced data (data-quality), or interpreting what the resulting numbers mean.",
       "verifies": false,
-      "provides": [
-        "lineage-trace",
-        "pipeline-contract",
-        "windowing-plan",
-        "rerun-semantics",
-        "backfill-plan",
-        "source-reconciliation"
-      ],
       "tools": [
         "workspace",
         "supabase"
@@ -797,18 +477,6 @@
       "references": [],
       "scripts": [],
       "provenance": "local",
-      "tags": [
-        "data",
-        "pipeline",
-        "etl",
-        "streaming",
-        "lineage",
-        "windowing",
-        "late-arrivals",
-        "idempotency",
-        "backfill",
-        "reconciliation"
-      ],
       "name": "data-pipelines",
       "path": "skills/database/data-pipelines/SKILL.md",
       "summary": "A batch or streaming pipeline, scheduled transform or ingestion job is being built, repaired or backfilled, or a run dropped, duplicated or reshaped rows.",
@@ -821,15 +489,6 @@
       "use_when": "Checks on a dataset are being written or reviewed, a wrong value reached a consumer with nothing catching it, or an existing check is noisy enough to be ignored.",
       "not_for": "Proving one migration did what it claimed (database-migration-verification), building or repairing the pipeline that produces the data (data-pipelines), enforcing an invariant in the schema's own design (schema-design), or interpreting what the numbers mean, or enforcing an invariant inside a live schema (data-integrity).",
       "verifies": false,
-      "provides": [
-        "assertion-placement",
-        "freshness-check",
-        "volume-check",
-        "distribution-check",
-        "referential-check",
-        "grain-check",
-        "source-reconciliation"
-      ],
       "tools": [
         "workspace",
         "supabase"
@@ -837,17 +496,6 @@
       "references": [],
       "scripts": [],
       "provenance": "local",
-      "tags": [
-        "data",
-        "data-quality",
-        "assertions",
-        "freshness",
-        "volume",
-        "distribution",
-        "referential-integrity",
-        "reconciliation",
-        "alerting"
-      ],
       "name": "data-quality",
       "path": "skills/database/data-quality/SKILL.md",
       "summary": "Checks on a dataset are being written or reviewed, a wrong value reached a consumer with nothing catching it, or an existing check is noisy enough to be ignored.",
@@ -860,14 +508,6 @@
       "use_when": "A migration has been applied to some environment and someone is about to report it as working, or that claim is being reviewed.",
       "not_for": "Planning or sequencing the migration itself (migrations), ongoing correctness of data that no migration touched (data-integrity), or accepting a clean exit code as proof.",
       "verifies": true,
-      "provides": [
-        "row-count-check",
-        "checksum-check",
-        "constraint-check",
-        "index-check",
-        "invariant-check",
-        "rollback-rehearsal"
-      ],
       "tools": [
         "workspace",
         "supabase"
@@ -875,15 +515,6 @@
       "references": [],
       "scripts": [],
       "provenance": "local",
-      "tags": [
-        "database",
-        "migration",
-        "verification",
-        "checksum",
-        "constraints",
-        "rollback",
-        "evidence"
-      ],
       "name": "database-migration-verification",
       "path": "skills/database/database-migration-verification/SKILL.md",
       "summary": "A migration has been applied to some environment and someone is about to report it as working, or that claim is being reviewed.",
@@ -896,12 +527,6 @@
       "use_when": "An open question's answer will change a decision and the evidence is not already in the conversation \u2014 unfamiliar, contested or fast-moving material that needs framing, primary sources and a stopping rule.",
       "not_for": "Looking up a single fact with one authoritative home, mapping the local codebase, judging an individual source (source-evaluation), or comparing named products against criteria (competitive-analysis).",
       "verifies": false,
-      "provides": [
-        "research-question",
-        "primary-source-sweep",
-        "evidence-ledger",
-        "stopping-rule"
-      ],
       "tools": [
         "workspace",
         "context7",
@@ -910,14 +535,6 @@
       "references": [],
       "scripts": [],
       "provenance": "local",
-      "tags": [
-        "research",
-        "evidence",
-        "primary-sources",
-        "investigation",
-        "synthesis",
-        "uncertainty"
-      ],
       "name": "deep-research",
       "path": "skills/knowledge/deep-research/SKILL.md",
       "summary": "An open question's answer will change a decision and the evidence is not already in the conversation \u2014 unfamiliar, contested or fast-moving material that needs framing, primary sources and a stopping rule.",
@@ -930,12 +547,6 @@
       "use_when": "An advisory or audit finding needs judging, a dependency is being added or bumped, a lockfile diff needs review, or someone asks whether a named CVE affects this project.",
       "not_for": "Finding vulnerabilities in first-party code, secret and credential exposure (secrets-management), auth weaknesses (auth-security), and treating a clean audit as proof the application is secure.",
       "verifies": false,
-      "provides": [
-        "advisory-triage",
-        "reachability-analysis",
-        "lockfile-review",
-        "dependency-adoption-check"
-      ],
       "tools": [
         "workspace",
         "github"
@@ -943,16 +554,6 @@
       "references": [],
       "scripts": [],
       "provenance": "local",
-      "tags": [
-        "dependencies",
-        "cve",
-        "advisory",
-        "lockfile",
-        "transitive",
-        "supply-chain",
-        "reachability",
-        "upgrade"
-      ],
       "name": "dependency-security",
       "path": "skills/security/dependency-security/SKILL.md",
       "summary": "An advisory or audit finding needs judging, a dependency is being added or bumped, a lockfile diff needs review, or someone asks whether a named CVE affects this project.",
@@ -965,14 +566,6 @@
       "use_when": "A change is going to an environment other people use, or the path that takes it there is being built or changed.",
       "not_for": "Proving the deployed revision is healthy (release-verification), getting back to a known-good state (rollback), schema sequencing itself (migrations), or an outage in progress where restoring service outranks release process.",
       "verifies": false,
-      "provides": [
-        "artifact-identity",
-        "environment-parity",
-        "config-reconciliation",
-        "rollout-strategy",
-        "preflight",
-        "release-record"
-      ],
       "tools": [
         "workspace",
         "github",
@@ -981,16 +574,6 @@
       "references": [],
       "scripts": [],
       "provenance": "local",
-      "tags": [
-        "devops",
-        "deployment",
-        "release",
-        "rollout",
-        "canary",
-        "blue-green",
-        "config",
-        "preflight"
-      ],
       "name": "deployment",
       "path": "skills/devops/deployment/SKILL.md",
       "summary": "A change is going to an environment other people use, or the path that takes it there is being built or changed.",
@@ -1003,12 +586,6 @@
       "use_when": "The project already has design tokens, a component library or a shared theme, and UI is being added or changed inside it.",
       "not_for": "Establishing a visual direction where no system exists (frontend-design), or judging an interface's usability (ui-audit).",
       "verifies": false,
-      "provides": [
-        "token-reuse",
-        "component-reuse",
-        "extend-versus-add-decision",
-        "system-gap-report"
-      ],
       "tools": [
         "workspace",
         "figma",
@@ -1017,14 +594,6 @@
       "references": [],
       "scripts": [],
       "provenance": "local",
-      "tags": [
-        "design-system",
-        "tokens",
-        "components",
-        "variants",
-        "theming",
-        "conventions"
-      ],
       "name": "design-systems",
       "path": "skills/design/design-systems/SKILL.md",
       "summary": "The project already has design tokens, a component library or a shared theme, and UI is being added or changed inside it.",
@@ -1037,12 +606,6 @@
       "use_when": "A design, mockup, Figma frame or screenshot is the source for a UI change, or an existing implementation is being compared against one.",
       "not_for": "Deciding what the design should be (ui-design), judging whether a design is good (design critique), or proving the built screen renders and works (browser-verification).",
       "verifies": false,
-      "provides": [
-        "design-fidelity-mapping",
-        "token-mapping",
-        "state-coverage",
-        "ambiguity-list"
-      ],
       "tools": [
         "workspace",
         "figma",
@@ -1051,14 +614,6 @@
       "references": [],
       "scripts": [],
       "provenance": "local",
-      "tags": [
-        "design-handoff",
-        "figma",
-        "fidelity",
-        "tokens",
-        "components",
-        "implementation"
-      ],
       "name": "design-to-code",
       "path": "skills/design/design-to-code/SKILL.md",
       "summary": "A design, mockup, Figma frame or screenshot is the source for a UI change, or an existing implementation is being compared against one.",
@@ -1071,12 +626,6 @@
       "use_when": "A Dockerfile is being written, changed or reviewed, an image build is slow, bloated or non-deterministic, or configuration and secrets need a route into a container.",
       "not_for": "Orchestration, compose or cluster topology; CI workflow authoring (github-actions); pipeline stage design (ci-cd); or debugging application code that merely happens to be containerized.",
       "verifies": false,
-      "provides": [
-        "dockerfile-review",
-        "layer-cache-analysis",
-        "image-size-reduction",
-        "container-runtime-posture"
-      ],
       "tools": [
         "workspace",
         "context7"
@@ -1084,15 +633,6 @@
       "references": [],
       "scripts": [],
       "provenance": "local",
-      "tags": [
-        "docker",
-        "containers",
-        "dockerfile",
-        "image-size",
-        "build-cache",
-        "multi-stage",
-        "reproducible-build"
-      ],
       "name": "docker",
       "path": "skills/devops/docker/SKILL.md",
       "summary": "A Dockerfile is being written, changed or reviewed, an image build is slow, bloated or non-deterministic, or configuration and secrets need a route into a container.",
@@ -1105,12 +645,6 @@
       "use_when": "Documentation is about to be called correct, current or ready to publish, or a setup guide, quickstart or onboarding path fails at an unidentified step.",
       "not_for": "Judging whether the writing is clear or well structured (technical-writing), and standing in for the project's own test suite (test-strategy).",
       "verifies": true,
-      "provides": [
-        "executed-commands",
-        "example-execution",
-        "link-resolution",
-        "identifier-check"
-      ],
       "tools": [
         "workspace",
         "playwright"
@@ -1118,15 +652,6 @@
       "references": [],
       "scripts": [],
       "provenance": "local",
-      "tags": [
-        "documentation",
-        "verification",
-        "readme",
-        "links",
-        "examples",
-        "onboarding",
-        "clean-environment"
-      ],
       "name": "documentation-verification",
       "path": "skills/knowledge/documentation-verification/SKILL.md",
       "summary": "Documentation is about to be called correct, current or ready to publish, or a setup guide, quickstart or onboarding path fails at an unidentified step.",
@@ -1139,12 +664,6 @@
       "use_when": "An automated end-to-end suite is being created, extended, triaged for flake, or pruned, or a case has to be placed at or below this level.",
       "not_for": "Manually confirming one change renders and works (browser-verification), unit and integration coverage (test-design), choosing overall coverage levels (test-strategy), and load or performance testing.",
       "verifies": false,
-      "provides": [
-        "journey-selection",
-        "selector-strategy",
-        "test-isolation",
-        "flake-triage"
-      ],
       "tools": [
         "playwright",
         "workspace"
@@ -1152,15 +671,6 @@
       "references": [],
       "scripts": [],
       "provenance": "local",
-      "tags": [
-        "e2e",
-        "browser",
-        "selectors",
-        "flake",
-        "isolation",
-        "ci",
-        "journeys"
-      ],
       "name": "e2e-testing",
       "path": "skills/quality/e2e-testing/SKILL.md",
       "summary": "An automated end-to-end suite is being created, extended, triaged for flake, or pruned, or a case has to be placed at or below this level.",
@@ -1173,27 +683,12 @@
       "use_when": "An A/B or online experiment is being designed, sized, sanity-checked or interpreted \u2014 including deciding whether the traffic can support one at all.",
       "not_for": "Defining the metric being tested (product-analytics), choosing which ideas to test (prioritization), or authorizing a rollout once a result is in.",
       "verifies": false,
-      "provides": [
-        "experiment-design",
-        "power-analysis",
-        "pre-registration",
-        "result-interpretation"
-      ],
       "tools": [
         "workspace"
       ],
       "references": [],
       "scripts": [],
       "provenance": "local",
-      "tags": [
-        "experiment",
-        "ab-test",
-        "hypothesis",
-        "power",
-        "sample-size",
-        "null-result",
-        "statistics"
-      ],
       "name": "experimentation",
       "path": "skills/product/experimentation/SKILL.md",
       "summary": "An A/B or online experiment is being designed, sized, sanity-checked or interpreted \u2014 including deciding whether the traffic can support one at all.",
@@ -1206,12 +701,6 @@
       "use_when": "A new or reshaped UI surface needs a visual direction decided \u2014 hierarchy, type, colour, spacing, density \u2014 and no design system already decides it.",
       "not_for": "Critiquing an interface that already exists (ui-audit), working inside an established design system (design-systems), or proving a change renders and works (browser-verification).",
       "verifies": false,
-      "provides": [
-        "visual-direction",
-        "type-scale",
-        "colour-roles",
-        "spacing-density"
-      ],
       "tools": [
         "workspace",
         "figma"
@@ -1219,14 +708,6 @@
       "references": [],
       "scripts": [],
       "provenance": "local",
-      "tags": [
-        "visual-design",
-        "typography",
-        "colour",
-        "spacing",
-        "hierarchy",
-        "density"
-      ],
       "name": "frontend-design",
       "path": "skills/design/frontend-design/SKILL.md",
       "summary": "A new or reshaped UI surface needs a visual direction decided \u2014 hierarchy, type, colour, spacing, density \u2014 and no design system already decides it.",
@@ -1239,11 +720,6 @@
       "use_when": "A page is reported slow, a Core Web Vital or bundle size is named, or a change is about to be described as a performance improvement.",
       "not_for": "Backend, query or API latency; framework selection; and it does not replace rendered verification after the optimization lands.",
       "verifies": false,
-      "provides": [
-        "web-vitals-measurement",
-        "bundle-analysis",
-        "performance-diagnosis"
-      ],
       "tools": [
         "playwright",
         "workspace"
@@ -1251,15 +727,6 @@
       "references": [],
       "scripts": [],
       "provenance": "local",
-      "tags": [
-        "performance",
-        "core-web-vitals",
-        "lcp",
-        "cls",
-        "inp",
-        "bundle-size",
-        "measurement"
-      ],
       "name": "frontend-performance",
       "path": "skills/frontend/frontend-performance/SKILL.md",
       "summary": "A page is reported slow, a Core Web Vital or bundle size is named, or a change is about to be described as a performance improvement.",
@@ -1272,12 +739,6 @@
       "use_when": "A GitHub Actions workflow is being added, changed or reviewed, or CI is slow, flaky, or reporting green when it should be red.",
       "not_for": "Provider-neutral pipeline and gate design (ci-cd), container image authoring (docker), writing the tests a workflow runs (test-design, e2e-testing), or authorizing a deployment.",
       "verifies": false,
-      "provides": [
-        "workflow-review",
-        "ci-permissions-scoping",
-        "ci-cache-strategy",
-        "ci-speed-analysis"
-      ],
       "tools": [
         "workspace",
         "github"
@@ -1285,16 +746,6 @@
       "references": [],
       "scripts": [],
       "provenance": "local",
-      "tags": [
-        "github-actions",
-        "ci",
-        "workflow",
-        "permissions",
-        "secrets",
-        "matrix",
-        "cache",
-        "runners"
-      ],
       "name": "github-actions",
       "path": "skills/devops/github-actions/SKILL.md",
       "summary": "A GitHub Actions workflow is being added, changed or reviewed, or CI is slow, flaky, or reporting green when it should be red.",
@@ -1307,26 +758,12 @@
       "use_when": "An operation with an external side effect has to survive being repeated, a caller needs a retry policy, or duplicate effects have appeared and must be prevented.",
       "not_for": "Webhook receipt and delivery mechanics (webhooks), endpoint and error shape design (api-design), database transaction or locking design, and picking a queue technology.",
       "verifies": false,
-      "provides": [
-        "idempotency-key-design",
-        "retry-policy",
-        "reconciliation-procedure"
-      ],
       "tools": [
         "workspace"
       ],
       "references": [],
       "scripts": [],
       "provenance": "local",
-      "tags": [
-        "idempotency",
-        "retries",
-        "backoff",
-        "at-least-once",
-        "duplicates",
-        "reconciliation",
-        "reliability"
-      ],
       "name": "idempotency-and-retries",
       "path": "skills/backend/idempotency-and-retries/SKILL.md",
       "summary": "An operation with an external side effect has to survive being repeated, a caller needs a retry policy, or duplicate effects have appeared and must be prevented.",
@@ -1339,12 +776,6 @@
       "use_when": "Production is failing or degraded right now and stopping the ongoing harm matters more than a complete causal explanation.",
       "not_for": "A defect that is not currently failing in production (systematic-debugging), the root-cause investigation after recovery, release preparation and pipeline work, and the postmortem write-up.",
       "verifies": false,
-      "provides": [
-        "blast-radius",
-        "incident-log",
-        "reversible-mitigation",
-        "recovery-confirmation"
-      ],
       "tools": [
         "workspace",
         "github"
@@ -1352,15 +783,6 @@
       "references": [],
       "scripts": [],
       "provenance": "local",
-      "tags": [
-        "incident",
-        "outage",
-        "mitigation",
-        "rollback",
-        "triage",
-        "on-call",
-        "timeline"
-      ],
       "name": "incident-response",
       "path": "skills/devops/incident-response/SKILL.md",
       "summary": "Production is failing or degraded right now and stopping the ongoing harm matters more than a complete causal explanation.",
@@ -1373,11 +795,6 @@
       "use_when": "An agent fails in ways that will not reproduce, cost or latency is unaccounted for, or failure modes must be found before evals can be written.",
       "not_for": "Deciding whether an output is correct or whether a change is an improvement (agent-evals), hardening against injected instructions (prompt-injection-defense), and general application monitoring.",
       "verifies": false,
-      "provides": [
-        "run-tracing",
-        "token-and-latency-accounting",
-        "failure-clustering"
-      ],
       "tools": [
         "workspace",
         "context7"
@@ -1385,15 +802,6 @@
       "references": [],
       "scripts": [],
       "provenance": "local",
-      "tags": [
-        "tracing",
-        "spans",
-        "tokens",
-        "cost",
-        "latency",
-        "failure-analysis",
-        "agents"
-      ],
       "name": "llm-observability",
       "path": "skills/ai/llm-observability/SKILL.md",
       "summary": "An agent fails in ways that will not reproduce, cost or latency is unaccounted for, or failure modes must be found before evals can be written.",
@@ -1406,14 +814,6 @@
       "use_when": "An MCP server is being written, an internal system is being wrapped as one, or a third-party server is being assessed before it is wired into a project.",
       "not_for": "Designing the signature, parameters and error text of an individual tool (tool-design), constraining model output to a schema (structured-output), or authorizing the installation and configuration of any server.",
       "verifies": false,
-      "provides": [
-        "transport-choice",
-        "capability-surface",
-        "read-write-separation",
-        "auth-scoping",
-        "failure-semantics",
-        "server-assessment"
-      ],
       "tools": [
         "workspace",
         "context7"
@@ -1421,16 +821,6 @@
       "references": [],
       "scripts": [],
       "provenance": "local",
-      "tags": [
-        "mcp",
-        "server",
-        "transport",
-        "stdio",
-        "capabilities",
-        "auth",
-        "least-privilege",
-        "integration"
-      ],
       "name": "mcp-design",
       "path": "skills/ai/mcp-design/SKILL.md",
       "summary": "An MCP server is being written, an internal system is being wrapped as one, or a third-party server is being assessed before it is wired into a project.",
@@ -1443,27 +833,12 @@
       "use_when": "An agent must carry facts, preferences or decisions past the current context, or an existing memory store has become noisy, contradictory or wrongly scoped.",
       "not_for": "Retrieval over a document corpus (retrieval-rag), context-window packing and prompt construction, model selection (model-routing), and raw transcript logging.",
       "verifies": false,
-      "provides": [
-        "memory-taxonomy",
-        "memory-scoping",
-        "staleness-detection",
-        "retirement-policy"
-      ],
       "tools": [
         "workspace"
       ],
       "references": [],
       "scripts": [],
       "provenance": "local",
-      "tags": [
-        "memory",
-        "agents",
-        "persistence",
-        "scoping",
-        "staleness",
-        "retirement",
-        "context"
-      ],
       "name": "memory-design",
       "path": "skills/ai/memory-design/SKILL.md",
       "summary": "An agent must carry facts, preferences or decisions past the current context, or an existing memory store has become noisy, contradictory or wrongly scoped.",
@@ -1476,13 +851,6 @@
       "use_when": "A schema or data migration is being written, reviewed or sequenced against a database that holds real data and has live readers.",
       "not_for": "Greenfield schema design, query tuning with no DDL, or proving after the fact that a migration did what it claimed (database-migration-verification).",
       "verifies": false,
-      "provides": [
-        "migration-plan",
-        "expand-contract-sequencing",
-        "lock-analysis",
-        "backfill-plan",
-        "rollback-plan"
-      ],
       "tools": [
         "workspace",
         "supabase"
@@ -1490,16 +858,6 @@
       "references": [],
       "scripts": [],
       "provenance": "local",
-      "tags": [
-        "database",
-        "migration",
-        "schema",
-        "ddl",
-        "locks",
-        "backfill",
-        "rollback",
-        "zero-downtime"
-      ],
       "name": "migrations",
       "path": "skills/database/migrations/SKILL.md",
       "summary": "A schema or data migration is being written, reviewed or sequenced against a database that holds real data and has live readers.",
@@ -1512,12 +870,6 @@
       "use_when": "More than one model is in play and a call has to be assigned to one, or cost, latency or a silently firing fallback has become a problem.",
       "not_for": "Prompt authoring and output quality for a single model, retrieval tuning (retrieval-rag), agent memory (memory-design), and infrastructure capacity planning.",
       "verifies": false,
-      "provides": [
-        "model-selection",
-        "routing-rule",
-        "fallback-policy",
-        "routing-measurement"
-      ],
       "tools": [
         "workspace",
         "context7"
@@ -1525,15 +877,6 @@
       "references": [],
       "scripts": [],
       "provenance": "local",
-      "tags": [
-        "routing",
-        "model-selection",
-        "cost",
-        "latency",
-        "fallback",
-        "evaluation",
-        "degradation"
-      ],
       "name": "model-routing",
       "path": "skills/ai/model-routing/SKILL.md",
       "summary": "More than one model is in play and a call has to be assigned to one, or cost, latency or a silently firing fallback has become a problem.",
@@ -1546,12 +889,6 @@
       "use_when": "Transitions, animated state changes, gesture movement or loading indicators are being added, tuned or reviewed, or an interface reads as janky or sluggish.",
       "not_for": "Static visual design and layout, general performance profiling of non-animated code, or proving a screen works at all (browser-verification).",
       "verifies": false,
-      "provides": [
-        "motion-spec",
-        "easing-and-duration",
-        "reduced-motion-fallback",
-        "interruption-behaviour"
-      ],
       "tools": [
         "workspace",
         "playwright"
@@ -1559,14 +896,6 @@
       "references": [],
       "scripts": [],
       "provenance": "local",
-      "tags": [
-        "motion",
-        "animation",
-        "transitions",
-        "easing",
-        "reduced-motion",
-        "interaction"
-      ],
       "name": "motion-design",
       "path": "skills/design/motion-design/SKILL.md",
       "summary": "Transitions, animated state changes, gesture movement or loading indicators are being added, tuned or reviewed, or an interface reads as janky or sluggish.",
@@ -1579,12 +908,6 @@
       "use_when": "A service or a new critical path is going to production, an incident ended with a question the data could not answer, or a dependency, queue or job is being added whose failure would otherwise be silent.",
       "not_for": "Stabilizing a failure that is happening right now (incident-response), measuring a known-slow path you can already reproduce (performance-profiling), and tracing agent or LLM runs (llm-observability).",
       "verifies": false,
-      "provides": [
-        "signal-design",
-        "structured-events",
-        "correlation-propagation",
-        "alert-thresholds"
-      ],
       "tools": [
         "workspace",
         "context7"
@@ -1592,15 +915,6 @@
       "references": [],
       "scripts": [],
       "provenance": "local",
-      "tags": [
-        "observability",
-        "logging",
-        "metrics",
-        "tracing",
-        "alerting",
-        "slo",
-        "cardinality"
-      ],
       "name": "observability",
       "path": "skills/devops/observability/SKILL.md",
       "summary": "A service or a new critical path is going to production, an incident ended with a question the data could not answer, or a dependency, queue or job is being added whose failure would otherwise be silent.",
@@ -1613,14 +927,6 @@
       "use_when": "Web code that takes requests, builds queries, renders output, fetches URLs, deserializes data, handles sessions or accepts files is being written or reviewed, or an app needs a sweep for the recurring vulnerability classes.",
       "not_for": "Design-stage boundary and asset work (threat-modeling), the reading order and reporting discipline of a review pass (secure-code-review), infrastructure and network hardening, or reciting a compliance list without reading code.",
       "verifies": false,
-      "provides": [
-        "access-control-check",
-        "injection-check",
-        "xss-context-check",
-        "ssrf-check",
-        "deserialization-check",
-        "secrets-check"
-      ],
       "tools": [
         "workspace",
         "context7"
@@ -1628,16 +934,6 @@
       "references": [],
       "scripts": [],
       "provenance": "local",
-      "tags": [
-        "owasp",
-        "injection",
-        "xss",
-        "ssrf",
-        "access-control",
-        "deserialization",
-        "secrets",
-        "web-security"
-      ],
       "name": "owasp-web",
       "path": "skills/security/owasp-web/SKILL.md",
       "summary": "Web code that takes requests, builds queries, renders output, fetches URLs, deserializes data, handles sessions or accepts files is being written or reviewed, or an app needs a sweep for the recurring vulnerability classes.",
@@ -1650,27 +946,12 @@
       "use_when": "Something is slow, or an optimization is about to be written from a hunch rather than from a measurement.",
       "not_for": "Correctness or crash investigation (systematic-debugging), capacity planning, or micro-tuning code with no measured user impact.",
       "verifies": false,
-      "provides": [
-        "baseline-measurement",
-        "profile",
-        "hotspot-confirmation",
-        "before-after-comparison"
-      ],
       "tools": [
         "workspace"
       ],
       "references": [],
       "scripts": [],
       "provenance": "local",
-      "tags": [
-        "performance",
-        "profiling",
-        "benchmark",
-        "baseline",
-        "latency",
-        "memory",
-        "optimization"
-      ],
       "name": "performance-profiling",
       "path": "skills/quality/performance-profiling/SKILL.md",
       "summary": "Something is slow, or an optimization is about to be written from a hunch rather than from a measurement.",
@@ -1683,27 +964,12 @@
       "use_when": "The product must be described to people who do not know it \u2014 homepage, deck, launch, a new segment \u2014 or \"who is this for\" and \"how is this different\" have no crisp, evidenced answer.",
       "not_for": "Writing the final copy (copywriting), interface strings (ux-writing), pricing strategy, deciding what to build next (prioritization), or running the customer interviews themselves (product-discovery).",
       "verifies": false,
-      "provides": [
-        "segment-definition",
-        "competitive-alternatives",
-        "differentiator-analysis",
-        "positioning-statement"
-      ],
       "tools": [
         "workspace"
       ],
       "references": [],
       "scripts": [],
       "provenance": "local",
-      "tags": [
-        "positioning",
-        "segment",
-        "differentiation",
-        "competitive-alternative",
-        "category",
-        "messaging",
-        "value-proposition"
-      ],
       "name": "positioning",
       "path": "skills/knowledge/positioning/SKILL.md",
       "summary": "The product must be described to people who do not know it \u2014 homepage, deck, launch, a new segment \u2014 or \"who is this for\" and \"how is this different\" have no crisp, evidenced answer.",
@@ -1716,12 +982,6 @@
       "use_when": "The project runs on Postgres and the decision depends on engine behaviour \u2014 a column type, an index kind, a plan to read, an isolation level, DDL lock behaviour, or a row-level security policy.",
       "not_for": "Engine-neutral modelling decisions (schema-design), the measure-fix-measure loop on one slow statement (query-optimization), or another database engine.",
       "verifies": false,
-      "provides": [
-        "postgres-guidance",
-        "index-selection",
-        "isolation-choice",
-        "rls-policy"
-      ],
       "tools": [
         "workspace",
         "supabase",
@@ -1730,15 +990,6 @@
       "references": [],
       "scripts": [],
       "provenance": "local",
-      "tags": [
-        "postgres",
-        "indexes",
-        "explain",
-        "transactions",
-        "isolation",
-        "rls",
-        "locking"
-      ],
       "name": "postgres",
       "path": "skills/database/postgres/SKILL.md",
       "summary": "The project runs on Postgres and the decision depends on engine behaviour \u2014 a column type, an index kind, a plan to read, an isolation level, DDL lock behaviour, or a row-level security policy.",
@@ -1751,13 +1002,6 @@
       "use_when": "A settled problem needs a written scope others can build and check against \u2014 a brief, PRD, epic or stories \u2014 or a ticket is too vague to estimate or verify.",
       "not_for": "Deciding whether the problem is real (product-discovery), ranking what to build first (prioritization), or choosing the implementation.",
       "verifies": false,
-      "provides": [
-        "product-brief",
-        "user-flow",
-        "acceptance-criteria",
-        "non-goals",
-        "user-stories"
-      ],
       "tools": [
         "workspace",
         "github"
@@ -1765,15 +1009,6 @@
       "references": [],
       "scripts": [],
       "provenance": "local",
-      "tags": [
-        "prd",
-        "spec",
-        "scope",
-        "user-stories",
-        "acceptance-criteria",
-        "non-goals",
-        "requirements"
-      ],
       "name": "prd-and-stories",
       "path": "skills/product/prd-and-stories/SKILL.md",
       "summary": "A settled problem needs a written scope others can build and check against \u2014 a brief, PRD, epic or stories \u2014 or a ticket is too vague to estimate or verify.",
@@ -1786,12 +1021,6 @@
       "use_when": "The candidate list is longer than the capacity, someone asks what to cut or what ships first, or an existing order cannot be justified.",
       "not_for": "Establishing whether a problem is real (product-discovery), specifying what wins (prd-and-stories), or committing the team to dates and customers.",
       "verifies": false,
-      "provides": [
-        "tradeoff-record",
-        "cut-line",
-        "sequencing",
-        "cost-value-table"
-      ],
       "tools": [
         "workspace",
         "github"
@@ -1799,14 +1028,6 @@
       "references": [],
       "scripts": [],
       "provenance": "local",
-      "tags": [
-        "prioritization",
-        "tradeoffs",
-        "scope-cutting",
-        "sequencing",
-        "roadmap",
-        "capacity"
-      ],
       "name": "prioritization",
       "path": "skills/product/prioritization/SKILL.md",
       "summary": "The candidate list is longer than the capacity, someone asks what to cut or what ships first, or an existing order cannot be justified.",
@@ -1819,27 +1040,12 @@
       "use_when": "A product metric, funnel or dashboard number is being defined, disputed, or about to be instrumented \u2014 including before tracking is added to a feature.",
       "not_for": "Deciding what to build next (prioritization), designing or reading an A/B test (experimentation), or analysing a dataset whose definitions are already settled.",
       "verifies": false,
-      "provides": [
-        "metric-definition",
-        "event-spec",
-        "funnel-definition",
-        "instrumentation-check"
-      ],
       "tools": [
         "workspace"
       ],
       "references": [],
       "scripts": [],
       "provenance": "local",
-      "tags": [
-        "metrics",
-        "events",
-        "funnel",
-        "instrumentation",
-        "denominator",
-        "analytics",
-        "tracking"
-      ],
       "name": "product-analytics",
       "path": "skills/product/product-analytics/SKILL.md",
       "summary": "A product metric, funnel or dashboard number is being defined, disputed, or about to be instrumented \u2014 including before tracking is added to a feature.",
@@ -1852,12 +1058,6 @@
       "use_when": "A request arrives phrased as a solution, or a plan rests on a belief about users that nobody has checked, and the question is whether the problem is real.",
       "not_for": "Writing the scope once the problem is settled (prd-and-stories), ranking work already understood (prioritization), or contacting users without approval.",
       "verifies": false,
-      "provides": [
-        "problem-statement",
-        "evidence-grading",
-        "falsifiable-assumption",
-        "research-plan"
-      ],
       "tools": [
         "workspace",
         "github"
@@ -1865,14 +1065,6 @@
       "references": [],
       "scripts": [],
       "provenance": "local",
-      "tags": [
-        "discovery",
-        "problem-framing",
-        "jobs-to-be-done",
-        "evidence",
-        "assumptions",
-        "validation"
-      ],
       "name": "product-discovery",
       "path": "skills/product/product-discovery/SKILL.md",
       "summary": "A request arrives phrased as a solution, or a plan rests on a belief about users that nobody has checked, and the question is whether the problem is real.",
@@ -1885,12 +1077,6 @@
       "use_when": "A prompt is being written or patched, its output is inconsistent or the wrong shape, a model version changed, or someone has declared a prompt improved.",
       "not_for": "Scoping an agent's job, tools and prohibitions (agent-design), choosing what material to load into the window (context-engineering), and model selection or fine-tuning.",
       "verifies": false,
-      "provides": [
-        "output-contract",
-        "prompt-revision",
-        "case-set",
-        "prompt-measurement"
-      ],
       "tools": [
         "workspace",
         "context7"
@@ -1898,15 +1084,6 @@
       "references": [],
       "scripts": [],
       "provenance": "local",
-      "tags": [
-        "prompt",
-        "instructions",
-        "examples",
-        "output-format",
-        "evaluation",
-        "regression",
-        "measurement"
-      ],
       "name": "prompt-engineering",
       "path": "skills/ai/prompt-engineering/SKILL.md",
       "summary": "A prompt is being written or patched, its output is inconsistent or the wrong shape, a model version changed, or someone has declared a prompt improved.",
@@ -1919,27 +1096,12 @@
       "use_when": "An agent ingests content it did not author \u2014 retrieval, browsing, email, files, MCP tool results, subagent output \u2014 and also holds tools that can act.",
       "not_for": "Authentication and authorization design, secret and credential management, general input validation of user-supplied data, and building the eval suite that holds the regression cases (agent-evals).",
       "verifies": false,
-      "provides": [
-        "trust-boundary",
-        "tool-call-gating",
-        "exfiltration-review",
-        "injection-marker-test"
-      ],
       "tools": [
         "workspace"
       ],
       "references": [],
       "scripts": [],
       "provenance": "local",
-      "tags": [
-        "prompt-injection",
-        "trust-boundary",
-        "tool-gating",
-        "exfiltration",
-        "retrieval",
-        "agents",
-        "security"
-      ],
       "name": "prompt-injection-defense",
       "path": "skills/ai/prompt-injection-defense/SKILL.md",
       "summary": "An agent ingests content it did not author \u2014 retrieval, browsing, email, files, MCP tool results, subagent output \u2014 and also holds tools that can act.",
@@ -1952,11 +1114,6 @@
       "use_when": "A specific statement is slow and the database is the suspect, a query plan needs interpreting, or an index is being proposed without evidence.",
       "not_for": "Deciding table and constraint structure (schema-design), engine feature reference (postgres), or system-wide performance work before the database has been shown to be the bottleneck.",
       "verifies": false,
-      "provides": [
-        "query-plan-analysis",
-        "index-recommendation",
-        "before-after-measurement"
-      ],
       "tools": [
         "workspace",
         "supabase"
@@ -1964,14 +1121,6 @@
       "references": [],
       "scripts": [],
       "provenance": "local",
-      "tags": [
-        "performance",
-        "explain",
-        "query-plan",
-        "indexes",
-        "measurement",
-        "slow-query"
-      ],
       "name": "query-optimization",
       "path": "skills/database/query-optimization/SKILL.md",
       "summary": "A specific statement is slow and the database is the suspect, a query plan needs interpreting, or an index is being proposed without evidence.",
@@ -1984,25 +1133,12 @@
       "use_when": "A bug has just been fixed, or keeps coming back, and the fix needs a test that is proven to fail without it.",
       "not_for": "Designing a test strategy or a new feature's suite, coverage for code with no known defect, or diagnosing the bug in the first place (systematic-debugging).",
       "verifies": false,
-      "provides": [
-        "regression-test",
-        "failing-test-proof",
-        "test-level-choice"
-      ],
       "tools": [
         "workspace"
       ],
       "references": [],
       "scripts": [],
       "provenance": "local",
-      "tags": [
-        "testing",
-        "regression",
-        "bug-fix",
-        "flaky-tests",
-        "determinism",
-        "coverage"
-      ],
       "name": "regression-testing",
       "path": "skills/quality/regression-testing/SKILL.md",
       "summary": "A bug has just been fixed, or keeps coming back, and the fix needs a test that is proven to fail without it.",
@@ -2015,13 +1151,6 @@
       "use_when": "A deploy has completed to a shared environment and someone is about to call the release good, or that claim is being checked.",
       "not_for": "Planning or executing the rollout (deployment), deciding and running a revert (rollback), rendered-UI checking (browser-verification), or accepting a green pipeline and a 200 health response as proof.",
       "verifies": true,
-      "provides": [
-        "serving-revision-check",
-        "rollout-completeness-check",
-        "smoke-path-check",
-        "baseline-comparison",
-        "async-surface-check"
-      ],
       "tools": [
         "workspace",
         "github",
@@ -2030,15 +1159,6 @@
       "references": [],
       "scripts": [],
       "provenance": "local",
-      "tags": [
-        "devops",
-        "deployment",
-        "verification",
-        "smoke-test",
-        "health",
-        "baseline",
-        "evidence"
-      ],
       "name": "release-verification",
       "path": "skills/devops/release-verification/SKILL.md",
       "summary": "A deploy has completed to a shared environment and someone is about to call the release good, or that claim is being checked.",
@@ -2051,13 +1171,6 @@
       "use_when": "A layout has to hold across viewport widths \u2014 building it, repairing an overflow or collapse at some size, or filling in the sizes a single-width design never specified.",
       "not_for": "Proving the rendered result (browser-verification), semantics and assistive-technology behaviour (accessibility), or visual style direction.",
       "verifies": false,
-      "provides": [
-        "breakpoint-strategy",
-        "fluid-type-scale",
-        "intrinsic-layout",
-        "touch-target-sizing",
-        "reflow-check"
-      ],
       "tools": [
         "playwright",
         "workspace"
@@ -2065,16 +1178,6 @@
       "references": [],
       "scripts": [],
       "provenance": "local",
-      "tags": [
-        "responsive",
-        "layout",
-        "breakpoints",
-        "viewport",
-        "fluid-type",
-        "touch-targets",
-        "reflow",
-        "css"
-      ],
       "name": "responsive-design",
       "path": "skills/design/responsive-design/SKILL.md",
       "summary": "A layout has to hold across viewport widths \u2014 building it, repairing an overflow or collapse at some size, or filling in the sizes a single-width design never specified.",
@@ -2087,12 +1190,6 @@
       "use_when": "A retrieval-backed system returns wrong or thin answers, or an index is being designed, chunked, embedded or rebuilt.",
       "not_for": "Prompt and output quality once the right passage is already in context, agent memory design (memory-design), model selection (model-routing), and choosing a vector database product.",
       "verifies": false,
-      "provides": [
-        "chunking-strategy",
-        "hybrid-search",
-        "reranking",
-        "retrieval-evaluation"
-      ],
       "tools": [
         "workspace",
         "context7"
@@ -2100,16 +1197,6 @@
       "references": [],
       "scripts": [],
       "provenance": "local",
-      "tags": [
-        "rag",
-        "retrieval",
-        "chunking",
-        "embeddings",
-        "hybrid-search",
-        "reranking",
-        "recall",
-        "evaluation"
-      ],
       "name": "retrieval-rag",
       "path": "skills/ai/retrieval-rag/SKILL.md",
       "summary": "A retrieval-backed system returns wrong or thin answers, or an index is being designed, chunked, embedded or rebuilt.",
@@ -2122,12 +1209,6 @@
       "use_when": "A release plan needs its way back written and rehearsed, or a deploy is going wrong and someone is deciding whether it can be undone.",
       "not_for": "Proving recovery actually happened (release-verification), planning the forward rollout (deployment), schema sequencing itself (migrations), root-cause analysis after the bleeding stops (systematic-debugging), or executing a production revert without explicit confirmation.",
       "verifies": false,
-      "provides": [
-        "known-good-target",
-        "reversibility-classification",
-        "rollback-rehearsal",
-        "recovery-record"
-      ],
       "tools": [
         "workspace",
         "github",
@@ -2136,15 +1217,6 @@
       "references": [],
       "scripts": [],
       "provenance": "local",
-      "tags": [
-        "devops",
-        "rollback",
-        "recovery",
-        "release",
-        "irreversible",
-        "restore",
-        "incident"
-      ],
       "name": "rollback",
       "path": "skills/devops/rollback/SKILL.md",
       "summary": "A release plan needs its way back written and rehearsed, or a deploy is going wrong and someone is deciding whether it can be undone.",
@@ -2157,25 +1229,12 @@
       "use_when": "New tables are being designed, ORM models or migration DDL are under review, or a defect traces back to the data model permitting a state that should be impossible.",
       "not_for": "Tuning a slow statement (query-optimization), engine-specific types, indexes and features (postgres), or writing and running the migration that ships the change.",
       "verifies": false,
-      "provides": [
-        "data-model",
-        "constraint-design",
-        "schema-review"
-      ],
       "tools": [
         "workspace"
       ],
       "references": [],
       "scripts": [],
       "provenance": "local",
-      "tags": [
-        "schema",
-        "normalization",
-        "keys",
-        "constraints",
-        "naming",
-        "data-integrity"
-      ],
       "name": "schema-design",
       "path": "skills/database/schema-design/SKILL.md",
       "summary": "New tables are being designed, ORM models or migration DDL are under review, or a defect traces back to the data model permitting a state that should be impossible.",
@@ -2188,12 +1247,6 @@
       "use_when": "A credential is added, moved, shared or due for rotation, or one has turned up in code, history, logs or a client bundle.",
       "not_for": "Deciding what a valid credential may access (authorization), auth flow weaknesses (auth-security), dependency advisories, and executing a revocation or a history rewrite without the owner's decision.",
       "verifies": false,
-      "provides": [
-        "secret-inventory",
-        "leak-response",
-        "rotation-plan",
-        "log-redaction-review"
-      ],
       "tools": [
         "workspace",
         "github"
@@ -2201,16 +1254,6 @@
       "references": [],
       "scripts": [],
       "provenance": "local",
-      "tags": [
-        "secrets",
-        "credentials",
-        "rotation",
-        "leak",
-        "git-history",
-        "logging",
-        "env-vars",
-        "incident"
-      ],
       "name": "secrets-management",
       "path": "skills/security/secrets-management/SKILL.md",
       "summary": "A credential is added, moved, shared or due for rotation, or one has turned up in code, history, logs or a client bundle.",
@@ -2223,13 +1266,6 @@
       "use_when": "A pull request, feature or repository needs a security read before shipping \u2014 especially anything touching auth, money, tenancy, uploads, deserialization or secrets \u2014 or someone reports reaching data they should not have.",
       "not_for": "Design-stage boundary and asset work (threat-modeling), the class-by-class pattern hunt itself (owasp-web), running scanners as a substitute for reading, or any form of live testing, which is separately authorized.",
       "verifies": false,
-      "provides": [
-        "review-reading-order",
-        "source-to-sink-trace",
-        "finding-report",
-        "severity-ranking",
-        "coverage-statement"
-      ],
       "tools": [
         "workspace",
         "github"
@@ -2237,15 +1273,6 @@
       "references": [],
       "scripts": [],
       "provenance": "local",
-      "tags": [
-        "code-review",
-        "security-review",
-        "source-to-sink",
-        "findings",
-        "severity",
-        "reachability",
-        "pull-request"
-      ],
       "name": "secure-code-review",
       "path": "skills/security/secure-code-review/SKILL.md",
       "summary": "A pull request, feature or repository needs a security read before shipping \u2014 especially anything touching auth, money, tenancy, uploads, deserialization or secrets \u2014 or someone reports reaching data they should not have.",
@@ -2258,12 +1285,6 @@
       "use_when": "A page is written or revised to be found in search, search traffic drops, a page is missing from results, or someone asks which query to target.",
       "not_for": "Writing the copy itself (copywriting), page-speed and Core Web Vitals work (frontend-performance), paid search, social distribution, or pages deliberately kept out of search.",
       "verifies": false,
-      "provides": [
-        "search-intent-match",
-        "page-structure",
-        "indexability-check",
-        "search-reporting"
-      ],
       "tools": [
         "workspace",
         "playwright"
@@ -2271,15 +1292,6 @@
       "references": [],
       "scripts": [],
       "provenance": "local",
-      "tags": [
-        "seo",
-        "search-intent",
-        "indexing",
-        "crawlability",
-        "canonical",
-        "internal-links",
-        "search-console"
-      ],
       "name": "seo",
       "path": "skills/knowledge/seo/SKILL.md",
       "summary": "A page is written or revised to be found in search, search traffic drops, a page is missing from results, or someone asks which query to target.",
@@ -2292,11 +1304,6 @@
       "use_when": "Adding, customizing or debugging a shadcn/ui component in a repo with components.json and a vendored UI directory.",
       "not_for": "Choosing a component library, general component boundaries and state (component-architecture), or a full accessibility audit.",
       "verifies": false,
-      "provides": [
-        "copy-in-model",
-        "primitive-customization",
-        "radix-accessibility-boundary"
-      ],
       "tools": [
         "workspace",
         "context7"
@@ -2304,14 +1311,6 @@
       "references": [],
       "scripts": [],
       "provenance": "local",
-      "tags": [
-        "frontend",
-        "shadcn",
-        "radix",
-        "components",
-        "accessibility",
-        "vendored"
-      ],
       "name": "shadcn-ui",
       "path": "skills/frontend/shadcn-ui/SKILL.md",
       "summary": "Adding, customizing or debugging a shadcn/ui component in a repo with components.json and a vendored UI directory.",
@@ -2324,12 +1323,6 @@
       "use_when": "A claim is about to be relied on, quoted or cited \u2014 or sources disagree, a number arrives without its method, or a 'widely reported' fact needs its origin traced.",
       "not_for": "Running the overall investigation (deep-research), comparing named products on criteria (competitive-analysis), or facts verifiable directly in the workspace.",
       "verifies": false,
-      "provides": [
-        "provenance-trace",
-        "recency-check",
-        "independence-check",
-        "citation-format"
-      ],
       "tools": [
         "workspace",
         "context7"
@@ -2337,14 +1330,6 @@
       "references": [],
       "scripts": [],
       "provenance": "local",
-      "tags": [
-        "sources",
-        "citation",
-        "provenance",
-        "recency",
-        "corroboration",
-        "evidence"
-      ],
       "name": "source-evaluation",
       "path": "skills/knowledge/source-evaluation/SKILL.md",
       "summary": "A claim is about to be relied on, quoted or cited \u2014 or sources disagree, a number arrives without its method, or a 'widely reported' fact needs its origin traced.",
@@ -2357,25 +1342,12 @@
       "use_when": "You are about to work in a frontend repo whose stack you have not yet confirmed this session, or about to load framework-specific guidance.",
       "not_for": "Choosing a stack for a greenfield project, evaluating dependency health, or replacing reading the specific code you are about to change.",
       "verifies": false,
-      "provides": [
-        "stack-profile",
-        "package-manager-detection",
-        "version-resolution"
-      ],
       "tools": [
         "workspace"
       ],
       "references": [],
       "scripts": [],
       "provenance": "local",
-      "tags": [
-        "frontend",
-        "detection",
-        "package-json",
-        "lockfile",
-        "monorepo",
-        "conventions"
-      ],
       "name": "stack-detection",
       "path": "skills/frontend/stack-detection/SKILL.md",
       "summary": "You are about to work in a frontend repo whose stack you have not yet confirmed this session, or about to load framework-specific guidance.",
@@ -2388,13 +1360,6 @@
       "use_when": "A model's output feeds code rather than a human \u2014 extraction, classification, routing, scoring \u2014 or parsing keeps failing, fields arrive invented, or a schema is being designed for a model to fill.",
       "not_for": "Designing the tools an agent calls (tool-design), building the server that hosts them (mcp-design), or the quality of prose a human will read.",
       "verifies": false,
-      "provides": [
-        "output-schema",
-        "enforcement-choice",
-        "validation-boundary",
-        "retry-policy",
-        "accuracy-measurement"
-      ],
       "tools": [
         "workspace",
         "context7"
@@ -2402,15 +1367,6 @@
       "references": [],
       "scripts": [],
       "provenance": "local",
-      "tags": [
-        "json-schema",
-        "structured-output",
-        "extraction",
-        "validation",
-        "retry",
-        "classification",
-        "evaluation"
-      ],
       "name": "structured-output",
       "path": "skills/ai/structured-output/SKILL.md",
       "summary": "A model's output feeds code rather than a human \u2014 extraction, classification, routing, scoring \u2014 or parsing keeps failing, fields arrive invented, or a schema is being designed for a model to fill.",
@@ -2423,12 +1379,6 @@
       "use_when": "Something is broken, the cause is not yet known, and someone is about to start editing code to find out.",
       "not_for": "An outage still in progress (investigate-incident \u2014 mitigate before explaining), a cause already diagnosed that only needs implementing, or writing the regression test itself (regression-testing).",
       "verifies": false,
-      "provides": [
-        "reproduction",
-        "root-cause-analysis",
-        "hypothesis-testing",
-        "bisection"
-      ],
       "tools": [
         "workspace",
         "github"
@@ -2436,15 +1386,6 @@
       "references": [],
       "scripts": [],
       "provenance": "local",
-      "tags": [
-        "debugging",
-        "root-cause",
-        "reproduction",
-        "bisect",
-        "hypothesis",
-        "logs",
-        "stack-trace"
-      ],
       "name": "systematic-debugging",
       "path": "skills/quality/systematic-debugging/SKILL.md",
       "summary": "Something is broken, the cause is not yet known, and someone is about to start editing code to find out.",
@@ -2457,11 +1398,6 @@
       "use_when": "Writing or editing Tailwind utility classes in a project that already uses Tailwind.",
       "not_for": "Deciding whether to adopt Tailwind, visual design direction (design skills), or checking what actually rendered (browser-verification).",
       "verifies": false,
-      "provides": [
-        "token-discipline",
-        "class-conflict-resolution",
-        "dark-mode-strategy"
-      ],
       "tools": [
         "workspace",
         "context7"
@@ -2469,14 +1405,6 @@
       "references": [],
       "scripts": [],
       "provenance": "local",
-      "tags": [
-        "frontend",
-        "tailwind",
-        "css",
-        "design-tokens",
-        "dark-mode",
-        "utility-classes"
-      ],
       "name": "tailwind",
       "path": "skills/frontend/tailwind/SKILL.md",
       "summary": "Writing or editing Tailwind utility classes in a project that already uses Tailwind.",
@@ -2489,12 +1417,6 @@
       "use_when": "Documentation is being written, restructured or repaired \u2014 README, setup guide, how-to, reference, architecture note, release notes, runbook \u2014 or a reader cannot get from the docs to a working result.",
       "not_for": "Interface strings inside the product (ux-writing), persuasive or marketing copy (copywriting), and proving the documented commands actually run (documentation-verification).",
       "verifies": false,
-      "provides": [
-        "audience-framing",
-        "document-structure",
-        "grounded-claims",
-        "example-discipline"
-      ],
       "tools": [
         "workspace",
         "context7"
@@ -2502,15 +1424,6 @@
       "references": [],
       "scripts": [],
       "provenance": "local",
-      "tags": [
-        "documentation",
-        "readme",
-        "guide",
-        "reference",
-        "release-notes",
-        "runbook",
-        "accuracy"
-      ],
       "name": "technical-writing",
       "path": "skills/knowledge/technical-writing/SKILL.md",
       "summary": "Documentation is being written, restructured or repaired \u2014 README, setup guide, how-to, reference, architecture note, release notes, runbook \u2014 or a reader cannot get from the docs to a working result.",
@@ -2523,28 +1436,12 @@
       "use_when": "Unit or integration tests are being written or repaired \u2014 new coverage, pinning a reported bug, or a suite that stays green while the behaviour is wrong.",
       "not_for": "Choosing what to cover and at which level (test-strategy), end-to-end browser journeys (e2e-testing), and concluding that a shipped change is verified (browser-verification, api-contract-verification).",
       "verifies": false,
-      "provides": [
-        "unit-test-design",
-        "integration-test-design",
-        "test-double-choice",
-        "determinism-check"
-      ],
       "tools": [
         "workspace"
       ],
       "references": [],
       "scripts": [],
       "provenance": "local",
-      "tags": [
-        "testing",
-        "unit-tests",
-        "integration-tests",
-        "boundaries",
-        "mocks",
-        "fixtures",
-        "determinism",
-        "flake"
-      ],
       "name": "test-design",
       "path": "skills/quality/test-design/SKILL.md",
       "summary": "Unit or integration tests are being written or repaired \u2014 new coverage, pinning a reported bug, or a suite that stays green while the behaviour is wrong.",
@@ -2557,11 +1454,6 @@
       "use_when": "Coverage has to be planned or defended \u2014 before writing a batch of tests, when a suite is slow and nobody can say what it buys, or after a bug escaped and nothing caught it.",
       "not_for": "Writing the tests themselves (test-design, e2e-testing), and proving a specific finished change works (browser-verification, api-contract-verification).",
       "verifies": false,
-      "provides": [
-        "risk-inventory",
-        "level-allocation",
-        "coverage-gaps"
-      ],
       "tools": [
         "workspace",
         "github"
@@ -2569,14 +1461,6 @@
       "references": [],
       "scripts": [],
       "provenance": "local",
-      "tags": [
-        "testing",
-        "strategy",
-        "risk",
-        "coverage",
-        "test-levels",
-        "planning"
-      ],
       "name": "test-strategy",
       "path": "skills/quality/test-strategy/SKILL.md",
       "summary": "Coverage has to be planned or defended \u2014 before writing a batch of tests, when a suite is slow and nobody can say what it buys, or after a bug escaped and nothing caught it.",
@@ -2589,28 +1473,12 @@
       "use_when": "A system's shape is being designed or changed \u2014 new service, integration, tenancy model, uploads, payments or auth \u2014 and someone needs to know which few things are actually worth defending.",
       "not_for": "Finding defects in existing code (secure-code-review), enumerating web bug classes in a codebase (owasp-web), compliance questionnaires, or responding to a live incident.",
       "verifies": false,
-      "provides": [
-        "trust-boundary-map",
-        "asset-inventory",
-        "attacker-capabilities",
-        "threat-list",
-        "accepted-risks"
-      ],
       "tools": [
         "workspace"
       ],
       "references": [],
       "scripts": [],
       "provenance": "local",
-      "tags": [
-        "threat-model",
-        "trust-boundary",
-        "attack-surface",
-        "stride",
-        "risk",
-        "design-review",
-        "security"
-      ],
       "name": "threat-modeling",
       "path": "skills/security/threat-modeling/SKILL.md",
       "summary": "A system's shape is being designed or changed \u2014 new service, integration, tenancy model, uploads, payments or auth \u2014 and someone needs to know which few things are actually worth defending.",
@@ -2623,12 +1491,6 @@
       "use_when": "A tool or function an LLM calls is being added or reshaped, or an agent is selecting the wrong tool, passing malformed arguments, looping, or stalling after a call.",
       "not_for": "Building or integrating the MCP server that hosts the tools (mcp-design), constraining a model's final answer to a schema (structured-output), general prompt wording, or internal functions no model invokes.",
       "verifies": false,
-      "provides": [
-        "tool-surface",
-        "parameter-schema",
-        "error-contract",
-        "result-shape"
-      ],
       "tools": [
         "workspace",
         "context7"
@@ -2636,14 +1498,6 @@
       "references": [],
       "scripts": [],
       "provenance": "local",
-      "tags": [
-        "tools",
-        "function-calling",
-        "agents",
-        "schema",
-        "errors",
-        "tool-selection"
-      ],
       "name": "tool-design",
       "path": "skills/ai/tool-design/SKILL.md",
       "summary": "A tool or function an LLM calls is being added or reshaped, or an agent is selecting the wrong tool, passing malformed arguments, looping, or stalling after a call.",
@@ -2656,11 +1510,6 @@
       "use_when": "An interface already exists and someone needs to know what is wrong with it, ranked and concrete enough to act on.",
       "not_for": "Proving a change renders and functions (browser-verification), setting a visual direction where none exists (frontend-design), or a formal accessibility conformance audit.",
       "verifies": false,
-      "provides": [
-        "usability-findings",
-        "hierarchy-review",
-        "state-coverage-report"
-      ],
       "tools": [
         "workspace",
         "playwright"
@@ -2668,14 +1517,6 @@
       "references": [],
       "scripts": [],
       "provenance": "local",
-      "tags": [
-        "usability",
-        "audit",
-        "critique",
-        "hierarchy",
-        "states",
-        "review"
-      ],
       "name": "ui-audit",
       "path": "skills/design/ui-audit/SKILL.md",
       "summary": "An interface already exists and someone needs to know what is wrong with it, ranked and concrete enough to act on.",
@@ -2688,27 +1529,12 @@
       "use_when": "Interface strings are being written, reviewed or repaired \u2014 labels, errors, empty states, confirmations, form hints \u2014 or a control's wording is causing hesitation.",
       "not_for": "Marketing and landing-page copy, documentation and release notes, or deciding layout and visual treatment (ui-design).",
       "verifies": false,
-      "provides": [
-        "interface-copy",
-        "error-messages",
-        "empty-states",
-        "confirmation-copy"
-      ],
       "tools": [
         "workspace"
       ],
       "references": [],
       "scripts": [],
       "provenance": "local",
-      "tags": [
-        "copy",
-        "microcopy",
-        "labels",
-        "errors",
-        "empty-state",
-        "confirmation",
-        "content-design"
-      ],
       "name": "ux-writing",
       "path": "skills/design/ux-writing/SKILL.md",
       "summary": "Interface strings are being written, reviewed or repaired \u2014 labels, errors, empty states, confirmations, form hints \u2014 or a control's wording is causing hesitation.",
@@ -2721,12 +1547,6 @@
       "use_when": "A change affects appearance and is about to be called done, or a screenshot-comparison result is about to be trusted as proof.",
       "not_for": "A single rendered check of one change (browser-verification), judging whether a design is good (ui-audit), or behaviour with no visual surface.",
       "verifies": true,
-      "provides": [
-        "visual-state-matrix",
-        "screenshot-comparison",
-        "responsive-visual-check",
-        "baseline-triage"
-      ],
       "tools": [
         "playwright",
         "workspace"
@@ -2734,15 +1554,6 @@
       "references": [],
       "scripts": [],
       "provenance": "local",
-      "tags": [
-        "visual",
-        "screenshot",
-        "regression",
-        "baseline",
-        "responsive",
-        "states",
-        "verification"
-      ],
       "name": "visual-verification",
       "path": "skills/frontend/visual-verification/SKILL.md",
       "summary": "A change affects appearance and is about to be called done, or a screenshot-comparison result is about to be trusted as proof.",
@@ -2755,27 +1566,12 @@
       "use_when": "A webhook endpoint is being built, integrated or debugged, or the service has to deliver events to external consumers.",
       "not_for": "Internal queue or event-bus consumers with no HTTP trust boundary, general outbound API retry policy (idempotency-and-retries), and ordinary request/response endpoint design (api-design).",
       "verifies": false,
-      "provides": [
-        "signature-verification",
-        "delivery-contract",
-        "dedupe-strategy",
-        "retry-and-dlq"
-      ],
       "tools": [
         "workspace"
       ],
       "references": [],
       "scripts": [],
       "provenance": "local",
-      "tags": [
-        "webhooks",
-        "signature",
-        "replay",
-        "at-least-once",
-        "dead-letter",
-        "ssrf",
-        "events"
-      ],
       "name": "webhooks",
       "path": "skills/backend/webhooks/SKILL.md",
       "summary": "A webhook endpoint is being built, integrated or debugged, or the service has to deliver events to external consumers.",

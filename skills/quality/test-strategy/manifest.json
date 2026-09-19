@@ -2,13 +2,14 @@
   "id": "test-strategy",
   "capability": "quality.strategy",
   "category": "quality",
-  "use_when": "Coverage has to be planned or defended — before writing a batch of tests, when a suite is slow and nobody can say what it buys, or after a bug escaped and nothing caught it.",
+  "use_when": "Coverage has to be planned or defended \u2014 before writing a batch of tests, when a suite is slow and nobody can say what it buys, or after a bug escaped and nothing caught it.",
   "not_for": "Writing the tests themselves (test-design, e2e-testing), and proving a specific finished change works (browser-verification, api-contract-verification).",
   "verifies": false,
-  "provides": ["risk-inventory", "level-allocation", "coverage-gaps"],
-  "tools": ["workspace", "github"],
+  "tools": [
+    "workspace",
+    "github"
+  ],
   "references": [],
   "scripts": [],
-  "provenance": "local",
-  "tags": ["testing", "strategy", "risk", "coverage", "test-levels", "planning"]
+  "provenance": "local"
 }

@@ -127,7 +127,6 @@ def parse_skill(path):
     man["description"] = fm["description"]
     man["path"] = str(path.relative_to(ROOT))
     man.setdefault("tools", [])
-    man.setdefault("tags", [])
     man.setdefault("verifies", False)
     man.setdefault("summary", man["use_when"])
     return man
@@ -141,7 +140,6 @@ def parse_recipe(path):
     fm["capabilities"] = listval(fm, "capabilities")
     fm["roles"] = listval(fm, "roles")
     fm["path"] = str(path.relative_to(ROOT))
-    fm["body"] = body
     return fm
 
 
@@ -155,11 +153,6 @@ def load_registry(path, key):
             raise SystemExit(f"{path}: duplicate id {r['id']!r}")
         out[r["id"]] = r
     return out
-
-
-def d_ext_cap(external, i):
-    e = external.get(i)
-    return {"capability": e.get("capability", "")} if e and e.get("capability") else None
 
 
 def load():
@@ -216,10 +209,10 @@ def load():
         caps_declared = {}
         for tier in TIERS:
             for i in r["skills"][tier]:
-                src = next((x for x in skills if x["id"] == i), None) or d_ext_cap(external, i)
-                if not src:
+                src = next((x for x in skills if x["id"] == i), None) or external.get(i)
+                cap = src.get("capability") if src else None
+                if not cap:
                     continue
-                cap = src["capability"] if isinstance(src, dict) else src
                 if cap in caps_declared and caps_declared[cap] != i:
                     raise SystemExit(
                         f"role {r['id']}: '{i}' and '{caps_declared[cap]}' both provide capability "
@@ -572,11 +565,8 @@ def write_docs(d):
             ss = [s for s in d["skills"] if s["category"] == cat]
             if not ss:
                 continue
-            rows += [f"### {cat} ({len(ss)})", "",
-                     "| Skill | Capability | Fires when |", "| --- | --- | --- |"]
-            rows += [f"| `{s['id']}`{' ✓' if s['verifies'] else ''} | `{s['capability']}` | "
-                     f"{s['use_when']} |" for s in ss]
-            rows += [""]
+            rows += [f"**{cat}** ({len(ss)}) — " + ", ".join(
+                f"[`{s['id']}`](../{s['path']}){'✓' if s['verifies'] else ''}" for s in ss), ""]
         txt = marked(txt, "local", "\n".join(rows))
         ext = []
         for trust in ("official", "verified", "community"):

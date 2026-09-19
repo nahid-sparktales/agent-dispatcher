@@ -2,13 +2,13 @@
   "id": "prompt-injection-defense",
   "capability": "ai.security",
   "category": "ai",
-  "use_when": "An agent ingests content it did not author — retrieval, browsing, email, files, MCP tool results, subagent output — and also holds tools that can act.",
+  "use_when": "An agent ingests content it did not author \u2014 retrieval, browsing, email, files, MCP tool results, subagent output \u2014 and also holds tools that can act.",
   "not_for": "Authentication and authorization design, secret and credential management, general input validation of user-supplied data, and building the eval suite that holds the regression cases (agent-evals).",
   "verifies": false,
-  "provides": ["trust-boundary", "tool-call-gating", "exfiltration-review", "injection-marker-test"],
-  "tools": ["workspace"],
+  "tools": [
+    "workspace"
+  ],
   "references": [],
   "scripts": [],
-  "provenance": "local",
-  "tags": ["prompt-injection", "trust-boundary", "tool-gating", "exfiltration", "retrieval", "agents", "security"]
+  "provenance": "local"
 }

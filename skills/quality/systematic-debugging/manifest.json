@@ -3,12 +3,13 @@
   "capability": "quality.debugging",
   "category": "quality",
   "use_when": "Something is broken, the cause is not yet known, and someone is about to start editing code to find out.",
-  "not_for": "An outage still in progress (investigate-incident — mitigate before explaining), a cause already diagnosed that only needs implementing, or writing the regression test itself (regression-testing).",
+  "not_for": "An outage still in progress (investigate-incident \u2014 mitigate before explaining), a cause already diagnosed that only needs implementing, or writing the regression test itself (regression-testing).",
   "verifies": false,
-  "provides": ["reproduction", "root-cause-analysis", "hypothesis-testing", "bisection"],
-  "tools": ["workspace", "github"],
+  "tools": [
+    "workspace",
+    "github"
+  ],
   "references": [],
   "scripts": [],
-  "provenance": "local",
-  "tags": ["debugging", "root-cause", "reproduction", "bisect", "hypothesis", "logs", "stack-trace"]
+  "provenance": "local"
 }
