@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Add a Codex adapter with one discoverable dispatcher skill, all shared roles and supporting
+  guides, native role/context/decision controls, a self-contained plugin export, and an owned
+  install/update/uninstall path. Add opt-in Codex session activation with separate user-owned
+  state and native hook trust review. Extend CI with Codex packaging and lifecycle regressions.
 - Add GitHub Actions checks for Python 3.10–3.14 on Linux, Python 3.14 on macOS, generated-file
   drift, installer lifecycle, shell scripts, and workflow syntax. Add full-history and current-file
   Gitleaks scans, CodeQL for the public repository, and Dependabot updates for pinned Actions.

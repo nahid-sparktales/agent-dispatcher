@@ -1,6 +1,6 @@
 # Public launch audit — 2026-09-19
 
-Audit baseline: `f6dc177`. The working tree now includes the fixes and CI described below.
+Audit baseline: `f6dc177`. The launch fixes and CI were published in `577262b`.
 This was a targeted review of distribution, installation/removal, generated artifacts, decision
 configuration, API transport, repository hygiene, and GitHub release controls. It does not prove
 the quality of every role or reverify every third-party catalog entry.
@@ -21,7 +21,7 @@ the quality of every role or reverify every third-party catalog entry.
 ## CI delivered
 
 - **CI:** pushes to `main`, version tags, pull requests, merge queues, and manual runs. Python
-  3.10–3.14 on Ubuntu plus 3.14 on macOS; both existing suites and the new release suite; a clean
+  3.10–3.14 on Ubuntu plus 3.14 on macOS; existing, release, and Codex suites; a clean
   checkout after generation; ShellCheck and actionlint. The stable aggregate check is `CI passed`.
 - **Security:** the same change events plus a weekly scan. Gitleaks scans full fetched history
   and current files with redacted output. `Secret scan` works while the repository is private.
@@ -44,12 +44,17 @@ The permission and pinning choices follow [GitHub's secure-use guidance](https:/
   marketplace manifest validators pass locally.
 - Gitleaks 8.30.1 found no leaks in the available Git history or current files. This is a scan
   result, not a guarantee that every kind of sensitive information is absent.
-- Local execution used macOS and Python 3.14.6. The hosted Linux/Python matrix and CodeQL have
-  not run yet; they require the workflow changes to be pushed. No live TypeSafe call was made.
+- Local execution used macOS and Python 3.14.6. Hosted CI and Secret scan passed for `577262b`,
+  including every Linux/Python and macOS job. CodeQL was skipped while the repository remained
+  private. No live TypeSafe call was made.
+- The subsequent Codex adapter adds offline packaging, installer, routing, and activation
+  regressions. Native skill discovery passed against Codex CLI `0.155.0-alpha.2.6`; the runtime
+  discovered one dispatcher and no supporting guides as separate skills. This is discovery
+  validation, not a live model test or proof that a user has trusted the optional hook.
 
 ## Remaining launch steps and limits
 
-1. **Publish the reviewed changes and wait for hosted checks.** The repository was private at
+1. **Publish the repository when ready.** The reviewed changes passed hosted checks; the repository was private at
    audit time. Its existing default Actions token is read-only and cannot approve PRs. Making
    it public is a separate publication decision; this audit does not change visibility.
 2. **Protect `main` after the checks exist.** Require `CI passed` and `Secret scan`, prevent

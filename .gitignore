@@ -7,3 +7,4 @@ __pycache__/
 !.env.sample
 .venv/
 .DS_Store
+dist/

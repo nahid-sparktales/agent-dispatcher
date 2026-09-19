@@ -11,9 +11,9 @@ Useful in a report: what an attacker controls, what they gain, and the smallest 
 
 ## What this repository is
 
-Text, two scripts of its own, and one optional Python package. It contains no credentials and
-runs no third-party installer. It makes no network request unless you configure one — see the
-third bullet.
+Text, build/install/activation helpers, and one optional Python package. It contains no credentials
+and runs no third-party installer. Runtime helpers make no network request unless you configure
+the optional decision engine described below.
 
 - **`install.sh`** copies the pack into `${CLAUDE_CONFIG_DIR:-$HOME/.claude}` — one directory,
   `skills/agent-dispatcher/`, plus `commands/agent-*.md` and one hook. It records every command
@@ -21,6 +21,15 @@ third bullet.
   a `SessionStart` entry, and `--uninstall` removes only what its manifest lists.
   It validates settings structure and manifest paths before changing the installation, rejects
   symlinked installation targets, and preserves unrelated commands and hook registrations.
+- **`install_codex.py`** installs one owned skill in `~/.agents/skills/agent-dispatcher/`, with
+  supporting guides and the optional decision engine bundled. It refuses unowned or symlinked
+  targets and rolls back the skill update if hook registration fails. No hook or activation state
+  is created by default. `--with-hook` registers an inert hook; Codex still requires its own trust
+  review. Uninstall removes only the owned skill and its exact hook, preserving unrelated entries.
+- **`adapters/codex/activate.py`** stores Codex activation and silence scopes in the user-owned
+  Codex config directory. Its native `SessionStart` hook reads this state, writes nothing, and
+  makes no network request. It ignores repository activation flags and fails closed on malformed
+  input. Enabling activation does not bypass Codex's hook trust review or permission controls.
 - **`decision/`** is the optional decision engine. It ships **inert**: no decision scope is
   enabled by default, so nothing in it runs, no credential is read and no socket opens. Enabling
   a scope (`AGENT_DISPATCHER_DECISION_SCOPES`) with a credential in `TYPESAFE_API_KEY` sends the
@@ -34,9 +43,11 @@ third bullet.
   session-silence directory, makes no network call, and its output is a fixed heredoc — a
   repository cannot inject text through it.
 
-Arming is not repo-controlled: a project-local `.agent-dispatcher-on` is honoured only when that
+Claude arming is not repo-controlled: a project-local `.agent-dispatcher-on` is honoured only when that
 project's absolute path also appears in `~/.claude/.agent-dispatcher-projects`. Silencing flags
 *are* repo-local, because they can only reduce behaviour.
+Codex uses its separate `${CODEX_HOME:-~/.codex}/agent-dispatcher/state.json` allow-list and
+does not read Claude flags. See [Codex setup](adapters/codex/README.md) for its controls.
 
 ## The boundary that actually holds
 

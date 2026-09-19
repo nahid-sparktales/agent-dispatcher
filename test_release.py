@@ -165,7 +165,7 @@ class InstallerTests(unittest.TestCase):
         # Work on a copy: install.sh runs the generator and both validation suites.
         repo = self.root / "source"
         shutil.copytree(ROOT, repo, ignore=shutil.ignore_patterns(
-            ".git", "__pycache__", ".venv", ".agent-dispatcher-decision.json"))
+            ".git", "__pycache__", ".venv", "dist", ".agent-dispatcher-decision.json"))
         self.config = self.root / "config $(touch PWNED) 'quoted'"
         self.config.mkdir()
         self.env["CLAUDE_CONFIG_DIR"] = str(self.config)
@@ -219,7 +219,7 @@ class GeneratedArtifactTests(unittest.TestCase):
     def test_missing_generated_files_fail_validation(self):
         with tempfile.TemporaryDirectory() as tmp:
             repo = Path(tmp) / "source"
-            shutil.copytree(ROOT, repo, ignore=shutil.ignore_patterns(".git", "__pycache__", ".venv"))
+            shutil.copytree(ROOT, repo, ignore=shutil.ignore_patterns(".git", "__pycache__", ".venv", "dist"))
             for rel in ("commands/agent-reviewer.md", "catalog/loadouts.json"):
                 (repo / rel).unlink()
             result = subprocess.run([sys.executable, str(repo / "test_build.py")], cwd=repo,

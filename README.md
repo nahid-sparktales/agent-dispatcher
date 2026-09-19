@@ -3,7 +3,7 @@
 [![CI](https://github.com/nahid-sparktales/agent-dispatcher/actions/workflows/ci.yml/badge.svg)](https://github.com/nahid-sparktales/agent-dispatcher/actions/workflows/ci.yml)
 [![Security](https://github.com/nahid-sparktales/agent-dispatcher/actions/workflows/security.yml/badge.svg)](https://github.com/nahid-sparktales/agent-dispatcher/actions/workflows/security.yml)
 
-**Give each Claude Code task the specialist, context, and skills it needs.**
+**Give each Claude Code or Codex task the specialist, context, and skills it needs.**
 
 Agent Dispatcher routes your request to a focused role, loads relevant guidance, and defines
 what evidence will count as done. Ask it to debug a failure, design an interface, review a
@@ -25,19 +25,44 @@ change, or research a decision. It adapts to the work and keeps small tasks smal
 - **Keep control of routing.** Let the dispatcher choose, force a role yourself, or opt into
   automatic activation for future sessions.
 
-Roles are working instructions Claude adopts within a session. It can chain roles or assign
-roles to subagents when the task calls for it. Installing the pack does not start a team of
+Roles are working instructions the coding agent adopts within a session. It can chain roles or
+assign roles to subagents when authorized and useful. Installing the pack does not start a team of
 agents or connect external services.
 
 ## Quick start
 
 You need an installed, authenticated [Claude Code](https://code.claude.com/docs/en/overview)
-and Git. The included session hook uses Bash and standard Unix utilities. The manual installer,
-validation suites, and optional decision engine also use Python 3.10+ with no third-party Python
-packages. CI covers Python 3.10–3.14 on Linux and Python 3.14 on macOS. Native Windows
+or [Codex](https://developers.openai.com/codex/), and Git. The installers, validation suites, and
+optional decision engine use Python 3.10+ with no third-party Python packages. The Claude session
+hook also uses Bash and standard Unix utilities. CI covers Python 3.10–3.14 on Linux and Python
+3.14 on macOS. Native Windows
 installation is not covered; use a Unix environment such as WSL.
 
-### Install as a plugin
+### Codex
+
+Run in your terminal:
+
+```bash
+git clone https://github.com/nahid-sparktales/agent-dispatcher.git
+cd agent-dispatcher
+python3 install_codex.py
+```
+
+Start a new Codex task, select **Agent Dispatcher** from the skill picker or invoke it with `$`:
+
+```text
+$agent-dispatcher Find why the tests are failing, fix the cause, and verify the fix.
+$agent-dispatcher reviewer Review this change for correctness and missing tests.
+$agent-dispatcher context explain
+$agent-dispatcher status
+```
+
+This installs one skill in `~/.agents/skills/agent-dispatcher/`. It includes all 27 roles and
+79 supporting guides from the same sources as Claude. Guides load only when selected.
+Automatic session activation is off by default; enabling it requires Codex's hook trust review.
+See [Codex setup, controls, and uninstall](adapters/codex/README.md).
+
+### Claude Code plugin
 
 Run in your terminal:
 
@@ -86,19 +111,25 @@ Start a new Claude Code session and use the shorter command names:
 /agent-dispatcher status
 ```
 
-Use one installation method at a time to avoid duplicate commands and hooks.
+Use one installation method per host at a time to avoid duplicate commands and hooks.
 
 </details>
 
-No additional API key is needed for normal dispatcher use. Claude Code's own access and usage
+No additional API key is needed for normal dispatcher use. Your coding agent's access and usage
 requirements still apply. External skills and MCP servers are catalog references; the pack does
 not install them.
 
 ## Usage
 
-The examples and catalogs below use the **manual-install command names**. For a plugin install,
+The examples and catalogs below use **Claude Code manual-install command names**. For a Claude plugin install,
 add `agent-dispatcher:` after the slash: `/agent-context` becomes
 `/agent-dispatcher:agent-context`.
+
+In Codex, use `$agent-dispatcher <request>`. Choose a role with `$agent-dispatcher reviewer`,
+inspect context with `$agent-dispatcher context`, and use `$agent-dispatcher decision` for
+decision settings. The catalog's `/agent-uidesigner` maps to `$agent-dispatcher uidesigner`,
+and the other role aliases work the same way. Activation arguments such as `on here` and
+`off everywhere` are shared between hosts; their settings are stored separately.
 
 ### Let the dispatcher choose
 
@@ -139,19 +170,26 @@ Automatic activation is opt-in. These commands manage the settings for you:
 | `/agent-dispatcher off everywhere` | Disable global activation; individually armed projects remain armed. |
 | `/agent-dispatcher status` | Show activation flags and whether the hook is installed. |
 
-Project activation requires both a local flag and an allow-list entry in your Claude config
-directory. Cloning a repository with an activation flag is not enough to enable the dispatcher.
+Claude project activation requires both a local flag and an allow-list entry in your Claude
+config directory. Codex keeps its allow-list in your Codex config directory and ignores local
+activation flags. Cloning a repository with an activation flag is not enough to enable the dispatcher.
 Project and session silences take precedence over activation.
 
 ### Uninstall
 
-For a plugin install:
+For Codex, run from your clone:
+
+```bash
+python3 install_codex.py --uninstall
+```
+
+For a Claude plugin install:
 
 ```bash
 claude plugin uninstall agent-dispatcher@agent-dispatcher
 ```
 
-For a manual install, run from your clone:
+For a Claude manual install, run from your clone:
 
 ```bash
 ./install.sh --uninstall
@@ -179,7 +217,7 @@ guidance. Missing skills or tools lead to documented fallbacks and explicit veri
 The build caps always-on skills at five and 30 KB per role.
 
 These are instructions and validation rules, not a sandbox. **Authorization remains with the
-user and Claude Code's permission controls.** Detecting a stack, selecting a tool, or switching
+user and the host's permission controls.** Detecting a stack, selecting a tool, or switching
 roles does not grant permission to use it.
 
 Verification is specific to the work: a bug fix needs the original reproduction and regression

@@ -17,6 +17,8 @@ SKILL.template.md                     the router body
 CONTEXT.template.md                   the context engine
 HOOK.template.sh                      the perpetual-mode SessionStart hook
 decision/                             the optional decision engine
+adapters/codex/                       Codex entrypoint template and activation/CLI helpers
+build_codex.py, install_codex.py       Codex export and installation
 evals/decision/                       decision fixtures and the comparison harness
 docs/*.md                             prose only — the tables inside markers are generated
 ```
@@ -33,6 +35,7 @@ python3 build.py          # regenerate
 python3 test_build.py     # validate
 python3 test_decision.py  # the decision engine — deterministic, offline, no credential
 python3 test_release.py   # full installer lifecycle and public-release regressions
+python3 test_codex.py     # Codex package, installer, activation, and offline routing
 ```
 
 CI runs the validation suites before any separate build step, so regeneration cannot hide
@@ -58,12 +61,19 @@ route around them with a bare `str.replace`: a replace that matches nothing leav
 as it was, and the drift check then compares stale content against an equally stale rebuild and
 passes.
 
-All four commands must pass. `test_decision.py` needs no network and no key: every external answer comes
+All five commands must pass. `test_decision.py` needs no network and no key: every external answer comes
 from a mock provider, so CI stays free and deterministic. The build is a validator as much as a generator — it rejects an unknown category, a
 loadout pointing at a skill that does not exist, a capability no skill provides, an unknown tool id,
 a missing referenced file, a verification skill that does not declare itself, more than five or more
 than 30KB of always-on skills per role, and two skills providing one capability in always-considered
 tiers.
+
+`python3 build_codex.py` exports the shared sources to `dist/codex/plugins/agent-dispatcher/`.
+Do not commit or hand-edit that build output. The Codex adapter translates host-specific paths
+and controls, while supporting guide contents remain identical to the canonical sources.
+`python3 verify_codex_runtime.py` optionally verifies discovery using an installed Codex CLI;
+it requires neither authentication nor a model call and is not part of the offline CI matrix.
+See [the Codex adapter](adapters/codex/README.md) for installation and hook trust details.
 
 ## Adding a role
 
