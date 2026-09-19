@@ -5,12 +5,16 @@ specialist — chaining roles inside a turn when the work needs it.
 
 ## Use
 
-- `/agent-dispatcher` — route the current request, and the ones after it.
-- `/agent-dispatcher on` / `off` — perpetual mode: arms the dispatcher at the start of every session
-  via a SessionStart hook. `off` stops it for this session; it can also be stopped per project
-  (`touch .agent-dispatcher-off` in the project root) or everywhere (delete
-  `~/.claude/.agent-dispatcher-active`).
+- `/agent-dispatcher` — routes this request and every one after it, for as long as the session
+  lasts. Nothing persists past the session.
+- `/agent-dispatcher on` — perpetual mode: a SessionStart hook arms the dispatcher in **every future
+  session, in every project**. `on` in one project only: `touch .agent-dispatcher-on` in its root.
+- `/agent-dispatcher off` — stops it for this session. Per project: `touch .agent-dispatcher-off`
+  in its root. Everywhere: `rm ~/.claude/.agent-dispatcher-active`. Silencing beats arming.
 - `/agent-uidesigner`, `/agent-reviewer`, `/agent-tester`, … — force a role directly (27 commands).
+
+When a role fans out, each subagent is routed to its own role rather than inheriting the caller's,
+and a verifier never carries the role that produced the work.
 
 Roles chain inside a turn when the work needs it (`planner → implementer`), up to three. An
 installed skill or slash command that covers the request outranks routing — the role stays as

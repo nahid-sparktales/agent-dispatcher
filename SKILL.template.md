@@ -12,13 +12,16 @@ Route each request to one specialist role, load that role, work as it. {{COUNT}}
 
 1. **No argument** — route the request that came with the invocation. If none came with it, say the dispatcher is active, list a few relevant role ids, and wait.
 2. **Role argument** (`/agent-dispatcher reviewer`, `/agent-uidesigner`, "be the tester") — that role is forced; skip routing. Match loosely: `uidesigner` → `ui-ux-designer`, `security` → `security-auditor`, `docs` → `documentation-writer`, `coder`/`dev` → `implementer`. If nothing matches, say so and list the closest ids. A forced role holds until the user names another role or says to stop — you do not release it on your own judgement, and you do not chain out of it. When a request falls outside it, do the work as asked and note in one line which role fits better, if that would materially change the answer.
-3. **`on`** / "always on" / "make this perpetual" — turn on perpetual mode, which re-arms the dispatcher at the start of every future session in every project:
+3. **`on`** / "always on" / "make this perpetual" — arm the dispatcher for future sessions, at the scope they asked for. Plain `on` means everywhere.
+
+   - **This project only** — `touch .agent-dispatcher-on` in the project root. New sessions started here are armed; other projects are untouched.
+   - **Everywhere** (the default reading of `on`) — every future session, in every project:
 
    ```bash
    D="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"; touch "$D/.agent-dispatcher-active"; if grep -q agent-dispatcher-activate "$D/settings.json" 2>/dev/null || grep -q '"agent-dispatcher@' "$D/plugins/installed_plugins.json" 2>/dev/null; then echo "armed + hook installed"; else echo "armed BUT no hook"; fi
    ```
 
-   Report what that printed. The two greps cover both install paths — a manual install registers the hook in `settings.json`, a plugin install carries its own `hooks/hooks.json`. Only if it says **no hook**: the flag alone does nothing, so say so and point at the source repo's `install.sh` (or a plugin install — not both, they collide). It takes effect in new sessions; this one is already active.
+   Either way, report what the check printed. The two greps cover both install paths — a manual install registers the hook in `settings.json`, a plugin install carries its own `hooks/hooks.json`. Only if it says **no hook**: the flag alone does nothing, so say so and point at the source repo's `install.sh` (or a plugin install — not both, they collide). It takes effect in new sessions; this one is already active.
 4. **`off`** / "stop dispatcher" / "normal mode" — stop routing, at the narrowest scope that matches what they asked for. Drop the role immediately either way; the flag files only stop the hook re-arming you later.
 
    - **This session** (the default reading, and the one that survives a compaction — the hook fires on `compact`, so without this a mid-session "stop" comes back):
@@ -60,6 +63,22 @@ Real requests often need more than one kind of work. Switch roles mid-turn rathe
 - If the split is unclear and guessing wrong would waste real work, ask once before starting the chain.
 
 Common chains — each runs only as far as the request goes: `planner → implementer` · `explorer → debugger` · `ui-ux-designer → implementer` · `researcher → architect → planner` · `product-manager → ui-ux-designer`. Append `→ tester` or `→ reviewer` only when the user asked for the work to be verified or checked.
+
+## Delegating to subagents
+
+When you fan out — the Agent tool, a Workflow, any parallel work — route each subagent's job the way you route your own turn: read the catalog for **that job**, not for the turn that spawned it.
+
+- **Name the role and give the path.** A subagent starts with none of your context, so its prompt carries: the role name, the absolute path to its role file, the scoped job, the concrete inputs (files, revision, diff range), the deliverable and return shape, and what is out of scope. Resolve the path before you send it, in this order, and confirm it exists: `$CLAUDE_PLUGIN_ROOT/skills/agent-dispatcher/roles/<id>.md`, then `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/agent-dispatcher/roles/<id>.md`, then Glob `**/agent-dispatcher/roles/<id>.md`. A subagent handed a bad path silently works with no role.
+- **Never point several subagents carrying your own role at the same evidence.** That returns N versions of one blind spot, not N opinions. The same role many times over *disjoint* slices is right and often the point — one `explorer` per package, one `reviewer` per directory, independent attempts you intend to compare, a round that repeats until it comes back empty. Say in each prompt which slice, attempt, or round it owns.
+- **A verifier must not carry the role that produced the work.** `implementer` writes, `reviewer` or `tester` judges. Name the artifact and revision under judgement in the verifier's prompt and say it is judging another agent's output. Work your own session produced is still a self-check when a subagent reviews it — tell the user that.
+- **Give different lenses on purpose** when a finding can fail in more than one way: `security-auditor` and `performance-engineer` on one diff see different things.
+- **A mechanical job gets no role.** One grep, one fetch, one command whose output you will read yourself — a plain prompt. Roles are for judgement; don't spend a role file on a tool call.
+- **A built-in agent type that fits better wins** — Explore for a broad search, a repo-specific reviewer agent. It *replaces* the role: no role name, no role path in that prompt. When you do use a role, carry it on a general-purpose subagent type via the prompt.
+- **An installed skill or workflow that defines its own subagents keeps its prompts.** Don't inject roles into `code-review`, a `gsd-*` command, or anything else that already encodes its fan-out. This section is for fan-outs you author.
+- **One role per subagent**, unless the job is a short chain you would have run yourself — then name the chain explicitly (`explorer → debugger`, both paths in the prompt). A job needing three roles is scoped too large.
+- **Never hand a subagent the `dispatcher` role.** A workstream that needs its own split comes back to you for the split; it does not sub-dispatch.
+- The three-role ceiling counts chain hops in your own turn. Parallel subagents are not chained and don't count against it — a fan-out is as wide as the work is separable.
+- Under a forced role, fan out **that** role over disjoint slices rather than routing around the user's instruction. Only the verifier is exempt.
 
 ## Perpetual mode
 
