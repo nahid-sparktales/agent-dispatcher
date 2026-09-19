@@ -77,8 +77,8 @@ Start a new Claude Code session in your project, then try:
 /agent-dispatcher:agent-dispatcher Find why the tests are failing, fix the cause, and verify the fix.
 ```
 
-The dispatcher announces a role, such as `→ debugger`, reads its working instructions, and
-starts the task. To inspect the installation and activation state:
+The dispatcher reads the selected role and guides, then announces the role, loaded skills,
+and selected tools before starting the task. To inspect the installation and activation state:
 
 ```text
 /agent-dispatcher:agent-dispatcher status
@@ -150,12 +150,86 @@ context plan. While active, the dispatcher re-routes when the kind of work chang
 | `/agent-uidesigner` | Work as the UI/UX Designer. |
 | `/agent-debugger` | Work as the Debugger. |
 | `/agent-reviewer` | Work as the Reviewer. |
+| `/agent-inventory` | List skills, tools, and MCPs with usability and setup status. |
 | `/agent-context` | Show the current context plan. |
 | `/agent-context explain` | Explain the role, skills, and tools selected. |
 | `/agent-context verbose` | Include candidates, dropped files, and the context budget. |
 | `/agent-decision` | Show optional decision-engine configuration and status. |
 
 A directly selected role stays active until you choose another or stop the dispatcher.
+
+### See what the dispatcher loads
+
+Compact output is the default. It combines the role and resources into one progress line:
+
+```text
+→ reviewer · Skills loaded: secure-code-review · Tools selected: files, terminal · MCPs: none selected
+```
+
+For more detail, switch to verbose output. In Codex:
+
+```text
+$agent-dispatcher output verbose
+$agent-dispatcher output compact
+$agent-dispatcher output
+```
+
+In Claude Code, use `/agent-dispatcher output verbose` or `output compact` (with the
+`agent-dispatcher:` prefix for plugin installations). `output` reports the current style.
+You can also say "use verbose output" or "show what you load".
+
+Verbose output explains the selections and names context read, recipes loaded, unavailable
+resources and fallbacks, and planned verification. For example:
+
+```text
+Role: reviewer — evaluate the change for correctness and regressions
+Skills loaded: secure-code-review — inspect the changed security boundary
+Tools selected: files, terminal — available; inspect the diff and run checks
+MCPs: none selected
+Recipe loaded: review-pull-request — structure the review
+Verification planned: focused regression checks; not run yet
+```
+
+These are examples, not a fixed loadout. Only skills actually read are labeled loaded;
+selected MCP servers are marked used only after a call. Later additions get a short update,
+and the final report names tools used and checks performed. Trivial tasks skip the summary.
+
+The setting lasts for the conversation; new conversations default to compact. It changes
+activity reporting, not routing, permissions, or the length of the requested deliverable.
+`context verbose` remains a one-time inspection of the context plan.
+
+### List what is usable and what needs setup
+
+In Codex:
+
+```text
+$agent-dispatcher inventory
+$agent-dispatcher inventory skills
+$agent-dispatcher inventory tools
+$agent-dispatcher inventory mcps
+$agent-dispatcher inventory setup
+$agent-dispatcher inventory setup verbose
+```
+
+In Claude Code, use `/agent-inventory` with the same filters, or
+`/agent-dispatcher:agent-inventory` for a plugin install. `/agent-dispatcher inventory` also works.
+
+The report covers bundled guides, referenced external skills, other host-exposed skills,
+visible tools, and catalog or host-exposed MCP servers. Each entry has a status and a next step:
+
+| Status | Meaning |
+| --- | --- |
+| Usable | Guidance is readable or the tool is exposed, with no known blocker. Tool connectivity may still be untested. |
+| Needs setup | A missing installation, dependency, connection, or authentication step is confirmed. |
+| Blocked | A user preference or host permission prevents use. |
+| Unknown | Available evidence is insufficient; the report names what to check. |
+| Not recommended | The registry records an unmaintained or retired integration and its fallback. |
+
+`setup` filters to entries needing attention. `verbose` adds evidence, prerequisites, source
+links, and fallbacks; compact still lists every entry in the requested scope. The command
+inspects availability without loading every skill, probing accounts, or installing anything.
+It reports discovery limits rather than treating an unseen integration as missing. Usability
+is separate from permission to perform a particular action.
 
 ### Activate automatically in future sessions
 

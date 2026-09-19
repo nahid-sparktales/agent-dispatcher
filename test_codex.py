@@ -54,6 +54,27 @@ class CodexPackageTests(unittest.TestCase):
             self.assertNotIn("~/.claude", text)
         self.assertNotIn("PYTHONPATH=<pack>", (self.pack / "references/CONTEXT.md").read_text())
 
+    def test_inventory_is_complete_and_paths_resolve_in_each_host(self):
+        inventory = json.loads((self.pack / "references/INVENTORY.json").read_text())
+        claude = json.loads((ROOT / "skills/agent-dispatcher/INVENTORY.json").read_text())
+        self.assertEqual({row["id"] for row in inventory["local_skills"]},
+                         {row["id"] for row in self.data["skills"]})
+        for category, registry in (("external_skills", "external"), ("tools_and_mcps", "mcp")):
+            self.assertEqual({row["id"] for row in inventory[category]}, set(self.data[registry]))
+            self.assertEqual(inventory[category], claude[category])
+        for item in inventory["local_skills"]:
+            self.assertTrue(all((self.pack / path).is_file() for path in item["paths"]), item["id"])
+            self.assertNotIn("status", item)  # availability belongs to the live session
+        for item in claude["local_skills"]:
+            self.assertTrue(any((ROOT / "skills/agent-dispatcher" / path).is_file()
+                                for path in item["paths"]), item["id"])
+        self.assertEqual((self.pack / "references/INVENTORY.md").read_text(),
+                         (ROOT / "INVENTORY.template.md").read_text())
+        # Editing metadata must flow into the shipped inventory rather than a second catalog.
+        for row in inventory["tools_and_mcps"]:
+            self.assertEqual(row["source"], self.data["mcp"][row["id"]].get("source"))
+            self.assertEqual(row["auth"], self.data["mcp"][row["id"]].get("auth"))
+
     def test_optional_decision_cli_runs_outside_package(self):
         project = self.root / "project"
         project.mkdir(exist_ok=True)

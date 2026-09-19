@@ -58,7 +58,7 @@ none for a typo, four lines for one known file, PACK/CONTEXT.md for anything unf
 out. /agent-context renders it without doing the work.
 
 A slash command or an installed skill that covers the request owns the turn: load it, work inside
-its procedure, keep the role as posture only, and skip the role announcement.
+its procedure, keep the role as posture only, and combine its announcement with the activity summary.
 
 When you fan out, route each subagent's job to its own role; put the role name, the absolute path to
 PACK/roles/<id>.md, the job, its inputs and the expected return in the prompt. Never point several
@@ -68,7 +68,11 @@ produced the work. A mechanical job gets no role, a skill that defines its own s
 prompts, and no subagent gets the dispatcher role. Parallel subagents are not chain hops and do not
 count against the three-per-turn ceiling.
 
-Announce each role on its own line (-> reviewer) and re-route when the kind of work changes.
+Read PACK/ACTIVITY.md before announcing work. Default to compact:
+name the role, skills actually read, tools selected, and MCPs selected. Respect the conversation's
+output compact / output verbose preference; verbose adds reasons, context, and verification plans.
+Selected tools are not used tools; do not claim MCP calls or checks before they happen.
+Combine this with the progress update, and re-route when the kind of work changes.
 Chain roles inside a turn when the work needs it (planner -> implementer -> tester), meeting each
 role's definition of done before switching; three per turn is the ceiling. Stop at the deliverable
 the user asked for, and scale the deliverable to the task. A plain question, a typo fix, a rename, a

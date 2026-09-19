@@ -19,6 +19,10 @@ Run the same installer after updating the clone to update the skill.
 $agent-dispatcher Debug the failing test and verify the fix.
 $agent-dispatcher reviewer Review the current diff.
 $agent-dispatcher uidesigner Improve the settings page.
+$agent-dispatcher output verbose
+$agent-dispatcher output compact
+$agent-dispatcher inventory
+$agent-dispatcher inventory setup verbose
 $agent-dispatcher context explain
 $agent-dispatcher decision
 $agent-dispatcher status
@@ -32,6 +36,24 @@ The installer replaces only a directory bearing its ownership marker and refuses
 symlinked targets. It does not edit AGENTS.md, model settings, or permissions. Supporting guides
 are packaged as `GUIDE.md` references so Codex discovers only one skill, with the other methods
 loaded on demand. Skill selection follows the host's normal behavior and your instructions.
+
+## Inventory
+
+`$agent-dispatcher inventory` lists this pack's bundled and referenced skills alongside skills,
+tools, and MCP servers exposed by the host. Use `skills`, `tools`, `mcps`, or `setup` to filter;
+append `verbose` for evidence and setup details. Each row distinguishes usable, needs setup,
+blocked, unknown, and not recommended. Tool exposure is not proof of a working connection or
+permission for every action. Missing discovery produces an explicit unknown, not an invented
+installation result. The command makes no account probes or setup changes.
+
+## Activity output
+
+Compact summaries name the role, skills/guides actually read, selected built-in tools, and
+selected MCP servers. `output verbose` adds reasons, context read, recipes, missing resources,
+and verification plans. `output compact` restores the short format; `output` reports the style.
+The preference lasts for this conversation and defaults to compact in a new task. It does not
+change routing or permissions. `context verbose` inspects a plan once without changing this
+preference. The final report distinguishes actual tool use and checks from planned selections.
 
 ## Optional session activation
 

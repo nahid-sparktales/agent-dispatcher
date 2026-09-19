@@ -13,7 +13,7 @@ If `$ARGUMENTS` names a request, plan for that. If it is empty or is only a mode
 
 - **default** - the plan, in the shape below.
 - **`explain`** - the plan, then a **Why** section: why this role and not the closest near-miss (quote its `not_for`), why each skill, why each tool, and one role or skill deliberately excluded. One short paragraph each.
-- **`verbose`** - the plan, plus the candidate roles considered, candidate skills not selected, excluded low-ranking files with the reason, and the per-source budget breakdown.
+- **`verbose`** - a one-time inspection, not a change to activity output style: the plan, plus the candidate roles considered, candidate skills not selected, excluded low-ranking files with the reason, and the per-source budget breakdown.
 
 ## Shape
 
@@ -25,7 +25,7 @@ Task          one line, in the user's words
 Engine        Default, or the decision engine that answered - omit when it is Default and nothing was attempted
 Agent         <role> - <why, one line>
 Capabilities  the capability ids the task needs
-Skills        [x] selected  [ ] available, not needed  [-] named but not installed
+Skills        selected / loaded (actually read) / unavailable / unknown; never imply selection means loading
 Stack         each claim with the file it came from
 Signals       condition -> true / false / unknown
 Workspace     ranked paths, each with why it is there and how it matched

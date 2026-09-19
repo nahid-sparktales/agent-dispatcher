@@ -14,6 +14,8 @@ catalog/external-skills.json          externally maintained skills
 catalog/signals.json                  how each conditional skill bucket is decided
 catalog/context-plan.schema.json      the shape of a context plan
 SKILL.template.md                     the router body
+ACTIVITY.template.md                  compact/verbose activity reporting shared by both hosts
+INVENTORY.template.md                 availability and setup inspection shared by both hosts
 CONTEXT.template.md                   the context engine
 HOOK.template.sh                      the perpetual-mode SessionStart hook
 decision/                             the optional decision engine

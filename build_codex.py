@@ -62,7 +62,7 @@ def export_package(destination, data):
             raise ValueError(f"unadapted Claude mode control in {rid}")
         write(refs / "roles" / f"{rid}.md", text)
     write(refs / "ROLES.md", "\n".join(roles))
-    for name in ("CONTEXT.md", "SIGNALS.md", "INDEX.md"):
+    for name in ("CONTEXT.md", "SIGNALS.md", "INDEX.md", "ACTIVITY.md", "INVENTORY.md"):
         text = adapt((build.ADAPTER / name).read_text())
         for skill_meta in data["skills"]:
             original = skill_meta["path"]
@@ -85,6 +85,11 @@ def export_package(destination, data):
             for recipe in data["recipes"]:
                 text = text.replace(f"`recipes/{recipe['id']}.md`", f"`references/recipes/{recipe['id']}.md`")
         write(refs / name, text)
+    inventory = json.loads((build.ADAPTER / "INVENTORY.json").read_text())
+    by_id = {item["id"]: item for item in data["skills"]}
+    for item in inventory["local_skills"]:
+        item["paths"] = ["references/" + by_id[item["id"]]["path"].replace("/SKILL.md", "/GUIDE.md")]
+    write(refs / "INVENTORY.json", json.dumps(inventory, indent=2) + "\n")
     # GUIDE.md avoids recursive skill discovery adding all 79 descriptions to every session.
     for skill_meta in data["skills"]:
         src = ROOT / skill_meta["path"]

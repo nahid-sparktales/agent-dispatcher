@@ -29,7 +29,7 @@ def check(name, cond, detail=""):
         print(f"  FAIL {name} — {detail}")
 
 
-GENERATED = ["skills/agent-dispatcher/SKILL.md", "skills/agent-dispatcher/INDEX.md",
+GENERATED = ["skills/agent-dispatcher/INVENTORY.md", "skills/agent-dispatcher/INVENTORY.json", "skills/agent-dispatcher/ACTIVITY.md", "skills/agent-dispatcher/SKILL.md", "skills/agent-dispatcher/INDEX.md",
              "skills/agent-dispatcher/CONTEXT.md", "skills/agent-dispatcher/SIGNALS.md",
              "catalog/skills.json", "catalog/loadouts.json", "README.md",
              "docs/skills.md", "docs/mcps.md", "docs/recipes.md",
@@ -407,11 +407,10 @@ def main():
     check("router catalog == templates",
           set(re.findall(r"^### `([a-z0-9-]+)`", router, re.M)) == ids)
     cmds = sorted(build.CMDS.glob("agent-*.md"))
-    # Two generated commands are not roles: the context-plan inspector, and the switch for the
-    # optional decision engine.
-    NON_ROLE_CMDS = ("agent-context.md", "agent-decision.md")
+    # Inspection and configuration commands do not force a specialist role.
+    NON_ROLE_CMDS = ("agent-context.md", "agent-decision.md", "agent-inventory.md")
     role_cmds = [c for c in cmds if c.name not in NON_ROLE_CMDS]
-    check("one command per role, plus the inspector and the decision switch",
+    check("one command per role, plus inspection and configuration commands",
           len(role_cmds) == len(roles)
           and all((build.CMDS / n).exists() for n in NON_ROLE_CMDS),
           f"{len(cmds)} files vs {len(roles)} roles")

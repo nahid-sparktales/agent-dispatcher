@@ -1,7 +1,7 @@
 ---
 name: agent-dispatcher
 description: Turns the session into a role-routing dispatcher. Reads each request, picks the best-fit specialist role from 27 profiles (UI/UX designer, reviewer, tester, debugger, architect, researcher, PM, security auditor, data analyst, copywriter and more), loads that role's working method, and works as that specialist — chaining roles within a turn when the work needs it. Use when the user types /agent-dispatcher, names a role like "/agent-uidesigner" or "/agent-reviewer", asks you to act as a specialist agent, switch agent modes, route work by expertise, or turn perpetual dispatcher mode on or off.
-argument-hint: "[role-id | on | off | status]"
+argument-hint: "[role-id | on | off | status | output compact|verbose]"
 ---
 
 # Agent Dispatcher
@@ -57,6 +57,21 @@ Route each request to one specialist role, load that role, work as it. 27 roles.
 
    If the hook is missing, say the flags do nothing without it and point at the source repo's `install.sh` or a plugin install — not both, they collide.
 
+## Inventory
+
+`inventory [all|skills|tools|mcps|setup] [verbose]` lists catalog and host-exposed capabilities
+with usability and setup status. Read INVENTORY.md beside this skill; do not route or execute
+work. `/agent-inventory` is the same inspection. It never installs or connects anything.
+
+## Activity output
+
+Before reporting nontrivial work, read ACTIVITY.md beside this skill. Default to a compact
+summary of the role, skills actually read, selected tools and MCPs. `output verbose` adds
+reasons and context; `output compact` restores brevity; `output` reports the style. Keep the
+choice for this conversation, including summaries; new conversations default to compact.
+These controls do not execute a task or change routing, permissions, or deliverable length.
+Report the style in `status`. `context verbose` is a one-time inspection, not a style change.
+
 ## Routing
 
 For every user request while active:
@@ -66,8 +81,8 @@ For every user request while active:
 3. Match against **Not for** as well as **Route here when** — that line is what keeps near-miss roles out.
 4. `dispatcher` is itself a role in the catalog: route there only when the user wants *multi-agent orchestration of separable workstreams*, not merely because this skill is active.
 5. Read `roles/<id>.md` **before** acting — it sits next to this SKILL.md, at `~/.claude/skills/agent-dispatcher/roles/<id>.md` for a manual install or inside the plugin's own directory for a plugin install. Follow its working method, deliverable, definition of done, boundaries, tool posture, and the mode line that fits the current turn.
-6. Announce the route in one short line — `→ ui-ux-designer` — then do the work. No explanation of why unless asked. Scale the role's deliverable to the task: a small change reports the change and nothing else; the role's full deliverable is for work that earns it.
-7. **Re-route per request.** When the next request is a different kind of work, switch roles and announce again. Same kind of work → stay, no re-read, no re-announcement.
+6. Emit the activity summary described above after the initial context is loaded, then do the work. Scale the role's deliverable to the task: a small change reports the change and nothing else; the role's full deliverable is for work that earns it.
+7. **Re-route per request.** When the next request is a different kind of work, switch roles and emit a fresh activity summary. Same kind of work → stay; report only newly loaded resources.
 8. Trivial turns — a one-line factual answer, a yes/no you can already answer without looking, a clarification, a typo fix, a rename, a one-line edit — need no role and no announcement. Just answer, or just do it. A question that needs a file read or a command to answer honestly is not trivial: look first.
 
 ## Context before execution
@@ -104,7 +119,7 @@ authorization stays exactly where it was. `CONTEXT.md` section 0 and `docs/jev.m
 
 Real requests often need more than one kind of work. Switch roles mid-turn rather than stretching one role over work it is not for.
 
-- Announce each switch on its own line — `→ planner`, then later `→ implementer` — and meet each role's **definition of done** before moving on. The previous role's deliverable is the next role's input.
+- Report each switch with an activity summary — and meet each role's **definition of done** before moving on. The previous role's deliverable is the next role's input.
 - Read the next role's file when you switch to it. Never blend two roles into one voice, and never carry a role's boundaries into the next one.
 - Stop at the deliverable the user actually asked for. "Give me a plan" ends at `planner`; do not chain into building it. A request that names both — "plan it and build it" — authorizes moving to the next role without re-asking, and the plan it produces is not "awaiting approval" for the role that follows. It is not authorization for any step that needs its own confirmation: destructive and outward-facing actions still stop and ask, in every role.
 - A forced role suppresses chaining as well as routing: stay in it and say what it does not cover, unless the user asked for the chain.
@@ -151,7 +166,7 @@ Perpetual mode is a routing default, not a mandate: a plain question still gets 
 
 ## Skills supply the method; the role still owns the outcome
 
-An installed skill or a slash command that covers the request supplies the **method** for the turn: load it and work inside its procedure rather than hand-rolling what it already encodes, and skip the role announcement. The role still owns **scope, deliverable and what done means** — a skill narrows how the work is done, it does not redefine what was asked for. Neither grants permission.
+An installed skill or a slash command that covers the request supplies the **method** for the turn: load it and work inside its procedure rather than hand-rolling what it already encodes, and combine its announcement with the activity summary. The role still owns **scope, deliverable and what done means** — a skill narrows how the work is done, it does not redefine what was asked for. Neither grants permission.
 
 This is about skills that do the *work* — not about this pack's own `/agent-*` commands, which are just these roles in another wrapper. They never suppress a route or an announcement.
 

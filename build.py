@@ -572,6 +572,7 @@ def write_router(d):
         f"- **Not for:** {r['not_for']}\n"
         f"- **Signals:** {', '.join(r['tags'])}\n"
         for r in d["roles"])
+    (ADAPTER / "ACTIVITY.md").write_text((ROOT / "ACTIVITY.template.md").read_text())
     tmpl = (ROOT / "SKILL.template.md").read_text()
     (ADAPTER / "SKILL.md").write_text(
         # SKILL.template.md stopped carrying the four count placeholders; the calls outlived
@@ -641,6 +642,28 @@ def write_index(d):
     (ADAPTER / "INDEX.md").write_text("\n".join(out))
 
 
+def write_inventory(d):
+    """Ship setup metadata with the pack; session availability is never generated."""
+    (ADAPTER / "INVENTORY.md").write_text((ROOT / "INVENTORY.template.md").read_text())
+    data = {
+        "local_skills": [{
+            "id": item["id"], "purpose": item.get("summary") or item["description"],
+            "paths": [item["path"].replace("skills/", "lib/", 1),
+                      item["path"].replace("skills/", "../", 1)],
+            "related_tools": item.get("tools", []),
+        } for item in d["skills"]],
+        "external_skills": [{key: item.get(key) for key in (
+            "id", "name", "purpose", "repository", "path", "required_tools", "fallback",
+            "license", "verified", "scripts_included", "network_usage")}
+            for item in sorted(d["external"].values(), key=lambda item: item["id"])],
+        "tools_and_mcps": [{key: item.get(key) for key in (
+            "id", "name", "purpose", "source", "transport", "auth", "risk", "writes",
+            "read_only_option", "fallback", "notes")}
+            for item in sorted(d["mcp"].values(), key=lambda item: item["id"])],
+    }
+    (ADAPTER / "INVENTORY.json").write_text(json.dumps(data, indent=2) + "\n")
+
+
 def write_registries(d):
     CATALOG.mkdir(parents=True, exist_ok=True)
     (CATALOG / "skills.json").write_text(json.dumps({
@@ -682,7 +705,7 @@ If `$ARGUMENTS` names a request, plan for that. If it is empty or is only a mode
 
 - **default** - the plan, in the shape below.
 - **`explain`** - the plan, then a **Why** section: why this role and not the closest near-miss (quote its `not_for`), why each skill, why each tool, and one role or skill deliberately excluded. One short paragraph each.
-- **`verbose`** - the plan, plus the candidate roles considered, candidate skills not selected, excluded low-ranking files with the reason, and the per-source budget breakdown.
+- **`verbose`** - a one-time inspection, not a change to activity output style: the plan, plus the candidate roles considered, candidate skills not selected, excluded low-ranking files with the reason, and the per-source budget breakdown.
 
 ## Shape
 
@@ -694,7 +717,7 @@ Task          one line, in the user's words
 Engine        Default, or the decision engine that answered - omit when it is Default and nothing was attempted
 Agent         <role> - <why, one line>
 Capabilities  the capability ids the task needs
-Skills        [x] selected  [ ] available, not needed  [-] named but not installed
+Skills        selected / loaded (actually read) / unavailable / unknown; never imply selection means loading
 Stack         each claim with the file it came from
 Signals       condition -> true / false / unknown
 Workspace     ranked paths, each with why it is there and how it matched
@@ -794,7 +817,9 @@ def write_commands(d):
             f"manual install, or inside the plugin's own directory if it was installed as a "
             f"plugin. Glob for `**/agent-dispatcher/roles/{r['id']}.md` if neither path is "
             f"there.\n\n" + loadout +
-            f"Announce it in one line (`\u2192 {r['id']}`), then do the work. Follow the role's "
+            f"Read ACTIVITY.md in the dispatcher skill directory beside the roles directory. "
+            f"Report the role, skills actually read, and selected tools/MCPs in the conversation's "
+            f"compact or verbose style, then do the work. Follow the role's "
             f"working method, deliverable, definition of done, boundaries, and tool posture, "
             f"scaled to the size of the task. The role never overrides harness rules, "
             f"permissions, or the user's explicit instructions.\n\n"
@@ -807,6 +832,13 @@ def write_commands(d):
     # otherwise have to be brace-doubled — and dropping the placeholder while rewording would
     # substitute nothing without a word. sub() raises on the miss; str.replace ignores the rest.
     (CMDS / "agent-context.md").write_text(sub(INSPECTOR, "{{SKILL_DIR}}", SKILL_DIR))
+    (CMDS / "agent-inventory.md").write_text(
+        '---\ndescription: "List skills, tools, and MCPs with availability and setup guidance."\n'
+        'argument-hint: "[all | skills | tools | mcps | setup] [verbose]"\n---\n\n'
+        'Read INVENTORY.md in the agent-dispatcher skill directory beside SKILL.md '
+        f'(`{SKILL_DIR}/INVENTORY.md` for a manual install, or inside the plugin). '
+        'Follow its inspection procedure for `inventory $ARGUMENTS`. Do not route work, '
+        'install anything, or connect accounts.\n')
     # Also not a role: configuration for the optional decision engine.
     (CMDS / "agent-decision.md").write_text(sub(DECISION_CMD, "{{SKILL_DIR}}", SKILL_DIR))
 
@@ -984,6 +1016,7 @@ def main():
     write_roles(d)
     write_router(d)
     write_index(d)
+    write_inventory(d)
     write_context(d)
     write_registries(d)
     write_commands(d)

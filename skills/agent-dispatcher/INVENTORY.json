@@ -1,0 +1,1603 @@
+{
+  "local_skills": [
+    {
+      "id": "accessibility",
+      "purpose": "UI is being built, changed or repaired and it has to be operable by keyboard and assistive technology \u2014 including turning an audit finding into an actual code change.",
+      "paths": [
+        "lib/design/accessibility/SKILL.md",
+        "../design/accessibility/SKILL.md"
+      ],
+      "related_tools": [
+        "workspace",
+        "context7"
+      ]
+    },
+    {
+      "id": "accessibility-verification",
+      "purpose": "Someone is about to claim a screen or flow is accessible, keyboard-operable, screen-reader usable or WCAG-conformant, or an accessibility fix needs re-checking.",
+      "paths": [
+        "lib/design/accessibility-verification/SKILL.md",
+        "../design/accessibility-verification/SKILL.md"
+      ],
+      "related_tools": [
+        "playwright",
+        "workspace"
+      ]
+    },
+    {
+      "id": "agent-design",
+      "purpose": "An agent or subagent is being scoped, granted tools, or reviewed after looping, over-reaching or reporting work it did not do.",
+      "paths": [
+        "lib/ai/agent-design/SKILL.md",
+        "../ai/agent-design/SKILL.md"
+      ],
+      "related_tools": [
+        "workspace",
+        "context7"
+      ]
+    },
+    {
+      "id": "agent-evals",
+      "purpose": "A prompt, model, tool definition or retrieval change is about to be called an improvement, agent behaviour must not silently regress, or a production failure needs to become a case that cannot come back.",
+      "paths": [
+        "lib/ai/agent-evals/SKILL.md",
+        "../ai/agent-evals/SKILL.md"
+      ],
+      "related_tools": [
+        "workspace",
+        "context7"
+      ]
+    },
+    {
+      "id": "agent-security",
+      "purpose": "An agent or subagent is being granted tools, credentials or MCP access, is about to reach a shared or production system, or acted beyond what the requester could have done.",
+      "paths": [
+        "lib/security/agent-security/SKILL.md",
+        "../security/agent-security/SKILL.md"
+      ],
+      "related_tools": [
+        "workspace"
+      ]
+    },
+    {
+      "id": "api-contract-verification",
+      "purpose": "An endpoint, API client or third-party integration is about to be reported as working, or someone asks whether an integration is actually verified.",
+      "paths": [
+        "lib/backend/api-contract-verification/SKILL.md",
+        "../backend/api-contract-verification/SKILL.md"
+      ],
+      "related_tools": [
+        "workspace",
+        "context7"
+      ]
+    },
+    {
+      "id": "api-design",
+      "purpose": "An HTTP endpoint is being added or reshaped, a response or error shape has to be decided, or a change to a published API has to be judged for breakage.",
+      "paths": [
+        "lib/backend/api-design/SKILL.md",
+        "../backend/api-design/SKILL.md"
+      ],
+      "related_tools": [
+        "workspace",
+        "context7"
+      ]
+    },
+    {
+      "id": "auth-security",
+      "purpose": "An existing auth path is reviewed, changed or doubted \u2014 sessions, tokens, reset and invite flows, impersonation, role elevation, MFA \u2014 or someone reports reaching another account's data.",
+      "paths": [
+        "lib/security/auth-security/SKILL.md",
+        "../security/auth-security/SKILL.md"
+      ],
+      "related_tools": [
+        "workspace",
+        "playwright"
+      ]
+    },
+    {
+      "id": "authentication",
+      "purpose": "A credential is issued, accepted, refreshed or revoked \u2014 login, logout, sessions, tokens, API keys, or an OAuth/OIDC integration.",
+      "paths": [
+        "lib/backend/authentication/SKILL.md",
+        "../backend/authentication/SKILL.md"
+      ],
+      "related_tools": [
+        "workspace",
+        "context7"
+      ]
+    },
+    {
+      "id": "authorization",
+      "purpose": "A rule of the form 'only X may do Y to Z' is added, changed or doubted \u2014 roles, permissions, per-owner or per-tenant scoping, admin paths.",
+      "paths": [
+        "lib/backend/authorization/SKILL.md",
+        "../backend/authorization/SKILL.md"
+      ],
+      "related_tools": [
+        "workspace"
+      ]
+    },
+    {
+      "id": "background-jobs",
+      "purpose": "Work is being moved off a request path onto a queue or scheduler, or a job ran twice, never ran, ran out of order, or is stuck retrying.",
+      "paths": [
+        "lib/backend/background-jobs/SKILL.md",
+        "../backend/background-jobs/SKILL.md"
+      ],
+      "related_tools": [
+        "workspace",
+        "context7"
+      ]
+    },
+    {
+      "id": "browser-verification",
+      "purpose": "A change touches rendered UI and someone is about to claim it works, or you are asked whether a screen actually functions.",
+      "paths": [
+        "lib/quality/browser-verification/SKILL.md",
+        "../quality/browser-verification/SKILL.md"
+      ],
+      "related_tools": [
+        "playwright",
+        "workspace"
+      ]
+    },
+    {
+      "id": "caching",
+      "purpose": "A cache is about to be added to a read path, or existing cached data is stale, leaking across users, or being blamed for a bug.",
+      "paths": [
+        "lib/backend/caching/SKILL.md",
+        "../backend/caching/SKILL.md"
+      ],
+      "related_tools": [
+        "workspace",
+        "context7"
+      ]
+    },
+    {
+      "id": "ci-cd",
+      "purpose": "A delivery pipeline is being designed or restructured, something broken reached an environment through a passing pipeline, or a stage is claiming more than it actually ran.",
+      "paths": [
+        "lib/devops/ci-cd/SKILL.md",
+        "../devops/ci-cd/SKILL.md"
+      ],
+      "related_tools": [
+        "workspace",
+        "github"
+      ]
+    },
+    {
+      "id": "competitive-analysis",
+      "purpose": "A choice between real alternatives \u2014 library, service, vendor, build versus buy \u2014 has to be defended, or someone arrives with a comparison table and a conclusion.",
+      "paths": [
+        "lib/knowledge/competitive-analysis/SKILL.md",
+        "../knowledge/competitive-analysis/SKILL.md"
+      ],
+      "related_tools": [
+        "workspace",
+        "github",
+        "context7",
+        "playwright"
+      ]
+    },
+    {
+      "id": "component-architecture",
+      "purpose": "A component is being added, has grown props or responsibilities, or a structure is under review for whether it will hold.",
+      "paths": [
+        "lib/frontend/component-architecture/SKILL.md",
+        "../frontend/component-architecture/SKILL.md"
+      ],
+      "related_tools": [
+        "workspace"
+      ]
+    },
+    {
+      "id": "context-engineering",
+      "purpose": "A prompt, agent or session loads substantial material, quality decays as context grows, or context has to be trimmed, summarized or split between inlining and retrieval.",
+      "paths": [
+        "lib/ai/context-engineering/SKILL.md",
+        "../ai/context-engineering/SKILL.md"
+      ],
+      "related_tools": [
+        "workspace"
+      ]
+    },
+    {
+      "id": "copywriting",
+      "purpose": "Copy aimed at an audience outside the product is being written or rewritten \u2014 landing page, product messaging, email, ad, announcement \u2014 or an existing draft's claims need auditing before it ships.",
+      "paths": [
+        "lib/knowledge/copywriting/SKILL.md",
+        "../knowledge/copywriting/SKILL.md"
+      ],
+      "related_tools": [
+        "workspace"
+      ]
+    },
+    {
+      "id": "data-analysis",
+      "purpose": "A dataset has to answer a question, a reported number needs explaining or reconciling, or a finding from data is about to reach someone who will act on it.",
+      "paths": [
+        "lib/knowledge/data-analysis/SKILL.md",
+        "../knowledge/data-analysis/SKILL.md"
+      ],
+      "related_tools": [
+        "workspace",
+        "supabase"
+      ]
+    },
+    {
+      "id": "data-integrity",
+      "purpose": "A rule about what must always be true of the data needs to be enforced in a live schema, or an invariant that was enforced has drifted.",
+      "paths": [
+        "lib/database/data-integrity/SKILL.md",
+        "../database/data-integrity/SKILL.md"
+      ],
+      "related_tools": [
+        "workspace"
+      ]
+    },
+    {
+      "id": "data-pipelines",
+      "purpose": "A batch or streaming pipeline, scheduled transform or ingestion job is being built, repaired or backfilled, or a run dropped, duplicated or reshaped rows.",
+      "paths": [
+        "lib/database/data-pipelines/SKILL.md",
+        "../database/data-pipelines/SKILL.md"
+      ],
+      "related_tools": [
+        "workspace",
+        "supabase"
+      ]
+    },
+    {
+      "id": "data-quality",
+      "purpose": "Checks on a dataset are being written or reviewed, a wrong value reached a consumer with nothing catching it, or an existing check is noisy enough to be ignored.",
+      "paths": [
+        "lib/database/data-quality/SKILL.md",
+        "../database/data-quality/SKILL.md"
+      ],
+      "related_tools": [
+        "workspace",
+        "supabase"
+      ]
+    },
+    {
+      "id": "database-migration-verification",
+      "purpose": "A migration has been applied to some environment and someone is about to report it as working, or that claim is being reviewed.",
+      "paths": [
+        "lib/database/database-migration-verification/SKILL.md",
+        "../database/database-migration-verification/SKILL.md"
+      ],
+      "related_tools": [
+        "workspace",
+        "supabase"
+      ]
+    },
+    {
+      "id": "deep-research",
+      "purpose": "An open question's answer will change a decision and the evidence is not already in the conversation \u2014 unfamiliar, contested or fast-moving material that needs framing, primary sources and a stopping rule.",
+      "paths": [
+        "lib/knowledge/deep-research/SKILL.md",
+        "../knowledge/deep-research/SKILL.md"
+      ],
+      "related_tools": [
+        "workspace",
+        "context7",
+        "github"
+      ]
+    },
+    {
+      "id": "dependency-security",
+      "purpose": "An advisory or audit finding needs judging, a dependency is being added or bumped, a lockfile diff needs review, or someone asks whether a named CVE affects this project.",
+      "paths": [
+        "lib/security/dependency-security/SKILL.md",
+        "../security/dependency-security/SKILL.md"
+      ],
+      "related_tools": [
+        "workspace",
+        "github"
+      ]
+    },
+    {
+      "id": "deployment",
+      "purpose": "A change is going to an environment other people use, or the path that takes it there is being built or changed.",
+      "paths": [
+        "lib/devops/deployment/SKILL.md",
+        "../devops/deployment/SKILL.md"
+      ],
+      "related_tools": [
+        "workspace",
+        "github",
+        "vercel"
+      ]
+    },
+    {
+      "id": "design-systems",
+      "purpose": "The project already has design tokens, a component library or a shared theme, and UI is being added or changed inside it.",
+      "paths": [
+        "lib/design/design-systems/SKILL.md",
+        "../design/design-systems/SKILL.md"
+      ],
+      "related_tools": [
+        "workspace",
+        "figma",
+        "context7"
+      ]
+    },
+    {
+      "id": "design-to-code",
+      "purpose": "A design, mockup, Figma frame or screenshot is the source for a UI change, or an existing implementation is being compared against one.",
+      "paths": [
+        "lib/design/design-to-code/SKILL.md",
+        "../design/design-to-code/SKILL.md"
+      ],
+      "related_tools": [
+        "workspace",
+        "figma",
+        "playwright"
+      ]
+    },
+    {
+      "id": "docker",
+      "purpose": "A Dockerfile is being written, changed or reviewed, an image build is slow, bloated or non-deterministic, or configuration and secrets need a route into a container.",
+      "paths": [
+        "lib/devops/docker/SKILL.md",
+        "../devops/docker/SKILL.md"
+      ],
+      "related_tools": [
+        "workspace",
+        "context7"
+      ]
+    },
+    {
+      "id": "documentation-verification",
+      "purpose": "Documentation is about to be called correct, current or ready to publish, or a setup guide, quickstart or onboarding path fails at an unidentified step.",
+      "paths": [
+        "lib/knowledge/documentation-verification/SKILL.md",
+        "../knowledge/documentation-verification/SKILL.md"
+      ],
+      "related_tools": [
+        "workspace",
+        "playwright"
+      ]
+    },
+    {
+      "id": "e2e-testing",
+      "purpose": "An automated end-to-end suite is being created, extended, triaged for flake, or pruned, or a case has to be placed at or below this level.",
+      "paths": [
+        "lib/quality/e2e-testing/SKILL.md",
+        "../quality/e2e-testing/SKILL.md"
+      ],
+      "related_tools": [
+        "playwright",
+        "workspace"
+      ]
+    },
+    {
+      "id": "experimentation",
+      "purpose": "An A/B or online experiment is being designed, sized, sanity-checked or interpreted \u2014 including deciding whether the traffic can support one at all.",
+      "paths": [
+        "lib/product/experimentation/SKILL.md",
+        "../product/experimentation/SKILL.md"
+      ],
+      "related_tools": [
+        "workspace"
+      ]
+    },
+    {
+      "id": "frontend-design",
+      "purpose": "A new or reshaped UI surface needs a visual direction decided \u2014 hierarchy, type, colour, spacing, density \u2014 and no design system already decides it.",
+      "paths": [
+        "lib/design/frontend-design/SKILL.md",
+        "../design/frontend-design/SKILL.md"
+      ],
+      "related_tools": [
+        "workspace",
+        "figma"
+      ]
+    },
+    {
+      "id": "frontend-performance",
+      "purpose": "A page is reported slow, a Core Web Vital or bundle size is named, or a change is about to be described as a performance improvement.",
+      "paths": [
+        "lib/frontend/frontend-performance/SKILL.md",
+        "../frontend/frontend-performance/SKILL.md"
+      ],
+      "related_tools": [
+        "playwright",
+        "workspace"
+      ]
+    },
+    {
+      "id": "github-actions",
+      "purpose": "A GitHub Actions workflow is being added, changed or reviewed, or CI is slow, flaky, or reporting green when it should be red.",
+      "paths": [
+        "lib/devops/github-actions/SKILL.md",
+        "../devops/github-actions/SKILL.md"
+      ],
+      "related_tools": [
+        "workspace",
+        "github"
+      ]
+    },
+    {
+      "id": "idempotency-and-retries",
+      "purpose": "An operation with an external side effect has to survive being repeated, a caller needs a retry policy, or duplicate effects have appeared and must be prevented.",
+      "paths": [
+        "lib/backend/idempotency-and-retries/SKILL.md",
+        "../backend/idempotency-and-retries/SKILL.md"
+      ],
+      "related_tools": [
+        "workspace"
+      ]
+    },
+    {
+      "id": "incident-response",
+      "purpose": "Production is failing or degraded right now and stopping the ongoing harm matters more than a complete causal explanation.",
+      "paths": [
+        "lib/devops/incident-response/SKILL.md",
+        "../devops/incident-response/SKILL.md"
+      ],
+      "related_tools": [
+        "workspace",
+        "github"
+      ]
+    },
+    {
+      "id": "llm-observability",
+      "purpose": "An agent fails in ways that will not reproduce, cost or latency is unaccounted for, or failure modes must be found before evals can be written.",
+      "paths": [
+        "lib/ai/llm-observability/SKILL.md",
+        "../ai/llm-observability/SKILL.md"
+      ],
+      "related_tools": [
+        "workspace",
+        "context7"
+      ]
+    },
+    {
+      "id": "mcp-design",
+      "purpose": "An MCP server is being written, an internal system is being wrapped as one, or a third-party server is being assessed before it is wired into a project.",
+      "paths": [
+        "lib/ai/mcp-design/SKILL.md",
+        "../ai/mcp-design/SKILL.md"
+      ],
+      "related_tools": [
+        "workspace",
+        "context7"
+      ]
+    },
+    {
+      "id": "memory-design",
+      "purpose": "An agent must carry facts, preferences or decisions past the current context, or an existing memory store has become noisy, contradictory or wrongly scoped.",
+      "paths": [
+        "lib/ai/memory-design/SKILL.md",
+        "../ai/memory-design/SKILL.md"
+      ],
+      "related_tools": [
+        "workspace"
+      ]
+    },
+    {
+      "id": "migrations",
+      "purpose": "A schema or data migration is being written, reviewed or sequenced against a database that holds real data and has live readers.",
+      "paths": [
+        "lib/database/migrations/SKILL.md",
+        "../database/migrations/SKILL.md"
+      ],
+      "related_tools": [
+        "workspace",
+        "supabase"
+      ]
+    },
+    {
+      "id": "model-routing",
+      "purpose": "More than one model is in play and a call has to be assigned to one, or cost, latency or a silently firing fallback has become a problem.",
+      "paths": [
+        "lib/ai/model-routing/SKILL.md",
+        "../ai/model-routing/SKILL.md"
+      ],
+      "related_tools": [
+        "workspace",
+        "context7"
+      ]
+    },
+    {
+      "id": "motion-design",
+      "purpose": "Transitions, animated state changes, gesture movement or loading indicators are being added, tuned or reviewed, or an interface reads as janky or sluggish.",
+      "paths": [
+        "lib/design/motion-design/SKILL.md",
+        "../design/motion-design/SKILL.md"
+      ],
+      "related_tools": [
+        "workspace",
+        "playwright"
+      ]
+    },
+    {
+      "id": "observability",
+      "purpose": "A service or a new critical path is going to production, an incident ended with a question the data could not answer, or a dependency, queue or job is being added whose failure would otherwise be silent.",
+      "paths": [
+        "lib/devops/observability/SKILL.md",
+        "../devops/observability/SKILL.md"
+      ],
+      "related_tools": [
+        "workspace",
+        "context7"
+      ]
+    },
+    {
+      "id": "owasp-web",
+      "purpose": "Web code that takes requests, builds queries, renders output, fetches URLs, deserializes data, handles sessions or accepts files is being written or reviewed, or an app needs a sweep for the recurring vulnerability classes.",
+      "paths": [
+        "lib/security/owasp-web/SKILL.md",
+        "../security/owasp-web/SKILL.md"
+      ],
+      "related_tools": [
+        "workspace",
+        "context7"
+      ]
+    },
+    {
+      "id": "performance-profiling",
+      "purpose": "Something is slow, or an optimization is about to be written from a hunch rather than from a measurement.",
+      "paths": [
+        "lib/quality/performance-profiling/SKILL.md",
+        "../quality/performance-profiling/SKILL.md"
+      ],
+      "related_tools": [
+        "workspace"
+      ]
+    },
+    {
+      "id": "positioning",
+      "purpose": "The product must be described to people who do not know it \u2014 homepage, deck, launch, a new segment \u2014 or \"who is this for\" and \"how is this different\" have no crisp, evidenced answer.",
+      "paths": [
+        "lib/knowledge/positioning/SKILL.md",
+        "../knowledge/positioning/SKILL.md"
+      ],
+      "related_tools": [
+        "workspace"
+      ]
+    },
+    {
+      "id": "postgres",
+      "purpose": "The project runs on Postgres and the decision depends on engine behaviour \u2014 a column type, an index kind, a plan to read, an isolation level, DDL lock behaviour, or a row-level security policy.",
+      "paths": [
+        "lib/database/postgres/SKILL.md",
+        "../database/postgres/SKILL.md"
+      ],
+      "related_tools": [
+        "workspace",
+        "supabase",
+        "context7"
+      ]
+    },
+    {
+      "id": "prd-and-stories",
+      "purpose": "A settled problem needs a written scope others can build and check against \u2014 a brief, PRD, epic or stories \u2014 or a ticket is too vague to estimate or verify.",
+      "paths": [
+        "lib/product/prd-and-stories/SKILL.md",
+        "../product/prd-and-stories/SKILL.md"
+      ],
+      "related_tools": [
+        "workspace",
+        "github"
+      ]
+    },
+    {
+      "id": "prioritization",
+      "purpose": "The candidate list is longer than the capacity, someone asks what to cut or what ships first, or an existing order cannot be justified.",
+      "paths": [
+        "lib/product/prioritization/SKILL.md",
+        "../product/prioritization/SKILL.md"
+      ],
+      "related_tools": [
+        "workspace",
+        "github"
+      ]
+    },
+    {
+      "id": "product-analytics",
+      "purpose": "A product metric, funnel or dashboard number is being defined, disputed, or about to be instrumented \u2014 including before tracking is added to a feature.",
+      "paths": [
+        "lib/product/product-analytics/SKILL.md",
+        "../product/product-analytics/SKILL.md"
+      ],
+      "related_tools": [
+        "workspace"
+      ]
+    },
+    {
+      "id": "product-discovery",
+      "purpose": "A request arrives phrased as a solution, or a plan rests on a belief about users that nobody has checked, and the question is whether the problem is real.",
+      "paths": [
+        "lib/product/product-discovery/SKILL.md",
+        "../product/product-discovery/SKILL.md"
+      ],
+      "related_tools": [
+        "workspace",
+        "github"
+      ]
+    },
+    {
+      "id": "prompt-engineering",
+      "purpose": "A prompt is being written or patched, its output is inconsistent or the wrong shape, a model version changed, or someone has declared a prompt improved.",
+      "paths": [
+        "lib/ai/prompt-engineering/SKILL.md",
+        "../ai/prompt-engineering/SKILL.md"
+      ],
+      "related_tools": [
+        "workspace",
+        "context7"
+      ]
+    },
+    {
+      "id": "prompt-injection-defense",
+      "purpose": "An agent ingests content it did not author \u2014 retrieval, browsing, email, files, MCP tool results, subagent output \u2014 and also holds tools that can act.",
+      "paths": [
+        "lib/ai/prompt-injection-defense/SKILL.md",
+        "../ai/prompt-injection-defense/SKILL.md"
+      ],
+      "related_tools": [
+        "workspace"
+      ]
+    },
+    {
+      "id": "query-optimization",
+      "purpose": "A specific statement is slow and the database is the suspect, a query plan needs interpreting, or an index is being proposed without evidence.",
+      "paths": [
+        "lib/database/query-optimization/SKILL.md",
+        "../database/query-optimization/SKILL.md"
+      ],
+      "related_tools": [
+        "workspace",
+        "supabase"
+      ]
+    },
+    {
+      "id": "regression-testing",
+      "purpose": "A bug has just been fixed, or keeps coming back, and the fix needs a test that is proven to fail without it.",
+      "paths": [
+        "lib/quality/regression-testing/SKILL.md",
+        "../quality/regression-testing/SKILL.md"
+      ],
+      "related_tools": [
+        "workspace"
+      ]
+    },
+    {
+      "id": "release-verification",
+      "purpose": "A deploy has completed to a shared environment and someone is about to call the release good, or that claim is being checked.",
+      "paths": [
+        "lib/devops/release-verification/SKILL.md",
+        "../devops/release-verification/SKILL.md"
+      ],
+      "related_tools": [
+        "workspace",
+        "github",
+        "vercel"
+      ]
+    },
+    {
+      "id": "responsive-design",
+      "purpose": "A layout has to hold across viewport widths \u2014 building it, repairing an overflow or collapse at some size, or filling in the sizes a single-width design never specified.",
+      "paths": [
+        "lib/design/responsive-design/SKILL.md",
+        "../design/responsive-design/SKILL.md"
+      ],
+      "related_tools": [
+        "playwright",
+        "workspace"
+      ]
+    },
+    {
+      "id": "retrieval-rag",
+      "purpose": "A retrieval-backed system returns wrong or thin answers, or an index is being designed, chunked, embedded or rebuilt.",
+      "paths": [
+        "lib/ai/retrieval-rag/SKILL.md",
+        "../ai/retrieval-rag/SKILL.md"
+      ],
+      "related_tools": [
+        "workspace",
+        "context7"
+      ]
+    },
+    {
+      "id": "rollback",
+      "purpose": "A release plan needs its way back written and rehearsed, or a deploy is going wrong and someone is deciding whether it can be undone.",
+      "paths": [
+        "lib/devops/rollback/SKILL.md",
+        "../devops/rollback/SKILL.md"
+      ],
+      "related_tools": [
+        "workspace",
+        "github",
+        "vercel"
+      ]
+    },
+    {
+      "id": "schema-design",
+      "purpose": "New tables are being designed, ORM models or migration DDL are under review, or a defect traces back to the data model permitting a state that should be impossible.",
+      "paths": [
+        "lib/database/schema-design/SKILL.md",
+        "../database/schema-design/SKILL.md"
+      ],
+      "related_tools": [
+        "workspace"
+      ]
+    },
+    {
+      "id": "secrets-management",
+      "purpose": "A credential is added, moved, shared or due for rotation, or one has turned up in code, history, logs or a client bundle.",
+      "paths": [
+        "lib/security/secrets-management/SKILL.md",
+        "../security/secrets-management/SKILL.md"
+      ],
+      "related_tools": [
+        "workspace",
+        "github"
+      ]
+    },
+    {
+      "id": "secure-code-review",
+      "purpose": "A pull request, feature or repository needs a security read before shipping \u2014 especially anything touching auth, money, tenancy, uploads, deserialization or secrets \u2014 or someone reports reaching data they should not have.",
+      "paths": [
+        "lib/security/secure-code-review/SKILL.md",
+        "../security/secure-code-review/SKILL.md"
+      ],
+      "related_tools": [
+        "workspace",
+        "github"
+      ]
+    },
+    {
+      "id": "seo",
+      "purpose": "A page is written or revised to be found in search, search traffic drops, a page is missing from results, or someone asks which query to target.",
+      "paths": [
+        "lib/knowledge/seo/SKILL.md",
+        "../knowledge/seo/SKILL.md"
+      ],
+      "related_tools": [
+        "workspace",
+        "playwright"
+      ]
+    },
+    {
+      "id": "shadcn-ui",
+      "purpose": "Adding, customizing or debugging a shadcn/ui component in a repo with components.json and a vendored UI directory.",
+      "paths": [
+        "lib/frontend/shadcn-ui/SKILL.md",
+        "../frontend/shadcn-ui/SKILL.md"
+      ],
+      "related_tools": [
+        "workspace",
+        "context7"
+      ]
+    },
+    {
+      "id": "source-evaluation",
+      "purpose": "A claim is about to be relied on, quoted or cited \u2014 or sources disagree, a number arrives without its method, or a 'widely reported' fact needs its origin traced.",
+      "paths": [
+        "lib/knowledge/source-evaluation/SKILL.md",
+        "../knowledge/source-evaluation/SKILL.md"
+      ],
+      "related_tools": [
+        "workspace",
+        "context7"
+      ]
+    },
+    {
+      "id": "stack-detection",
+      "purpose": "You are about to work in a frontend repo whose stack you have not yet confirmed this session, or about to load framework-specific guidance.",
+      "paths": [
+        "lib/frontend/stack-detection/SKILL.md",
+        "../frontend/stack-detection/SKILL.md"
+      ],
+      "related_tools": [
+        "workspace"
+      ]
+    },
+    {
+      "id": "structured-output",
+      "purpose": "A model's output feeds code rather than a human \u2014 extraction, classification, routing, scoring \u2014 or parsing keeps failing, fields arrive invented, or a schema is being designed for a model to fill.",
+      "paths": [
+        "lib/ai/structured-output/SKILL.md",
+        "../ai/structured-output/SKILL.md"
+      ],
+      "related_tools": [
+        "workspace",
+        "context7"
+      ]
+    },
+    {
+      "id": "systematic-debugging",
+      "purpose": "Something is broken, the cause is not yet known, and someone is about to start editing code to find out.",
+      "paths": [
+        "lib/quality/systematic-debugging/SKILL.md",
+        "../quality/systematic-debugging/SKILL.md"
+      ],
+      "related_tools": [
+        "workspace",
+        "github"
+      ]
+    },
+    {
+      "id": "tailwind",
+      "purpose": "Writing or editing Tailwind utility classes in a project that already uses Tailwind.",
+      "paths": [
+        "lib/frontend/tailwind/SKILL.md",
+        "../frontend/tailwind/SKILL.md"
+      ],
+      "related_tools": [
+        "workspace",
+        "context7"
+      ]
+    },
+    {
+      "id": "technical-writing",
+      "purpose": "Documentation is being written, restructured or repaired \u2014 README, setup guide, how-to, reference, architecture note, release notes, runbook \u2014 or a reader cannot get from the docs to a working result.",
+      "paths": [
+        "lib/knowledge/technical-writing/SKILL.md",
+        "../knowledge/technical-writing/SKILL.md"
+      ],
+      "related_tools": [
+        "workspace",
+        "context7"
+      ]
+    },
+    {
+      "id": "test-design",
+      "purpose": "Unit or integration tests are being written or repaired \u2014 new coverage, pinning a reported bug, or a suite that stays green while the behaviour is wrong.",
+      "paths": [
+        "lib/quality/test-design/SKILL.md",
+        "../quality/test-design/SKILL.md"
+      ],
+      "related_tools": [
+        "workspace"
+      ]
+    },
+    {
+      "id": "test-strategy",
+      "purpose": "Coverage has to be planned or defended \u2014 before writing a batch of tests, when a suite is slow and nobody can say what it buys, or after a bug escaped and nothing caught it.",
+      "paths": [
+        "lib/quality/test-strategy/SKILL.md",
+        "../quality/test-strategy/SKILL.md"
+      ],
+      "related_tools": [
+        "workspace",
+        "github"
+      ]
+    },
+    {
+      "id": "threat-modeling",
+      "purpose": "A system's shape is being designed or changed \u2014 new service, integration, tenancy model, uploads, payments or auth \u2014 and someone needs to know which few things are actually worth defending.",
+      "paths": [
+        "lib/security/threat-modeling/SKILL.md",
+        "../security/threat-modeling/SKILL.md"
+      ],
+      "related_tools": [
+        "workspace"
+      ]
+    },
+    {
+      "id": "tool-design",
+      "purpose": "A tool or function an LLM calls is being added or reshaped, or an agent is selecting the wrong tool, passing malformed arguments, looping, or stalling after a call.",
+      "paths": [
+        "lib/ai/tool-design/SKILL.md",
+        "../ai/tool-design/SKILL.md"
+      ],
+      "related_tools": [
+        "workspace",
+        "context7"
+      ]
+    },
+    {
+      "id": "ui-audit",
+      "purpose": "An interface already exists and someone needs to know what is wrong with it, ranked and concrete enough to act on.",
+      "paths": [
+        "lib/design/ui-audit/SKILL.md",
+        "../design/ui-audit/SKILL.md"
+      ],
+      "related_tools": [
+        "workspace",
+        "playwright"
+      ]
+    },
+    {
+      "id": "ux-writing",
+      "purpose": "Interface strings are being written, reviewed or repaired \u2014 labels, errors, empty states, confirmations, form hints \u2014 or a control's wording is causing hesitation.",
+      "paths": [
+        "lib/design/ux-writing/SKILL.md",
+        "../design/ux-writing/SKILL.md"
+      ],
+      "related_tools": [
+        "workspace"
+      ]
+    },
+    {
+      "id": "visual-verification",
+      "purpose": "A change affects appearance and is about to be called done, or a screenshot-comparison result is about to be trusted as proof.",
+      "paths": [
+        "lib/frontend/visual-verification/SKILL.md",
+        "../frontend/visual-verification/SKILL.md"
+      ],
+      "related_tools": [
+        "playwright",
+        "workspace"
+      ]
+    },
+    {
+      "id": "webhooks",
+      "purpose": "A webhook endpoint is being built, integrated or debugged, or the service has to deliver events to external consumers.",
+      "paths": [
+        "lib/backend/webhooks/SKILL.md",
+        "../backend/webhooks/SKILL.md"
+      ],
+      "related_tools": [
+        "workspace"
+      ]
+    }
+  ],
+  "external_skills": [
+    {
+      "id": "anthropic-agent-development",
+      "name": "agent-development (Anthropic)",
+      "purpose": "Authoring subagents: frontmatter, triggering conditions, system-prompt design.",
+      "repository": "https://github.com/anthropics/claude-code",
+      "path": "plugins/plugin-dev/skills/agent-development/SKILL.md",
+      "required_tools": [],
+      "fallback": "The local agent-design skill.",
+      "license": "proprietary \u2014 anthropics/claude-code is under Anthropic's Commercial Terms",
+      "verified": "2026-09-19",
+      "scripts_included": false,
+      "network_usage": false
+    },
+    {
+      "id": "anthropic-brand-guidelines",
+      "name": "brand-guidelines (Anthropic)",
+      "purpose": "Applying a brand's voice and visual guidelines.",
+      "repository": "https://github.com/anthropics/skills",
+      "path": "skills/brand-guidelines/SKILL.md",
+      "required_tools": [],
+      "fallback": "The local copywriting skill plus the project's own brand material.",
+      "license": "Apache-2.0",
+      "verified": "2026-09-19",
+      "scripts_included": false,
+      "network_usage": false
+    },
+    {
+      "id": "anthropic-claude-api",
+      "name": "claude-api (Anthropic)",
+      "purpose": "Current Claude API surface: model ids, pricing, tool use, caching, agents.",
+      "repository": "https://github.com/anthropics/skills",
+      "path": "skills/claude-api/SKILL.md",
+      "required_tools": [],
+      "fallback": "Official Anthropic documentation via the browser.",
+      "license": "Apache-2.0",
+      "verified": "2026-09-19",
+      "scripts_included": false,
+      "network_usage": false
+    },
+    {
+      "id": "anthropic-claude-security",
+      "name": "claude-security (Anthropic)",
+      "purpose": "Security review guidance from Anthropic.",
+      "repository": "https://github.com/anthropics/claude-plugins-official",
+      "path": "plugins/claude-security/skills/claude-security/SKILL.md",
+      "required_tools": [],
+      "fallback": "The local secure-code-review skill.",
+      "license": "Apache-2.0",
+      "verified": "2026-09-19",
+      "scripts_included": false,
+      "network_usage": false
+    },
+    {
+      "id": "anthropic-doc-coauthoring",
+      "name": "doc-coauthoring (Anthropic)",
+      "purpose": "Co-authoring documents with a person in the loop.",
+      "repository": "https://github.com/anthropics/skills",
+      "path": "skills/doc-coauthoring/SKILL.md",
+      "required_tools": [],
+      "fallback": "The local technical-writing skill.",
+      "license": "Apache-2.0",
+      "verified": "2026-09-19",
+      "scripts_included": false,
+      "network_usage": false
+    },
+    {
+      "id": "anthropic-frontend-design",
+      "name": "frontend-design (Anthropic)",
+      "purpose": "Distinctive, intentional visual design: aesthetic direction, typography, avoiding templated defaults.",
+      "repository": "https://github.com/anthropics/skills",
+      "path": "skills/frontend-design/SKILL.md",
+      "required_tools": [],
+      "fallback": "The local frontend-design skill.",
+      "license": "Apache-2.0 (per-skill LICENSE.txt in anthropics/skills)",
+      "verified": "2026-09-19",
+      "scripts_included": false,
+      "network_usage": false
+    },
+    {
+      "id": "anthropic-mcp-builder",
+      "name": "mcp-builder (Anthropic)",
+      "purpose": "Building an MCP server.",
+      "repository": "https://github.com/anthropics/skills",
+      "path": "skills/mcp-builder/SKILL.md",
+      "required_tools": [],
+      "fallback": "The local mcp-design skill.",
+      "license": "Apache-2.0",
+      "verified": "2026-09-19",
+      "scripts_included": false,
+      "network_usage": false
+    },
+    {
+      "id": "anthropic-mcp-integration",
+      "name": "mcp-integration (Anthropic)",
+      "purpose": "Wiring MCP servers into a plugin (.mcp.json, transports, auth).",
+      "repository": "https://github.com/anthropics/claude-code",
+      "path": "plugins/plugin-dev/skills/mcp-integration/SKILL.md",
+      "required_tools": [],
+      "fallback": "The local mcp-design skill.",
+      "license": "proprietary \u2014 see above",
+      "verified": "2026-09-19",
+      "scripts_included": false,
+      "network_usage": false
+    },
+    {
+      "id": "anthropic-plugin-structure",
+      "name": "plugin-structure (Anthropic)",
+      "purpose": "Plugin layout, manifest and auto-discovery conventions.",
+      "repository": "https://github.com/anthropics/claude-code",
+      "path": "plugins/plugin-dev/skills/plugin-structure/SKILL.md",
+      "required_tools": [],
+      "fallback": "The role's own method; this pack's own layout is the worked example.",
+      "license": "proprietary \u2014 see above",
+      "verified": "2026-09-19",
+      "scripts_included": false,
+      "network_usage": false
+    },
+    {
+      "id": "anthropic-skill-creator",
+      "name": "skill-creator (Anthropic)",
+      "purpose": "Authoring Agent Skills: structure, progressive disclosure, description quality.",
+      "repository": "https://github.com/anthropics/skills",
+      "path": "skills/skill-creator/SKILL.md",
+      "required_tools": [],
+      "fallback": "The agent-design skill, plus the role's own method.",
+      "license": "Apache-2.0",
+      "verified": "2026-09-19",
+      "scripts_included": false,
+      "network_usage": false
+    },
+    {
+      "id": "anthropic-skill-development",
+      "name": "skill-development (Anthropic)",
+      "purpose": "Skill structure and progressive disclosure for Claude Code plugins.",
+      "repository": "https://github.com/anthropics/claude-code",
+      "path": "plugins/plugin-dev/skills/skill-development/SKILL.md",
+      "required_tools": [],
+      "fallback": "anthropic-skill-creator when installed, otherwise the agent-design skill and the role's own method.",
+      "license": "proprietary \u2014 see above",
+      "verified": "2026-09-19",
+      "scripts_included": false,
+      "network_usage": false
+    },
+    {
+      "id": "anthropic-webapp-testing",
+      "name": "webapp-testing (Anthropic)",
+      "purpose": "Testing web applications through a real browser.",
+      "repository": "https://github.com/anthropics/skills",
+      "path": "skills/webapp-testing/SKILL.md",
+      "required_tools": [],
+      "fallback": "The local browser-verification skill.",
+      "license": "Apache-2.0",
+      "verified": "2026-09-19",
+      "scripts_included": false,
+      "network_usage": false
+    },
+    {
+      "id": "community-frontend-ui-ux",
+      "name": "frontend-ui-ux (community)",
+      "purpose": "Single-file doctrine: Nielsen heuristics, Fitts/Hick/Miller laws, WCAG 2.2 AA, Core Web Vitals budgets, plus a definition-of-done gate. Ships 5 reference files.",
+      "repository": "https://github.com/overseek944/frontend-ui-ux-skill",
+      "path": "SKILL.md",
+      "required_tools": [],
+      "fallback": "The local accessibility and ui-audit skills, which cover the same ground.",
+      "license": "MIT",
+      "verified": "2026-09-19",
+      "scripts_included": false,
+      "network_usage": false
+    },
+    {
+      "id": "community-playwright-skill",
+      "name": "playwright-skill (community)",
+      "purpose": "Community Playwright automation skill, versioned and released.",
+      "repository": "https://github.com/lackeyjb/playwright-skill",
+      "path": "skills/playwright-skill/SKILL.md",
+      "required_tools": [
+        "workspace"
+      ],
+      "fallback": "microsoft-playwright-cli, or the playwright MCP.",
+      "license": "MIT",
+      "verified": "2026-09-19",
+      "scripts_included": true,
+      "network_usage": false
+    },
+    {
+      "id": "microsoft-playwright-cli",
+      "name": "playwright-cli (Playwright)",
+      "purpose": "Automating browser interactions and working with Playwright tests from the CLI.",
+      "repository": "https://github.com/microsoft/playwright",
+      "path": "packages/playwright-core/src/tools/skills/playwright-cli/SKILL.md",
+      "required_tools": [
+        "workspace"
+      ],
+      "fallback": "The local browser-verification skill.",
+      "license": "Apache-2.0",
+      "verified": "2026-09-19",
+      "scripts_included": true,
+      "network_usage": false
+    },
+    {
+      "id": "microsoft-playwright-component-testing",
+      "name": "playwright-component-testing (Playwright)",
+      "purpose": "Playwright component testing.",
+      "repository": "https://github.com/microsoft/playwright",
+      "path": "packages/playwright-core/src/tools/skills/playwright-component-testing/SKILL.md",
+      "required_tools": [
+        "workspace"
+      ],
+      "fallback": "The local browser-verification skill.",
+      "license": "Apache-2.0",
+      "verified": "2026-09-19",
+      "scripts_included": true,
+      "network_usage": false
+    },
+    {
+      "id": "microsoft-playwright-trace",
+      "name": "playwright-trace (Playwright)",
+      "purpose": "Inspecting Playwright trace files: actions, requests, console, errors, snapshots.",
+      "repository": "https://github.com/microsoft/playwright",
+      "path": "packages/playwright-core/src/tools/skills/playwright-trace/SKILL.md",
+      "required_tools": [
+        "workspace"
+      ],
+      "fallback": "The local browser-verification skill.",
+      "license": "Apache-2.0",
+      "verified": "2026-09-19",
+      "scripts_included": true,
+      "network_usage": false
+    },
+    {
+      "id": "nextjs-next-cache-components-adoption",
+      "name": "next-cache-components-adoption (Next.js)",
+      "purpose": "Turning on Cache Components and working through the errors it surfaces.",
+      "repository": "https://github.com/vercel/next.js",
+      "path": "skills/next-cache-components-adoption/SKILL.md",
+      "required_tools": [],
+      "fallback": "Official Next.js documentation, or Context7.",
+      "license": "MIT",
+      "verified": "2026-09-19",
+      "scripts_included": false,
+      "network_usage": false
+    },
+    {
+      "id": "nextjs-next-cache-components-optimizer",
+      "name": "next-cache-components-optimizer (Next.js)",
+      "purpose": "Tuning Cache Components once adopted.",
+      "repository": "https://github.com/vercel/next.js",
+      "path": "skills/next-cache-components-optimizer/SKILL.md",
+      "required_tools": [],
+      "fallback": "Official Next.js documentation, or Context7.",
+      "license": "MIT",
+      "verified": "2026-09-19",
+      "scripts_included": false,
+      "network_usage": false
+    },
+    {
+      "id": "nextjs-next-dev-loop",
+      "name": "next-dev-loop (Next.js)",
+      "purpose": "The Next.js development loop.",
+      "repository": "https://github.com/vercel/next.js",
+      "path": "skills/next-dev-loop/SKILL.md",
+      "required_tools": [],
+      "fallback": "Official Next.js documentation, or Context7.",
+      "license": "MIT",
+      "verified": "2026-09-19",
+      "scripts_included": false,
+      "network_usage": false
+    },
+    {
+      "id": "nextjs-next-partial-prefetching-adoption",
+      "name": "next-partial-prefetching-adoption (Next.js)",
+      "purpose": "Adopting partial prefetching.",
+      "repository": "https://github.com/vercel/next.js",
+      "path": "skills/next-partial-prefetching-adoption/SKILL.md",
+      "required_tools": [],
+      "fallback": "Official Next.js documentation, or Context7.",
+      "license": "MIT",
+      "verified": "2026-09-19",
+      "scripts_included": false,
+      "network_usage": false
+    },
+    {
+      "id": "nextjs-next-partial-prefetching-optimizer",
+      "name": "next-partial-prefetching-optimizer (Next.js)",
+      "purpose": "Tuning partial prefetching.",
+      "repository": "https://github.com/vercel/next.js",
+      "path": "skills/next-partial-prefetching-optimizer/SKILL.md",
+      "required_tools": [],
+      "fallback": "Official Next.js documentation, or Context7.",
+      "license": "MIT",
+      "verified": "2026-09-19",
+      "scripts_included": false,
+      "network_usage": false
+    },
+    {
+      "id": "vercel-composition-patterns",
+      "name": "composition-patterns (Vercel)",
+      "purpose": "Component composition patterns.",
+      "repository": "https://github.com/vercel-labs/agent-skills",
+      "path": "skills/composition-patterns/SKILL.md",
+      "required_tools": [],
+      "fallback": "The local equivalent skill, or official documentation.",
+      "license": "MIT claimed per-skill; no LICENSE file at the repository root and the GitHub API reports no license",
+      "verified": "2026-09-19",
+      "scripts_included": false,
+      "network_usage": false
+    },
+    {
+      "id": "vercel-deploy-to-vercel",
+      "name": "deploy-to-vercel (Vercel)",
+      "purpose": "Deploying a project to Vercel.",
+      "repository": "https://github.com/vercel-labs/agent-skills",
+      "path": "skills/deploy-to-vercel/SKILL.md",
+      "required_tools": [],
+      "fallback": "The local equivalent skill, or official documentation.",
+      "license": "MIT claimed per-skill; no LICENSE file at the repository root and the GitHub API reports no license",
+      "verified": "2026-09-19",
+      "scripts_included": false,
+      "network_usage": false
+    },
+    {
+      "id": "vercel-react-best-practices",
+      "name": "react-best-practices (Vercel)",
+      "purpose": "Current React patterns and pitfalls.",
+      "repository": "https://github.com/vercel-labs/agent-skills",
+      "path": "skills/react-best-practices/SKILL.md",
+      "required_tools": [],
+      "fallback": "The local equivalent skill, or official documentation.",
+      "license": "MIT claimed per-skill; no LICENSE file at the repository root and the GitHub API reports no license",
+      "verified": "2026-09-19",
+      "scripts_included": false,
+      "network_usage": false
+    },
+    {
+      "id": "vercel-react-native-skills",
+      "name": "react-native-skills (Vercel)",
+      "purpose": "React Native implementation guidance.",
+      "repository": "https://github.com/vercel-labs/agent-skills",
+      "path": "skills/react-native-skills/SKILL.md",
+      "required_tools": [],
+      "fallback": "The local equivalent skill, or official documentation.",
+      "license": "MIT claimed per-skill; no LICENSE file at the repository root and the GitHub API reports no license",
+      "verified": "2026-09-19",
+      "scripts_included": false,
+      "network_usage": false
+    },
+    {
+      "id": "vercel-react-view-transitions",
+      "name": "react-view-transitions (Vercel)",
+      "purpose": "View Transitions in React.",
+      "repository": "https://github.com/vercel-labs/agent-skills",
+      "path": "skills/react-view-transitions/SKILL.md",
+      "required_tools": [],
+      "fallback": "The local equivalent skill, or official documentation.",
+      "license": "MIT claimed per-skill; no LICENSE file at the repository root and the GitHub API reports no license",
+      "verified": "2026-09-19",
+      "scripts_included": false,
+      "network_usage": false
+    },
+    {
+      "id": "vercel-vercel-cli-with-tokens",
+      "name": "vercel-cli-with-tokens (Vercel)",
+      "purpose": "Driving the Vercel CLI with tokens.",
+      "repository": "https://github.com/vercel-labs/agent-skills",
+      "path": "skills/vercel-cli-with-tokens/SKILL.md",
+      "required_tools": [],
+      "fallback": "The local equivalent skill, or official documentation.",
+      "license": "MIT claimed per-skill; no LICENSE file at the repository root and the GitHub API reports no license",
+      "verified": "2026-09-19",
+      "scripts_included": false,
+      "network_usage": false
+    },
+    {
+      "id": "vercel-vercel-optimize",
+      "name": "vercel-optimize (Vercel)",
+      "purpose": "Vercel cost and performance audit for a deployed project: usage metrics, config and code scan into ranked recommendations.",
+      "repository": "https://github.com/vercel-labs/agent-skills",
+      "path": "skills/vercel-optimize/SKILL.md",
+      "required_tools": [],
+      "fallback": "The local equivalent skill, or official documentation.",
+      "license": "MIT claimed per-skill; no LICENSE file at the repository root and the GitHub API reports no license",
+      "verified": "2026-09-19",
+      "scripts_included": false,
+      "network_usage": false
+    },
+    {
+      "id": "vercel-web-design-guidelines",
+      "name": "web-design-guidelines (Vercel)",
+      "purpose": "Vercel's web design guidelines.",
+      "repository": "https://github.com/vercel-labs/agent-skills",
+      "path": "skills/web-design-guidelines/SKILL.md",
+      "required_tools": [],
+      "fallback": "The local equivalent skill, or official documentation.",
+      "license": "MIT claimed per-skill; no LICENSE file at the repository root and the GitHub API reports no license",
+      "verified": "2026-09-19",
+      "scripts_included": false,
+      "network_usage": false
+    },
+    {
+      "id": "vercel-writing-guidelines",
+      "name": "writing-guidelines (Vercel)",
+      "purpose": "Vercel's writing guidelines.",
+      "repository": "https://github.com/vercel-labs/agent-skills",
+      "path": "skills/writing-guidelines/SKILL.md",
+      "required_tools": [],
+      "fallback": "The local equivalent skill, or official documentation.",
+      "license": "MIT claimed per-skill; no LICENSE file at the repository root and the GitHub API reports no license",
+      "verified": "2026-09-19",
+      "scripts_included": false,
+      "network_usage": false
+    }
+  ],
+  "tools_and_mcps": [
+    {
+      "id": "axe-devtools",
+      "name": "axe DevTools MCP (Deque)",
+      "purpose": "Automated accessibility scanning with code-level remediation guidance.",
+      "source": "https://github.com/dequelabs/axe-mcp-server-public",
+      "transport": "Docker or npm, per Deque's documentation",
+      "auth": "Deque axe DevTools account",
+      "risk": "medium",
+      "writes": true,
+      "read_only_option": "Use its scan tools without acting on the remediate tool's edits automatically.",
+      "fallback": "axe-core via the browser or @axe-core/playwright, plus the manual keyboard and screen-reader checks a scanner cannot make.",
+      "notes": "Official Deque server. Its remediate tool produces code changes \u2014 review them, do not apply blind. An automated scan catches roughly a third of WCAG issues: it never proves accessibility on its own."
+    },
+    {
+      "id": "chrome-devtools",
+      "name": "Chrome DevTools MCP",
+      "purpose": "Drive Chrome with DevTools access: performance traces, network, console, DOM, plus full interaction.",
+      "source": "https://github.com/ChromeDevTools/chrome-devtools-mcp",
+      "transport": "Local: npx -y chrome-devtools-mcp@latest",
+      "auth": "none; a non-isolated profile carries the user's logins",
+      "risk": "high",
+      "writes": true,
+      "read_only_option": "None. It clicks, fills, uploads and evaluates scripts.",
+      "fallback": "The playwright MCP or the host's own browser tools.",
+      "notes": "Official Google/Chrome. Strongest choice for performance profiling of a real page; overlaps playwright for plain interaction."
+    },
+    {
+      "id": "cloudflare",
+      "name": "Cloudflare MCP servers",
+      "purpose": "Cloudflare account and platform: API/config, docs, observability, Workers builds and bindings, Radar, browser rendering.",
+      "source": "https://developers.cloudflare.com/agents/model-context-protocol/mcp-servers-for-cloudflare/ (code: https://github.com/cloudflare/mcp-server-cloudflare)",
+      "transport": "Remote, one endpoint per server. Main API: https://mcp.cloudflare.com/mcp; docs: https://docs.mcp.cloudflare.com/mcp; observability: https://observability.mcp.cloudflare.com/mcp",
+      "auth": "OAuth with per-permission consent, or a scoped Cloudflare API token as a bearer header",
+      "risk": "high",
+      "writes": true,
+      "read_only_option": "No flag. Contain it by granting narrow permissions at the OAuth screen or minting a read-only API token.",
+      "fallback": "Read wrangler.toml and CI config from the repository; treat live edge state as unknown.",
+      "notes": "The main API server is read AND write over 2,500+ endpoints including DNS, Workers and Zero Trust. The docs and observability endpoints are the safe ones. Container and Browser Run endpoints spend billable resources."
+    },
+    {
+      "id": "context7",
+      "name": "Context7",
+      "purpose": "Fetch current, version-aware documentation for a library or framework instead of relying on stale model knowledge.",
+      "source": "https://github.com/upstash/context7",
+      "transport": "remote https://mcp.context7.com/mcp; npm @upstash/context7-mcp; CLI ctx7",
+      "auth": "API key for higher rate limits; usable without one",
+      "risk": "low",
+      "writes": false,
+      "read_only_option": "read-only by nature \u2014 its tools are resolve-library-id and query-docs",
+      "fallback": "Official documentation via the browser; cite what was read.",
+      "notes": "Do not reach for it to answer questions the repository already answers. Library entries are community-contributed, so treat a returned snippet as evidence to check, not as authority."
+    },
+    {
+      "id": "datadog",
+      "name": "Datadog MCP",
+      "purpose": "Query metrics, logs, traces, monitors and incidents.",
+      "source": "https://docs.datadoghq.com/mcp_server/ (examples: https://github.com/datadog-labs/mcp-server)",
+      "transport": "Remote https://mcp.datadoghq.com/v1/mcp",
+      "auth": "Datadog OAuth / API credentials",
+      "risk": "high",
+      "writes": true,
+      "read_only_option": "Permission-scoped: Datadog checks the matching permission (e.g. monitors_write) on each tool call, so a read-only key yields a read-only server.",
+      "fallback": "Whatever telemetry is reachable locally; say what could not be observed.",
+      "notes": "Datadog does publish an official managed MCP server, contrary to a common assumption. The public repo under datadog-labs holds docs and examples, not the server."
+    },
+    {
+      "id": "figma",
+      "name": "Figma MCP Server",
+      "purpose": "Inspect design files, components, variables and design tokens, and compare an implementation against the design.",
+      "source": "https://developers.figma.com/docs/figma-mcp-server/",
+      "transport": "remote https://mcp.figma.com/mcp; desktop http://127.0.0.1:3845/mcp",
+      "auth": "Figma account; the remote server is available on all seats and plans, the desktop server needs a Dev or Full seat on a paid plan",
+      "risk": "medium",
+      "writes": true,
+      "read_only_option": "Use only the read tools (get_design_context, get_metadata, get_screenshot, get_variable_defs and the rest); the write and Weave tool groups change or generate canvas content.",
+      "fallback": "Work from the repository's own design tokens, existing components and screenshots. Never invent what a design says.",
+      "notes": "Three tool groups: read, write, and Weave (which runs tools and uploads assets). Figma for Government supports only the desktop server \u2014 the remote one is not available there, and MCP is outside Figma's FedRAMP audit scope."
+    },
+    {
+      "id": "github",
+      "name": "GitHub MCP Server",
+      "purpose": "Repositories, files, issues, pull requests, commits, Actions and code search as an authoritative source of repository state.",
+      "source": "https://github.com/github/github-mcp-server",
+      "transport": "remote https://api.githubcopilot.com/mcp/ (OAuth or PAT); local ghcr.io/github/github-mcp-server via Docker",
+      "auth": "GITHUB_PERSONAL_ACCESS_TOKEN, or OAuth against the remote endpoint",
+      "risk": "medium",
+      "writes": true,
+      "read_only_option": "--read-only flag; GITHUB_TOOLSETS scopes which of the 22 toolsets are exposed at all",
+      "fallback": "git and the gh CLI against the local checkout; say which repository facts could not be confirmed.",
+      "notes": "Prefer --read-only for review and audit roles. Writing an issue, a PR or a comment is an outward-facing action and needs its own confirmation."
+    },
+    {
+      "id": "google-workspace",
+      "name": "Google Workspace MCP servers",
+      "purpose": "Gmail, Calendar, Drive, Docs, Sheets, Slides, Chat and People as first-party MCP endpoints.",
+      "source": "https://developers.google.com/workspace/guides/configure-mcp-servers",
+      "transport": "One remote endpoint per product, e.g. Gmail https://gmailmcp.googleapis.com/mcp/v1, Drive https://drivemcp.googleapis.com/mcp/v1",
+      "auth": "Google OAuth with per-product scopes",
+      "risk": "high",
+      "writes": true,
+      "read_only_option": "Scope-based: request read-only OAuth scopes.",
+      "fallback": "Ask the user for the content; never guess at the contents of a mailbox or calendar.",
+      "notes": "Google now publishes first-party Workspace MCP servers (Developer Preview) \u2014 community servers are no longer the only option and should not be used in preference. Google's own docs warn that these clients have powerful access and should be treated accordingly. Sending mail or creating events is outward-facing: confirm each one."
+    },
+    {
+      "id": "grafana",
+      "name": "Grafana MCP",
+      "purpose": "Query Prometheus/Loki, read dashboards and alerts, inspect incidents and profiles.",
+      "source": "https://github.com/grafana/mcp-grafana",
+      "transport": "Local: uvx mcp-grafana, docker grafana/mcp-grafana, or go install",
+      "auth": "Grafana service account token",
+      "risk": "high",
+      "writes": true,
+      "read_only_option": "Disable the write-capable tool groups; 29+ tools are enabled by default.",
+      "fallback": "Logs and metrics reachable from the workspace; state what was not observed.",
+      "notes": "Default tool set can create and update dashboards, alert rules, annotations and incidents \u2014 that is production observability config, not just reads."
+    },
+    {
+      "id": "linear",
+      "name": "Linear MCP",
+      "purpose": "Find, create and update issues, projects and comments.",
+      "source": "https://linear.app/docs/mcp",
+      "transport": "Remote https://mcp.linear.app/mcp \u2014 read-only variant https://mcp.linear.app/mcp/readonly",
+      "auth": "Linear OAuth",
+      "risk": "medium",
+      "writes": true,
+      "read_only_option": "A purpose-built read-only endpoint: https://mcp.linear.app/mcp/readonly \u2014 use it unless the task genuinely requires filing or editing issues.",
+      "fallback": "Work from what the user pasted or from the repository's own issue references.",
+      "notes": "The only server in this catalog shipping a dedicated read-only endpoint. Creating or updating an issue is outward-facing and needs confirmation."
+    },
+    {
+      "id": "notion",
+      "name": "Notion MCP",
+      "purpose": "Search, read, create and update Notion pages and databases.",
+      "source": "https://developers.notion.com/docs/get-started-with-mcp (self-host: https://github.com/makenotion/notion-mcp-server)",
+      "transport": "Remote https://mcp.notion.com/mcp; or local npx -y @notionhq/notion-mcp-server",
+      "auth": "Notion OAuth, or NOTION_TOKEN for the self-hosted server",
+      "risk": "medium",
+      "writes": true,
+      "read_only_option": "None. Restrict by sharing only the pages the integration needs.",
+      "fallback": "Ask for the content, or work from the repository's own docs.",
+      "notes": "Write tools create, update, move and duplicate pages and databases \u2014 shared workspace content. Some tools are plan-gated. Self-hosted v2.0.0 was a breaking change: database tools became data-source tools."
+    },
+    {
+      "id": "playwright",
+      "name": "Playwright MCP",
+      "purpose": "Drive a real browser: navigate, screenshot, interact, emulate viewports, read console and network.",
+      "source": "https://github.com/microsoft/playwright-mcp",
+      "transport": "npx @playwright/mcp@latest",
+      "auth": "none by default; a persistent profile carries whatever the browser is logged into",
+      "risk": "high",
+      "writes": true,
+      "read_only_option": "None. --isolated gives an in-memory profile and is the real containment control.",
+      "fallback": "The host's own browser tools, or a local Playwright script. With neither, report that rendered verification was unavailable and never describe the UI as verified.",
+      "notes": "Its README states plainly: \"Playwright MCP is not a security boundary.\" --allowed-origins is NOT a security control either \u2014 the README says it \"does not serve as a security boundary and does not affect redirects\". A non-isolated profile can act as the logged-in user on any site."
+    },
+    {
+      "id": "postgres-community",
+      "name": "Postgres MCP (community alternatives)",
+      "purpose": "Generic Postgres access where no vendor server applies.",
+      "source": "https://github.com/crystaldba/postgres-mcp",
+      "transport": "Local: pipx install postgres-mcp / uvx postgres-mcp / docker crystaldba/postgres-mcp",
+      "auth": "a Postgres connection string",
+      "risk": "high",
+      "writes": true,
+      "read_only_option": "--access-mode=restricted. The default is not unrestricted, but confirm the mode before pointing it anywhere real.",
+      "fallback": "psql through the workspace against a local database, and the repository's migrations as the schema source of truth.",
+      "notes": "NOT official \u2014 published by Crystal DBA, an independent company. It is the most-cited successor to the archived reference server, but it is a third party holding a database connection string. Never point it at production. For Neon, Neon publishes its own official server (https://neon.com/docs/ai/neon-mcp-server), which its own docs warn grants broad database management."
+    },
+    {
+      "id": "postgres-reference",
+      "name": "Reference Postgres MCP server (archived)",
+      "purpose": "Recorded so nobody adds it: the Model Context Protocol reference Postgres server is no longer maintained.",
+      "source": "https://github.com/modelcontextprotocol/servers-archived/tree/main/src/postgres",
+      "transport": "n/a \u2014 do not adopt",
+      "auth": "n/a",
+      "risk": "unmaintained",
+      "writes": false,
+      "read_only_option": "n/a",
+      "fallback": "For Supabase projects use the supabase entry. Otherwise use psql and the project's own migration tooling through the workspace, and keep production credentials out of the agent's reach.",
+      "notes": "It was removed from modelcontextprotocol/servers and moved to servers-archived. Any guide still recommending it is stale."
+    },
+    {
+      "id": "sentry",
+      "name": "Sentry MCP",
+      "purpose": "Inspect issues, events, traces and releases; triage.",
+      "source": "https://mcp.sentry.dev/ (code: https://github.com/getsentry/sentry-mcp)",
+      "transport": "Remote https://mcp.sentry.dev/mcp, optionally scoped .../mcp/{org}/{project}",
+      "auth": "Sentry OAuth; the documented scopes include write scopes (project:write, team:write, event:write)",
+      "risk": "medium",
+      "writes": true,
+      "read_only_option": "None published. Scope the endpoint to one org/project and keep to inspection tools.",
+      "fallback": "Application logs through the workspace; say that production error data was not available.",
+      "notes": "Sentry describes it as \"primarily designed for human-in-the-loop coding agents\". docs.sentry.io/product/sentry-mcp/ now redirects to mcp.sentry.dev."
+    },
+    {
+      "id": "slack",
+      "name": "Slack MCP",
+      "purpose": "Read channels and threads, search history, and send messages.",
+      "source": "https://docs.slack.dev/ai/slack-mcp-server/",
+      "transport": "Remote https://mcp.slack.com/mcp",
+      "auth": "Slack OAuth; workspace admins approve MCP client integrations",
+      "risk": "high",
+      "writes": true,
+      "read_only_option": "None. Keep to search and read tools.",
+      "fallback": "Ask the user to paste the thread.",
+      "notes": "The highest-consequence server here: it sends messages to real people, creates canvases and uploads files. Every send is an outward-facing action requiring explicit per-message confirmation \u2014 drafting is not sending."
+    },
+    {
+      "id": "supabase",
+      "name": "Supabase MCP",
+      "purpose": "Inspect and operate a Supabase project \u2014 schema, SQL, edge functions, logs, advisors.",
+      "source": "https://github.com/supabase/mcp",
+      "transport": "hosted https://mcp.supabase.com/mcp; local via the Supabase CLI at http://localhost:54321/mcp",
+      "auth": "Supabase personal access token or project credentials",
+      "risk": "high",
+      "writes": true,
+      "read_only_option": "Point it at a local or branch project rather than production, and prefer its read-only mode where the deployment offers one.",
+      "fallback": "Read migrations and schema files from the repository; state that live database state was not inspected.",
+      "notes": "The repository was renamed from supabase-community/supabase-mcp to supabase/mcp; the old URL still redirects. Never assume production access \u2014 apply migrations to a branch or local project first."
+    },
+    {
+      "id": "vercel",
+      "name": "Vercel MCP",
+      "purpose": "Inspect Vercel projects, deployments, logs and configuration, and run Vercel CLI operations.",
+      "source": "https://vercel.com/docs/mcp/vercel-mcp",
+      "transport": "remote https://mcp.vercel.com",
+      "auth": "OAuth against the user's Vercel account",
+      "risk": "high",
+      "writes": true,
+      "read_only_option": "none published \u2014 scope by using only the inspection tools",
+      "fallback": "Read vercel.json and CI configuration from the repository; treat deployment state as unknown.",
+      "notes": "Vercel's own documentation says connecting \"grants the AI system you're using the same access as your Vercel user account\", and its purchase tools \"execute real, non-refundable charges\". Deployment and purchase are separately authorized actions \u2014 preparing a deployment is not permission to run one."
+    },
+    {
+      "id": "workspace",
+      "name": "Workspace files and terminal",
+      "purpose": "Read, search and edit files in the project, and run commands.",
+      "source": "Built into the host runtime (Claude Code: Read/Write/Edit/Grep/Glob/Bash). Not an MCP server and nothing to install.",
+      "transport": "native",
+      "auth": "none \u2014 governed by the runtime's permission mode",
+      "risk": "medium",
+      "writes": true,
+      "read_only_option": "The runtime's permission mode; a read-only role simply does not call the mutating tools.",
+      "fallback": "none needed",
+      "notes": "Listed so loadouts can name it explicitly. It is the baseline every other entry is measured against."
+    }
+  ]
+}

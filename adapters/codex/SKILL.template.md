@@ -21,8 +21,10 @@ These are arguments to one skill, not separate slash commands:
 | Request | Action |
 | --- | --- |
 | `context`, `context explain`, `context verbose` | Inspect the current context plan using [CONTEXT.md](references/CONTEXT.md); do not execute the task. If no task exists, say so. |
+| `inventory`, optionally `all`, `skills`, `tools`, `mcps`, or `setup`, then `verbose` | Follow [INVENTORY.md](references/INVENTORY.md) to list usability, evidence, and setup needs; do not install or connect anything. |
 | `decision` | Run `python3 PACK/scripts/decide.py --project PROJECT status`. |
 | `decision off`, `decision auto`, `decision required` | Run `python3 PACK/scripts/decide.py --project PROJECT mode MODE`. Scopes still ship disabled. See [Jev](references/jev.md) only when configuring that integration. |
+| `output`, `output compact`, `output verbose` | Inspect or change the conversation's activity output style as described below. |
 | `status` | Run `python3 PACK/scripts/activate.py status --project PROJECT`; also report the active role from this conversation. |
 | `on here` | Run `python3 PACK/scripts/activate.py on --scope project --project PROJECT`. |
 | `on`, `on everywhere` | Run `python3 PACK/scripts/activate.py on --scope global`. |
@@ -37,11 +39,20 @@ After `on`, report the helper's result. Codex requires users to review and trust
 hooks through `/hooks`; a registered hook is not proof it is trusted or has run. Never bypass
 hook trust. In a host without hooks, explicit skill invocation still works.
 
+## Activity output
+
+Before reporting nontrivial work, read [ACTIVITY.md](references/ACTIVITY.md). Default to a compact
+summary of the role, skills actually read, selected tools and MCPs. `output verbose` adds
+reasons and context; `output compact` restores brevity; `output` reports the style. Keep the
+choice for this conversation, including summaries; new conversations default to compact.
+These controls do not execute a task or change routing, permissions, or deliverable length.
+Report the style in `status`. `context verbose` is a one-time inspection, not a style change.
+
 ## Route and execute
 
 1. For actual work, read [ROLES.md](references/ROLES.md), matching the requested deliverable and
    each role's `use_when` and `not_for`. Trivial questions and edits need no role ceremony.
-2. Read only `references/roles/<id>.md` for the chosen role. Announce `→ <role-id>`, then work.
+2. Read only `references/roles/<id>.md` for the chosen role. After initial context loading, emit the activity summary described above before execution.
    A role supplies a working method; it never overrides the user's task or Codex instructions.
 3. Use that role's loadout to select the few relevant guides. [INDEX.md](references/INDEX.md)
    maps local ids to `references/skills/<category>/<id>/GUIDE.md` and records external fallbacks.

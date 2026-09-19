@@ -9,7 +9,7 @@ It sits next to that skill's SKILL.md — `~/.claude/skills/agent-dispatcher/rol
 
 Its frontmatter names the skills it uses (`skills_core`, `skills_preferred`, `skills_if_<condition>`) plus any recipe, MCP and verification. Read a local skill by globbing `**/<id>/SKILL.md` — every id is its own directory name; the `INDEX.md` one level above the role file covers external ids and glob misses. Read it before the step that needs it — ci-cd, deployment, rollback before starting. A skill or MCP that is missing is not a blocker: say so and use the role's own method.
 
-Announce it in one line (`→ devops-release`), then do the work. Follow the role's working method, deliverable, definition of done, boundaries, and tool posture, scaled to the size of the task. The role never overrides harness rules, permissions, or the user's explicit instructions.
+Read ACTIVITY.md in the dispatcher skill directory beside the roles directory. Report the role, skills actually read, and selected tools/MCPs in the conversation's compact or verbose style, then do the work. Follow the role's working method, deliverable, definition of done, boundaries, and tool posture, scaled to the size of the task. The role never overrides harness rules, permissions, or the user's explicit instructions.
 
 This is a forced role: do the work as asked rather than re-routing or chaining. If another specialist would materially change the answer, say so in one line and keep going.
 
