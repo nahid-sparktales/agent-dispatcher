@@ -25,7 +25,8 @@ def check(name, cond, detail=""):
 
 
 GENERATED = ["skills/agent-dispatcher/SKILL.md", "skills/agent-dispatcher/INDEX.md",
-             "catalog/skills.json", "catalog/loadouts.json", "README.md"]
+             "catalog/skills.json", "catalog/loadouts.json", "README.md",
+             "docs/skills.md", "docs/mcps.md", "docs/recipes.md"]
 
 
 def drift():
@@ -125,8 +126,15 @@ def main():
 
     print("\ndocs match reality")
     readme = (ROOT / "README.md").read_text()
-    for n, label in ((len(roles), "roles"), (len(skills), "skills")):
-        check(f"README states {label} count {n}", str(n) in readme)
+    counts = readme.split("<!-- counts:start -->")[1].split("<!-- counts:end -->")[0]
+    for n, label in ((len(roles), "roles"), (len(skills), "local skills"),
+                     (len(recipes), "recipes"), (len(mcp), "MCP servers")):
+        check(f"README counts state {n} {label}", re.search(rf"\b{n} {label}\b", counts),
+              f"counts region reads: {counts.strip()[:90]}")
+    for doc, n in (("skills.md", len(skills)), ("mcps.md", len(mcp)), ("recipes.md", len(recipes))):
+        body = (ROOT / "docs" / doc).read_text()
+        region = body.split("<!-- counts:start -->")[1].split("<!-- counts:end -->")[0]
+        check(f"docs/{doc} count is generated, not stale", str(n) in region, region.strip()[:60])
     for doc in ("architecture.md", "security.md", "adding-a-skill.md"):
         check(f"docs/{doc} exists", (ROOT / "docs" / doc).exists())
 

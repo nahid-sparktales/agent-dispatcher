@@ -1,6 +1,6 @@
 # MCP servers
 
-19 servers, every one verified against the vendor's own source on 2026-09-19 by two
+<!-- counts:start -->19 servers<!-- counts:end -->, every one verified against the vendor's own source on 2026-09-19 by two
 independent research passes. **This repository installs none of them.** It records what exists,
 what each can do, and what an agent should do when one is absent.
 
@@ -8,27 +8,32 @@ Availability is not authorization. A configured server does not widen what an ag
 runtime's permission layer is unchanged, and a mutating call still stops and asks. See
 [security.md](security.md).
 
+<!-- table:start -->
+
 | Server | Official | Writes | Risk | Read-only path |
 | --- | --- | --- | --- | --- |
-| `axe-devtools` | yes | yes | medium | Use its scan tools without acting on the remediate tool's  |
+| `axe-devtools` | yes | yes | medium | Use its scan tools without acting on the remediate tool's edits automatically. |
 | `chrome-devtools` | yes | yes | high | — |
-| `cloudflare` | yes | yes | high | No flag. Contain it by granting narrow permissions at the  |
-| `context7` | yes | no | low | read-only by nature — its tools are resolve-library-id and |
-| `datadog` | yes | yes | high | Permission-scoped: Datadog checks the matching permission  |
-| `figma` | yes | yes | medium | Use only the read tools (get_design_context, get_metadata, |
-| `github` | yes | yes | medium | --read-only flag; GITHUB_TOOLSETS scopes which of the 22 t |
+| `cloudflare` | yes | yes | high | No flag. Contain it by granting narrow permissions at the OAuth screen or minting a read-only API token. |
+| `context7` | yes | no | low | read-only by nature — its tools are resolve-library-id and query-docs |
+| `datadog` | yes | yes | high | Permission-scoped: Datadog checks the matching permission (e.g. monitors_write) on each tool call, so a read-only key yields a read-only server. |
+| `figma` | yes | yes | medium | Use only the read tools (get_design_context, get_metadata, get_screenshot, get_variable_defs and the rest); the write and Weave tool groups change or generate canvas content. |
+| `github` | yes | yes | medium | --read-only flag; GITHUB_TOOLSETS scopes which of the 22 toolsets are exposed at all |
 | `google-workspace` | yes | yes | high | Scope-based: request read-only OAuth scopes. |
-| `grafana` | yes | yes | high | Disable the write-capable tool groups; 29+ tools are enabl |
-| `linear` | yes | yes | medium | yes — `https://mcp.linear.app/mcp/readonly` |
+| `grafana` | yes | yes | high | Disable the write-capable tool groups; 29+ tools are enabled by default. |
+| `linear` | yes | yes | medium | A purpose-built read-only endpoint: https://mcp.linear.app/mcp/readonly — use it unless the task genuinely requires filing or editing issues. |
 | `notion` | yes | yes | medium | — |
 | `playwright` | yes | yes | high | — |
-| `postgres-community` | no | yes | high | --access-mode=restricted. The default is not unrestricted, |
+| `postgres-community` | no | yes | high | --access-mode=restricted. The default is not unrestricted, but confirm the mode before pointing it anywhere real. |
 | `postgres-reference` | yes | no | unmaintained | — |
 | `sentry` | yes | yes | medium | — |
 | `slack` | yes | yes | high | — |
-| `supabase` | yes | yes | high | Point it at a local or branch project rather than producti |
+| `supabase` | yes | yes | high | Point it at a local or branch project rather than production, and prefer its read-only mode where the deployment offers one. |
 | `vercel` | yes | yes | high | — |
-| `workspace` | yes | yes | medium | The runtime's permission mode; a read-only role simply doe |
+| `workspace` | yes | yes | medium | The runtime's permission mode; a read-only role simply does not call the mutating tools. |
+<!-- table:end -->
+
+<!-- detail:start -->
 
 ### `axe-devtools` — axe DevTools MCP (Deque)
 
@@ -335,3 +340,5 @@ Read, search and edit files in the project, and run commands.
 - **Recommended for** `dispatcher`, `explorer`, `implementer`, `tester`, `reviewer`, `debugger`, `refactoring-migration-specialist`, `version-control`, `documentation-writer`, `data-engineer`
 
 > Listed so loadouts can name it explicitly. It is the baseline every other entry is measured against.
+
+<!-- detail:end -->

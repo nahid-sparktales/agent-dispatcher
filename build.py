@@ -552,11 +552,99 @@ DISPATCH
         '            "timeout": 5\n          }\n        ]\n      }\n    ]\n  }\n}\n')
 
 
-def marked(txt, name, body):
+def marked(txt, name, body, inline=False):
+    """Replace the region between <!-- name:start --> and <!-- name:end -->, if both are present."""
     a, b = f"<!-- {name}:start -->", f"<!-- {name}:end -->"
     if a not in txt or b not in txt:
         return txt
-    return txt[:txt.index(a) + len(a)] + "\n\n" + body + txt[txt.index(b):]
+    sep = "" if inline else "\n\n"
+    tail = "" if inline else "\n"
+    return txt[:txt.index(a) + len(a)] + sep + body + tail + txt[txt.index(b):]
+
+
+def write_docs(d):
+    """docs/ tables come from the catalog too — a hand-maintained count goes stale silently."""
+    skills = DOCS / "skills.md"
+    if skills.exists():
+        txt = skills.read_text()
+        rows = []
+        for cat in SKILL_CATEGORIES:
+            ss = [s for s in d["skills"] if s["category"] == cat]
+            if not ss:
+                continue
+            rows += [f"### {cat} ({len(ss)})", "",
+                     "| Skill | Capability | Fires when |", "| --- | --- | --- |"]
+            rows += [f"| `{s['id']}`{' ✓' if s['verifies'] else ''} | `{s['capability']}` | "
+                     f"{s['use_when']} |" for s in ss]
+            rows += [""]
+        txt = marked(txt, "local", "\n".join(rows))
+        ext = []
+        for trust in ("official", "verified", "community"):
+            es = [e for e in sorted(d["external"].values(), key=lambda x: x["id"])
+                  if e.get("trust") == trust]
+            if not es:
+                continue
+            ext += [f"### {trust} ({len(es)})", "",
+                    "| Skill | Source | Licence | Fallback |", "| --- | --- | --- | --- |"]
+            ext += [f"| `{e['id']}` | [{e['repository'].replace('https://github.com/', '')}]"
+                    f"({e['repository']}) `{e['path']}` | {e['license'][:60]} | {e['fallback']} |"
+                    for e in es]
+            ext += [""]
+        txt = marked(txt, "external", "\n".join(ext))
+        txt = marked(txt, "counts",
+                     f"{len(d['skills'])} local skills and {len(d['external'])} externally "
+                     f"maintained ones, across {len(d['capabilities'])} capabilities.", inline=True)
+        skills.write_text(txt)
+
+    mcps = DOCS / "mcps.md"
+    if mcps.exists():
+        txt = mcps.read_text()
+        rows = ["| Server | Official | Writes | Risk | Read-only path |",
+                "| --- | --- | --- | --- | --- |"]
+        for m in sorted(d["mcp"].values(), key=lambda x: x["id"]):
+            ro = m.get("read_only_option", "")
+            ro = "—" if ro.lower().startswith("none") or ro == "n/a" else ro
+            rows.append(f"| `{m['id']}` | {'yes' if m.get('official') else 'no'} | "
+                        f"{'yes' if m.get('writes') else 'no'} | {m.get('risk', '')} | {ro} |")
+        txt = marked(txt, "table", "\n".join(rows))
+        detail = []
+        for m in sorted(d["mcp"].values(), key=lambda x: x["id"]):
+            detail += [f"### `{m['id']}` — {m['name']}", "", m.get("purpose", ""), "",
+                       f"- **Source** {m['source']}",
+                       f"- **Licence** {m['license']}"
+                       + (f" · **Version** {m['version']}" if m.get("version") else ""),
+                       f"- **Transport** {m['transport']}", f"- **Auth** {m['auth']}",
+                       f"- **Writes** {'yes' if m.get('writes') else 'no'} · "
+                       f"**Risk** {m.get('risk')}",
+                       f"- **Read-only** {m.get('read_only_option')}",
+                       f"- **Activate when** {m.get('activation')}",
+                       f"- **When absent** {m.get('fallback')}"]
+            if m.get("recommended_for"):
+                detail.append("- **Recommended for** "
+                              + ", ".join(f"`{x}`" for x in m["recommended_for"]))
+            if m.get("conditional_for"):
+                detail.append("- **Conditional for** "
+                              + ", ".join(f"`{x}`" for x in m["conditional_for"]))
+            if m.get("notes"):
+                detail += ["", f"> {m['notes']}"]
+            detail.append("")
+        txt = marked(txt, "detail", "\n".join(detail))
+        txt = marked(txt, "counts", f"{len(d['mcp'])} servers", inline=True)
+        mcps.write_text(txt)
+
+    recipes = DOCS / "recipes.md"
+    if recipes.exists():
+        txt = recipes.read_text()
+        rows = []
+        for r in d["recipes"]:
+            rows += [f"### `{r['id']}` — {r['name']}", "", r["summary"], "",
+                     f"- **Use when** {r['use_when']}",
+                     f"- **Roles** {', '.join(r['roles']) or '—'}",
+                     f"- **Capabilities** {', '.join(r['capabilities']) or '—'}",
+                     f"- [read it](../{r['path']})", ""]
+        txt = marked(txt, "recipes", "\n".join(rows))
+        txt = marked(txt, "counts", str(len(d["recipes"])), inline=True)
+        recipes.write_text(txt)
 
 
 def write_readme(d):
@@ -593,7 +681,7 @@ def write_readme(d):
     txt = marked(txt, "counts",
                  f"**{len(d['roles'])} roles · {len(d['skills'])} local skills · "
                  f"{len(d['external'])} external skills · {len(d['recipes'])} recipes · "
-                 f"{len(d['mcp'])} MCP servers**")
+                 f"{len(d['mcp'])} MCP servers**", inline=True)
     readme.write_text(txt)
 
 
@@ -606,6 +694,7 @@ def main():
     write_commands(d)
     write_hook(d)
     write_readme(d)
+    write_docs(d)
     print(f"indexed {len(d['roles'])} roles, {len(d['skills'])} local skills, "
           f"{len(d['external'])} external, {len(d['recipes'])} recipes, {len(d['mcp'])} mcp, "
           f"{len(d['capabilities'])} capabilities")

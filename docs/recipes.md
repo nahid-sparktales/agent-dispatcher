@@ -1,11 +1,13 @@
 # Recipes
 
-8 default shapes for multi-step work. A recipe is **not** a chain that must run in full —
+<!-- counts:start -->8<!-- counts:end --> default shapes for multi-step work. A recipe is **not** a chain that must run in full —
 the dispatcher shortens it when the work is small and extends it when risk warrants. Every one of
 them names what to cut.
 
 Recipes reference capabilities rather than agent names wherever they can, so the dispatcher maps a
 capability onto whichever role is actually available.
+
+<!-- recipes:start -->
 
 ### `build-production-ui` — Build production UI
 
@@ -78,3 +80,5 @@ Get a feature from request to merged, with the smallest set of specialists the w
 - **Roles** explorer, planner, implementer, tester, reviewer
 - **Capabilities** quality.debugging, quality.tests, quality.strategy
 - [read it](../recipes/ship-feature.md)
+
+<!-- recipes:end -->
