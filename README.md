@@ -150,13 +150,15 @@ whole thing — including what it could not establish.
 ## Optional Jev decision engine
 
 `agent-dispatcher` includes a default decision path and needs nothing to use it. It can
-*optionally* use [Jev](https://typesafe.ai), a structured decision model, for bounded choices:
-by default which skills a role loads and which servers are relevant, and — if you switch it on —
-which role owns the task.
+*optionally* use [Jev](https://typesafe.ai), a structured decision model, for its bounded
+choices: which role owns the task, which skills that role loads, which servers are relevant.
 
-That split is not a hedge. The evaluation below put Claude, Jev and a keyword baseline on
-identical fixtures: **Claude routes better than Jev, and Jev selects skills and tools better
-than the loadout does.** Each decision ships with whichever mechanism won.
+**It ships off on every decision, and the evaluation below is why.** Put on identical fixtures
+against Claude reading the dispatcher's own catalog, Jev matched or lost everywhere — decisively
+on routing, clearly on skill recall, and to a tie on tools. Quality is not the reason to switch
+it on. Latency and cost are: ~360 ms and a fraction of a cent against a full model turn, which
+is a real trade at volume or under a latency budget, and no trade at all in a session where the
+dispatcher is already running.
 
 ```text
 Without Jev                         With Jev
@@ -203,7 +205,11 @@ Three modes. `off` never calls it. `auto` — the default — uses it when it is
 healthy, and falls back to the default engine on a timeout, an error, an id that does not
 resolve, or a confidence below the calibrated floor, recording that in diagnostics. `required`
 errors clearly instead of falling back, which is what makes controlled evaluation possible.
-With no key configured, `auto` is indistinguishable from `off`.
+With no key configured, or no scope enabled, `auto` is indistinguishable from `off`.
+
+```bash
+AGENT_DISPATCHER_DECISION_SCOPES=skills,tools   # choose the decisions to hand over
+```
 
 **It decides relevance. It never decides authorization.** A decision result cannot grant a
 workspace write, a deployment, a database mutation, a message send or an OAuth scope. The
@@ -223,22 +229,28 @@ Measured over 162 routing fixtures covering all 27 roles, plus 24 skill and 20 t
 
 | | Keyword baseline | Jev | Claude |
 | --- | --- | --- | --- |
-| Agent top-1 | 23 / 162 | 142 / 162 | **158 / 162** |
-| Acceptable route | 29 / 162 | 153 / 162 | **162 / 162** |
+| Agent top-1 | 23 / 162 | 143 / 162 | **158 / 162** |
+| Acceptable route | 29 / 162 | 154 / 162 | **162 / 162** |
 | Near-neighbour top-1 | 6 / 54 | 49 / 54 | **53 / 54** |
-| Ambiguous, acceptable | 9 / 27 | 26 / 27 | 27 / 27 |
-| Skill precision / recall | 0.31 / 0.56 | **0.68 / 0.73** | not measured |
-| Tool precision / recall | 0.15 / 0.23 | **0.66 / 0.97** | not measured |
-| Median decision latency | 0 ms | 357 ms | not comparable |
+| Ambiguous top-1 | 3 / 27 | 17 / 27 | **25 / 27** |
+| Skill precision / recall | 0.31 / 0.56 | 0.68 / 0.71 | **0.74 / 0.90** |
+| Tool precision / recall | 0.15 / 0.23 | 0.65 / 0.97 | 0.69 / 0.95 |
+| Median decision latency | 0 ms | 358 ms | not comparable |
 
-Claude wins agent routing and is free in production, because the dispatcher is already running —
-so **agent selection is off by default**, a change this evaluation caused. Jev wins skill and
-tool relevance, where the share of selections carrying a known-irrelevant skill falls from 0.36
-to 0.01 — so those are on. The keyword baseline is a floor, there to show what the numbers look
-like without any model at all.
+The keyword baseline is a floor — what the numbers look like with no model at all, and roughly
+what selecting from a loadout instead of from the task gets you. Both engines crush it. Against
+each other, Claude wins routing outright, wins skill recall by a wide margin at slightly better
+precision, and ties on tools.
 
-What it does not establish: whether a better route produces better *work*. That needs end-to-end
-fixtures, which do not exist yet.
+That is the architecture working, not failing: it exists so each decision can use whichever
+mechanism the evidence supports, and here the evidence came back for the default path. The
+integration stays because the finding could change and because throughput is a real reason to
+want it.
+
+What none of it establishes: whether a better decision produces better *work*. That needs
+end-to-end fixtures, which do not exist yet — and the Claude column is a reconstruction (a
+focused subagent per case, no competing work), which cuts against the conclusion rather than
+for it.
 
 [docs/jev.md](docs/jev.md) · setup, modes, privacy, cost, calibration and troubleshooting.
 

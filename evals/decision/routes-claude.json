@@ -3,7 +3,7 @@
  "engine": "claude-opus-5",
  "recorded": "2026-09-19",
  "registry_version": "89baa5fa0e0c",
- "method": "One subagent per fixture, each given the dispatcher's own routing rules and full role catalog verbatim from the shipped SKILL.md, the task, and nothing else \u2014 no repository access, no conversation, no other fixture. This is a reconstruction of the default path, not the default path itself: a real session also carries the conversation and is doing other work at the time.",
+ "method": "Agent routing: one subagent per fixture, given the dispatcher's own routing rules and full role catalog verbatim from the shipped SKILL.md, the task, and nothing else. Skill and tool selection: one subagent per fixture, given the dispatcher's own skill-resolution rule verbatim from CONTEXT.md section 2, the task, the settled role, the detected stack, and the same candidate set and limit the engine is handed. No repository access, no conversation, no sight of another fixture in either case. This is a reconstruction of the default path, not a capture of it: a real session also carries the conversation and is doing other work at the time.",
  "routes": [
   {
    "id": "dispatcher-obvious-1",
@@ -1138,6 +1138,415 @@
    "confidence": 0.92,
    "runner_up": "implementer",
    "why": "Deliverable is a measured page-load speedup against a numeric target (8s to under 2s), not marketing or a plain code change."
+  }
+ ],
+ "selections": [
+  {
+   "id": "ai-01",
+   "kind": "skills",
+   "selected": [
+    "memory-design",
+    "context-engineering",
+    "agent-evals"
+   ],
+   "why": "A fact stated mid-chat has to survive to turn 20: memory-design decides what is retained, in which layer (Redis is already there) and at what scope; context-engineering covers why it falls out of the window and what compaction must preserve; agent-evals is the only way a long-conversation recall fix is shown to hold, since one good run proves nothing \u2014 retrieval-rag (no corpus), llm-observability (failure is already reproducible) and the tool/MCP/security skills are adjacent, not load-bearing."
+  },
+  {
+   "id": "ai-02",
+   "kind": "skills",
+   "selected": [
+    "anthropic-claude-api",
+    "model-routing",
+    "agent-evals"
+   ],
+   "why": "The work turns on current Claude API facts (model ids, pricing, prompt caching of the 40k preamble), choosing/pinning the new tier against a quality bar, and proving the tier swap is not a regression; context-engineering is adjacent \u2014 the preamble is being cached, not re-decided."
+  },
+  {
+   "id": "sec-01",
+   "kind": "skills",
+   "selected": [
+    "prompt-injection-defense",
+    "agent-security"
+   ],
+   "why": "Pasted page content was obeyed as instructions (ingestion trust boundary = prompt-injection-defense) and the agent then sent data to a content-chosen outside address via its MCP tools (tool authority and blast radius = agent-security); threat-modeling, secure-code-review and owasp-web are adjacent, not what this failure turns on."
+  },
+  {
+   "id": "api-01",
+   "kind": "skills",
+   "selected": [
+    "webhooks",
+    "idempotency-and-retries"
+   ],
+   "why": "Provider redelivery double-charging turns on webhook-side deduplication of the redelivered event plus idempotency on the charge it triggers; everything else in the list is topic-adjacent."
+  },
+  {
+   "id": "arch-01",
+   "kind": "skills",
+   "selected": [
+    "background-jobs",
+    "api-design"
+   ],
+   "why": "The argument is whether a 20-minute export runs in the request path, so the work turns on queued-work design (background-jobs: job contract, transactional enqueue, retries, dead letters \u2014 which also absorbs idempotency-and-retries, same capability) plus the endpoint contract that falls out of moving it off the path (202 + status resource); postgres/schema-design/threat-modeling/observability are adjacent to the topic but not what the decision hinges on."
+  },
+  {
+   "id": "auto-01",
+   "kind": "skills",
+   "selected": [
+    "idempotency-and-retries",
+    "github-actions"
+   ],
+   "why": "The failure is a repeated external side effect after an unknown-outcome timeout (idempotency-and-retries), triggered by a scheduled GitHub Actions workflow that re-fired (github-actions for concurrency/retry config); background-jobs would duplicate the idempotency capability and excludes cron pipeline config, and the rest are adjacent at best."
+  },
+  {
+   "id": "copy-01",
+   "kind": "skills",
+   "selected": [
+    "ux-writing"
+   ],
+   "why": "Empty states and error messages are in-product interface strings \u2014 ux-writing owns exactly that, and copywriting/positioning/seo/technical-writing all defer it to ux-writing; no established brand voice is named, so brand-guidelines is adjacent only."
+  },
+  {
+   "id": "da-01",
+   "kind": "skills",
+   "selected": [
+    "data-analysis",
+    "data-quality"
+   ],
+   "why": "Verifying a suspicious 40% jump turns on reproducing the number with pinned grain/denominators (data-analysis) and ruling out a data artifact \u2014 duplicate loads, volume/freshness shifts, source reconciliation (data-quality); the metric definition is settled and no experiment, external source, or Postgres-engine behavior is in play."
+  },
+  {
+   "id": "de-01",
+   "kind": "skills",
+   "selected": [
+    "data-pipelines",
+    "data-quality"
+   ],
+   "why": "The work turns on two capabilities: re-runnable/backfillable writes for the broken dates (data-pipelines) and an assertion that makes a renamed upstream column fail loudly instead of emitting half-empty rows (data-quality); background-jobs, idempotency-and-retries and observability are adjacent to \"scheduled job\" and \"fail loudly\" but cover queue/side-effect/telemetry concerns this task does not have, and postgres is the wrong engine."
+  },
+  {
+   "id": "db-01",
+   "kind": "skills",
+   "selected": [
+    "migrations",
+    "postgres",
+    "database-migration-verification"
+   ],
+   "why": "Task turns on online expand/contract sequencing with a batched backfill and a reachable rollback (migrations), Postgres DDL lock behaviour at 200M rows (postgres), and proving the backfill/rollback actually worked (database-migration-verification); rollback loses to migrations for the same capability, and schema-design/data-integrity are adjacent since the modelling decision is trivial here."
+  },
+  {
+   "id": "dbg-01",
+   "kind": "skills",
+   "selected": [
+    "systematic-debugging",
+    "caching",
+    "regression-testing"
+   ],
+   "why": "A self-healing ~10-minute staleness window that only appears in production is a cache-layer diagnosis: systematic-debugging supplies the evidence method for a prod-only bug, caching supplies the TTL/invalidation reasoning across the Redis and Fastly read path the symptom points at, and regression-testing closes it once the invalidation is fixed; Postgres/query-optimization/performance-profiling are adjacent stack items, not what the bug turns on, since the write lands fine and nothing is slow."
+  },
+  {
+   "id": "devops-01",
+   "kind": "skills",
+   "selected": [
+    "deployment",
+    "rollback",
+    "vercel-deploy-to-vercel"
+   ],
+   "why": "Task turns on two capabilities \u2014 getting config/env parity right at release time (deployment, with Vercel's per-environment variable scoping the actual mechanism on this stack) and having a reachable backout (rollback); ci-cd/github-actions/secrets-management are adjacent pipeline-and-credential topics the request never reaches."
+  },
+  {
+   "id": "exp-01",
+   "kind": "skills",
+   "selected": [],
+   "why": "Task is tracing computation and mutation paths through existing Rails code; no candidate supplies that \u2014 postgres/schema-design are about designing and tuning storage (not reading call paths), and the other three are frontend or docs skills."
+  },
+  {
+   "id": "impl-01",
+   "kind": "skills",
+   "selected": [
+    "design-to-code",
+    "shadcn-ui",
+    "tailwind",
+    "browser-verification"
+   ],
+   "why": "Task is translating an approved design into a modal in a known shadcn/Tailwind stack, so it turns on design-to-code plus the two stack skills that own the components and styling tokens, with browser-verification as the proof the rendered modal works; stack-detection is moot (stack given), and component-architecture, responsive-design, accessibility, auth/API/test skills are adjacent, not what this build hinges on."
+  },
+  {
+   "id": "impl-02",
+   "kind": "skills",
+   "selected": [
+    "authentication",
+    "api-design",
+    "schema-design",
+    "test-design"
+   ],
+   "why": "The work is a verification-token lifecycle (issuance, one-time redemption, 1h expiry) exposed as a new HTTP endpoint: authentication owns the token semantics, api-design the endpoint contract, schema-design the token row's constraints that make \"once\" and \"expires\" enforceable, test-design pins the two boundary invariants; postgres/owasp/background-jobs/api-contract-verification are adjacent, and all frontend candidates are off-stack for an Express endpoint."
+  },
+  {
+   "id": "inc-01",
+   "kind": "skills",
+   "selected": [
+    "incident-response",
+    "rollback"
+   ],
+   "why": "Live production failure needs stabilization method (incident-response), and with a release four minutes before onset the smallest reversible mitigation is a revert, including what can't come back (rollback); recovery confirmation is already inside incident-response, and deployment/observability/migrations are adjacent-not-needed."
+  },
+  {
+   "id": "perf-01",
+   "kind": "skills",
+   "selected": [
+    "performance-profiling",
+    "query-optimization",
+    "frontend-performance"
+   ],
+   "why": "Cause is unmeasured, so profiling comes first; scaling with project count puts the query path and the React paint path as the two live axes, and caching/postgres/schema-design are all downstream of a measurement nobody has taken yet."
+  },
+  {
+   "id": "pm-01",
+   "kind": "skills",
+   "selected": [
+    "product-discovery",
+    "prioritization",
+    "product-analytics"
+   ],
+   "why": "Request arrives as a solution from sales, so the work turns on finding the real problem and who has it (product-discovery), sequencing the first slice against capacity (prioritization), and defining a measurable success signal with instrumentation that exists (product-analytics); no scope doc, test design, or competitor grid was asked for."
+  },
+  {
+   "id": "refac-01",
+   "kind": "skills",
+   "selected": [
+    "nextjs-next-cache-components-adoption"
+   ],
+   "why": "The task is exactly \"turn on the new Next.js caching model and work through what it surfaces\" \u2014 one skill supplies that; react-best-practices fires on the stack, not on this work, and the testing/migration/API skills cover capabilities this task never reaches."
+  },
+  {
+   "id": "rev-01",
+   "kind": "skills",
+   "selected": [
+    "dependency-security"
+   ],
+   "why": "The review turns on judging whether a new npm package plus three transitive deps is worth taking \u2014 supply-chain risk through the lockfile \u2014 which only dependency-security supplies; the reviewer role's own method already covers reading the diff, and nothing here is a security-defect hunt, an API/schema design, or a UI/test-authoring task."
+  },
+  {
+   "id": "test-01",
+   "kind": "skills",
+   "selected": [
+    "e2e-testing",
+    "microsoft-playwright-cli"
+   ],
+   "why": "The journey and the level are already named, so the work turns on building a durable E2E suite (selectors, waits, data isolation, flake) plus the Playwright CLI/CI mechanics for the detected stack; test-strategy is moot once the level is fixed, and anthropic-webapp-testing duplicates e2e-testing's capability less sharply."
+  },
+  {
+   "id": "test-02",
+   "kind": "skills",
+   "selected": [
+    "regression-testing"
+   ],
+   "why": "The task is exactly \"pin a known, already-fixed defect so it can't recur\" \u2014 regression-testing supplies that whole capability (pick the cheapest observing level, assert behaviour not patch, confirm by reverting the fix); test-design would duplicate the same test-writing capability, and systematic-debugging/e2e/strategy skills answer questions this task doesn't ask."
+  },
+  {
+   "id": "ui-01",
+   "kind": "skills",
+   "selected": [
+    "ui-audit",
+    "ux-writing"
+   ],
+   "why": "The flow already exists and is losing people at a known point, so the work is diagnosing an existing interface into ranked, located findings (ui-audit), plus the orientation copy \u2014 step labels, \"where you are\" text \u2014 that tells a reader what just happened and what is next (ux-writing); visual direction, layout, motion, component boundaries and the three verification skills are adjacent to a form, not what this abandonment turns on."
+  },
+  {
+   "id": "vc-01",
+   "kind": "skills",
+   "selected": [
+    "secrets-management"
+   ],
+   "why": "A live credential is already leaked in history, so the only capability the task needs beyond the version-control agent's own history-rewrite method is the rotate-first leaked-credential response; the other candidates are adjacent topics (docs, debugging, dependency CVEs, release rollback, CI workflows) that this task does not turn on."
+  },
+  {
+   "id": "tool-rel-001",
+   "kind": "tools",
+   "selected": [
+    "axe-devtools",
+    "playwright",
+    "workspace"
+   ],
+   "why": "Needs a WCAG scanner with code-level remediation (axe), a real browser to reach and step through the live staging checkout (playwright \u2014 chrome-devtools is the same capability plus perf/network the task doesn't need), and the repo files to name the markup changes; Vercel/Figma/monitoring servers are adjacent to the stack, not to finding violations."
+  },
+  {
+   "id": "tool-rel-002",
+   "kind": "tools",
+   "selected": [
+    "chrome-devtools",
+    "workspace",
+    "vercel"
+   ],
+   "why": "Finding where 4.2s of TTI goes needs a device-emulated performance trace (chrome-devtools), the source/bundle it comes from (workspace), and the Next-on-Vercel build output, config and response timings (vercel); playwright duplicates chrome-devtools' browser capability without the trace depth, and the APM/docs/issue servers are topic-adjacent only."
+  },
+  {
+   "id": "tool-rel-003",
+   "kind": "tools",
+   "selected": [
+    "datadog",
+    "postgres-community",
+    "workspace"
+   ],
+   "why": "Splitting app time from DB time needs the traces/metrics that already record the regression (datadog), direct Postgres access to EXPLAIN the aggregate and read pg_stat_statements, and the code plus a shell to see what the endpoint does; browser, design, ticketing and other-vendor servers touch nothing in a server-side latency split, and postgres-reference is listed only as a warning not to add it."
+  },
+  {
+   "id": "tool-rel-004",
+   "kind": "tools",
+   "selected": [
+    "postgres-community",
+    "workspace"
+   ],
+   "why": "Verifying the table is truly dead and dropping it happens in Postgres itself (pg_stat_user_tables, dependencies, the DROP), and confirming nothing in the Rails codebase still references it plus writing the migration happens in the workspace; the observability, vendor-platform and design servers are adjacent to \"production database\" but touch nothing this task does, and postgres-reference is an archived anti-entry."
+  },
+  {
+   "id": "tool-rel-005",
+   "kind": "tools",
+   "selected": [
+    "vercel",
+    "github",
+    "workspace"
+   ],
+   "why": "Promoting a merged, green commit to prod on Next.js/Vercel/Actions turns on the deploy platform, the repo/CI state it ships from, and the local terminal to run it \u2014 monitoring, design, and issue-tracker servers are adjacent to \"ship\", not needed to do it."
+  },
+  {
+   "id": "tool-rel-006",
+   "kind": "tools",
+   "selected": [
+    "google-workspace"
+   ],
+   "why": "The whole task is composing and sending mail from support@ (plus the recipient list living in Workspace); no candidate reaches Zendesk, and monitoring/repo/browser tools are outage-adjacent, not needed to write and send the apology."
+  },
+  {
+   "id": "tool-rel-007",
+   "kind": "tools",
+   "selected": [
+    "datadog",
+    "vercel",
+    "sentry",
+    "workspace",
+    "github"
+   ],
+   "why": "Live 5xx spike on a Next.js/Vercel gateway: Datadog for the error-rate and trace signal, Vercel for the deployment/logs and rollback path, Sentry for the exception detail, workspace to inspect and change code, GitHub to identify the offending change; Grafana/Cloudflare/Postgres/Supabase are off-stack and Slack/Linear are comms, not stabilisation."
+  },
+  {
+   "id": "tool-rel-008",
+   "kind": "tools",
+   "selected": [
+    "figma",
+    "chrome-devtools",
+    "workspace"
+   ],
+   "why": "Adjudicating mock vs. shipped needs the design's spec (figma), the rendered form's real spacing and error state (chrome-devtools), and the component's Tailwind classes (workspace); playwright is the same browser capability as chrome-devtools but without computed-style inspection, and everything else is adjacent infrastructure."
+  },
+  {
+   "id": "tool-rel-009",
+   "kind": "tools",
+   "selected": [
+    "workspace",
+    "context7",
+    "github"
+   ],
+   "why": "Needs the local pin/lockfile and router code (workspace), version-aware SDK docs for the two versions (context7), and the SDK's own release/commit history to diff the routing options (github); observability and design/browser servers are adjacent at best since the symptom is a config-surface change, not a runtime error."
+  },
+  {
+   "id": "tool-rel-010",
+   "kind": "tools",
+   "selected": [
+    "workspace"
+   ],
+   "why": "Exhaustively locating rate-limit enforcement and bypass paths in this repo is local file search and reading; no external service holds that answer."
+  },
+  {
+   "id": "tool-rel-011",
+   "kind": "tools",
+   "selected": [
+    "supabase",
+    "google-workspace"
+   ],
+   "why": "The numbers live in Supabase (schema + SQL to compute weekly active orgs) and the deliverable is a doc/sheet leadership can open; postgres-community is the same capability as supabase so only one loads, and nothing else touches this task."
+  },
+  {
+   "id": "tool-rel-012",
+   "kind": "tools",
+   "selected": [
+    "linear",
+    "notion"
+   ],
+   "why": "The work is writing a scope/success-criteria doc and filing it in the team's tracker \u2014 Linear for the issue/project, Notion for the written spec; no code, browser, infra or observability capability is involved."
+  },
+  {
+   "id": "tool-rel-013",
+   "kind": "tools",
+   "selected": [
+    "workspace",
+    "context7"
+   ],
+   "why": "The audit turns on reading the actual webhook handler code path (signature check, tolerance window, raw-body handling, dedupe) and checking it against current Stripe verification docs; observability, deploy and DB servers are adjacent, not what proves reachability."
+  },
+  {
+   "id": "tool-rel-014",
+   "kind": "tools",
+   "selected": [
+    "workspace",
+    "playwright"
+   ],
+   "why": "Writing and running Playwright regression specs needs the repo files plus a test run (workspace) and a real browser to walk add-to-cart through confirmation (playwright); everything else \u2014 devtools traces, a11y scanning, Vercel/Sentry/GitHub state \u2014 is adjacent to a checkout test, not what it turns on."
+  },
+  {
+   "id": "tool-rel-015",
+   "kind": "tools",
+   "selected": [
+    "sentry",
+    "workspace"
+   ],
+   "why": "The crash report (stack traces, event payloads, tier pattern, onset time) lives in Sentry, and the fix plus reproduction happens in the project files and terminal \u2014 local git already covers \"what changed Friday\", so GitHub, other observability vendors and DB servers are adjacent, not needed."
+  },
+  {
+   "id": "tool-rel-016",
+   "kind": "tools",
+   "selected": [
+    "workspace",
+    "github"
+   ],
+   "why": "Recovery runs on the local repo (reflog/fsck plus stashing what is staged), so the terminal is the whole job; GitHub is the one other place the pre-rebase commits could still exist if the branch was pushed. Everything else is browser, observability, design, or product tooling with no bearing on git history."
+  },
+  {
+   "id": "tool-rel-017",
+   "kind": "tools",
+   "selected": [
+    "cloudflare",
+    "datadog",
+    "workspace"
+   ],
+   "why": "A 522 is \"edge couldn't reach origin\", so the case turns on reading Worker-side observability (cloudflare) against origin-side latency/errors (datadog), with workspace to inspect the Worker's fetch/timeout code and reproduce; everything else is a different system."
+  },
+  {
+   "id": "tool-rel-018",
+   "kind": "tools",
+   "selected": [
+    "github",
+    "workspace",
+    "linear"
+   ],
+   "why": "Release notes turn on reconstructing what actually shipped since v3.1: merged PRs/commits/tags (github), the local diff, changelog and migration/upgrade code (workspace), and the issues closed in the release (linear); browser, observability, design and hosting servers are topic-adjacent but supply nothing the notes need."
+  },
+  {
+   "id": "tool-rel-019",
+   "kind": "tools",
+   "selected": [
+    "slack"
+   ],
+   "why": "The window is already confirmed and the details are in the request, so the work is purely posting a message to two Slack channels \u2014 Linear and workspace access are stack-adjacent, not needed."
+  },
+  {
+   "id": "tool-rel-020",
+   "kind": "tools",
+   "selected": [
+    "supabase",
+    "workspace"
+   ],
+   "why": "The work is a staged column-type change plus backfill and rollback on a Supabase Postgres project: the Supabase MCP inspects the schema and runs the SQL/migrations, and workspace files+terminal hold the migration files and CLI; postgres-community is the same capability with a vendor server present, and github/vercel/sentry/datadog/context7 are only adjacent to shipping or watching the change."
   }
  ]
 }

@@ -538,15 +538,18 @@ def main():
           _raises(lambda: load_config(project_root=CFG, provider="acme")))
     check("the default mode is auto", load_config(project_root=CFG).mode == "auto")
     shipped = load_config(project_root=CFG).scopes
-    check("context ranking and the verification gate are off by default",
-          not shipped["context"] and not shipped["verification"])
-    # Set by evals/decision, not by how much of the integration exists: Claude reading the
-    # router's own catalog beat Jev on agent routing (158/162 against 142/162 top-1), so the
-    # default path keeps that decision. Skill and tool relevance is where the gain was.
-    check("agent selection is off by default, because the evaluation said so",
-          not shipped["agent"], "Jev would route by default despite scoring worse than Claude")
-    check("skill and tool relevance are on by default",
-          shipped["skills"] and shipped["tools"])
+    # Set by evals/decision, not by how much of the integration exists. Claude matched or beat
+    # Jev on every decision — 158/162 against 143 on routing, 0.74/0.90 against 0.68/0.71 on
+    # skills, a tie on tools — and costs no extra call in production, so Jev ships inert.
+    check("no decision scope is on by default, because the evaluation said so",
+          not any(shipped.values()),
+          "Jev would be called by default despite not winning any decision on quality")
+    check("a scope can be enabled without touching anything else",
+          load_config(project_root=CFG, scopes={"skills": True}).scopes["skills"])
+    check("enabling one scope does not enable the rest",
+          not load_config(project_root=CFG, scopes={"skills": True}).scopes["agent"])
+    check("an idle configuration makes no request", not load_config(
+        project_root=CFG).uses_jev("skills"), "a scope was live with none enabled")
 
     # ---------------------------------------------------------------- engines
     print("\nengines")

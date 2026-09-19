@@ -120,8 +120,8 @@ python3 -m decision mode auto        # writes .agent-dispatcher-decision.json
 /agent-decision auto                 # the same thing, from inside a session
 ```
 
-**`auto`** is what you want. With no key configured it is indistinguishable from `off` — no
-lookup, no request, no warning. With a key it uses Jev, and on a timeout, an HTTP error, a rate
+**`auto`** is what you want. With no key configured, or with no scope enabled, it is
+indistinguishable from `off` — no lookup, no request, no warning. With a key it uses Jev, and on a timeout, an HTTP error, a rate
 limit, a malformed body, an answer whose ids do not resolve, or a confidence below the floor, it
 records a diagnostic and falls back to the default engine. An optional optimisation must never
 be the reason a task fails.
@@ -149,12 +149,11 @@ the environment → the defaults.
 | `log` | `AGENT_DISPATCHER_DECISION_LOG` | off |
 
 Scopes are per decision, not global, because the right engine for one decision is not
-necessarily the right engine for another — and here that is not a hypothetical. The shipped
-default is `skills,tools`: the evaluation found Claude routes better than Jev and Jev selects
-skills and tools better than the loadout, so each decision uses whichever mechanism won.
-`context` (ranking retrieved files) and `verification` (judging whether evidence is sufficient)
-are declared in the interface and off: designed for, not shipped, and turning them on would be a
-claim no evaluation supports.
+necessarily the right engine for another. All five ship off. Turn on what you want:
+`AGENT_DISPATCHER_DECISION_SCOPES=skills,tools`. `context` (ranking retrieved files) and
+`verification` (judging whether evidence is sufficient) are declared in the interface and
+unimplemented — designed for, not shipped, and enabling them would claim something no
+evaluation supports.
 
 The credential is not in that table on purpose. It is never a config key, never written to a
 file by this pack, and never carried on a config object. The provider reads it out of the
@@ -284,57 +283,63 @@ everything has perfect recall and no value.
 ### Results
 
 Run against `jev-latest` through the TypeSafe API, registry `89baa5fa0e0c`, 2026-09-19. Three
-engines, identical fixtures.
+engines, identical fixtures, every decision measured for all three.
 
-| | Lexical baseline | Jev | Claude |
+| | Keyword baseline | Jev | Claude |
 | --- | --- | --- | --- |
-| Agent top-1 | 23 / 162 | 142 / 162 | **158 / 162** |
-| Acceptable route | 29 / 162 | 153 / 162 | **162 / 162** |
+| Agent top-1 | 23 / 162 | 143 / 162 | **158 / 162** |
+| Acceptable route | 29 / 162 | 154 / 162 | **162 / 162** |
 | Avoided a forbidden route | 153 / 162 | 162 / 162 | 162 / 162 |
-| Obvious cases, top-1 | 9 / 54 | 51 / 54 | 54 / 54 |
+| Obvious cases, top-1 | 9 / 54 | 52 / 54 | **54 / 54** |
 | Near-neighbour, top-1 | 6 / 54 | 49 / 54 | **53 / 54** |
-| Ambiguous, acceptable | 9 / 27 | 26 / 27 | 27 / 27 |
-| Negative, top-1 | 5 / 27 | 25 / 27 | 26 / 27 |
-| Median decision latency | 0 ms | 357 ms | not comparable |
-| Skill precision / recall | 0.31 / 0.56 | **0.68 / 0.73** | not measured |
-| Skill selections carrying a known-irrelevant id | 0.36 | **0.01** | not measured |
-| Tool precision / recall | 0.15 / 0.23 | **0.66 / 0.97** | not measured |
+| Ambiguous, top-1 | 3 / 27 | 17 / 27 | **25 / 27** |
+| Negative, top-1 | 5 / 27 | 25 / 27 | **26 / 27** |
+| Skill precision / recall | 0.31 / 0.56 | 0.68 / 0.71 | **0.74 / 0.90** |
+| Skill selections carrying a known-irrelevant id | 0.36 | **0.01** | 0.03 |
+| Tool precision / recall | 0.15 / 0.23 | 0.65 / **0.97** | **0.69** / 0.95 |
+| Median decision latency | 0 ms | 358 ms | not comparable |
 
-`Claude` is the production default path: the model reading the router's own catalog. It is not
-something the harness can call, so it is replayed from `evals/decision/routes-claude.json` — one
-focused subagent per fixture, given the dispatcher's routing rules and role catalog verbatim and
-nothing else. A real session also carries the conversation and is doing other work at the time,
-so treat it as a close reconstruction rather than the thing itself. Its latency is not comparable
-either: in production, routing costs no extra call, because the dispatcher is already running.
+`Claude` is the production default path: the model reading the dispatcher's own catalog and
+rules. It is not something the harness can call, so it is replayed from
+`evals/decision/routes-claude.json` — one focused subagent per fixture, handed the same
+candidate set and limit the engine gets and nothing else. A real session also carries the
+conversation and is doing other work at the time, so treat it as a close reconstruction rather
+than a capture. Its latency is not comparable either: in production, deciding costs no extra
+call, because the dispatcher is already running.
 
-**Claude wins agent routing, and it is not close.** 158 against 142 on top-1, and 162/162
-acceptable — it never picked a route the fixtures call indefensible. It wins hardest exactly
-where the decision is hard: 53/54 near-neighbour against 49/54, and 25/27 ambiguous against
-17/27. Jev is faster in isolation and far cheaper, but the default path is both better *and*
-free, so **agent selection is off by default.** That is a configuration change this evaluation
-caused, not a caveat attached to one it did not.
+**Claude matched or beat Jev on every decision.** Routing is not close — 158 against 143 on
+top-1, 162/162 acceptable, and it wins hardest exactly where the decision is hard (53/54
+near-neighbour, 25/27 ambiguous). Skill selection it wins on recall by a wide margin at slightly
+better precision. Tool relevance is a genuine tie, and on 20 cases a 0.04 gap either way is
+noise.
 
-**Jev wins skill and tool relevance**, which is where the dispatcher was otherwise working from
-a loadout rather than from the task. Skill precision more than doubles, and the share of
-selections carrying an id the fixture marks irrelevant falls from 0.36 to 0.01. Tool relevance
-goes from near-useless to 0.66/0.97. Those two scopes are **on** by default.
+**Both crush the floor.** The keyword baseline — which is what the dispatcher falls back to
+when it selects from a loadout rather than from the task — sits at 0.31/0.56 for skills and
+0.15/0.23 for tools. The first cut of these defaults was set against *that*, which was the wrong
+comparison. Against the path that actually ships, Jev wins nothing on quality.
 
-So the shipped configuration is the one the evidence supports, not the one that uses the most of
-the integration:
+So **Jev is installed inert. No decision scope is on by default.**
 
 ```text
-agent selection      default (Claude)
-skill selection      jev
-tool selection       jev
-context ranking      off — designed for, not shipped
-verification gate    off — designed for, not shipped
+agent selection      off      claude 158/162 · jev 143/162
+skill selection      off      claude 0.74/0.90 · jev 0.68/0.71
+tool selection       off      claude 0.69/0.95 · jev 0.65/0.97 — a tie
+context ranking      off      designed for, not shipped
+verification gate    off      designed for, not shipped
 ```
 
-Turn agent selection on if your situation differs — a latency budget, a high-volume automated
-path, a session where routing is not already happening:
+That is this architecture working, not failing. It was built so each decision could use whichever
+mechanism the evidence supports, and the evidence came back for the default path. The integration
+stays because the finding could change — a metadata rewrite, a new Jev version, a different
+fixture set — and because what Jev still offers is real:
+
+**latency and cost.** ~360 ms and a fraction of a cent against a full model turn. That is a
+serious trade for a high-volume automated path, a hard latency budget, or anywhere the
+dispatcher is not already in the loop — a standalone router, a pre-filter, a batch job. Quality
+is not the reason to switch it on; throughput is.
 
 ```bash
-AGENT_DISPATCHER_DECISION_SCOPES=agent,skills,tools python3 -m decision plan --task "..."
+AGENT_DISPATCHER_DECISION_SCOPES=skills,tools python3 -m decision plan --task "..."
 ```
 
 ### Confidence calibration
@@ -343,16 +348,16 @@ Observed top-1 accuracy per confidence band, same run:
 
 | Confidence | Jev n | Jev top-1 | Claude n | Claude top-1 |
 | --- | --- | --- | --- | --- |
-| 0.90 – 1.00 | 111 | 0.98 | 99 | 1.00 |
+| 0.90 – 1.00 | 109 | 0.98 | 99 | 1.00 |
 | 0.80 – 0.90 | 18 | 0.94 | 42 | 0.98 |
-| 0.70 – 0.80 | 10 | 0.70 | 14 | 0.93 |
-| 0.50 – 0.70 | 18 | 0.33 | 7 | 0.71 |
-| below 0.50 | 5 | 0.60 | 0 | — |
+| 0.70 – 0.80 | 13 | 0.69 | 14 | 0.93 |
+| 0.50 – 0.70 | 16 | 0.38 | 7 | 0.71 |
+| below 0.50 | 6 | 0.67 | 0 | — |
 
 Both are informative, and Jev's collapses harder and sooner — below 0.70 it is worse than a coin,
-where Claude is still at 0.71. `agent_confidence` stays at **0.80** for the case where agent
-selection is switched on: above it Jev was right 96% of the time, below it the default path is
-the safer answer. TypeSafe's own guidance puts the absolute floor at 0.50; this is stricter
+where Claude is still at 0.71. `agent_confidence` stays at **0.80** for anyone who switches agent
+selection on: above it Jev was right 96% of the time, below it the default path is the safer
+answer. TypeSafe's own guidance puts the absolute floor at 0.50; this is stricter
 because routing a whole task is not a cheap action to get wrong.
 
 The relevance floors are the precision knee from a sweep over the same fixtures. Skills went
@@ -372,14 +377,16 @@ AGENT_DISPATCHER_DECISION_THRESHOLDS=skill_relevance=0.7 python3 evals/decision/
 
 ### What this does not establish
 
-- **No end-to-end comparison.** Whether a route produces better *work*, not just a better label,
-  is untested. The fixture schema supports it; the runs do not exist.
-- The Claude column is a reconstruction — a focused subagent per task, no conversation, no
-  competing work. A real session could do better or worse.
-- Claude's skill and tool selection was never measured. It may beat Jev there too; nobody has
-  asked it.
+- **No end-to-end comparison.** Whether a better decision produces better *work*, not just a
+  better label, is untested. The fixture schema supports it; the runs do not exist.
+- The Claude column is a reconstruction — a focused subagent per case, no conversation, no
+  competing work. A real in-session dispatcher, juggling the task as well, could do worse. That
+  cuts against the conclusion here, and it is the biggest hole in it.
+- Tool selection is 20 cases. The Claude-Jev gap there is noise, and it is reported as a tie
+  rather than a win for either.
 - 162 cases over 27 roles is 4 to 9 gold labels per role, so macro numbers lean on the
   best-covered roles.
+- Nothing here measures cost or throughput at volume, which is the case for Jev that remains.
 - Some fixtures paraphrase the registry's own `use_when` lines, which inflates accuracy on those
   cases for every engine. They were kept rather than tuned toward the answer.
 

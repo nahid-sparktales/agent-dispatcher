@@ -18,27 +18,35 @@ import pathlib
 
 MODES = ("off", "auto", "required")
 
-# Default scopes, set by evidence rather than by how much of the integration exists.
+# Every scope is OFF by default, and that is a finding rather than a fence-sit.
 #
-# `agent` is OFF. Over the same 162 routing fixtures, Claude reading the router's own catalog
-# scored 158/162 top-1 and 162/162 acceptable; Jev scored 142 and 153. Claude also wins where
-# it matters most — 53/54 near-neighbour against 49/54, and 25/27 ambiguous against 17/27 —
-# and in production it costs no extra call at all, because the dispatcher is already running.
-# Jev is faster in isolation (357ms against a full model turn) and much cheaper, so this is
-# worth revisiting for latency-sensitive or high-volume use; it is not worth making the
-# default when the default path is both better and free.
+# The point of this package is that each decision can use whichever mechanism the evidence
+# supports. `evals/decision` put three engines on identical fixtures — a keyword baseline, Jev,
+# and Claude reading the dispatcher's own catalog and rules — and Claude matched or beat Jev
+# everywhere:
 #
-# `skills` and `tools` are ON. That is where the measured gain is: skill selection goes from
-# 0.31 to 0.68 precision with the share of selections carrying a known-irrelevant id dropping
-# from 0.36 to 0.01, and tool relevance from 0.15/0.23 to 0.66/0.97 precision/recall. Those
-# are decisions the dispatcher otherwise makes from a loadout rather than from the task.
+#   agent routing      claude 158/162 top-1, 162/162 acceptable · jev 143/162, 154/162
+#   skill selection    claude 0.74/0.90 precision/recall        · jev 0.68/0.71
+#   tool relevance     claude 0.69/0.95                          · jev 0.65/0.97  (a tie)
 #
-# `context` and `verification` are declared in the interface and off: designed for, not
-# shipped, and turning them on would be a claim no evaluation supports.
+# Both crush the loadout-and-keyword floor (0.31/0.56 and 0.15/0.23), which is what the first
+# cut of these defaults was set against — the wrong comparison. Against the path that actually
+# ships, Jev wins nothing on quality, and in production Claude's answer costs no extra call at
+# all, because the dispatcher is already running when it decides.
+#
+# So Jev is installed inert. What it still offers is latency and cost: ~360ms and a fraction of
+# a cent against a full model turn, which is a real trade for a high-volume automated path, a
+# latency budget, or somewhere the dispatcher is not already in the loop. Turn on exactly the
+# decisions you want it for:
+#
+#   AGENT_DISPATCHER_DECISION_SCOPES=skills,tools
+#
+# `context` (ranking retrieved files) and `verification` (judging evidence) are declared in the
+# interface and unimplemented — designed for, not shipped.
 #
 # Re-derive all of this with `python3 evals/decision/run.py --engine all
-# --routes evals/decision/routes-claude.json`. If a later run disagrees, change the defaults.
-DEFAULT_SCOPES = {"agent": False, "skills": True, "tools": True,
+# --routes evals/decision/routes-claude.json`, and change these defaults if it disagrees.
+DEFAULT_SCOPES = {"agent": False, "skills": False, "tools": False,
                   "context": False, "verification": False}
 
 # Calibrated against `evals/decision`, not guessed. Over 162 routing fixtures the observed
@@ -142,6 +150,8 @@ class Config:
         elif not self.has_credential():
             state = ("unavailable — no credential" if self.mode == "required"
                      else "not configured — default engine in use")
+        elif not any(self.scopes.values()):
+            state = "idle — credential configured, no decision scope enabled"
         else:
             state = "available"
         return {"mode": self.mode, "provider": spec["label"], "provider_id": self.provider,

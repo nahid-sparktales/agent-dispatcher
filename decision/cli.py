@@ -39,7 +39,14 @@ def render_status(cfg):
     for name, val in st["thresholds"].items():
         lines.append(f"  {name:<20}{val:g}")
     lines += ["", "Config from   " + ", ".join(st["config_sources"])]
-    if st["mode"] != "off" and st["credentials"] == "not configured":
+    if st["mode"] != "off" and not any(st["scopes"].values()):
+        lines += ["", "No decision scope is enabled, so Jev will not be called. That is the",
+                  "shipped default: on this repository's own evaluation the default path matched",
+                  "or beat Jev on every decision, so it is installed inert. Enable what you want",
+                  "it for — latency and cost are the real trade:", "",
+                  "  AGENT_DISPATCHER_DECISION_SCOPES=skills,tools", "",
+                  "See docs/jev.md for the numbers."]
+    elif st["mode"] != "off" and st["credentials"] == "not configured":
         lines += ["", "No credential is configured, so the default engine is in use. That is a",
                   "supported configuration: agent-dispatcher needs no Jev account. To enable",
                   f"Jev, set {st['credential_env']} in your environment; usage is billed to the",

@@ -6,13 +6,17 @@ runs in two steps — route the fixtures with Claude however you can (a headless
 `claude -p` loop, a subagent fan-out, a notebook), write the answers to a file, then score that
 file here against the same fixtures Jev was scored on.
 
-The file is a JSON object with a `routes` array:
+The file is a JSON object with a `routes` array, and optionally a `selections` array:
 
     {"routes": [{"id": "debugger-obvious-1", "role": "debugger", "confidence": 0.95,
-                 "runner_up": "implementer", "why": "..."}]}
+                 "runner_up": "implementer", "why": "..."}],
+     "selections": [{"id": "ui-03", "kind": "skills",
+                     "selected": ["responsive-design", "browser-verification"]}]}
 
-`confidence` and `runner_up` are optional. Only `id` and `role` are required, and an id that
-does not match a fixture is ignored rather than guessed at.
+`confidence` and `runner_up` are optional. Only `id` and `role` are required on a route, and
+`id`/`kind`/`selected` on a selection. An id that does not match a fixture is ignored rather
+than guessed at, and a decision the file does not cover is reported as unanswered rather than
+scored as an empty one — "not measured" and "selected nothing" are different results.
 """
 import json
 import pathlib
@@ -32,7 +36,14 @@ class ReplayDecisionEngine(DecisionEngine):
         raw = json.loads(pathlib.Path(path).read_text())
         rows = raw.get("routes", raw if isinstance(raw, list) else [])
         self.routes = {r["id"]: r for r in rows if isinstance(r, dict) and r.get("id")}
+        picks = raw.get("selections", []) if isinstance(raw, dict) else []
+        self.selections = {(p["id"], p.get("kind")): p for p in picks
+                           if isinstance(p, dict) and p.get("id")}
         self.missing = []
+
+    def covers(self, kind):
+        """Whether this file answers a decision at all, as opposed to answering it emptily."""
+        return any(k == kind for _, k in self.selections)
 
     def route_for(self, case_id):
         return self.routes.get(case_id)
@@ -64,9 +75,31 @@ class ReplayDecisionEngine(DecisionEngine):
             ranked=tuple(ranked), engine=self.name)
 
     def choose_skills(self, inp):
-        return SkillDecision(engine=self.name,
-                             diagnostics=("skill selection was not recorded for this engine",))
+        return self._replay(inp, "skills", SkillDecision)
 
     def choose_tools(self, inp):
-        return ToolDecision(engine=self.name,
-                            diagnostics=("tool selection was not recorded for this engine",))
+        return self._replay(inp, "tools", ToolDecision)
+
+    def _replay(self, inp, kind, cls):
+        case = getattr(inp, "_case", None)
+        row = self.selections.get((case, kind))
+        if not row:
+            return cls(engine=self.name,
+                       diagnostics=(f"no recorded {kind} selection for {case}",))
+        offered = {c.id for c in inp.candidates}
+        kept, dropped = [], []
+        for raw in row.get("selected", []):
+            sid = str(raw).strip()
+            # Same rule the runtime applies: an id that does not resolve is discarded, not
+            # invented. Scoring it would flatter whatever produced it.
+            (kept if sid in offered else dropped).append(sid)
+        limit = getattr(inp, "limit", None)
+        if limit:
+            kept = kept[:limit]
+        notes = ()
+        if dropped:
+            notes = (f"discarded {len(dropped)} id(s) not in the candidate set: "
+                     + ", ".join(d[:40] for d in dropped[:5]),)
+        return cls(selected=tuple(Selection(id=i, confidence=None, selected_by="default",
+                                            reason=str(row.get("why", ""))[:200]) for i in kept),
+                   ranked=tuple((i, 1.0) for i in kept), engine=self.name, diagnostics=notes)

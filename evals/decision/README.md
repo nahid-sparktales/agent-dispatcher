@@ -56,9 +56,10 @@ call. Record your own the same way and pass it in.
 account that owns the key, and is not run without one — the report says `not run`, which is not
 the same as `passed`.
 
-The comparison is what set the shipped defaults: Claude routes better than Jev, Jev picks skills
-and tools better than a loadout, so `DEFAULT_SCOPES` in `decision/config.py` is `skills,tools`
-and agent selection is off. [docs/jev.md](../../docs/jev.md) carries the table.
+The comparison is what set the shipped defaults, and it did not go the way the integration
+would have liked: Claude matched or beat Jev on every decision, so `DEFAULT_SCOPES` in
+`decision/config.py` is all-off and Jev installs inert. What survives for Jev is latency and
+cost, not quality. [docs/jev.md](../../docs/jev.md) carries the table and the caveats.
 
 ## Reading the output
 
@@ -81,9 +82,11 @@ digest in every report is there so a stale number can be spotted rather than tru
 
 - There is no end-to-end comparison yet — whether a route produces better *work* rather than a
   better label. The fixture schema supports it; the runs do not exist.
-- Claude's skill and tool selection was never measured; it was asked only which role owns the
-  task. It may beat Jev there too.
-- The recorded Claude routes are a reconstruction of the default path, not a capture of it.
+- The recorded Claude answers are a reconstruction of the default path, not a capture of it:
+  one focused subagent per case, no conversation, no competing work. A real in-session
+  dispatcher could do worse, which cuts against the conclusion drawn from them.
+- Tool selection is 20 cases. The Claude-Jev gap there is noise and is reported as a tie.
+- Nothing here measures cost or throughput at volume, which is the case for Jev that remains.
 - 162 cases over 27 roles is 4 to 9 gold labels each, so macro numbers lean on the best-covered
   roles.
 - A handful of fixtures paraphrase the registry's own `use_when` lines, which inflates accuracy

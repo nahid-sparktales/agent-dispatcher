@@ -121,6 +121,7 @@ def score_multi(engine, registry, cases, kind):
                                     candidates=registry.tool_candidates(),
                                     stack=tuple(case.get("stack", ())))
             call = engine.choose_tools
+        object.__setattr__(inp, "_case", case["id"])
         started = time.monotonic()
         try:
             out = call(inp)
@@ -299,11 +300,13 @@ def main(argv=None):
         res["provider"] = getattr(cfg, "provider", "") if kind == "jev" else kind
         res["model"] = getattr(cfg, "model", "") if kind == "jev" else ""
         if kind == "claude":
-            # Claude was asked which role owns the task and nothing else, so reporting a zero
-            # for skills and tools would read as a result rather than as a question not asked.
-            res.pop("skill_selection", None)
-            res.pop("tool_selection", None)
-            res["not_measured"] = ["skill_selection", "tool_selection"]
+            # A zero for a question that was never asked reads as a result. Drop whatever the
+            # routes file does not actually cover, and say so.
+            res["not_measured"] = []
+            for scope, name in (("skills", "skill_selection"), ("tools", "tool_selection")):
+                if not engine.covers(scope):
+                    res.pop(name, None)
+                    res["not_measured"].append(name)
             res["agent_routing"]["median_latency_ms"] = None
             res["agent_routing"]["p90_latency_ms"] = None
         report["engines"][kind] = res

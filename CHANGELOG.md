@@ -1,5 +1,62 @@
 # Changelog
 
+## 2.3.0 — 2026-09-19
+
+Finished the comparison and let it decide. Jev now installs inert.
+
+### Measured
+
+Three engines, identical fixtures, every decision measured for all three. Registry
+`89baa5fa0e0c`:
+
+                              baseline      jev           claude
+  agent top-1                 23 / 162      143 / 162     158 / 162
+  acceptable route            29 / 162      154 / 162     162 / 162
+  near-neighbour top-1         6 / 54        49 / 54       53 / 54
+  ambiguous top-1              3 / 27        17 / 27       25 / 27
+  skill precision / recall    0.31 / 0.56   0.68 / 0.71   0.74 / 0.90
+  tool precision / recall     0.15 / 0.23   0.65 / 0.97   0.69 / 0.95
+  median latency              0 ms          358 ms        not comparable
+
+`claude` is the production default path — the model reading the dispatcher's own catalog and
+rules, replayed from recorded answers. It **matched or beat Jev on every decision**: decisively
+on routing, clearly on skill recall at slightly better precision, and to a tie on tools, where
+20 cases cannot separate a 0.04 gap.
+
+Both engines crush the keyword floor, which is roughly what selecting from a loadout rather
+than from the task gets you. 2.2 set its defaults against that floor. That was the wrong
+comparison; this is the right one.
+
+### Changed
+
+- **Every decision scope is off by default.** Jev is installed, wired, tested and not called.
+  Quality is no longer a reason to enable it — the default path is as good or better and costs
+  no extra call, because the dispatcher is already running when it decides. Latency and cost
+  still are: ~360 ms and a fraction of a cent against a full model turn, which is a real trade
+  for a high-volume automated path, a latency budget, or anywhere the dispatcher is not in the
+  loop. `AGENT_DISPATCHER_DECISION_SCOPES=skills,tools` turns on what you want.
+- `status` says so plainly rather than looking broken: *idle — credential configured, no
+  decision scope enabled*.
+
+This is the architecture working. It was built so each decision could use whichever mechanism
+the evidence supports, and the evidence came back for the default path. The integration stays
+because the finding could change — a metadata rewrite, a new model version, a different fixture
+set — and because the harness that produced this answer is now the thing that would notice.
+
+### Added
+
+- `replay.py` now serves skill and tool selections as well as routes, and distinguishes "not
+  measured" from "selected nothing" rather than scoring a question nobody asked as a zero.
+- `evals/decision/routes-claude.json` carries all three decisions for all 206 fixtures, with
+  its method written down.
+
+### Known holes
+
+Unchanged and worth repeating: no end-to-end comparison exists, so nothing here shows a better
+decision produces better work. The Claude column is a reconstruction — a focused subagent per
+case, no competing work — which cuts against the conclusion rather than for it. And nothing
+measures cost or throughput at volume, which is the case for Jev that remains.
+
 ## 2.2.1 — 2026-09-19
 
 Ran the comparison v2.2 said had not been run, and changed a default because of what it said.
