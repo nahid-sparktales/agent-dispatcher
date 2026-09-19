@@ -7,20 +7,34 @@ D="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
 [ -f "$D/.agent-dispatcher-active" ] || exit 0
 
 payload=$(cat 2>/dev/null)
-sid=$(printf '%s' "$payload" | sed -n 's/.*"session_id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
-cwd=$(printf '%s' "$payload" | sed -n 's/.*"cwd"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
+read -r sid cwd <<EOF
+$(printf '%s' "$payload" | python3 -c 'import json,sys
+try: d = json.load(sys.stdin)
+except Exception: d = {}
+print(d.get("session_id", ""), d.get("cwd", ""))' 2>/dev/null)
+EOF
+
+# where this pack is installed: next to this hook (plugin) or under the config dir (manual)
+self=$(cd "$(dirname "$0")" && pwd)
+if [ -d "$self/../skills/agent-dispatcher/roles" ]; then
+  pack=$(cd "$self/../skills/agent-dispatcher" && pwd)
+else
+  pack="$D/skills/agent-dispatcher"
+fi
 [ -n "$sid" ] && [ -f "$D/.agent-dispatcher-off/$sid" ] && exit 0
 [ -n "$cwd" ] && [ -f "$cwd/.agent-dispatcher-off" ] && exit 0
 # forget session silences older than a week
 [ -d "$D/.agent-dispatcher-off" ] && find "$D/.agent-dispatcher-off" -type f -mtime +7 -delete 2>/dev/null
 
+printf 'AGENT DISPATCHER ACTIVE (perpetual mode) — this pack lives at %s
+
+' "$pack"
 cat <<'DISPATCH'
-AGENT DISPATCHER ACTIVE (perpetual mode)
 
 Route each request that involves real work to the best-fit specialist role below, then work as that
 role. Match the "not for" line as carefully as the "route here when" line.
-Read ~/.claude/skills/agent-dispatcher/roles/<id>.md before acting as one; read
-~/.claude/skills/agent-dispatcher/SKILL.md for the full catalog, the chaining rules, or to break a tie.
+Read PACK/roles/<id>.md before acting as one; read PACK/SKILL.md for the full catalog, the
+chaining rules, or to break a tie.
 
 A slash command or an installed skill that covers the request owns the turn: load it, work inside
 its procedure, keep the role as posture only, and skip the role announcement.

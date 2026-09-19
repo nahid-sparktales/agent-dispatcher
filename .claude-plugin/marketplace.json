@@ -1,6 +1,7 @@
 {
   "name": "agent-dispatcher",
   "owner": {"name": "nahid"},
+  "description": "One skill that routes each request to a specialist agent role and works as it.",
   "plugins": [
     {
       "name": "agent-dispatcher",

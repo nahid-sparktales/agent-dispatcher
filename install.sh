@@ -23,6 +23,10 @@ uninstall_previous() {
 
 if [ "$1" = "--uninstall" ]; then
   uninstall_previous
+  for f in commands/agent-*.md; do
+    t="$D/commands/$(basename "$f")"
+    [ -f "$t" ] && grep -q "agent-dispatcher skill's" "$t" 2>/dev/null && rm -f "$t"
+  done
   rm -rf "$D/skills/agent-dispatcher" "$D/hooks/agent-dispatcher-activate.sh"
   python3 - "$D" <<'PY'
 import json, pathlib, shutil, sys
@@ -33,7 +37,6 @@ if p.exists():
     kept = [e for e in starts
             if not any("agent-dispatcher-activate" in h.get("command", "") for h in e.get("hooks", []))]
     if len(kept) != len(starts):
-        shutil.copy(p, p.with_suffix(".json.bak-agent-dispatcher"))
         s["hooks"]["SessionStart"] = kept
         p.write_text(json.dumps(s, indent=2) + "\n")
         print("removed SessionStart hook")
@@ -44,6 +47,8 @@ fi
 
 python3 build.py
 python3 test_build.py
+python3 -c "import json,pathlib,sys; p=pathlib.Path(sys.argv[1])/'settings.json'; p.exists() and json.loads(p.read_text())" "$D" \
+  || { echo "$D/settings.json is not valid JSON — fix it first; nothing was installed"; exit 1; }
 
 uninstall_previous
 mkdir -p "$D/skills" "$D/commands" "$D/hooks"
@@ -69,8 +74,9 @@ cmd = f'bash "{d}/hooks/agent-dispatcher-activate.sh"'
 s = json.loads(p.read_text()) if p.exists() else {}
 hooks = s.setdefault("hooks", {}).setdefault("SessionStart", [])
 if not any(h.get("command") == cmd for e in hooks for h in e.get("hooks", [])):
-    if p.exists():
-        shutil.copy(p, p.with_suffix(".json.bak-agent-dispatcher"))
+    bak = p.with_suffix(".json.bak-agent-dispatcher")
+    if p.exists() and not bak.exists():
+        shutil.copy(p, bak)
     hooks.append({"matcher": "startup|resume|clear|compact",
                   "hooks": [{"type": "command", "command": cmd, "timeout": 5}]})
     p.write_text(json.dumps(s, indent=2) + "\n")

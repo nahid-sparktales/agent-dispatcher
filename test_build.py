@@ -20,7 +20,7 @@ def main():
         assert (build.ROLES / f"{r['id']}.md").exists(), f"missing role file for {r['id']}"
         for field in ("name", "summary", "use_when", "not_for"):
             assert r[field].strip(), f"{r['id']}: empty {field}"
-        assert '"' not in r[field], f"{r['id']}: quote inside frontmatter value"
+            assert '"' not in r[field], f"{r['id']}: quote inside frontmatter {field}"
         assert r["tags"], f"{r['id']}: no tags"
 
     skill = (build.SKILL / "SKILL.md").read_text()
@@ -42,6 +42,12 @@ def main():
     assert readme.count("<!-- roles:start -->") == 1 and readme.count("<!-- roles:end -->") == 1
     table = readme.split("<!-- roles:start -->")[1].split("<!-- roles:end -->")[0]
     assert set(re.findall(r"`/agent-([a-z0-9-]+)`", table)) == set(slugs), "README table != commands"
+
+    assert str(len(roles)) in readme.split("<!-- roles:start -->")[0], (
+        f"README prose does not mention the real role count ({len(roles)})")
+    for stale in re.findall(r"one of (\d+) specialist|The (\d+) roles", readme):
+        n = next(v for v in stale if v)
+        assert int(n) == len(roles), f"README says {n} roles, there are {len(roles)}"
 
     print(f"ok — {len(roles)} roles, {len(cmds)} commands, hook and README all agree")
 
