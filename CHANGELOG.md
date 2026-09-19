@@ -1,5 +1,34 @@
 # Changelog
 
+## 2.3.2 — 2026-09-19
+
+Perpetual mode was documented as a set of files to `touch`. It was always a set of commands.
+
+### Changed
+
+- **The README leads with the commands.** `/agent-dispatcher on`, `on here`, `off`, `off here`,
+  `off everywhere`, `status` — a six-row table of what you want and what to say. The flag files
+  move into a collapsed section for anyone scripting it, which is the only audience that ever
+  needed them. Nobody should have been typing `touch ~/.claude/.agent-dispatcher-active`; the
+  skill has run that for them since 2.0, and the README simply never said so.
+- **The scopes have canonical words.** `on here`, `off here` and `off everywhere` are defined
+  forms rather than phrasings the router happened to match. Bare `off` still means *this
+  session*, because that is what people mean mid-conversation, and the wider scopes now have to
+  be spelled out so nothing global is disarmed by accident.
+- **`/agent-dispatcher status` actually reports something.** It was an `ls` on one flag file. It
+  now covers global arming, project arming, project and session silencing, and whether the
+  SessionStart hook is installed at all — including the state that looks armed but is not: a
+  project flag with no matching entry in the allow-list. Arming without the hook does nothing,
+  and that was previously invisible.
+- The perpetual-mode preamble the hook injects each session now tells Claude that the user says
+  `/agent-dispatcher off` and Claude runs the command, rather than reading as instructions to
+  hand over. Same mechanism, no longer phrased as homework.
+
+The two-step project allow-list is unchanged and still deliberate: a flag file alone would let
+any repository you clone arm your sessions, so the list lives in your own config directory where
+a `git clone` cannot reach it. The README now explains that where someone deciding whether to
+trust it will read it, rather than as a footnote to a table of shell commands.
+
 ## 2.3.1 — 2026-09-19
 
 Two deletions, both because Jev is off by default and carrying weight for a disabled feature is

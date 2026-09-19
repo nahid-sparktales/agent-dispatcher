@@ -860,11 +860,11 @@ requests that follow, and do not route or chain out of it until they name anothe
 DISPATCH
 
 if [ -n "$sid" ]; then
-  printf 'To stop routing: this session only, run\\n  mkdir -p "%s/.agent-dispatcher-off" && touch "%s/.agent-dispatcher-off/%s"\\n' "$D" "$D" "$sid"
+  printf 'The user stops this with /agent-dispatcher off (or "stop the dispatcher") - never\\nhand them a command to run. When they ask, run the line for the scope they meant:\\n  this session    mkdir -p "%s/.agent-dispatcher-off" && touch "%s/.agent-dispatcher-off/%s"\\n' "$D" "$D" "$sid"
 else
-  printf 'To stop routing this session, ask the user for the session id first (the payload carried none).\\n'
+  printf 'The user stops this with /agent-dispatcher off. Stopping just this session needs the\\nsession id, which this payload did not carry - ask for it, or use a wider scope below.\\n'
 fi
-printf 'For this project, touch .agent-dispatcher-off in its root; everywhere, rm -f "%s/.agent-dispatcher-active".\\n\\n' "$D"
+printf '  this project    touch .agent-dispatcher-off   (beats any arming, including global)\\n  everywhere      rm -f "%s/.agent-dispatcher-active"\\nEither way, drop the role immediately; the flags only stop the hook re-arming you later.\\n/agent-dispatcher status reports what is armed.\\n\\n' "$D"
 
 cat <<'DISPATCH'
 ROLES

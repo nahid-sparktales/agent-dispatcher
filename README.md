@@ -36,8 +36,7 @@ Knowledge is not capability, capability is not authorization, and relevance is n
 
 ```text
 /agent-dispatcher            route this request and the rest of the session
-/agent-dispatcher on         perpetual mode, every future session
-/agent-dispatcher off        stop for this session
+/agent-dispatcher status     what is armed, where, and whether the hook is installed
 /agent-context               show the context plan behind the current request
 /agent-context explain       ...and why this role, these skills, these tools
 /agent-context verbose       ...plus the candidates, the dropped files and the budget split
@@ -45,23 +44,52 @@ Knowledge is not capability, capability is not authorization, and relevance is n
 /agent-decision off|auto|required    switch it for this project
 ```
 
-Perpetual mode runs through a `SessionStart` hook. Scopes:
-
-| Scope | Arm | Silence |
-| --- | --- | --- |
-| Session | `/agent-dispatcher` | `/agent-dispatcher off` |
-| Project | `touch .agent-dispatcher-on` **and** add the project path to `~/.claude/.agent-dispatcher-projects` | `touch .agent-dispatcher-off` |
-| Everywhere | `touch ~/.claude/.agent-dispatcher-active` | delete that file |
-
-Silencing beats arming. Project arming takes two steps on purpose: a flag file alone would let any
-repository you clone switch your sessions into perpetual mode, so the allow-list lives in your own
-config directory. Silencing stays repo-local, because it can only ever reduce behaviour.
-
-Force a role directly with `/agent-uidesigner`, `/agent-debugger`, `/agent-reviewer` — 27 commands,
-one per role.
+Force a role directly with `/agent-uidesigner`, `/agent-debugger`, `/agent-reviewer` — 27
+commands, one per role. A forced role holds until you name another or say stop.
 
 When work fans out, each subagent is routed to the role that fits **its** assignment rather than
 inheriting the caller's, and a verifier never carries the role that produced the work.
+
+## Perpetual mode
+
+Ask for it. There is nothing to configure by hand.
+
+| | Say |
+| --- | --- |
+| Route every session, everywhere | `/agent-dispatcher on` |
+| Route every session in this project | `/agent-dispatcher on here` |
+| Stop — this session | `/agent-dispatcher off` |
+| Stop — this project | `/agent-dispatcher off here` |
+| Stop — everywhere | `/agent-dispatcher off everywhere` |
+| What is armed right now? | `/agent-dispatcher status` |
+
+Plain English works as well as the keywords — "always on", "just this repo", "stop the
+dispatcher". Bare `off` means *this session*, because that is what people mean when they say it
+mid-conversation; the wider scopes are spelled out so you cannot disarm everything by accident.
+
+**Silencing always beats arming.** `off here` wins over a global `on`, so one noisy repository
+never costs you the setting everywhere else.
+
+<details>
+<summary>What those commands actually write, if you would rather script it</summary>
+
+Perpetual mode runs through a `SessionStart` hook that reads four flag files:
+
+| Scope | Armed by | Silenced by |
+| --- | --- | --- |
+| Session | the command itself | `~/.claude/.agent-dispatcher-off/<session-id>` |
+| Project | `.agent-dispatcher-on` in the project **and** its absolute path in `~/.claude/.agent-dispatcher-projects` | `.agent-dispatcher-off` in the project |
+| Everywhere | `~/.claude/.agent-dispatcher-active` | delete that file |
+
+Arming a project takes two steps on purpose. A flag file alone would let any repository you
+clone switch your sessions into perpetual mode, so the allow-list lives in your own config
+directory where a `git clone` cannot reach it. Silencing stays repo-local, because it can only
+ever reduce behaviour — a hostile repo turning the dispatcher *off* is not a threat.
+
+Session silences are forgotten after a week. `/agent-dispatcher status` reports all of this,
+including the case that looks armed but is not: a project flag with no matching allow-list entry.
+
+</details>
 
 ## Install
 
