@@ -18,10 +18,27 @@ import pathlib
 
 MODES = ("off", "auto", "required")
 
-# Default scopes. Agent, skill and tool selection are bounded choice problems and are on;
-# context ranking and the verification gate are designed for and left off until evidence
-# from evals/decision says they help.
-DEFAULT_SCOPES = {"agent": True, "skills": True, "tools": True,
+# Default scopes, set by evidence rather than by how much of the integration exists.
+#
+# `agent` is OFF. Over the same 162 routing fixtures, Claude reading the router's own catalog
+# scored 158/162 top-1 and 162/162 acceptable; Jev scored 142 and 153. Claude also wins where
+# it matters most — 53/54 near-neighbour against 49/54, and 25/27 ambiguous against 17/27 —
+# and in production it costs no extra call at all, because the dispatcher is already running.
+# Jev is faster in isolation (357ms against a full model turn) and much cheaper, so this is
+# worth revisiting for latency-sensitive or high-volume use; it is not worth making the
+# default when the default path is both better and free.
+#
+# `skills` and `tools` are ON. That is where the measured gain is: skill selection goes from
+# 0.31 to 0.68 precision with the share of selections carrying a known-irrelevant id dropping
+# from 0.36 to 0.01, and tool relevance from 0.15/0.23 to 0.66/0.97 precision/recall. Those
+# are decisions the dispatcher otherwise makes from a loadout rather than from the task.
+#
+# `context` and `verification` are declared in the interface and off: designed for, not
+# shipped, and turning them on would be a claim no evaluation supports.
+#
+# Re-derive all of this with `python3 evals/decision/run.py --engine all
+# --routes evals/decision/routes-claude.json`. If a later run disagrees, change the defaults.
+DEFAULT_SCOPES = {"agent": False, "skills": True, "tools": True,
                   "context": False, "verification": False}
 
 # Calibrated against `evals/decision`, not guessed. Over 162 routing fixtures the observed

@@ -309,9 +309,8 @@ def main():
     agents = reg.agent_candidates()
     check("every decision candidate maps to a real role",
           {c.id for c in agents} <= ids, "a candidate id has no template behind it")
-    check("every role but the dispatcher is a candidate",
-          {c.id for c in agents} == ids - {"dispatcher"},
-          str(sorted(ids - {"dispatcher"} - {c.id for c in agents})))
+    check("every role in the router's catalog is a decision candidate",
+          {c.id for c in agents} == ids, str(sorted(ids - {c.id for c in agents})))
     check("candidate ids are unique", len({c.id for c in agents}) == len(agents))
     check("routing metadata reaches the registry the engine reads",
           all(r.get("summary") and r.get("use_when") and r.get("not_for")

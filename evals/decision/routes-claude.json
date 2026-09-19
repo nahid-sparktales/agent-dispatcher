@@ -1,0 +1,1143 @@
+{
+ "schema_version": "1.0",
+ "engine": "claude-opus-5",
+ "recorded": "2026-09-19",
+ "registry_version": "89baa5fa0e0c",
+ "method": "One subagent per fixture, each given the dispatcher's own routing rules and full role catalog verbatim from the shipped SKILL.md, the task, and nothing else \u2014 no repository access, no conversation, no other fixture. This is a reconstruction of the default path, not the default path itself: a real session also carries the conversation and is doing other work at the time.",
+ "routes": [
+  {
+   "id": "dispatcher-obvious-1",
+   "role": "dispatcher",
+   "confidence": 0.93,
+   "runner_up": "planner",
+   "why": "Four separable workstreams with ordering dependencies, an independent verification pass, and one combined go/no-go answer at the end \u2014 orchestration and synthesis, not a single specialist's deliverable."
+  },
+  {
+   "id": "dispatcher-obvious-2",
+   "role": "dispatcher",
+   "confidence": 0.93,
+   "runner_up": "planner",
+   "why": "Four separable workstreams with managed handoffs, independent per-piece sign-off, and one combined go/no-go at the end \u2014 multi-agent coordination, not a plan document."
+  },
+  {
+   "id": "dispatcher-near-neighbour-1",
+   "role": "dispatcher",
+   "confidence": 0.9,
+   "runner_up": "planner",
+   "why": "Approved plan, three dependent tracks to drive and verify at each handoff \u2014 coordination of separable workstreams, and planner's \"Not for\" rules out executing and ongoing coordination."
+  },
+  {
+   "id": "dispatcher-near-neighbour-2",
+   "role": "dispatcher",
+   "confidence": 0.93,
+   "runner_up": "planner",
+   "why": "Four separable parallel workstreams plus an independent verification run, needing coordination to a shared date \u2014 orchestration, not a plan document (planner is \"not for ongoing team coordination\")."
+  },
+  {
+   "id": "dispatcher-ambiguous-1",
+   "role": "dispatcher",
+   "confidence": 0.6,
+   "runner_up": "product-manager",
+   "why": "One dated goal with separable, dependent workstreams (scope call, backend, static site, on-call sign-off) \u2014 coordination and combined ownership, not a single specialist deliverable."
+  },
+  {
+   "id": "dispatcher-negative-1",
+   "role": "implementer",
+   "confidence": 0.82,
+   "runner_up": "generalist",
+   "why": "Three small authorized edits one agent finishes directly \u2014 dispatcher's \"Not for\" excludes routine work with no separable workstreams."
+  },
+  {
+   "id": "generalist-obvious-1",
+   "role": "generalist",
+   "confidence": 0.92,
+   "runner_up": "implementer",
+   "why": "Small multi-domain cleanup \u2014 triage, delete, write a note \u2014 with no single specialty deliverable; explorer is barred from code changes, implementer from the discovery work."
+  },
+  {
+   "id": "generalist-obvious-2",
+   "role": "generalist",
+   "confidence": 0.72,
+   "runner_up": "implementer",
+   "why": "Two small chores in different domains (CLI error message plus a README fix) that one agent finishes end to end \u2014 generalist's \"spans several domains, small enough for one agent\"; not a single specced code change, so implementer is the near miss."
+  },
+  {
+   "id": "generalist-near-neighbour-1",
+   "role": "generalist",
+   "confidence": 0.82,
+   "runner_up": "implementer",
+   "why": "Three small unrelated chores spanning code, data, and build \u2014 each trivial and finishable end to end by one agent, which is generalist's \"spans several domains, small enough for one agent\"; no single specialist owns all three and it is too routine for dispatcher."
+  },
+  {
+   "id": "generalist-near-neighbour-2",
+   "role": "generalist",
+   "confidence": 0.82,
+   "runner_up": "explorer",
+   "why": "Codebase orientation plus a small env-var startup fix spans two domains in one small task; explorer is explicitly not for making code changes."
+  },
+  {
+   "id": "generalist-ambiguous-1",
+   "role": "debugger",
+   "confidence": 0.62,
+   "runner_up": "generalist",
+   "why": "A working feature silently broke; deliverable is root cause plus a verified fix, and it is not an active outage needing mitigation first."
+  },
+  {
+   "id": "generalist-negative-1",
+   "role": "security-auditor",
+   "confidence": 0.9,
+   "runner_up": "debugger",
+   "why": "Unvalidated account id from the query string leaks other users' saved cards \u2014 a broken-authorization flaw on sensitive data at a trust boundary, not a generic task; casual phrasing does not make it a generalist request."
+  },
+  {
+   "id": "implementer-obvious-1",
+   "role": "implementer",
+   "confidence": 0.94,
+   "runner_up": "generalist",
+   "why": "Deliverable is a diff \u2014 an authorized, scoped feature build with the design signed off and the API already in place, so no design or planning work remains."
+  },
+  {
+   "id": "implementer-obvious-2",
+   "role": "implementer",
+   "confidence": 0.94,
+   "runner_up": "generalist",
+   "why": "Behavior is already specified and authorized; deliverable is a code change (a --dry-run flag), i.e. a diff."
+  },
+  {
+   "id": "implementer-near-neighbour-1",
+   "role": "implementer",
+   "confidence": 0.85,
+   "runner_up": "api-integration-engineer",
+   "why": "Cause is already diagnosed and the change is specified; deliverable is a bounded, authorized code diff preserving call sites."
+  },
+  {
+   "id": "implementer-near-neighbour-2",
+   "role": "implementer",
+   "confidence": 0.93,
+   "runner_up": "ui-ux-designer",
+   "why": "Design is already specced and approved; the deliverable is authorized code wiring an existing store \u2014 a diff, not a design."
+  },
+  {
+   "id": "implementer-ambiguous-1",
+   "role": "architect",
+   "confidence": 0.82,
+   "runner_up": "implementer",
+   "why": "The open question is gateway vs in-app \u2014 an execution-boundary decision, and implementer is explicitly not for building against an unsettled plan."
+  },
+  {
+   "id": "implementer-negative-1",
+   "role": "refactoring-migration-specialist",
+   "confidence": 0.93,
+   "runner_up": "implementer",
+   "why": "Staged migration off a deprecated wrapper with explicitly preserved behavior and no feature changes \u2014 behavior-preservation, not new feature work."
+  },
+  {
+   "id": "planner-obvious-1",
+   "role": "planner",
+   "confidence": 0.94,
+   "runner_up": "refactoring-migration-specialist",
+   "why": "Deliverable is a sequenced plan with prerequisites, dependencies and per-step acceptance criteria, explicitly before any code is written."
+  },
+  {
+   "id": "planner-obvious-2",
+   "role": "planner",
+   "confidence": 0.95,
+   "runner_up": "architect",
+   "why": "Deliverable is a sequenced plan with dependencies and risks, explicitly not implementation \u2014 planner's \"Route here when\" (multiple dependencies, migration risk, explicit request for a plan)."
+  },
+  {
+   "id": "planner-near-neighbour-1",
+   "role": "planner",
+   "confidence": 0.93,
+   "runner_up": "architect",
+   "why": "Design is already settled; what's wanted is sequencing, parallelism and dependency risk \u2014 a plan, not a boundary decision."
+  },
+  {
+   "id": "planner-near-neighbour-2",
+   "role": "planner",
+   "confidence": 0.92,
+   "runner_up": "product-manager",
+   "why": "Scope and success metric are settled, so the ask is sequencing work across a hard dependency and a fixed two-engineer/six-week capacity \u2014 a plan, not product scoping."
+  },
+  {
+   "id": "planner-ambiguous-1",
+   "role": "planner",
+   "confidence": 0.78,
+   "runner_up": "devops-release",
+   "why": "Ask is \"what should we do and in what order\" \u2014 the deliverable is a sequenced, evidence-grounded plan, not a CI change or a measured speedup."
+  },
+  {
+   "id": "planner-negative-1",
+   "role": "implementer",
+   "confidence": 0.85,
+   "runner_up": "generalist",
+   "why": "Deliverable is a one-line footer edit the user wants done (\"just sort it out\"); planner's \"Not for\" excludes elaborate plans for a trivial fix."
+  },
+  {
+   "id": "researcher-obvious-1",
+   "role": "researcher",
+   "confidence": 0.96,
+   "runner_up": "architect",
+   "why": "Deliverable is external, cited evidence on Apple's current review guidance before a decision \u2014 source investigation, not code or design."
+  },
+  {
+   "id": "researcher-obvious-2",
+   "role": "researcher",
+   "confidence": 0.95,
+   "runner_up": "architect",
+   "why": "Deliverable is a decision-ready comparison of external vendor docs and SLAs \u2014 source investigation, not a design or a code change."
+  },
+  {
+   "id": "researcher-near-neighbour-1",
+   "role": "researcher",
+   "confidence": 0.92,
+   "runner_up": "api-integration-engineer",
+   "why": "Deliverable is a sourced reading of an external spec and changelog, not a connector change \u2014 researcher's \"documentation investigation\" over api-integration-engineer's build work."
+  },
+  {
+   "id": "researcher-near-neighbour-2",
+   "role": "researcher",
+   "confidence": 0.88,
+   "runner_up": "ai-agent-engineer",
+   "why": "Deliverable is cited findings from external provider documentation to inform a decision \u2014 explicitly \"sources, not recollection\" \u2014 which is researcher; ai-agent-engineer's \"Not for\" excludes guessing provider capabilities and no prompt/route/eval artifact is being built."
+  },
+  {
+   "id": "researcher-ambiguous-1",
+   "role": "researcher",
+   "confidence": 0.78,
+   "runner_up": "architect",
+   "why": "The blocker is stale external knowledge of two search products, so the deliverable is a sourced comparison feeding a go/no-go decision, not a system design or a migration."
+  },
+  {
+   "id": "researcher-negative-1",
+   "role": "explorer",
+   "confidence": 0.94,
+   "runner_up": "researcher",
+   "why": "Deliverable is a map of where behavior lives in local code with the real file paths; researcher's \"Not for\" explicitly excludes local code mapping alone."
+  },
+  {
+   "id": "reviewer-obvious-1",
+   "role": "reviewer",
+   "confidence": 0.92,
+   "runner_up": "security-auditor",
+   "why": "Completed change needs an independent merge-readiness verdict with evidence-backed findings, not a fix or a threat model."
+  },
+  {
+   "id": "reviewer-obvious-2",
+   "role": "reviewer",
+   "confidence": 0.96,
+   "runner_up": "tester",
+   "why": "Deliverable is an independent verdict on a completed diff \u2014 scope creep and gaps \u2014 not a fix, plan, or test suite."
+  },
+  {
+   "id": "reviewer-near-neighbour-1",
+   "role": "reviewer",
+   "confidence": 0.93,
+   "runner_up": "architect",
+   "why": "Functional testing is already done; what's wanted is an independent verdict on code quality, maintainability, and scope creep in a completed change."
+  },
+  {
+   "id": "reviewer-near-neighbour-2",
+   "role": "reviewer",
+   "confidence": 0.82,
+   "runner_up": "architect",
+   "why": "Deliverable is an evidence-backed verdict on an existing branch with an explicit no-edits constraint \u2014 reviewer's independent assessment, not architect's design decision or implementer's diff."
+  },
+  {
+   "id": "reviewer-ambiguous-1",
+   "role": "reviewer",
+   "confidence": 0.78,
+   "runner_up": "devops-release",
+   "why": "Finished branch needing an independent go/no-go readiness verdict \u2014 a judgment on the artifact, not release pipeline or deploy work."
+  },
+  {
+   "id": "reviewer-negative-1",
+   "role": "security-auditor",
+   "confidence": 0.93,
+   "runner_up": "reviewer",
+   "why": "Webhook signature verification plus a shared secret leaking into logs is secrets/trust-boundary review, not a general correctness verdict on a change."
+  },
+  {
+   "id": "tester-obvious-1",
+   "role": "tester",
+   "confidence": 0.94,
+   "runner_up": "devops-release",
+   "why": "Deliverable is regression coverage that fails the build on recurrence, not a root-cause fix or CI platform work."
+  },
+  {
+   "id": "tester-obvious-2",
+   "role": "tester",
+   "confidence": 0.94,
+   "runner_up": "reviewer",
+   "why": "Independent verification of acceptance criteria against a running build, delivering reproducible failure steps \u2014 tester's core deliverable, not a code-artifact verdict."
+  },
+  {
+   "id": "tester-near-neighbour-1",
+   "role": "tester",
+   "confidence": 0.94,
+   "runner_up": "reviewer",
+   "why": "Static review is already done; what's missing is actually executing the change against the ticket's cases and edge cases \u2014 independent functional verification, which is tester's deliverable, not reviewer's re-read."
+  },
+  {
+   "id": "tester-near-neighbour-2",
+   "role": "tester",
+   "confidence": 0.86,
+   "runner_up": "debugger",
+   "why": "Deliverable is a reproducible failure sequence with no code change, which is tester's \"reports reproducible failures\"; debugger's repro+fix is explicitly excluded."
+  },
+  {
+   "id": "tester-ambiguous-1",
+   "role": "tester",
+   "confidence": 0.62,
+   "runner_up": "debugger",
+   "why": "A week-long red, ignored nightly E2E suite is suite-health work \u2014 triage real vs flaky failures and restore trustworthy regression coverage (deliverable = a credible test suite), not one defect's root-cause repro+fix, and nothing is failing in production."
+  },
+  {
+   "id": "tester-negative-1",
+   "role": "devops-release",
+   "confidence": 0.88,
+   "runner_up": "tester",
+   "why": "The deliverable is CI wiring and branch-protection config, not test authoring \u2014 tester's scope is writing/reporting tests, not the pipeline that gates merges."
+  },
+  {
+   "id": "ai-agent-engineer-obvious-1",
+   "role": "ai-agent-engineer",
+   "confidence": 0.95,
+   "runner_up": "debugger",
+   "why": "Reworking an AI assistant's reply-selection logic plus a scored eval harness over past tickets is squarely agent routing + evaluation, not a single-defect root-cause hunt."
+  },
+  {
+   "id": "ai-agent-engineer-obvious-2",
+   "role": "ai-agent-engineer",
+   "confidence": 0.95,
+   "runner_up": "tester",
+   "why": "Fixing an agent's tool-call arguments by rewriting its tool contracts plus building a replayable eval harness is squarely agent prompt/tool-contract/evaluation work."
+  },
+  {
+   "id": "ai-agent-engineer-near-neighbour-1",
+   "role": "ai-agent-engineer",
+   "confidence": 0.85,
+   "runner_up": "debugger",
+   "why": "Asks to rework an AI assistant's conversation memory/state handling \u2014 agent memory and execution behavior, not a repro-and-fix of a code defect."
+  },
+  {
+   "id": "ai-agent-engineer-near-neighbour-2",
+   "role": "ai-agent-engineer",
+   "confidence": 0.93,
+   "runner_up": "data-analyst",
+   "why": "Deliverable is a repeatable evaluation harness grading a model route swap \u2014 ai-agent-engineer's explicit \"model route / evaluation harness\" trigger; data-analyst is for interpreting numbers, not building the graded comparison."
+  },
+  {
+   "id": "ai-agent-engineer-ambiguous-1",
+   "role": "ai-agent-engineer",
+   "confidence": 0.78,
+   "runner_up": "debugger",
+   "why": "Stale answer traced to a RAG corpus/ranking question \u2014 retrieval behavior is explicitly ai-agent-engineer territory, not a code defect repro."
+  },
+  {
+   "id": "ai-agent-engineer-negative-1",
+   "role": "security-auditor",
+   "confidence": 0.86,
+   "runner_up": "ai-agent-engineer",
+   "why": "Prompt injection crossed a trust boundary and leaked another customer's data; the ask is an authorization/exposure assessment before re-enabling access, and ai-agent-engineer's \"Not for\" rules out prompt-only security enforcement."
+  },
+  {
+   "id": "api-integration-engineer-obvious-1",
+   "role": "api-integration-engineer",
+   "confidence": 0.95,
+   "runner_up": "implementer",
+   "why": "Inbound webhook from an external provider needs idempotent handling \u2014 squarely the API/integration contract role, not generic feature coding."
+  },
+  {
+   "id": "api-integration-engineer-obvious-2",
+   "role": "api-integration-engineer",
+   "confidence": 0.95,
+   "runner_up": "implementer",
+   "why": "Outbound CRM connector with retry/failure handling so records aren't dropped when the external API rejects calls \u2014 a service contract and durability problem, not a scheduled transform pipeline."
+  },
+  {
+   "id": "api-integration-engineer-near-neighbour-1",
+   "role": "api-integration-engineer",
+   "confidence": 0.88,
+   "runner_up": "debugger",
+   "why": "Cross-service sync path (CRM \u2192 accounting) whose real work is idempotency and timeout/retry semantics on an external write \u2014 the connector's contract, not a pipeline or a one-off root cause."
+  },
+  {
+   "id": "api-integration-engineer-near-neighbour-2",
+   "role": "api-integration-engineer",
+   "confidence": 0.86,
+   "runner_up": "implementer",
+   "why": "Work is outbound-call failure handling (timeouts, fast-fail, graceful degradation) on a third-party payment integration; the outage is already over, so incident-responder is excluded."
+  },
+  {
+   "id": "api-integration-engineer-ambiguous-1",
+   "role": "api-integration-engineer",
+   "confidence": 0.82,
+   "runner_up": "debugger",
+   "why": "Dropped inbound webhooks from a payments provider under load \u2014 the fix is durable, idempotent intake of an external service contract, not a mystery defect hunt or a reconciliation workflow."
+  },
+  {
+   "id": "api-integration-engineer-negative-1",
+   "role": "data-engineer",
+   "confidence": 0.92,
+   "runner_up": "api-integration-engineer",
+   "why": "A nightly scheduled job that ingests and reshapes vendor data into warehouse tables is pipeline work; api-integration-engineer's \"Not for\" explicitly excludes scheduled pipelines that land and reshape data for downstream consumers."
+  },
+  {
+   "id": "architect-obvious-1",
+   "role": "architect",
+   "confidence": 0.95,
+   "runner_up": "planner",
+   "why": "Deliverable is an agreed service boundary \u2014 where payments/fulfillment split, ownership, and the contract crossing between them \u2014 which is component-spanning system design, not a task sequence."
+  },
+  {
+   "id": "architect-obvious-2",
+   "role": "architect",
+   "confidence": 0.94,
+   "runner_up": "database-engineer",
+   "why": "Asks for a product-wide tenancy/region-placement boundary decision with explicit tradeoffs \u2014 a cross-component design call, not a schema or migration task."
+  },
+  {
+   "id": "architect-near-neighbour-1",
+   "role": "architect",
+   "confidence": 0.86,
+   "runner_up": "product-manager",
+   "why": "Offline-capable client plus conflicting concurrent edits is a system boundary, data-model and sync-semantics tradeoff with long-term consequences, not scope definition or schema work."
+  },
+  {
+   "id": "architect-near-neighbour-2",
+   "role": "architect",
+   "confidence": 0.82,
+   "runner_up": "refactoring-migration-specialist",
+   "why": "Deliverable is one agreed event contract spanning three producers and all consumers plus a transition story \u2014 a cross-component data-model decision with long-term consequences, not the mechanical migration or a connector build."
+  },
+  {
+   "id": "architect-ambiguous-1",
+   "role": "architect",
+   "confidence": 0.78,
+   "runner_up": "database-engineer",
+   "why": "Deliverable is a tradeoff decision among read replica / separate reporting store / query rework \u2014 a data-flow boundary choice with long-term consequences, not a measured speedup or a schema change."
+  },
+  {
+   "id": "architect-negative-1",
+   "role": "planner",
+   "confidence": 0.92,
+   "runner_up": "architect",
+   "why": "Design is already settled; the ask is sequencing, out-of-order risk, and per-step acceptance checks \u2014 a plan, not a design decision."
+  },
+  {
+   "id": "data-engineer-obvious-1",
+   "role": "data-engineer",
+   "confidence": 0.95,
+   "runner_up": "debugger",
+   "why": "Fix a scheduled pipeline's transform step and backfill the produced history \u2014 data-engineer's exact scope; cause is already known, so no root-cause hunt is needed."
+  },
+  {
+   "id": "data-engineer-obvious-2",
+   "role": "data-engineer",
+   "confidence": 0.95,
+   "runner_up": "devops-release",
+   "why": "Promoting a manual analyst notebook into a scheduled transform that lands data in the warehouse is data-engineer's exact \"notebook promoted to production\" case; devops-release only owns the scheduler platform itself."
+  },
+  {
+   "id": "data-engineer-near-neighbour-1",
+   "role": "data-engineer",
+   "confidence": 0.9,
+   "runner_up": "data-analyst",
+   "why": "Duplicate sessions must be deduped in the transform that produces the metric, not interpreted in the dashboard \u2014 data-analyst is explicitly \"not for\" repairing the producing pipeline."
+  },
+  {
+   "id": "data-engineer-near-neighbour-2",
+   "role": "data-engineer",
+   "confidence": 0.82,
+   "runner_up": "database-engineer",
+   "why": "Fix belongs in the loading step itself \u2014 pipeline idempotency on re-edited upstream records, not destination schema design."
+  },
+  {
+   "id": "data-engineer-ambiguous-1",
+   "role": "data-engineer",
+   "confidence": 0.76,
+   "runner_up": "debugger",
+   "why": "Deliverable is closing a three-day gap in produced warehouse data \u2014 a backfill through the loader job, which is data-engineer's route; not an active outage (incident-responder out) and not schema work (database-engineer's \"Not for\" excludes backfilling through the producing pipeline)."
+  },
+  {
+   "id": "data-engineer-negative-1",
+   "role": "data-analyst",
+   "confidence": 0.93,
+   "runner_up": "data-engineer",
+   "why": "Deliverable is an interpretation of a metric divergence with stated confidence \u2014 comparing cohorts and explaining a trend, which data-engineer explicitly excludes (\"interpreting what the resulting numbers mean\")."
+  },
+  {
+   "id": "database-engineer-obvious-1",
+   "role": "database-engineer",
+   "confidence": 0.95,
+   "runner_up": "refactoring-migration-specialist",
+   "why": "Deliverable is new schema plus a lock-free migration on a 40M-row table \u2014 schema design, integrity, and safe migration behavior."
+  },
+  {
+   "id": "database-engineer-obvious-2",
+   "role": "database-engineer",
+   "confidence": 0.94,
+   "runner_up": "debugger",
+   "why": "Fix is a transactional/unique-constraint change enforced in the storage layer \u2014 a schema+migration deliverable, not a root-cause hunt."
+  },
+  {
+   "id": "database-engineer-near-neighbour-1",
+   "role": "database-engineer",
+   "confidence": 0.76,
+   "runner_up": "refactoring-migration-specialist",
+   "why": "Deliverable is a schema change plus a backward-compatible data migration on the customer record, which the tie-break sends to database-engineer rather than the code-contract-focused migration specialist."
+  },
+  {
+   "id": "database-engineer-near-neighbour-2",
+   "role": "database-engineer",
+   "confidence": 0.87,
+   "runner_up": "refactoring-migration-specialist",
+   "why": "Deliverable is a storage-level access rule (view/RLS/constraint) so no query can bypass the soft-delete flag \u2014 schema and access rules where the records live, not a 40-call-site refactor or a security audit verdict."
+  },
+  {
+   "id": "database-engineer-ambiguous-1",
+   "role": "database-engineer",
+   "confidence": 0.55,
+   "runner_up": "debugger",
+   "why": "All three candidate causes are database persistence concerns \u2014 pool configuration, a long-running query holding a connection/transaction, and instance capacity \u2014 so the fix lands in connection/query management, not a code defect repro."
+  },
+  {
+   "id": "database-engineer-negative-1",
+   "role": "performance-engineer",
+   "confidence": 0.88,
+   "runner_up": "database-engineer",
+   "why": "Deliverable is a measured latency improvement to a stated target (4s to under 1s), not a schema or migration change; the duplicate fetch is a call-path bottleneck to profile and remove."
+  },
+  {
+   "id": "debugger-obvious-1",
+   "role": "debugger",
+   "confidence": 0.95,
+   "runner_up": "tester",
+   "why": "Intermittent, non-reproducible crash where the ask is a reproduction, root cause, and permanent fix \u2014 debugger's exact deliverable; not an in-progress outage needing mitigation."
+  },
+  {
+   "id": "debugger-obvious-2",
+   "role": "debugger",
+   "confidence": 0.95,
+   "runner_up": "incident-responder",
+   "why": "Intermittent wrong-value defect needing root cause plus a fix that stays fixed; \"nothing is on fire\" rules out incident-responder."
+  },
+  {
+   "id": "debugger-near-neighbour-1",
+   "role": "debugger",
+   "confidence": 0.93,
+   "runner_up": "incident-responder",
+   "why": "Intermittent defect where a symptom-level retry failed; deliverable is root cause + fix + regression test, which is debugger's, not an in-progress outage needing mitigation."
+  },
+  {
+   "id": "debugger-near-neighbour-2",
+   "role": "debugger",
+   "confidence": 0.9,
+   "runner_up": "version-control",
+   "why": "Deliverable is root cause plus corrected behaviour for a live defect; version-control's \"Not for\" excludes locating or fixing the defect a commit introduced."
+  },
+  {
+   "id": "debugger-ambiguous-1",
+   "role": "debugger",
+   "confidence": 0.82,
+   "runner_up": "refactoring-migration-specialist",
+   "why": "Deliverable is a root cause for failing tests plus a fix \u2014 \"failing test needs disciplined root-cause investigation\"; the migration is already done, so it is not a staged dependency transition."
+  },
+  {
+   "id": "debugger-negative-1",
+   "role": "incident-responder",
+   "confidence": 0.95,
+   "runner_up": "debugger",
+   "why": "Production payment path failing right now with \"get it working again\" \u2014 mitigation outranks root cause, and debugger's Not for excludes in-progress outages."
+  },
+  {
+   "id": "devops-release-obvious-1",
+   "role": "devops-release",
+   "confidence": 0.96,
+   "runner_up": "implementer",
+   "why": "Deliverable is a reproducible build and signed package pipeline off a clean checkout \u2014 packaging/release engineering, not a feature diff."
+  },
+  {
+   "id": "devops-release-obvious-2",
+   "role": "devops-release",
+   "confidence": 0.94,
+   "runner_up": "planner",
+   "why": "Release readiness work \u2014 staging promotion path, tagging, and an exercised rollback before a cut date; nothing is currently failing, so not incident-responder, and the tagging is release mechanics, not history repair."
+  },
+  {
+   "id": "devops-release-near-neighbour-1",
+   "role": "devops-release",
+   "confidence": 0.92,
+   "runner_up": "incident-responder",
+   "why": "Aligning staging and production runtime versions and deployment configuration is environment/release work; \"nothing broken right now\" rules out incident-responder and debugger."
+  },
+  {
+   "id": "devops-release-near-neighbour-2",
+   "role": "devops-release",
+   "confidence": 0.92,
+   "runner_up": "data-engineer",
+   "why": "Transforms are explicitly fine; the work is the CI runner's disk and scheduling setup \u2014 data-engineer's \"Not for\" excludes the scheduler platform or CI itself."
+  },
+  {
+   "id": "devops-release-ambiguous-1",
+   "role": "devops-release",
+   "confidence": 0.72,
+   "runner_up": "performance-engineer",
+   "why": "The slow thing is the CI container image build itself \u2014 build/packaging/pipeline configuration, which is devops-release's \"Route here when\", not application latency profiling."
+  },
+  {
+   "id": "devops-release-negative-1",
+   "role": "documentation-writer",
+   "confidence": 0.87,
+   "runner_up": "content-copywriter",
+   "why": "Deliverable is release notes written from merged PRs and tickets \u2014 documentation-writer lists release notes explicitly; devops-release owns shipping the release, not writing its notes."
+  },
+  {
+   "id": "explorer-obvious-1",
+   "role": "explorer",
+   "confidence": 0.92,
+   "runner_up": "implementer",
+   "why": "Blocker is locating which of three config sites actually wins at runtime in an unfamiliar repo \u2014 a map of where behavior lives, not yet a diff."
+  },
+  {
+   "id": "explorer-obvious-2",
+   "role": "explorer",
+   "confidence": 0.96,
+   "runner_up": "architect",
+   "why": "Deliverable is a map of an existing codebase \u2014 execution path from endpoint to price computation plus every reader of that field \u2014 with no change made."
+  },
+  {
+   "id": "explorer-near-neighbour-1",
+   "role": "explorer",
+   "confidence": 0.95,
+   "runner_up": "researcher",
+   "why": "Deliverable is a map of where CSV-import behavior lives in an unfamiliar codebase, explicitly with nothing changed \u2014 explorer's core case; researcher is excluded by \"not for local code mapping alone\"."
+  },
+  {
+   "id": "explorer-near-neighbour-2",
+   "role": "explorer",
+   "confidence": 0.92,
+   "runner_up": "refactoring-migration-specialist",
+   "why": "Deliverable is a map of call sites and their arguments across the workspace, not the migration itself \u2014 the ICU swap is explicitly deferred."
+  },
+  {
+   "id": "explorer-ambiguous-1",
+   "role": "explorer",
+   "confidence": 0.86,
+   "runner_up": "documentation-writer",
+   "why": "The ask is a map of how five services actually connect in this repo \u2014 explorer's deliverable; the onboarding guide is downstream, not this request."
+  },
+  {
+   "id": "explorer-negative-1",
+   "role": "researcher",
+   "confidence": 0.86,
+   "runner_up": "architect",
+   "why": "Comparing three external vendors against stated constraints and recommending one is source-based external research producing a decision, not codebase mapping (explorer excludes broad web research)."
+  },
+  {
+   "id": "incident-responder-obvious-1",
+   "role": "incident-responder",
+   "confidence": 0.97,
+   "runner_up": "debugger",
+   "why": "Production checkout is failing right now and the ask is restoring service, not explaining the cause \u2014 debugger's \"Not for\" excludes an outage in progress."
+  },
+  {
+   "id": "incident-responder-obvious-2",
+   "role": "incident-responder",
+   "confidence": 0.97,
+   "runner_up": "debugger",
+   "why": "Production API failing right now; wants fastest safe mitigation plus a timestamped record of actions, not a root-cause explanation."
+  },
+  {
+   "id": "incident-responder-near-neighbour-1",
+   "role": "incident-responder",
+   "confidence": 0.95,
+   "runner_up": "debugger",
+   "why": "Live production failure where the user explicitly defers root cause and wants mitigation now; debugger's \"Not for\" excludes an outage still in progress."
+  },
+  {
+   "id": "incident-responder-near-neighbour-2",
+   "role": "incident-responder",
+   "confidence": 0.95,
+   "runner_up": "devops-release",
+   "why": "Production is failing right now mid-rollout and the ask is immediate mitigation (rollback), with release-process work explicitly deferred \u2014 devops-release's \"Not for\" excludes an outage in progress."
+  },
+  {
+   "id": "incident-responder-ambiguous-1",
+   "role": "incident-responder",
+   "confidence": 0.92,
+   "runner_up": "debugger",
+   "why": "Production is failing right now at connection saturation, so mitigation outranks root cause \u2014 debugger's \"Not for\" explicitly excludes an outage in progress."
+  },
+  {
+   "id": "incident-responder-negative-1",
+   "role": "documentation-writer",
+   "confidence": 0.82,
+   "runner_up": "incident-responder",
+   "why": "Deliverable is a written postmortem record (status page + internal timeline) after recovery \u2014 incident-responder's \"Not for\" excludes postmortem write-ups, and nothing is failing now."
+  },
+  {
+   "id": "performance-engineer-obvious-1",
+   "role": "performance-engineer",
+   "confidence": 0.97,
+   "runner_up": "debugger",
+   "why": "Deliverable is a measured speedup \u2014 profile latency, cut it, show before/after on the same benchmark; no defect to root-cause."
+  },
+  {
+   "id": "performance-engineer-obvious-2",
+   "role": "performance-engineer",
+   "confidence": 0.95,
+   "runner_up": "debugger",
+   "why": "Startup-latency work with a numeric target (2.3s to under 200ms) \u2014 deliverable is a measured before/after speedup, not a defect repro."
+  },
+  {
+   "id": "performance-engineer-near-neighbour-1",
+   "role": "performance-engineer",
+   "confidence": 0.92,
+   "runner_up": "database-engineer",
+   "why": "Wants latency attribution by measurement before any fix \u2014 profiling, not schema work or a defect hunt."
+  },
+  {
+   "id": "performance-engineer-near-neighbour-2",
+   "role": "performance-engineer",
+   "confidence": 0.92,
+   "runner_up": "debugger",
+   "why": "No defect or crash \u2014 it's dropped frames on a scroll path needing profiling plus a targeted fix, i.e. a measured before/after, which is performance-engineer; debugger's \"Route here when\" requires a failure to root-cause."
+  },
+  {
+   "id": "performance-engineer-ambiguous-1",
+   "role": "performance-engineer",
+   "confidence": 0.72,
+   "runner_up": "data-engineer",
+   "why": "The job runs correctly but too slowly; the deliverable is a measured runtime reduction against the report window, not building or repairing the pipeline."
+  },
+  {
+   "id": "performance-engineer-negative-1",
+   "role": "ui-ux-designer",
+   "confidence": 0.88,
+   "runner_up": "performance-engineer",
+   "why": "Backend is already fast at 300ms; the ask is to design the feedback/loading interaction between click and data, an interaction-design deliverable, not a measured speedup."
+  },
+  {
+   "id": "refactoring-migration-specialist-obvious-1",
+   "role": "refactoring-migration-specialist",
+   "confidence": 0.95,
+   "runner_up": "implementer",
+   "why": "Deliberate deduplication of drifted branches with behavior preserved exactly \u2014 a refactor, not a new feature."
+  },
+  {
+   "id": "refactoring-migration-specialist-obvious-2",
+   "role": "refactoring-migration-specialist",
+   "confidence": 0.96,
+   "runner_up": "implementer",
+   "why": "Staged dependency upgrade to a new API contract with behavior preserved \u2014 the specialist's exact remit, not a fresh feature diff."
+  },
+  {
+   "id": "refactoring-migration-specialist-near-implementer-1",
+   "role": "refactoring-migration-specialist",
+   "confidence": 0.9,
+   "runner_up": "implementer",
+   "why": "Deliberate consolidation of duplicate clients onto one contract with behavior explicitly preserved \u2014 structure change, not new functionality."
+  },
+  {
+   "id": "refactoring-migration-specialist-near-planner-1",
+   "role": "refactoring-migration-specialist",
+   "confidence": 0.92,
+   "runner_up": "planner",
+   "why": "Decision and target design are already signed off; the deliverable is executing a staged dependency swap that preserves behavior \u2014 planner is excluded because no plan is being asked for."
+  },
+  {
+   "id": "refactoring-migration-specialist-ambiguous-1",
+   "role": "refactoring-migration-specialist",
+   "confidence": 0.85,
+   "runner_up": "devops-release",
+   "why": "A runtime/dependency version upgrade that must preserve existing nightly-job behavior is a staged compatibility migration, not pipeline or release work."
+  },
+  {
+   "id": "refactoring-migration-specialist-negative-1",
+   "role": "database-engineer",
+   "confidence": 0.82,
+   "runner_up": "refactoring-migration-specialist",
+   "why": "Deliverable is a data migration into a new table layout with online cutover and rollback \u2014 schema/persistence work, not a code-contract refactor or a pipeline job."
+  },
+  {
+   "id": "security-auditor-obvious-1",
+   "role": "security-auditor",
+   "confidence": 0.96,
+   "runner_up": "reviewer",
+   "why": "Pre-launch review of session issuance, password reset and org-membership authorization for cross-tenant data exposure \u2014 authentication, authorization and trust-boundary weaknesses, the security-auditor's exact remit."
+  },
+  {
+   "id": "security-auditor-obvious-2",
+   "role": "security-auditor",
+   "confidence": 0.94,
+   "runner_up": "ai-agent-engineer",
+   "why": "Asks what an attacker could achieve via untrusted uploaded input driving shell execution, plus what to restrict \u2014 a trust-boundary/tool-execution threat assessment with remediation, not agent build work (ai-agent-engineer is explicitly \"not for\" prompt-only security enforcement)."
+  },
+  {
+   "id": "security-auditor-near-reviewer-1",
+   "role": "security-auditor",
+   "confidence": 0.92,
+   "runner_up": "reviewer",
+   "why": "Asks specifically for authorization/cross-tenant file access weaknesses plus remediation, not a general correctness verdict."
+  },
+  {
+   "id": "security-auditor-near-devops-1",
+   "role": "security-auditor",
+   "confidence": 0.92,
+   "runner_up": "devops-release",
+   "why": "Deliverable is a threat assessment of an over-scoped token crossing a fork trust boundary plus remediation \u2014 security-auditor, not devops-release pipeline work."
+  },
+  {
+   "id": "security-auditor-ambiguous-1",
+   "role": "security-auditor",
+   "confidence": 0.6,
+   "runner_up": "debugger",
+   "why": "One tenant's data appearing in another's export is a data-isolation/authorization boundary failure, and \"can't happen again\" asks for systemic remediation, not just a root-cause patch."
+  },
+  {
+   "id": "security-auditor-negative-1",
+   "role": "debugger",
+   "confidence": 0.88,
+   "runner_up": "security-auditor",
+   "why": "Post-deploy defect with inconsistent behavior; deliverable is a root-cause repro plus fix, not an authz security review."
+  },
+  {
+   "id": "version-control-obvious-1",
+   "role": "version-control",
+   "confidence": 0.97,
+   "runner_up": "debugger",
+   "why": "Commits lost after a pull/rebase \u2014 recovering history via reflog/branch surgery, not fixing a code defect."
+  },
+  {
+   "id": "version-control-obvious-2",
+   "role": "version-control",
+   "confidence": 0.96,
+   "runner_up": "devops-release",
+   "why": "Deliverable is repaired branch history \u2014 duplicated and missing commits after a bad merge \u2014 which is branch surgery, not a release pipeline or a code defect."
+  },
+  {
+   "id": "version-control-near-debugger-1",
+   "role": "version-control",
+   "confidence": 0.92,
+   "runner_up": "debugger",
+   "why": "Deliverable is a read-only history reconstruction \u2014 which commit dropped the fix and its test \u2014 not a repro or a fix, which version-control owns and debugger's scope excludes."
+  },
+  {
+   "id": "version-control-near-incident-1",
+   "role": "version-control",
+   "confidence": 0.94,
+   "runner_up": "incident-responder",
+   "why": "Deliverable is recovering lost commits after a force-push \u2014 reflog/branch surgery on repo history, not a failing production system."
+  },
+  {
+   "id": "version-control-ambiguous-1",
+   "role": "version-control",
+   "confidence": 0.82,
+   "runner_up": "performance-engineer",
+   "why": "The fix is purging old fixture blobs from committed history (filter-repo/BFG, branch rewrite) without losing work \u2014 repository history surgery, not a code, pipeline, or profiling task."
+  },
+  {
+   "id": "version-control-negative-1",
+   "role": "devops-release",
+   "confidence": 0.85,
+   "runner_up": "debugger",
+   "why": "The fix lives in the CI/deploy job's checkout and artifact-tagging config, not in repo history \u2014 version-control explicitly excludes the delivery pipeline."
+  },
+  {
+   "id": "product-manager-obvious-1",
+   "role": "product-manager",
+   "confidence": 0.95,
+   "runner_up": "planner",
+   "why": "Conflicting stakeholder asks must be turned into first-version scope, who it serves, and success measures \u2014 product scoping, not sequencing or implementation."
+  },
+  {
+   "id": "product-manager-obvious-2",
+   "role": "product-manager",
+   "confidence": 0.96,
+   "runner_up": "planner",
+   "why": "Deliverable is what to build first, for whom, and the success measures \u2014 prioritization and scope, not an execution plan."
+  },
+  {
+   "id": "product-manager-near-neighbour-1",
+   "role": "product-manager",
+   "confidence": 0.87,
+   "runner_up": "planner",
+   "why": "Asks whether to build it, for which customers, and what belongs in the first version \u2014 scope and prioritization, not architecture or an execution plan."
+  },
+  {
+   "id": "product-manager-near-neighbour-2",
+   "role": "product-manager",
+   "confidence": 0.86,
+   "runner_up": "planner",
+   "why": "Deliverable is a first-release scope cut from conflicting stakeholder asks plus the rationale and measurable success criteria \u2014 prioritization, not an execution plan."
+  },
+  {
+   "id": "product-manager-ambiguous-1",
+   "role": "product-manager",
+   "confidence": 0.78,
+   "runner_up": "data-analyst",
+   "why": "Deliverable is a scope decision on who the product is for versus what to fix in onboarding, not a metric or a redesigned screen."
+  },
+  {
+   "id": "product-manager-negative-1",
+   "role": "planner",
+   "confidence": 0.94,
+   "runner_up": "product-manager",
+   "why": "Scope is already signed off; the deliverable is ordered work items with dependencies, migration risk, and per-step preconditions \u2014 planner's exact trigger, and PM's \"Not for: detailed implementation sequencing alone\"."
+  },
+  {
+   "id": "ui-ux-designer-obvious-1",
+   "role": "ui-ux-designer",
+   "confidence": 0.95,
+   "runner_up": "product-manager",
+   "why": "Deliverable is a redesigned multi-step flow with per-screen content, empty and error states, detailed enough to build from \u2014 interaction/hierarchy design, not scope definition."
+  },
+  {
+   "id": "ui-ux-designer-obvious-2",
+   "role": "ui-ux-designer",
+   "confidence": 0.95,
+   "runner_up": "product-manager",
+   "why": "Deliverable is screens \u2014 a screen-by-screen flow with pending/rejected/bulk states that matches the existing tool's visual coherence."
+  },
+  {
+   "id": "ui-ux-designer-near-neighbour-1",
+   "role": "ui-ux-designer",
+   "confidence": 0.92,
+   "runner_up": "implementer",
+   "why": "Deliverable is interaction design \u2014 how applied/cleared filter states read and behave \u2014 explicitly before code, so it is UX state and feedback design, not a diff."
+  },
+  {
+   "id": "ui-ux-designer-near-neighbour-2",
+   "role": "ui-ux-designer",
+   "confidence": 0.9,
+   "runner_up": "refactoring-migration-specialist",
+   "why": "Deliverable is one canonical screen spec plus written visual rules \u2014 interface consistency and hierarchy work, not a code refactor or a review verdict."
+  },
+  {
+   "id": "ui-ux-designer-ambiguous-1",
+   "role": "ui-ux-designer",
+   "confidence": 0.82,
+   "runner_up": "content-copywriter",
+   "why": "Deliverable is a coherent error state across a flow \u2014 icons, hierarchy, and next-step affordance together, not copy alone."
+  },
+  {
+   "id": "ui-ux-designer-negative-1",
+   "role": "performance-engineer",
+   "confidence": 0.9,
+   "runner_up": "debugger",
+   "why": "Stutter and input lag on a device class is a responsiveness bottleneck needing profiling and before/after frame-time evidence, not interaction redesign."
+  },
+  {
+   "id": "automation-operations-obvious-1",
+   "role": "automation-operations",
+   "confidence": 0.94,
+   "runner_up": "implementer",
+   "why": "A recurring daily brief stitched from merged commits, calendar and a shared inbox, then posted to a channel \u2014 the catalog's exact \"recurring briefs, inbox or calendar workflows, coordinated service actions\" case."
+  },
+  {
+   "id": "automation-operations-obvious-2",
+   "role": "automation-operations",
+   "confidence": 0.9,
+   "runner_up": "api-integration-engineer",
+   "why": "Recurring multi-service admin workflow (doc, calendar booking, CRM record updates) that must be safe on repeat triggers \u2014 automation with state checks, not a new API connector."
+  },
+  {
+   "id": "automation-operations-near-1",
+   "role": "automation-operations",
+   "confidence": 0.72,
+   "runner_up": "devops-release",
+   "why": "Deliverable is a recurring read-only sweep that files tickets and calendar reminders across authorized services \u2014 coordinated admin workflow, not a release/deploy config change (nothing is toggled)."
+  },
+  {
+   "id": "automation-operations-near-2",
+   "role": "api-integration-engineer",
+   "confidence": 0.68,
+   "runner_up": "automation-operations",
+   "why": "Deliverable is a built HR-system connector whose re-runs are idempotent (no double-book, no duplicate send) \u2014 api-integration-engineer's explicit connector/idempotency scope, not an assistant hand-running a recurring calendar/inbox workflow."
+  },
+  {
+   "id": "automation-operations-ambiguous-1",
+   "role": "automation-operations",
+   "confidence": 0.78,
+   "runner_up": "data-engineer",
+   "why": "Recurring weekly brief assembled from two authorized services and delivered on a schedule \u2014 a repeatable admin workflow, not a production data pipeline or an analysis of what the numbers mean."
+  },
+  {
+   "id": "automation-operations-negative-1",
+   "role": "data-engineer",
+   "confidence": 0.9,
+   "runner_up": "debugger",
+   "why": "Nightly export transform broken by an upstream schema change plus reprocessing five days of output is pipeline repair and backfill, data-engineer's explicit route; automation-operations covers admin/service workflows, not data pipelines."
+  },
+  {
+   "id": "content-copywriter-obvious-1",
+   "role": "content-copywriter",
+   "confidence": 0.95,
+   "runner_up": "growth-marketing-strategist",
+   "why": "Deliverable is rewritten web copy (hero + tier blurbs), which is content-copywriter's core; no positioning strategy or channel plan is requested."
+  },
+  {
+   "id": "content-copywriter-obvious-2",
+   "role": "content-copywriter",
+   "confidence": 0.95,
+   "runner_up": "documentation-writer",
+   "why": "Substantive editing of announcement copy for a stated audience \u2014 the copywriter's \"substantive editing\" case, not product reference docs."
+  },
+  {
+   "id": "content-copywriter-near-1",
+   "role": "content-copywriter",
+   "confidence": 0.82,
+   "runner_up": "documentation-writer",
+   "why": "Deliverable is persuasive customer-facing messaging that drives an action, not accurate reference docs."
+  },
+  {
+   "id": "content-copywriter-near-2",
+   "role": "content-copywriter",
+   "confidence": 0.95,
+   "runner_up": "growth-marketing-strategist",
+   "why": "Positioning is already decided; the ask is written homepage, listing and ad copy for review \u2014 a copy deliverable, not strategy."
+  },
+  {
+   "id": "content-copywriter-ambiguous-1",
+   "role": "growth-marketing-strategist",
+   "confidence": 0.82,
+   "runner_up": "content-copywriter",
+   "why": "Launch positioning, audience sequencing and first-week success metrics are marketing strategy, not drafting \u2014 copywriter is explicitly \"not for setting business strategy without a brief\"."
+  },
+  {
+   "id": "content-copywriter-negative-1",
+   "role": "documentation-writer",
+   "confidence": 0.94,
+   "runner_up": "content-copywriter",
+   "why": "Deliverable is a README plus setup/first-run instructions grounded in the actual tool \u2014 documentation-writer's \"setup instructions, guides\"; content-copywriter is for marketing/product messaging, not install docs."
+  },
+  {
+   "id": "data-analyst-obvious-1",
+   "role": "data-analyst",
+   "confidence": 0.97,
+   "runner_up": "",
+   "why": "Deliverable is a metric breakdown by cohort (source, plan size) distinguishing real drop from mix shift \u2014 inspecting data and explaining a trend."
+  },
+  {
+   "id": "data-analyst-obvious-2",
+   "role": "data-analyst",
+   "confidence": 0.95,
+   "runner_up": "data-engineer",
+   "why": "Cohort comparison on data that already exists in the warehouse \u2014 the deliverable is a number/finding, not a pipeline."
+  },
+  {
+   "id": "data-analyst-near-1",
+   "role": "data-analyst",
+   "confidence": 0.85,
+   "runner_up": "data-engineer",
+   "why": "Reconciling two metric definitions and isolating the account cohort behind an 8% gap is dataset inspection and cohort comparison, not pipeline repair."
+  },
+  {
+   "id": "data-analyst-near-2",
+   "role": "data-analyst",
+   "confidence": 0.92,
+   "runner_up": "product-manager",
+   "why": "Deliverable is a number plus a cohort comparison (stall rate at step three by team size), which is data-analyst work; the redesign decision it feeds is not yet being scoped."
+  },
+  {
+   "id": "data-analyst-ambiguous-1",
+   "role": "data-analyst",
+   "confidence": 0.76,
+   "runner_up": "debugger",
+   "why": "Ask is to segment and compare funnel metrics to tell a real drop from a tracking artifact \u2014 analysis, not a confirmed defect or pipeline repair."
+  },
+  {
+   "id": "data-analyst-negative-1",
+   "role": "debugger",
+   "confidence": 0.92,
+   "runner_up": "data-analyst",
+   "why": "Inconsistent behavior on a known conditional path needing root cause plus a fix \u2014 a repro+fix deliverable, not a metric interpretation."
+  },
+  {
+   "id": "documentation-writer-obvious-1",
+   "role": "documentation-writer",
+   "confidence": 0.96,
+   "runner_up": "generalist",
+   "why": "Deliverable is a self-serve onboarding/setup guide for developers \u2014 documentation-writer's core \"setup instructions, guides, onboarding\" case."
+  },
+  {
+   "id": "documentation-writer-obvious-2",
+   "role": "documentation-writer",
+   "confidence": 0.95,
+   "runner_up": "implementer",
+   "why": "Deliverable is corrected API reference docs grounded in what the service actually returns, not a code change."
+  },
+  {
+   "id": "documentation-writer-near-1",
+   "role": "documentation-writer",
+   "confidence": 0.9,
+   "runner_up": "content-copywriter",
+   "why": "Deliverable is a customer-facing reference page documenting existing rate-limit behavior (thresholds, headers, window reset), not a code change or marketing copy."
+  },
+  {
+   "id": "documentation-writer-near-2",
+   "role": "documentation-writer",
+   "confidence": 0.82,
+   "runner_up": "explorer",
+   "why": "Deliverable is reference material on real retry/backoff behavior that support can rely on, grounded in the actual service \u2014 documentation, not a code map or a connector change."
+  },
+  {
+   "id": "documentation-writer-ambiguous-1",
+   "role": "documentation-writer",
+   "confidence": 0.85,
+   "runner_up": "planner",
+   "why": "Deliverable is accurate, non-contradictory install docs grounded in the actual current flow, plus where each surface should say it."
+  },
+  {
+   "id": "documentation-writer-negative-1",
+   "role": "architect",
+   "confidence": 0.86,
+   "runner_up": "researcher",
+   "why": "Deliverable is a pre-commitment tradeoff decision on batch vs queue ingestion with long-term cost and stack fit \u2014 architecture, not documenting existing behavior."
+  },
+  {
+   "id": "growth-marketing-strategist-obvious-1",
+   "role": "growth-marketing-strategist",
+   "confidence": 0.95,
+   "runner_up": "product-manager",
+   "why": "Awareness/acquisition gap needing a channel plan plus measurable six-week signals \u2014 that is marketing strategy, not product scope."
+  },
+  {
+   "id": "growth-marketing-strategist-obvious-2",
+   "role": "growth-marketing-strategist",
+   "confidence": 0.95,
+   "runner_up": "product-manager",
+   "why": "Competitive differentiation plus a measurable marketing test is positioning and experiment design, not product scope."
+  },
+  {
+   "id": "growth-marketing-strategist-near-1",
+   "role": "growth-marketing-strategist",
+   "confidence": 0.82,
+   "runner_up": "content-copywriter",
+   "why": "Deliverable is settled positioning and target audience across channels, not the copy itself \u2014 copywriter is explicitly \"not for setting business strategy without a brief\"."
+  },
+  {
+   "id": "growth-marketing-strategist-near-2",
+   "role": "growth-marketing-strategist",
+   "confidence": 0.82,
+   "runner_up": "data-analyst",
+   "why": "Deliverable is the design of a marketing test \u2014 message/offer variants, audience, and win criteria for trial starts \u2014 not analysis of results or a product build."
+  },
+  {
+   "id": "growth-marketing-strategist-ambiguous-1",
+   "role": "growth-marketing-strategist",
+   "confidence": 0.68,
+   "runner_up": "product-manager",
+   "why": "A signup-growth target with pricing/onboarding/reach as competing levers needs an acquisition strategy and a measurable test, not a build scope."
+  },
+  {
+   "id": "growth-marketing-strategist-negative-1",
+   "role": "performance-engineer",
+   "confidence": 0.92,
+   "runner_up": "implementer",
+   "why": "Deliverable is a measured page-load speedup against a numeric target (8s to under 2s), not marketing or a plain code change."
+  }
+ ]
+}

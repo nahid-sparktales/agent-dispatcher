@@ -71,12 +71,19 @@ class Registry:
 
     # -------------------------------------------------------------- candidates
 
-    def agent_candidates(self, exclude=("dispatcher",)):
+    def agent_candidates(self, exclude=()):
         """Every role, as the compact routing metadata a decision model can tell apart.
 
         Deliberately not the role bodies: 27 full prompts is tens of thousands of characters
         and none of it distinguishes one role from another better than these four lines do.
-        `dispatcher` is excluded by default because routing *to* the router is not a route.
+
+        All 27, including `dispatcher`. It is tempting to drop it — "routing to the router is
+        not a route" — but that is a misreading: `dispatcher` owns multi-agent orchestration of
+        separable workstreams, which is a real deliverable and the right answer for some
+        requests. `SKILL.md` keeps it in the catalog the model reads, so an engine that cannot
+        name it is being asked a different question than the default path answers, and the
+        comparison stops being like-for-like. `exclude` stays available for a caller that has
+        a reason.
         """
         out = []
         for role in sorted(self.roles.values(), key=lambda r: r["id"]):

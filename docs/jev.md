@@ -149,9 +149,12 @@ the environment → the defaults.
 | `log` | `AGENT_DISPATCHER_DECISION_LOG` | off |
 
 Scopes are per decision, not global, because the right engine for one decision is not
-necessarily the right engine for another. `context` (ranking retrieved files) and `verification`
-(judging whether evidence is sufficient) are declared in the interface and **off**: they are
-designed for, not shipped, and turning them on would be a claim the evaluation does not support.
+necessarily the right engine for another — and here that is not a hypothetical. The shipped
+default is `skills,tools`: the evaluation found Claude routes better than Jev and Jev selects
+skills and tools better than the loadout, so each decision uses whichever mechanism won.
+`context` (ranking retrieved files) and `verification` (judging whether evidence is sufficient)
+are declared in the interface and off: designed for, not shipped, and turning them on would be a
+claim no evaluation supports.
 
 The credential is not in that table on purpose. It is never a config key, never written to a
 file by this pack, and never carried on a config object. The provider reads it out of the
@@ -280,80 +283,105 @@ everything has perfect recall and no value.
 
 ### Results
 
-Run against `jev-latest` through the TypeSafe API, registry `89baa5fa0e0c`, 2026-09-19:
+Run against `jev-latest` through the TypeSafe API, registry `89baa5fa0e0c`, 2026-09-19. Three
+engines, identical fixtures.
 
-| | Default (lexical baseline) | Jev |
-| --- | --- | --- |
-| Agent top-1 | 23 / 162 | **138 / 162** |
-| Agent acceptable | 28 / 162 | **150 / 162** |
-| Avoided a forbidden route | 154 / 162 | **160 / 162** |
-| Obvious cases, top-1 | 9 / 54 | 49 / 54 |
-| Near-neighbour, top-1 | 6 / 54 | 48 / 54 |
-| Ambiguous, acceptable | 8 / 27 | 26 / 27 |
-| Skill precision / recall | 0.31 / 0.56 | **0.68 / 0.73** |
-| Skill selections carrying a known-irrelevant id | 0.36 | **0.01** |
-| Tool precision / recall | 0.15 / 0.23 | **0.64 / 0.97** |
-| Median decision latency | 0 ms | 366 ms |
-| Failures / fallbacks | 0 | 0 |
+| | Lexical baseline | Jev | Claude |
+| --- | --- | --- | --- |
+| Agent top-1 | 23 / 162 | 142 / 162 | **158 / 162** |
+| Acceptable route | 29 / 162 | 153 / 162 | **162 / 162** |
+| Avoided a forbidden route | 153 / 162 | 162 / 162 | 162 / 162 |
+| Obvious cases, top-1 | 9 / 54 | 51 / 54 | 54 / 54 |
+| Near-neighbour, top-1 | 6 / 54 | 49 / 54 | **53 / 54** |
+| Ambiguous, acceptable | 9 / 27 | 26 / 27 | 27 / 27 |
+| Negative, top-1 | 5 / 27 | 25 / 27 | 26 / 27 |
+| Median decision latency | 0 ms | 357 ms | not comparable |
+| Skill precision / recall | 0.31 / 0.56 | **0.68 / 0.73** | not measured |
+| Skill selections carrying a known-irrelevant id | 0.36 | **0.01** | not measured |
+| Tool precision / recall | 0.15 / 0.23 | **0.66 / 0.97** | not measured |
 
-**Read the baseline honestly.** The `default` column is the lexical engine — inverse-frequency
-term overlap against role metadata. It is a measurement floor, not what a real installation does:
-in production the default engine hands agent routing to the model, which this harness cannot
-score offline. Jev beating a keyword matcher by 6x is a real result about keyword matchers. It is
-evidence that Jev is a serious candidate for these decisions, not proof it beats Claude at them.
+`Claude` is the production default path: the model reading the router's own catalog. It is not
+something the harness can call, so it is replayed from `evals/decision/routes-claude.json` — one
+focused subagent per fixture, given the dispatcher's routing rules and role catalog verbatim and
+nothing else. A real session also carries the conversation and is doing other work at the time,
+so treat it as a close reconstruction rather than the thing itself. Its latency is not comparable
+either: in production, routing costs no extra call, because the dispatcher is already running.
 
-What the numbers do support: near-neighbour discrimination is the strong result (48/54 on cases
-built specifically to make a sibling role look right), skill and tool selection are where the
-noise reduction is largest, and 366 ms is small enough not to matter next to the task itself.
+**Claude wins agent routing, and it is not close.** 158 against 142 on top-1, and 162/162
+acceptable — it never picked a route the fixtures call indefensible. It wins hardest exactly
+where the decision is hard: 53/54 near-neighbour against 49/54, and 25/27 ambiguous against
+17/27. Jev is faster in isolation and far cheaper, but the default path is both better *and*
+free, so **agent selection is off by default.** That is a configuration change this evaluation
+caused, not a caveat attached to one it did not.
+
+**Jev wins skill and tool relevance**, which is where the dispatcher was otherwise working from
+a loadout rather than from the task. Skill precision more than doubles, and the share of
+selections carrying an id the fixture marks irrelevant falls from 0.36 to 0.01. Tool relevance
+goes from near-useless to 0.66/0.97. Those two scopes are **on** by default.
+
+So the shipped configuration is the one the evidence supports, not the one that uses the most of
+the integration:
+
+```text
+agent selection      default (Claude)
+skill selection      jev
+tool selection       jev
+context ranking      off — designed for, not shipped
+verification gate    off — designed for, not shipped
+```
+
+Turn agent selection on if your situation differs — a latency budget, a high-volume automated
+path, a session where routing is not already happening:
+
+```bash
+AGENT_DISPATCHER_DECISION_SCOPES=agent,skills,tools python3 -m decision plan --task "..."
+```
 
 ### Confidence calibration
 
 Observed top-1 accuracy per confidence band, same run:
 
-| Confidence | n | Observed top-1 |
-| --- | --- | --- |
-| 0.90 – 1.00 | 113 | 0.98 |
-| 0.80 – 0.90 | 12 | 0.75 |
-| 0.70 – 0.80 | 15 | 0.67 |
-| 0.50 – 0.70 | 13 | 0.38 |
-| below 0.50 | 9 | 0.33 |
+| Confidence | Jev n | Jev top-1 | Claude n | Claude top-1 |
+| --- | --- | --- | --- | --- |
+| 0.90 – 1.00 | 111 | 0.98 | 99 | 1.00 |
+| 0.80 – 0.90 | 18 | 0.94 | 42 | 0.98 |
+| 0.70 – 0.80 | 10 | 0.70 | 14 | 0.93 |
+| 0.50 – 0.70 | 18 | 0.33 | 7 | 0.71 |
+| below 0.50 | 5 | 0.60 | 0 | — |
 
-(Across four runs the 0.80–0.90 band ranged 0.75–0.87 on n=12–16, and everything below 0.70
-stayed between 0.14 and 0.38.)
+Both are informative, and Jev's collapses harder and sooner — below 0.70 it is worse than a coin,
+where Claude is still at 0.71. `agent_confidence` stays at **0.80** for the case where agent
+selection is switched on: above it Jev was right 96% of the time, below it the default path is
+the safer answer. TypeSafe's own guidance puts the absolute floor at 0.50; this is stricter
+because routing a whole task is not a cheap action to get wrong.
 
-Confidence is informative here and the collapse below 0.80 is sharp, so `agent_confidence`
-is **0.80**: above it the route was right 96% of the time across 125 cases, and below it the
-model is worse than a coin. TypeSafe's own guidance puts the absolute floor at 0.50 — this is stricter because
-routing a whole task is not a cheap action to get wrong.
+The relevance floors are the precision knee from a sweep over the same fixtures. Skills went
+0.63/0.81 precision-recall at 0.50, 0.70/0.77 at 0.60 and 0.70/0.62 at 0.70 — past 0.60 recall
+falls away for no precision, so **0.60**. Tools likewise.
 
-The relevance floors are the precision knee from the same sweep. Skills went 0.63/0.81
-precision-recall at 0.50, 0.70/0.77 at 0.60, 0.70/0.62 at 0.70 — past 0.60 recall falls away for
-no precision, so **0.60**. Tools likewise.
-
-These numbers move a little between runs. Four full runs scored 136, 137, 138 and 138 out of
-162 — a spread of about 1% — with band populations shifting by a case or two while the shape
-held: ~0.98 above 0.90 every time, and a collapse below 0.70 every time. The table above is one
-recorded run, not a best-of. They will move again when role metadata changes — which is why the registry digest
-is in every eval report. Re-derive rather than trusting this table:
+These numbers move a little between runs. Five runs of the Jev routing set scored 136–142 out of
+162, with band populations shifting by a case or two while the shape held: ~0.98 above 0.90 every
+time, and a collapse below 0.70 every time. The table above is one recorded run, not a best-of.
+They will move again when role metadata changes, which is why the registry digest is in every
+report. Re-derive rather than trusting this table:
 
 ```bash
+python3 evals/decision/run.py --engine all --routes evals/decision/routes-claude.json
 AGENT_DISPATCHER_DECISION_THRESHOLDS=skill_relevance=0.7 python3 evals/decision/run.py --engine jev
 ```
 
 ### What this does not establish
 
-The architecture exists so each decision can use whichever mechanism the evidence supports, and
-the evidence here is partial:
-
-- Agent routing was not compared against Claude, only against a keyword floor.
-- No end-to-end comparison exists yet: whether a Jev route produces better *work*, not just a
-  better label, needs fixtures this repository has the schema for and has not run.
-- 162 cases over 27 roles is 4 to 9 gold labels per role. The macro numbers are dominated by the
+- **No end-to-end comparison.** Whether a route produces better *work*, not just a better label,
+  is untested. The fixture schema supports it; the runs do not exist.
+- The Claude column is a reconstruction — a focused subagent per task, no conversation, no
+  competing work. A real session could do better or worse.
+- Claude's skill and tool selection was never measured. It may beat Jev there too; nobody has
+  asked it.
+- 162 cases over 27 roles is 4 to 9 gold labels per role, so macro numbers lean on the
   best-covered roles.
 - Some fixtures paraphrase the registry's own `use_when` lines, which inflates accuracy on those
-  cases. They were kept because rewriting them would have been tuning the test to the answer.
-
-If a later run shows the default path routes better, that belongs in this table too.
+  cases for every engine. They were kept rather than tuned toward the answer.
 
 ## Diagnostics
 

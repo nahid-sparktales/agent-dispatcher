@@ -71,8 +71,14 @@ class env:
         return False
 
 
+# The suite exercises the mechanism, so every scope is on unless a test says otherwise. The
+# *shipped* defaults are a separate question, asserted on their own further down.
+ALL_SCOPES = {"agent": True, "skills": True, "tools": True}
+
+
 def svc(registry, provider=None, **over):
     """A service wired to the mock transport, with the default engine behind it."""
+    over.setdefault("scopes", dict(ALL_SCOPES))
     cfg = load_config(project_root=CFG, **over)
     primary = None
     if cfg.mode != "off" and provider is not None:
@@ -109,8 +115,9 @@ def main():
     print("\nregistry and candidates")
     check("every agent candidate resolves to a role",
           all(registry.valid_agent(c.id) for c in cands), "unknown id in the roster")
-    check("the roster excludes the dispatcher itself",
-          "dispatcher" not in {c.id for c in cands}, "routing to the router is not a route")
+    check("the roster is every role the router's own catalog offers",
+          {c.id for c in cands} == set(registry.roles),
+          "an engine cannot pick a role the default path can")
     check("candidate ids are unique",
           len({c.id for c in cands}) == len(cands), "duplicate candidate id")
     check("every role's skill candidates resolve",
@@ -530,9 +537,16 @@ def main():
     check("an unknown provider is refused",
           _raises(lambda: load_config(project_root=CFG, provider="acme")))
     check("the default mode is auto", load_config(project_root=CFG).mode == "auto")
+    shipped = load_config(project_root=CFG).scopes
     check("context ranking and the verification gate are off by default",
-          not load_config(project_root=CFG).scopes["context"]
-          and not load_config(project_root=CFG).scopes["verification"])
+          not shipped["context"] and not shipped["verification"])
+    # Set by evals/decision, not by how much of the integration exists: Claude reading the
+    # router's own catalog beat Jev on agent routing (158/162 against 142/162 top-1), so the
+    # default path keeps that decision. Skill and tool relevance is where the gain was.
+    check("agent selection is off by default, because the evaluation said so",
+          not shipped["agent"], "Jev would route by default despite scoring worse than Claude")
+    check("skill and tool relevance are on by default",
+          shipped["skills"] and shipped["tools"])
 
     # ---------------------------------------------------------------- engines
     print("\nengines")

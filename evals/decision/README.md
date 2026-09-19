@@ -4,10 +4,13 @@ Whether an optional decision engine actually helps is a question with an answer,
 where it gets one.
 
 ```bash
-python3 evals/decision/run.py                  # the offline baseline — free, no network
-python3 evals/decision/run.py --engine both    # add Jev; needs your own credential
-python3 evals/decision/run.py --engine jev --json out.json
+python3 evals/decision/run.py                  # the keyword baseline — free, no network
+python3 evals/decision/run.py --engine claude --routes routes-claude.json   # also free
+python3 evals/decision/run.py --engine all --routes evals/decision/routes-claude.json
 ```
+
+`--engine` is repeatable; `both` is default+jev and `all` adds claude. Only `jev` costs money,
+and only when you supply a credential.
 
 ## Fixtures
 
@@ -38,14 +41,24 @@ renamed role or a removed skill fails the build rather than quietly scoring zero
 
 ## Engines
 
-`default` is `LexicalDecisionEngine` — inverse-frequency term overlap against role metadata. It
-is a **measurement floor**, not what a real installation does. The production default engine
-hands agent routing to the model, which this harness cannot score offline. Every report repeats
-that caveat, and so should anyone quoting a number from it.
+`default` is `LexicalDecisionEngine` in `baseline.py` — inverse-frequency term overlap against
+role metadata. A **measurement floor**: what the numbers look like with no model at all.
+
+`claude` is the production default path, the model reading the router's own catalog. It is not a
+service this harness can call, so `replay.py` scores routes recorded out of band and handed in
+with `--routes`. `routes-claude.json` is one such run, with its method written down: one focused
+subagent per fixture, given the dispatcher's routing rules and role catalog verbatim and nothing
+else. That is a close reconstruction, not the thing itself — a real session also carries the
+conversation — and its latency is not comparable, because in production routing costs no extra
+call. Record your own the same way and pass it in.
 
 `jev` is the real engine through whichever provider is configured. It costs money, billed to the
 account that owns the key, and is not run without one — the report says `not run`, which is not
 the same as `passed`.
+
+The comparison is what set the shipped defaults: Claude routes better than Jev, Jev picks skills
+and tools better than a loadout, so `DEFAULT_SCOPES` in `decision/config.py` is `skills,tools`
+and agent selection is off. [docs/jev.md](../../docs/jev.md) carries the table.
 
 ## Reading the output
 
@@ -66,9 +79,11 @@ digest in every report is there so a stale number can be spotted rather than tru
 
 ## Known limits
 
-- The baseline is a keyword floor, so the gap to Jev overstates the gap to production.
 - There is no end-to-end comparison yet — whether a route produces better *work* rather than a
   better label. The fixture schema supports it; the runs do not exist.
+- Claude's skill and tool selection was never measured; it was asked only which role owns the
+  task. It may beat Jev there too.
+- The recorded Claude routes are a reconstruction of the default path, not a capture of it.
 - 162 cases over 27 roles is 4 to 9 gold labels each, so macro numbers lean on the best-covered
   roles.
 - A handful of fixtures paraphrase the registry's own `use_when` lines, which inflates accuracy

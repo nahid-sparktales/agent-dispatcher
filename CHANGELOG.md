@@ -1,5 +1,50 @@
 # Changelog
 
+## 2.2.1 — 2026-09-19
+
+Ran the comparison v2.2 said had not been run, and changed a default because of what it said.
+
+### Measured
+
+Three engines, the same 162 routing fixtures, registry `89baa5fa0e0c`:
+
+                              baseline      jev           claude
+  agent top-1                 23 / 162      142 / 162     158 / 162
+  acceptable route            29 / 162      153 / 162     162 / 162
+  near-neighbour top-1         6 / 54        49 / 54       53 / 54
+  ambiguous acceptable         9 / 27        26 / 27       27 / 27
+  skill precision / recall    0.31 / 0.56   0.68 / 0.73   not measured
+  tool precision / recall     0.15 / 0.23   0.66 / 0.97   not measured
+  median latency              0 ms          357 ms        not comparable
+
+`claude` is the production default path — the model reading the router's own catalog, replayed
+from recorded routes. **It beats Jev on agent routing and is not close**, winning hardest where
+the decision is hard: 53/54 near-neighbour against 49/54, 25/27 ambiguous against 17/27, and
+162/162 acceptable against 153. It is also free in production, because the dispatcher is already
+running. Jev wins skill and tool relevance by a wide margin.
+
+### Changed
+
+- **Agent selection is off by default.** The dispatcher keeps routing, as it always did. Switch
+  it on with `AGENT_DISPATCHER_DECISION_SCOPES=agent,skills,tools` if your situation differs — a
+  latency budget, a high-volume automated path. The abstraction exists precisely so each decision
+  can use the mechanism the evidence supports, and this is that being used.
+- Skill and tool relevance stay on: precision 0.31 → 0.68 for skills, with the share of
+  selections carrying a known-irrelevant id falling 0.36 → 0.01, and 0.15/0.23 → 0.66/0.97 for
+  tools.
+- The candidate roster now includes `dispatcher`, which it wrongly excluded. `SKILL.md` keeps it
+  in the catalog the model reads, so leaving it out asked the engines a different question than
+  the default path answers and made five fixtures unwinnable for everyone.
+
+### Added
+
+- `evals/decision/replay.py` and `run.py --engine claude --routes <file>`: score decisions made
+  out of band, so the production default path can be compared at all. Claude is the model running
+  the dispatcher, not a service the harness can call.
+- `evals/decision/routes-claude.json`: one recorded run of all 162 fixtures, with its method
+  written down, so the comparison is repeatable without re-spending.
+- `run.py --engine` is repeatable and takes `all`.
+
 ## 2.2.0 — 2026-09-19
 
 Decision Engine v1. Routing answered *who*; the context engine answered *what with*. This release

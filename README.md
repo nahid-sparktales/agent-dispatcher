@@ -150,8 +150,13 @@ whole thing — including what it could not establish.
 ## Optional Jev decision engine
 
 `agent-dispatcher` includes a default decision path and needs nothing to use it. It can
-*optionally* use [Jev](https://typesafe.ai), a structured decision model, for three bounded
-choices: which role owns the task, which skills it loads, and which servers are relevant.
+*optionally* use [Jev](https://typesafe.ai), a structured decision model, for bounded choices:
+by default which skills a role loads and which servers are relevant, and — if you switch it on —
+which role owns the task.
+
+That split is not a hedge. The evaluation below put Claude, Jev and a keyword baseline on
+identical fixtures: **Claude routes better than Jev, and Jev selects skills and tools better
+than the loadout does.** Each decision ships with whichever mechanism won.
 
 ```text
 Without Jev                         With Jev
@@ -216,20 +221,24 @@ framework to a repository whose whole promise is that it installs nothing.
 Measured over 162 routing fixtures covering all 27 roles, plus 24 skill and 20 tool cases
 (registry `89baa5fa0e0c`, 2026-09-19):
 
-| | Lexical baseline | Jev |
-| --- | --- | --- |
-| Agent top-1 | 23 / 162 | 138 / 162 |
-| Acceptable route | 28 / 162 | 150 / 162 |
-| Near-neighbour top-1 | 6 / 54 | 48 / 54 |
-| Skill precision / recall | 0.31 / 0.56 | 0.68 / 0.73 |
-| Tool precision / recall | 0.15 / 0.23 | 0.64 / 0.97 |
-| Median decision latency | 0 ms | 366 ms |
+| | Keyword baseline | Jev | Claude |
+| --- | --- | --- | --- |
+| Agent top-1 | 23 / 162 | 142 / 162 | **158 / 162** |
+| Acceptable route | 29 / 162 | 153 / 162 | **162 / 162** |
+| Near-neighbour top-1 | 6 / 54 | 49 / 54 | **53 / 54** |
+| Ambiguous, acceptable | 9 / 27 | 26 / 27 | 27 / 27 |
+| Skill precision / recall | 0.31 / 0.56 | **0.68 / 0.73** | not measured |
+| Tool precision / recall | 0.15 / 0.23 | **0.66 / 0.97** | not measured |
+| Median decision latency | 0 ms | 357 ms | not comparable |
 
-The baseline there is a keyword floor, not what a real installation does — production hands
-routing to the model, which cannot be scored offline. Beating a keyword matcher is evidence that
-Jev is a serious candidate for these decisions, not proof it beats Claude at them. The evaluation
-exists to answer that honestly, and if a later run says the default path is better, that goes in
-the table too.
+Claude wins agent routing and is free in production, because the dispatcher is already running —
+so **agent selection is off by default**, a change this evaluation caused. Jev wins skill and
+tool relevance, where the share of selections carrying a known-irrelevant skill falls from 0.36
+to 0.01 — so those are on. The keyword baseline is a floor, there to show what the numbers look
+like without any model at all.
+
+What it does not establish: whether a better route produces better *work*. That needs end-to-end
+fixtures, which do not exist yet.
 
 [docs/jev.md](docs/jev.md) · setup, modes, privacy, cost, calibration and troubleshooting.
 

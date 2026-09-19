@@ -12,13 +12,15 @@ evidence supports — see `docs/jev.md`.
 
 Two engines are compared:
 
-  `default`  the lexical baseline in `decision/default.py`. It is a *measurement floor*, not
-             the dispatcher's production default: in production the default engine defers
-             agent routing to the model, which is not something this harness can score
-             offline. The report repeats that caveat rather than letting the number imply
-             otherwise.
+  `default`  the lexical baseline in `evals/decision/baseline.py`. A *measurement floor*, not
+             the dispatcher's production default.
+  `claude`   the production default path — the model reading the router's own catalog. It is
+             not a service this harness can call, so it is replayed from a file of recorded
+             routes (`--routes`, see `replay.py`); `routes-claude.json` holds one such run.
   `jev`      the real thing, through whichever provider is configured. Costs money, billed to
              the account that owns the key. Not run unless asked for and credentialed.
+
+    python3 evals/decision/run.py --engine all --routes evals/decision/routes-claude.json
 """
 import argparse
 import json
@@ -46,11 +48,16 @@ def load_cases(name):
     return json.loads(path.read_text()).get("cases", [])
 
 
-def build_engine(kind, registry, provider_instance=None, **over):
-    cfg = load_config(project_root=str(ROOT), mode="off" if kind == "default" else "required",
+def build_engine(kind, registry, provider_instance=None, routes=None, **over):
+    cfg = load_config(project_root=str(ROOT), mode="off" if kind != "jev" else "required",
                       **over)
     if kind == "default":
         return LexicalDecisionEngine(registry), cfg
+    if kind == "claude":
+        from replay import ReplayDecisionEngine
+        if not routes:
+            raise ValueError("--engine claude needs --routes <file.json>")
+        return ReplayDecisionEngine(registry, routes, label="claude"), cfg
     from decision.jev import JevDecisionEngine
     return JevDecisionEngine(cfg, registry, provider=provider_instance), cfg
 
@@ -62,9 +69,13 @@ def score_agents(engine, registry, cases):
     rows, failures = [], 0
     for case in cases:
         started = time.monotonic()
+        inp = AgentDecisionInput(task=case["task"], candidates=candidates,
+                                 stack=tuple(case.get("stack", ())))
+        # A replay engine needs to know which fixture it is answering; a live one neither reads
+        # this nor should, because the case id is not something a router gets to see.
+        object.__setattr__(inp, "_case", case["id"])
         try:
-            out = engine.choose_agent(AgentDecisionInput(
-                task=case["task"], candidates=candidates, stack=tuple(case.get("stack", ()))))
+            out = engine.choose_agent(inp)
             error = ""
         except Exception as exc:                                    # noqa: BLE001
             failures += 1
@@ -196,14 +207,15 @@ def render(report):
             lines += [f"{engine}", f"  not run — {res['not_run']}", ""]
             continue
         route = res["agent_routing"]
+        lat = ("latency not comparable — routed out of band"
+               if route["median_latency_ms"] is None
+               else f"median {route['median_latency_ms']}ms · p90 {route['p90_latency_ms']}ms")
         lines += [f"{engine}",
                   f"  Agent routing   top-1 {route['top1_correct']}/{route['cases']}"
                   f" · acceptable {route['acceptable']}/{route['cases']}"
                   f" · avoided-wrong {route['avoided_wrong_route']}/{route['cases']}",
                   f"                  no decision {route['no_decision']}"
-                  f" · failures {route['failures']}"
-                  f" · median {route['median_latency_ms']}ms"
-                  f" · p90 {route['p90_latency_ms']}ms"]
+                  f" · failures {route['failures']} · {lat}"]
         for kind, k in route["by_kind"].items():
             lines.append(f"    {kind:<16}top-1 {k['top1']}/{k['n']}"
                          f" · acceptable {k['acceptable']}/{k['n']}")
@@ -214,6 +226,9 @@ def render(report):
                              f"  (n={band['n']})")
         else:
             lines.append("    confidence      none produced by this engine")
+        for name in res.get("not_measured", ()):
+            lines.append(f"  {name.replace('_', ' ').title():<16}not measured — this engine was "
+                         f"asked only which role owns the task")
         for name, label in (("skill_selection", "Skill selection"),
                             ("tool_selection", "Tool selection")):
             if name in res:
@@ -230,8 +245,12 @@ def render(report):
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument("--engine", choices=("default", "jev", "both"), default="default")
+    ap.add_argument("--engine", action="append", dest="engines",
+                    choices=("default", "jev", "claude", "both", "all"),
+                    help="repeatable; `both` is default+jev, `all` adds claude")
     ap.add_argument("--provider", default=None)
+    ap.add_argument("--routes", help="a file of pre-computed routes, for --engine claude "
+                                     "(see evals/decision/replay.py)")
     ap.add_argument("--json", help="write the full per-case report here")
     ap.add_argument("--limit", type=int, default=0, help="run only the first N cases of each set")
     args = ap.parse_args(argv)
@@ -243,7 +262,13 @@ def main(argv=None):
     if args.limit:
         agents, skills, tools = agents[:args.limit], skills[:args.limit], tools[:args.limit]
 
-    wanted = ("default", "jev") if args.engine == "both" else (args.engine,)
+    asked = args.engines or ["default"]
+    wanted = []
+    for name in asked:
+        for kind in (("default", "jev") if name == "both"
+                     else ("default", "jev", "claude") if name == "all" else (name,)):
+            if kind not in wanted:
+                wanted.append(kind)
     report = {"registry_version": registry.version,
               "counts": {"agents": len(agents), "skills": len(skills), "tools": len(tools)},
               "engines": {}, "caveats": []}
@@ -256,25 +281,40 @@ def main(argv=None):
                     "not_run": f"no credential in {cfg.credential_env}. This is not a failure; "
                                f"supply your own key to run it."}
                 continue
+        if kind == "claude" and not args.routes:
+            report["engines"]["claude"] = {
+                "not_run": "no --routes file. Claude is the model running the dispatcher, not a "
+                           "service this harness can call; route the fixtures with it, save the "
+                           "answers, and pass them here. See evals/decision/replay.py."}
+            continue
         try:
             engine, cfg = build_engine(kind, registry, provider_instance=None,
-                                       provider=args.provider)
-        except (DecisionError, ValueError) as exc:
+                                       routes=args.routes, provider=args.provider)
+        except (DecisionError, ValueError, OSError) as exc:
             report["engines"][kind] = {"not_run": str(exc)}
             continue
         res = summarise(score_agents(engine, registry, agents),
                         score_multi(engine, registry, skills, "skills"),
                         score_multi(engine, registry, tools, "tools"))
-        res["provider"] = getattr(cfg, "provider", "")
-        res["model"] = getattr(cfg, "model", "")
+        res["provider"] = getattr(cfg, "provider", "") if kind == "jev" else kind
+        res["model"] = getattr(cfg, "model", "") if kind == "jev" else ""
+        if kind == "claude":
+            # Claude was asked which role owns the task and nothing else, so reporting a zero
+            # for skills and tools would read as a result rather than as a question not asked.
+            res.pop("skill_selection", None)
+            res.pop("tool_selection", None)
+            res["not_measured"] = ["skill_selection", "tool_selection"]
+            res["agent_routing"]["median_latency_ms"] = None
+            res["agent_routing"]["p90_latency_ms"] = None
         report["engines"][kind] = res
 
     report["caveats"] = [
-        "`default` here is the lexical baseline, a measurement floor. In production the",
-        "default engine defers agent routing to the model, which cannot be scored offline —",
-        "so a Jev number above the baseline is not automatically a number above production.",
+        "`default` is the lexical baseline — a measurement floor, not what an installation",
+        "does. `claude` is the production default path, replayed from recorded routes; it is a",
+        "reconstruction (one focused subagent per task, no conversation) and its latency is not",
+        "comparable, because in a real session routing costs no extra call.",
         "Confidence bands are observed, not assumed calibrated. Thresholds in decision/config.py",
-        "stay provisional until these bands say otherwise.",
+        "are derived from them and should be re-derived when the registries change.",
     ]
     if args.json:
         detail = dict(report)
