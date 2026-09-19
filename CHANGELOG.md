@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased
+
+- Add GitHub Actions checks for Python 3.10–3.14 on Linux, Python 3.14 on macOS, generated-file
+  drift, installer lifecycle, shell scripts, and workflow syntax. Add full-history and current-file
+  Gitleaks scans, CodeQL for the public repository, and Dependabot updates for pinned Actions.
+- Refuse malformed installation settings, symlinked targets, and manifest entries outside the
+  owned command directory before modifying the installation. Preserve unrelated commands and
+  hooks on uninstall, quote paths safely, and migrate older hook registrations on update.
+- Ignore malformed decision configuration and require boolean scope flags and finite, bounded
+  numeric settings. Recover non-object configuration in the mode command. Document the actual
+  environment-over-project precedence.
+- Parse provider URLs before allowing the loopback HTTP exception and remove transport-supplied
+  error text from credential-bearing requests. Correct the claim of a hard response deadline;
+  socket timeouts and late-result rejection do not guarantee an overall wall-clock limit.
+- Detect missing and removed generated artifacts, and resolve build paths consistently when
+  a checkout is accessed through a symlink. Add release regressions for the above behavior.
+
 ## 2.3.4 — 2026-09-19
 
 2.3.3 claimed the silent-no-op class was addressed by running the hook. It was not, and the

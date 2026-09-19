@@ -23,6 +23,7 @@ import re
 import socket
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 
 PATH = "/v1/systemone"
@@ -80,9 +81,16 @@ def credential(config):
 
 def endpoint(config, path):
     url = config.base_url().rstrip("/") + path
-    if not url.startswith("https://"):
-        host = url.split("://", 1)[-1].split("/", 1)[0].split(":", 1)[0]
-        if host not in ("localhost", "127.0.0.1", "::1"):
+    try:
+        parsed = urllib.parse.urlsplit(url)
+        parsed.port  # Validate the port as well as the hostname.
+        if (not parsed.hostname or parsed.username is not None or parsed.password is not None
+                or parsed.query or parsed.fragment or any(c.isspace() for c in url)):
+            raise ValueError
+    except ValueError:
+        raise ProviderError("the configured base URL is invalid") from None
+    if parsed.scheme != "https":
+        if parsed.scheme != "http" or parsed.hostname not in ("localhost", "127.0.0.1", "::1"):
             # Worded to survive its own scrub: `redact.py` treats "bearer <word>" as a
             # credential shape, so saying "bearer credential" here would redact the sentence.
             raise ProviderError(
@@ -101,8 +109,9 @@ def send(config, url, headers, body, opener):
             raw = resp.read(MAX_BODY_BYTES + 1)
     except urllib.error.HTTPError as exc:
         raise ProviderError(http_message(exc.code)) from None
-    except urllib.error.URLError as exc:
-        raise ProviderError(f"could not reach the provider ({exc.reason})") from None
+    except urllib.error.URLError:
+        # A transport's reason may quote request headers. Do not render it.
+        raise ProviderError("could not reach the provider") from None
     except (TimeoutError, socket.timeout):
         raise ProviderError("the provider did not answer in time") from None
     except ProviderError:
@@ -114,8 +123,8 @@ def send(config, url, headers, body, opener):
         raise ProviderError("the request could not be sent") from None
     if len(raw) > MAX_BODY_BYTES:
         raise ProviderError("the provider returned an implausibly large response")
-    # `timeout` is urllib's per-socket-read timeout, so a drip-feed can outlive it many times
-    # over. This is the deadline that actually bounds the exchange.
+    # Reject late results, but this is not a hard deadline: urllib's timeout applies to
+    # individual socket operations and a slowly streaming response can outlive it.
     if time.monotonic() - started > config.timeout_seconds * 3:
         raise ProviderError("the provider did not answer in time")
     try:

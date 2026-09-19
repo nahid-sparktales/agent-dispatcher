@@ -1,5 +1,8 @@
 # agent-dispatcher
 
+[![CI](https://github.com/nahid-sparktales/agent-dispatcher/actions/workflows/ci.yml/badge.svg)](https://github.com/nahid-sparktales/agent-dispatcher/actions/workflows/ci.yml)
+[![Security](https://github.com/nahid-sparktales/agent-dispatcher/actions/workflows/security.yml/badge.svg)](https://github.com/nahid-sparktales/agent-dispatcher/actions/workflows/security.yml)
+
 **Give each Claude Code task the specialist, context, and skills it needs.**
 
 Agent Dispatcher routes your request to a focused role, loads relevant guidance, and defines
@@ -30,8 +33,9 @@ agents or connect external services.
 
 You need an installed, authenticated [Claude Code](https://code.claude.com/docs/en/overview)
 and Git. The included session hook uses Bash and standard Unix utilities. The manual installer,
-validation suites, and optional decision engine also use Python 3 with no third-party Python
-packages.
+validation suites, and optional decision engine also use Python 3.10+ with no third-party Python
+packages. CI covers Python 3.10–3.14 on Linux and Python 3.14 on macOS. Native Windows
+installation is not covered; use a Unix environment such as WSL.
 
 ### Install as a plugin
 

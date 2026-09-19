@@ -120,8 +120,10 @@ def cmd_mode(args):
     if path.is_file():
         try:
             raw = json.loads(path.read_text())
-        except json.JSONDecodeError:
+        except (json.JSONDecodeError, UnicodeError):
             raw = {}
+    if not isinstance(raw, dict):
+        raw = {}
     raw["mode"] = args.value
     path.write_text(json.dumps(raw, indent=2) + "\n")
     print(f"decision mode set to `{args.value}` in {path}")

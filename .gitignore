@@ -1,3 +1,9 @@
 locus-agent-templates.json
 __pycache__/
 .agent-dispatcher-decision.json
+.env
+.env.*
+!.env.example
+!.env.sample
+.venv/
+.DS_Store

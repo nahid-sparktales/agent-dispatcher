@@ -32,7 +32,19 @@ silently discard the change.
 python3 build.py          # regenerate
 python3 test_build.py     # validate
 python3 test_decision.py  # the decision engine — deterministic, offline, no credential
+python3 test_release.py   # full installer lifecycle and public-release regressions
 ```
+
+CI runs the validation suites before any separate build step, so regeneration cannot hide
+missing or stale committed files. It checks Python 3.10–3.14 on Linux and Python 3.14 on macOS,
+then requires a clean checkout. `test_release.py` installs into temporary directories and is
+deliberately not called by `install.sh`, which would recursively invoke installation tests.
+
+Workflow and shell checks use actionlint and ShellCheck. The security workflow runs Gitleaks
+against the full fetched history and current files; CodeQL scans Python and Actions once the
+repository is public. No API key or live model call is part of CI. Actions are pinned to commit
+SHAs and updated by Dependabot. The actionlint and Gitleaks binary versions and SHA-256 checksums
+are pinned in the workflows; update those together after verifying upstream release checksums.
 
 Editing the perpetual-mode hook means editing `HOOK.template.sh`, not
 `hooks/agent-dispatcher-activate.sh` — the second is generated from the first with the role
@@ -46,7 +58,7 @@ route around them with a bare `str.replace`: a replace that matches nothing leav
 as it was, and the drift check then compares stale content against an equally stale rebuild and
 passes.
 
-All three must pass. `test_decision.py` needs no network and no key: every external answer comes
+All four commands must pass. `test_decision.py` needs no network and no key: every external answer comes
 from a mock provider, so CI stays free and deterministic. The build is a validator as much as a generator — it rejects an unknown category, a
 loadout pointing at a skill that does not exist, a capability no skill provides, an unknown tool id,
 a missing referenced file, a verification skill that does not declare itself, more than five or more

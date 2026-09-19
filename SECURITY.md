@@ -2,8 +2,10 @@
 
 ## Reporting a vulnerability
 
-Open a private security advisory through GitHub's **Security → Report a vulnerability** on this
-repository. Please do not open a public issue for anything exploitable.
+Use this repository's [private vulnerability reporting form](https://github.com/nahid-sparktales/agent-dispatcher/security/advisories/new)
+when available. If reporting is unavailable, open an issue requesting a private contact channel
+without including vulnerability details, credentials, or reproduction steps. Please do not
+disclose anything exploitable in a public issue.
 
 Useful in a report: what an attacker controls, what they gain, and the smallest reproduction.
 
@@ -17,6 +19,8 @@ third bullet.
   `skills/agent-dispatcher/`, plus `commands/agent-*.md` and one hook. It records every command
   file it writes, refuses to overwrite one it did not write, backs up `settings.json` before adding
   a `SessionStart` entry, and `--uninstall` removes only what its manifest lists.
+  It validates settings structure and manifest paths before changing the installation, rejects
+  symlinked installation targets, and preserves unrelated commands and hook registrations.
 - **`decision/`** is the optional decision engine. It ships **inert**: no decision scope is
   enabled by default, so nothing in it runs, no credential is read and no socket opens. Enabling
   a scope (`AGENT_DISPATCHER_DECISION_SCOPES`) with a credential in `TYPESAFE_API_KEY` sends the

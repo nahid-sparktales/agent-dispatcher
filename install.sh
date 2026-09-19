@@ -10,9 +10,17 @@
 #
 # Non-interactive, and it never asks for a credential. The optional decision engine is installed
 # inert; enabling it is a separate, opt-in step documented in docs/jev.md.
-set -e
+set -euo pipefail
 cd "$(dirname "$0")"
+case "${1:-}" in
+  ""|--uninstall) ;;
+  --help|-h) echo "Usage: ./install.sh [--uninstall]"; exit 0 ;;
+  *) echo "Usage: ./install.sh [--uninstall]" >&2; exit 2 ;;
+esac
+[ "$#" -le 1 ] || { echo "Usage: ./install.sh [--uninstall]" >&2; exit 2; }
 D="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
+# Manifest entries and hook paths must stay valid when called from another directory.
+D=$(python3 -c 'import os,sys; print(os.path.abspath(sys.argv[1]))' "$D")
 MANIFEST="$D/.agent-dispatcher-installed"
 
 # Remove only files a previous run of this script installed.
@@ -24,20 +32,59 @@ uninstall_previous() {
   rm -f "$MANIFEST"
 }
 
-# A settings.json that will not parse is the one thing that stops either path part-way. Both
-# check before touching anything, so a failure is always "nothing happened" rather than half.
+# Validate settings and deletion targets before either path touches the installation.
 require_valid_settings() {
-  python3 -c "import json,pathlib,sys; p=pathlib.Path(sys.argv[1])/'settings.json'; p.exists() and json.loads(p.read_text())" "$D" 2>/dev/null \
-    || { echo "$D/settings.json is not valid JSON — fix it first; nothing was changed"; exit 1; }
+  python3 -c '
+import json, pathlib, re, sys
+d = pathlib.Path(sys.argv[1])
+try:
+    for rel in ("settings.json", "settings.json.bak-agent-dispatcher", "skills", "commands",
+                "hooks", "skills/agent-dispatcher", "hooks/agent-dispatcher-activate.sh",
+                ".agent-dispatcher-installed"):
+        if (d / rel).is_symlink():
+            raise ValueError("an installation target is a symlink")
+        if (d / rel).exists():
+            directory = rel in ("skills", "commands", "hooks", "skills/agent-dispatcher")
+            if (d / rel).is_dir() != directory:
+                raise ValueError("an installation target has the wrong file type")
+    p = d / "settings.json"
+    s = json.loads(p.read_text()) if p.exists() else {}
+    if not isinstance(s, dict) or not isinstance(s.get("hooks", {}), dict):
+        raise ValueError("settings must contain objects")
+    starts = s.get("hooks", {}).get("SessionStart", [])
+    if not isinstance(starts, list):
+        raise ValueError("SessionStart must be an array")
+    for e in starts:
+        if not isinstance(e, dict) or not isinstance(e.get("hooks", []), list):
+            raise ValueError("invalid SessionStart entry")
+        if any(not isinstance(h, dict) or not isinstance(h.get("command", ""), str)
+               for h in e.get("hooks", [])):
+            raise ValueError("invalid hook entry")
+    manifest = d / ".agent-dispatcher-installed"
+    if manifest.exists():
+        for name in manifest.read_text().splitlines():
+            if not name:
+                continue
+            p = pathlib.Path(name)
+            if (p.parent != d / "commands" or not re.fullmatch(r"agent-[a-z0-9-]+\.md", p.name)
+                    or p.is_symlink()):
+                raise ValueError("installed-file manifest has an unsafe entry")
+except (OSError, ValueError) as exc:
+    print(f"Installation settings are not valid JSON or have an unsafe layout ({exc.__class__.__name__}); nothing was changed", file=sys.stderr)
+    sys.exit(1)
+' "$D"
 }
 
-if [ "$1" = "--uninstall" ]; then
-  require_valid_settings
+require_valid_settings
+if [ "${1:-}" = "--uninstall" ]; then
   # Deregister before deleting. The other order leaves settings.json starting a hook script the
   # same run has already removed, and every later session errors on it.
   python3 - "$D" <<'PY'
-import json, pathlib, sys
-p = pathlib.Path(sys.argv[1]) / "settings.json"
+import json, pathlib, shlex, shutil, sys
+d = pathlib.Path(sys.argv[1])
+p = d / "settings.json"
+script = str(d / "hooks" / "agent-dispatcher-activate.sh")
+owned = {"bash " + shlex.quote(script), f'bash "{script}"'}
 if p.exists():
     s = json.loads(p.read_text())
     starts = s.get("hooks", {}).get("SessionStart", [])
@@ -45,19 +92,18 @@ if p.exists():
     for e in starts:
         # Drop our hook, not the entry around it — a hook of the user's own may share it.
         hooks = [h for h in e.get("hooks", [])
-                 if "agent-dispatcher-activate" not in h.get("command", "")]
+                 if h.get("command", "") not in owned]
         if hooks or not e.get("hooks"):
             kept.append(e if hooks == e.get("hooks", []) else {**e, "hooks": hooks})
     if kept != starts:
+        bak = p.with_suffix(".json.bak-agent-dispatcher")
+        if not bak.exists():
+            shutil.copy(p, bak)
         s["hooks"]["SessionStart"] = kept
         p.write_text(json.dumps(s, indent=2) + "\n")
         print("removed SessionStart hook")
 PY
   uninstall_previous
-  for f in commands/agent-*.md; do
-    t="$D/commands/$(basename "$f")"
-    [ -f "$t" ] && grep -q "agent-dispatcher skill" "$t" 2>/dev/null && rm -f "$t"
-  done
   rm -rf "$D/skills/agent-dispatcher"
   rm -f "$D/hooks/agent-dispatcher-activate.sh"
   echo "uninstalled from $D (flag files left alone)"
@@ -67,7 +113,6 @@ fi
 python3 build.py
 python3 test_build.py
 python3 test_decision.py
-require_valid_settings
 
 uninstall_previous
 mkdir -p "$D/skills" "$D/commands" "$D/hooks"
@@ -94,7 +139,7 @@ chmod +x "$D/hooks/agent-dispatcher-activate.sh"
 : > "$MANIFEST"
 for f in commands/agent-*.md; do
   target="$D/commands/$(basename "$f")"
-  if [ -e "$target" ]; then
+  if [ -e "$target" ] || [ -L "$target" ]; then
     echo "skipped $(basename "$f") — a file of that name already exists and was not installed by this script"
     continue
   fi
@@ -103,17 +148,28 @@ for f in commands/agent-*.md; do
 done
 
 python3 - "$D" <<'PY'
-import json, pathlib, shutil, sys
+import json, pathlib, shlex, shutil, sys
 d = pathlib.Path(sys.argv[1]); p = d / "settings.json"
-cmd = f'bash "{d}/hooks/agent-dispatcher-activate.sh"'
+cmd = "bash " + shlex.quote(str(d / "hooks" / "agent-dispatcher-activate.sh"))
 s = json.loads(p.read_text()) if p.exists() else {}
 hooks = s.setdefault("hooks", {}).setdefault("SessionStart", [])
+changed = False
+# Earlier versions wrote a double-quoted path. Upgrade it in place, both to avoid a second
+# hook registration and to remove shell expansion from paths containing dollars/backticks.
+legacy = f'bash "{d}/hooks/agent-dispatcher-activate.sh"'
+for entry in hooks:
+    for hook in entry.get("hooks", []):
+        if hook.get("command") == legacy and legacy != cmd:
+            hook["command"] = cmd
+            changed = True
 if not any(h.get("command") == cmd for e in hooks for h in e.get("hooks", [])):
+    hooks.append({"matcher": "startup|resume|clear|compact",
+                  "hooks": [{"type": "command", "command": cmd, "timeout": 5}]})
+    changed = True
+if changed:
     bak = p.with_suffix(".json.bak-agent-dispatcher")
     if p.exists() and not bak.exists():
         shutil.copy(p, bak)
-    hooks.append({"matcher": "startup|resume|clear|compact",
-                  "hooks": [{"type": "command", "command": cmd, "timeout": 5}]})
     p.write_text(json.dumps(s, indent=2) + "\n")
     print("registered SessionStart hook")
 else:

@@ -104,8 +104,8 @@ are declared in the `DecisionEngine` interface and unimplemented — designed fo
 
 ## Configuration
 
-Precedence, highest first: an explicit flag → `.agent-dispatcher-decision.json` in the project →
-the environment → the defaults.
+Precedence, highest first: an explicit flag → the environment →
+`.agent-dispatcher-decision.json` in the project → the defaults.
 
 | Key | Env | Default |
 | --- | --- | --- |
@@ -116,6 +116,10 @@ the environment → the defaults.
 | `max_task_chars` | `AGENT_DISPATCHER_DECISION_MAX_TASK_CHARS` | `2000` |
 | `thresholds` | `AGENT_DISPATCHER_DECISION_THRESHOLDS` | see calibration |
 | `log` | `AGENT_DISPATCHER_DECISION_LOG` | off — env only, never the project file |
+
+Scopes must be JSON booleans. Invalid ambient settings are ignored, including non-object JSON,
+non-finite numbers, timeouts outside `(0, 300]` seconds, task limits outside `1–100000`
+characters, and thresholds outside `0–1`. Explicit invalid arguments raise an error.
 
 The credential is deliberately not in that table. It is never a config key, never written to a
 file by this pack, and never carried on a config object. The provider reads it from the
@@ -194,8 +198,10 @@ never the last line of defence:
 - Any exception from below the provider is replaced, not wrapped — the class name survives, the
   message does not. `required`-mode errors are raised `from None` so a traceback cannot
   resurrect it.
-- The response is size-capped and read against a wall-clock deadline; urllib's `timeout` is per
-  socket read and does not bound the exchange.
+- The response is capped at 4 MB. Socket operations time out and late results are rejected
+  after reading, but there is no hard wall-clock deadline: a slowly streaming response can
+  outlive the configured timeout. Use a process-level deadline when embedding the engine in
+  a service that needs a strict overall latency bound.
 - Ids an external engine returns are character-filtered and truncated before being echoed into a
   diagnostic, even when the next thing that happens is rejecting them.
 - The plan's own `task` field carries the scrubbed, capped text, because it is rendered,

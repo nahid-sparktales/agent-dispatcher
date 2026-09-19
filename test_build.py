@@ -10,13 +10,14 @@ import json
 import os
 import pathlib
 import re
+import shlex
 import subprocess
 import sys
 import tempfile
 
 import build
 
-ROOT = pathlib.Path(__file__).parent
+ROOT = pathlib.Path(__file__).resolve().parent
 FAILURES = []
 
 
@@ -37,17 +38,18 @@ GENERATED = ["skills/agent-dispatcher/SKILL.md", "skills/agent-dispatcher/INDEX.
 
 def drift():
     """A generated file edited by hand is a change that the next build silently discards."""
-    before = {}
-    for rel in GENERATED:
-        p = ROOT / rel
-        if p.exists():
-            before[rel] = p.read_bytes()
-    for p in list((build.ADAPTER / "roles").glob("*.md")) + list(build.CMDS.glob("agent-*.md")) \
-            + list(build.HOOKS.glob("*")):
-        before[str(p.relative_to(ROOT))] = p.read_bytes()
+    def snapshot():
+        paths = {ROOT / rel for rel in GENERATED}
+        paths.update((build.ADAPTER / "roles").glob("*.md"))
+        paths.update(build.CMDS.glob("agent-*.md"))
+        paths.update(p for p in build.HOOKS.glob("*") if p.is_file())
+        return {str(p.relative_to(ROOT)): p.read_bytes() if p.is_file() else None
+                for p in paths}
+    before = snapshot()
     build.main()
-    return [rel for rel, old in before.items()
-            if (ROOT / rel).exists() and (ROOT / rel).read_bytes() != old]
+    after = snapshot()
+    return sorted(rel for rel in before.keys() | after.keys()
+                  if before.get(rel) != after.get(rel))
 
 
 SKIP = {"node_modules", ".git", "dist", "build", "__pycache__", ".venv", "vendor"}
@@ -283,7 +285,8 @@ def install_heredocs():
             # The path it registers has to be the path the `cp` above it writes to, or the hook
             # is registered under a name that does not exist the first time it is called.
             check(f"and registers the path install.sh copies the script to — {label}",
-                  bool(ours) and f'"{d}/hooks/{script}"' in ours[0]["hooks"][0].get("command", ""),
+                  bool(ours) and shlex.split(ours[0]["hooks"][0].get("command", ""))
+                  == ["bash", str(d / "hooks" / script)],
                   repr(ours[0]["hooks"][0].get("command", "") if ours else None))
 
             r = run(install, d)

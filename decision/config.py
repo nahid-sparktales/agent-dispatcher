@@ -3,8 +3,8 @@
 Precedence, highest first:
 
     1. an explicit argument (a CLI flag, a per-task override)
-    2. the project's `.agent-dispatcher-decision.json`
-    3. the environment
+    2. the environment
+    3. the project's `.agent-dispatcher-decision.json`
     4. the defaults below
 
 The credential is deliberately absent from this object. `Config` can say *whether* one is
@@ -13,6 +13,7 @@ moment of the request, straight out of `os.environ`. Nothing that is rendered, l
 serialised or handed to a model has ever held it.
 """
 import json
+import math
 import os
 import pathlib
 
@@ -101,8 +102,16 @@ class Config:
         self.provider = provider
         self.model = model or PROVIDERS[provider]["model"]
         self.timeout_seconds = float(timeout_seconds)
+        if not math.isfinite(self.timeout_seconds) or not 0 < self.timeout_seconds <= 300:
+            raise ValueError("timeout_seconds must be finite and between 0 and 300 seconds")
         self.scopes = dict(DEFAULT_SCOPES, **(scopes or {}))
         self.thresholds = dict(DEFAULT_THRESHOLDS, **(thresholds or {}))
+        if any(type(v) is not bool for v in self.scopes.values()):
+            raise ValueError("decision scopes must be booleans")
+        if any(not _number(v) or not 0 <= v <= 1 for v in self.thresholds.values()):
+            raise ValueError("decision thresholds must be finite numbers between 0 and 1")
+        if not _number(max_task_chars) or not 1 <= max_task_chars <= 100000:
+            raise ValueError("max_task_chars must be between 1 and 100000")
         self.max_task_chars = int(max_task_chars)
         self.log = log
         self.offline = bool(offline)
@@ -157,6 +166,13 @@ class Config:
 
 # ------------------------------------------------------------------ loading
 
+def _number(value):
+    try:
+        return type(value) in (int, float) and math.isfinite(value)
+    except OverflowError:
+        return False
+
+
 def _coerce(raw):
     """Take only the keys we know, and only values that are already valid.
 
@@ -169,6 +185,8 @@ def _coerce(raw):
       to, and a cloned repository should not be able to choose one. Set it in the environment.
     """
     out = {}
+    if not isinstance(raw, dict):
+        return out
     for key in ("mode", "provider", "model"):
         if isinstance(raw.get(key), str) and raw[key].strip():
             out[key] = raw[key].strip()
@@ -176,14 +194,16 @@ def _coerce(raw):
         out.pop("mode", None)
     if out.get("provider") not in PROVIDERS:
         out.pop("provider", None)
-    for key in ("timeout_seconds", "max_task_chars"):
-        if isinstance(raw.get(key), (int, float)):
-            out[key] = raw[key]
+    if _number(raw.get("timeout_seconds")) and 0 < raw["timeout_seconds"] <= 300:
+        out["timeout_seconds"] = raw["timeout_seconds"]
+    if _number(raw.get("max_task_chars")) and 1 <= raw["max_task_chars"] <= 100000:
+        out["max_task_chars"] = raw["max_task_chars"]
     if isinstance(raw.get("scopes"), dict):
-        out["scopes"] = {k: bool(v) for k, v in raw["scopes"].items() if k in DEFAULT_SCOPES}
+        out["scopes"] = {k: v for k, v in raw["scopes"].items()
+                         if k in DEFAULT_SCOPES and type(v) is bool}
     if isinstance(raw.get("thresholds"), dict):
         out["thresholds"] = {k: float(v) for k, v in raw["thresholds"].items()
-                             if k in DEFAULT_THRESHOLDS and isinstance(v, (int, float))}
+                             if k in DEFAULT_THRESHOLDS and _number(v) and 0 <= v <= 1}
     return out
 
 
@@ -222,7 +242,10 @@ def _from_env():
     if raw_scopes:
         named = {s.strip() for s in raw_scopes.split(",") if s.strip()}
         out["scopes"] = {k: (k in named) for k in DEFAULT_SCOPES}
-    return out
+    clean = _coerce(out)
+    if "log" in out:
+        clean["log"] = out["log"]  # Only the user's environment can choose a log path.
+    return clean
 
 
 def _offline():
@@ -242,7 +265,7 @@ def load(project_root=None, **overrides):
         try:
             values.update(_coerce(json.loads(path.read_text())))
             sources.append(str(path))
-        except (json.JSONDecodeError, OSError) as exc:
+        except (ValueError, OSError) as exc:
             # A broken project file must not take the dispatcher down with it.
             sources.append(f"{path} (ignored: {exc.__class__.__name__})")
 

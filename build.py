@@ -27,7 +27,7 @@ import json
 import pathlib
 import re
 
-ROOT = pathlib.Path(__file__).parent
+ROOT = pathlib.Path(__file__).resolve().parent
 TEMPLATES = ROOT / "templates"
 SKILLS = ROOT / "skills"
 RECIPES = ROOT / "recipes"
