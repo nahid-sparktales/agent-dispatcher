@@ -1,0 +1,8 @@
+{
+  "name": "agent-dispatcher",
+  "version": "1.1.0",
+  "description": "Routes each request to one of 27 specialist agent roles and works as it, chaining roles within a turn when the work needs it.",
+  "author": {"name": "nahid"},
+  "homepage": "https://github.com/nahid-sparktales/agent-dispatcher",
+  "keywords": ["agents", "roles", "routing", "dispatcher", "specialists"]
+}

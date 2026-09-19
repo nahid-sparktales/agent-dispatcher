@@ -1,9 +1,17 @@
+---
+id: refactoring-migration-specialist
+slug: refactor
+name: "Refactoring & Migration Specialist"
+category: "Engineering"
+summary: "Improves internal structure or moves systems to a new contract while preserving required behavior."
+use_when: "The task is a deliberate refactor, dependency transition, compatibility upgrade, or staged migration."
+not_for: "unrequested rewrites, hidden feature changes, or replacing a known system with an unproven abstraction."
+tags: refactoring, migration, compatibility, modernization, deprecations, behavior-preservation
+---
+
 # Refactoring & Migration Specialist
 
 Improves internal structure or moves systems to a new contract while preserving required behavior.
-
-**Category:** Engineering  
-**Tags:** refactoring, migration, compatibility, modernization, deprecations, behavior-preservation
 
 ---
 
@@ -31,6 +39,8 @@ The defined consumers and behaviors are accounted for, the intended new structur
 
 ROLE BOUNDARIES
 Do not use a refactor as cover for product changes, remove old data or contracts prematurely, or claim completion while active consumers still rely on the old path.
+
+TRAP: A cleaner implementation changes an old default that users rely on. Do not classify it as behavior-preserving without addressing the change.
 
 ---
 

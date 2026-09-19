@@ -6,7 +6,7 @@ argument-hint: "[role-id | on | off | status]"
 
 # Agent Dispatcher
 
-Route each request to one specialist role, load that role, work as it. Locus Agent Template Pack v{{VERSION}}, {{COUNT}} roles.
+Route each request to one specialist role, load that role, work as it. {{COUNT}} roles.
 
 ## Activating
 
@@ -19,13 +19,19 @@ Route each request to one specialist role, load that role, work as it. Locus Age
    ```
 
    Report what that printed. If the hook is missing, say so — the flag alone does nothing — and point at `install.sh` in the source repo. It takes effect in new sessions; this one is already active.
-4. **`off`** / "stop dispatcher" / "normal mode" — drop the current role for this session and resume normal behavior. That is all it means by default; leave the flag alone. Only when the user means perpetual mode off *everywhere*:
+4. **`off`** / "stop dispatcher" / "normal mode" — stop routing, at the narrowest scope that matches what they asked for. Drop the role immediately either way; the flag files only stop the hook re-arming you later.
 
-   ```bash
-   rm -f "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/.agent-dispatcher-active"
-   ```
+   - **This session** (the default reading, and the one that survives a compaction — the hook fires on `compact`, so without this a mid-session "stop" comes back):
 
-   Ask which they meant when it is ambiguous.
+     ```bash
+     D="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"; mkdir -p "$D/.agent-dispatcher-off" && touch "$D/.agent-dispatcher-off/$CLAUDE_SESSION_ID"
+     ```
+
+     The perpetual-mode preamble prints this line with the session id already filled in — prefer that one, since `$CLAUDE_SESSION_ID` may not be set.
+   - **This project** — `touch .agent-dispatcher-off` in the project root.
+   - **Everywhere** — `rm -f "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/.agent-dispatcher-active"`.
+
+   Ask which they meant only when it is genuinely ambiguous; "stop dispatcher" means this session.
 5. **`status`** — report the active role, whether perpetual mode is armed (`ls "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/.agent-dispatcher-active"`), and the roles announced in the visible transcript (say so if the session was compacted).
 
 ## Routing
@@ -64,6 +70,14 @@ Perpetual mode is a routing default, not a mandate: a plain question still gets 
 ## Manually picking a role
 
 The user can always override routing — `/agent-dispatcher reviewer`, the generated per-role commands (`/agent-uidesigner`, `/agent-reviewer`, `/agent-tester`, …), or plain English ("stay in tester for this"). Honor it without arguing, even when you would have routed elsewhere, and stay in it — no re-routing, no chaining out. Mention a better-fitting role in one line only when the mismatch would materially change the answer; otherwise just do the work.
+
+## Skills and commands outrank routing
+
+An installed skill or a slash command that covers the request owns the turn. Load it, work inside its procedure, and keep the role as posture only — no role announcement, no competing deliverable. Never hand-roll what an installed skill already encodes.
+
+This is about skills that do the *work* — not about this pack's own `/agent-*` commands, which are just these roles in another wrapper. They never suppress a route or an announcement.
+
+That means `dataviz` before the first line of chart code even under `data-analyst`; `code-review` rather than `reviewer`'s generic method when reviewing a diff; `frontend-design` or `apple-design` alongside `ui-ux-designer`; `run` when a role needs the app actually started. If a skill and a role disagree on method, the skill wins; the role only decides what "done" looks like.
 
 ## What the role does and does not change
 

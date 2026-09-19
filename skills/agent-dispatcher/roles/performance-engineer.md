@@ -1,9 +1,17 @@
+---
+id: performance-engineer
+slug: performance
+name: "Performance Engineer"
+category: "Engineering"
+summary: "Measures bottlenecks and makes targeted improvements with reproducible before-and-after evidence."
+use_when: "Latency, resource use, throughput, startup time, or responsiveness needs measurable improvement."
+not_for: "speculative optimization, cherry-picked benchmarks, or reporting percentages without comparable measurements."
+tags: performance, profiling, latency, benchmarking, memory-use, optimization
+---
+
 # Performance Engineer
 
 Measures bottlenecks and makes targeted improvements with reproducible before-and-after evidence.
-
-**Category:** Engineering  
-**Tags:** performance, profiling, latency, benchmarking, memory-use, optimization
 
 ---
 
@@ -31,6 +39,8 @@ A representative metric shows a supported improvement or the investigation expla
 
 ROLE BOUNDARIES
 Do not optimize a guessed hotspot, compare incompatible environments, hide regressions, or claim production impact from a tiny synthetic test alone.
+
+TRAP: One unusually fast run is not proof of a stable 50% performance improvement.
 
 ---
 

@@ -1,0 +1,11 @@
+{
+  "name": "agent-dispatcher",
+  "owner": {"name": "nahid"},
+  "plugins": [
+    {
+      "name": "agent-dispatcher",
+      "source": "./",
+      "description": "Routes each request to one of 27 specialist agent roles and works as it."
+    }
+  ]
+}

@@ -1,0 +1,26 @@
+Two different things live in this repository.
+
+MIT (see LICENSE) — the tooling and the text written here:
+  build.py, test_build.py, install.sh, SKILL.template.md, hooks/, .claude-plugin/,
+  the hand-written parts of README.md, and the role files
+  skills/agent-dispatcher/roles/{version-control,data-engineer,incident-responder}.md.
+
+THIRD-PARTY, terms unknown — the other 24 role files and everything generated from them:
+  skills/agent-dispatcher/roles/*.md (the other 24), skills/agent-dispatcher/SKILL.md,
+  commands/agent-*.md, and the roles table in README.md.
+
+Those 24 roles come from the "Locus Agent Template Pack v1.0.0" (18 September 2026, 24
+templates), a third-party content pack. The adaptation here replaced that pack's runtime,
+mode, memory-scope, and access-level vocabulary with this harness's equivalents and dropped
+its grading metadata — but the working methods, deliverables, boundaries, and mode guidance
+are substantially verbatim from the pack, in places word for word. Treat this as
+redistribution of that text, not as an independent rewrite.
+
+The pack states no license: it contains no copyright line, no terms of use, and no
+redistribution grant. There is therefore no recorded permission to redistribute this
+derived text.
+
+Before making this repository public, or redistributing it in any form, obtain and record
+an explicit license or written permission from the pack's author. If that is not
+obtainable, the 24 derived role files have to be rewritten from scratch or dropped, leaving
+the three roles original to this repository.

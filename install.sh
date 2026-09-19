@@ -1,24 +1,76 @@
 #!/bin/bash
-# Install the generated agent-dispatcher skill, per-role commands, and perpetual-mode hook.
+# Manual install: copy the skill, the per-role commands, and the perpetual-mode hook into
+# ~/.claude and register the hook in settings.json.
+#
+# Prefer the plugin install (see README) — it needs no file copying and uninstalls cleanly.
+# Use this only if you are not installing as a plugin; running both double-installs the skill.
+#
+#   ./install.sh            install or update
+#   ./install.sh --uninstall  remove everything this script installed
 set -e
 cd "$(dirname "$0")"
-python3 build.py
 D="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
-rm -rf "$D/skills/agent-dispatcher"
+MANIFEST="$D/.agent-dispatcher-installed"
+
+# Remove only files a previous run of this script installed.
+uninstall_previous() {
+  [ -f "$MANIFEST" ] || return 0
+  while IFS= read -r f; do
+    [ -n "$f" ] && rm -f "$f"
+  done < "$MANIFEST"
+  rm -f "$MANIFEST"
+}
+
+if [ "$1" = "--uninstall" ]; then
+  uninstall_previous
+  rm -rf "$D/skills/agent-dispatcher" "$D/hooks/agent-dispatcher-activate.sh"
+  python3 - "$D" <<'PY'
+import json, pathlib, shutil, sys
+p = pathlib.Path(sys.argv[1]) / "settings.json"
+if p.exists():
+    s = json.loads(p.read_text())
+    starts = s.get("hooks", {}).get("SessionStart", [])
+    kept = [e for e in starts
+            if not any("agent-dispatcher-activate" in h.get("command", "") for h in e.get("hooks", []))]
+    if len(kept) != len(starts):
+        shutil.copy(p, p.with_suffix(".json.bak-agent-dispatcher"))
+        s["hooks"]["SessionStart"] = kept
+        p.write_text(json.dumps(s, indent=2) + "\n")
+        print("removed SessionStart hook")
+PY
+  echo "uninstalled from $D (flag files left alone)"
+  exit 0
+fi
+
+python3 build.py
+python3 test_build.py
+
+uninstall_previous
 mkdir -p "$D/skills" "$D/commands" "$D/hooks"
+rm -rf "$D/skills/agent-dispatcher"
 cp -R skills/agent-dispatcher "$D/skills/agent-dispatcher"
-rm -f "$D"/commands/agent-*.md
-cp commands/agent-*.md "$D/commands/"
 cp hooks/agent-dispatcher-activate.sh "$D/hooks/"
 chmod +x "$D/hooks/agent-dispatcher-activate.sh"
+: > "$MANIFEST"
+for f in commands/agent-*.md; do
+  target="$D/commands/$(basename "$f")"
+  if [ -e "$target" ]; then
+    echo "skipped $(basename "$f") — a file of that name already exists and was not installed by this script"
+    continue
+  fi
+  cp "$f" "$target"
+  echo "$target" >> "$MANIFEST"
+done
+
 python3 - "$D" <<'PY'
-import json, sys, pathlib, shutil
+import json, pathlib, shutil, sys
 d = pathlib.Path(sys.argv[1]); p = d / "settings.json"
 cmd = f'bash "{d}/hooks/agent-dispatcher-activate.sh"'
 s = json.loads(p.read_text()) if p.exists() else {}
 hooks = s.setdefault("hooks", {}).setdefault("SessionStart", [])
 if not any(h.get("command") == cmd for e in hooks for h in e.get("hooks", [])):
-    if p.exists(): shutil.copy(p, p.with_suffix(".json.bak-agent-dispatcher"))
+    if p.exists():
+        shutil.copy(p, p.with_suffix(".json.bak-agent-dispatcher"))
     hooks.append({"matcher": "startup|resume|clear|compact",
                   "hooks": [{"type": "command", "command": cmd, "timeout": 5}]})
     p.write_text(json.dumps(s, indent=2) + "\n")
