@@ -1,0 +1,14 @@
+{
+  "id": "rollback",
+  "capability": "devops.rollback",
+  "category": "devops",
+  "use_when": "A release plan needs its way back written and rehearsed, or a deploy is going wrong and someone is deciding whether it can be undone.",
+  "not_for": "Proving recovery actually happened (release-verification), planning the forward rollout (deployment), schema sequencing itself (migrations), root-cause analysis after the bleeding stops (systematic-debugging), or executing a production revert without explicit confirmation.",
+  "verifies": false,
+  "provides": ["known-good-target", "reversibility-classification", "rollback-rehearsal", "recovery-record"],
+  "tools": ["workspace", "github", "vercel"],
+  "references": [],
+  "scripts": [],
+  "provenance": "local",
+  "tags": ["devops", "rollback", "recovery", "release", "irreversible", "restore", "incident"]
+}

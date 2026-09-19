@@ -1,0 +1,623 @@
+{
+  "catalog_name": "agent-dispatcher",
+  "catalog_version": "2.0.0",
+  "schema_version": "2.0.0",
+  "format_kind": "portable_role_catalog_not_a_verified_locus_import",
+  "note": "Role definitions in a shape a Locus importer can consume. Extension metadata (skills, mcps, recipes, verification) has no verified Locus equivalent and should be carried opaquely rather than dropped.",
+  "template_count": 27,
+  "templates": [
+    {
+      "id": "dispatcher",
+      "name": "Dispatcher",
+      "category": "Core",
+      "existing_specialty_fallback": "orchestrator",
+      "description": "Coordinates bounded work, chooses available specialists, and owns the combined outcome.",
+      "routing": {
+        "use_when": "The goal has separable workstreams, dependencies, or independent verification that genuinely benefit from multiple agents.",
+        "do_not_route_for": "routine tasks that one agent can finish directly, or a planner that never executes its handoffs.",
+        "capability_tags": [
+          "orchestration",
+          "delegation",
+          "routing",
+          "coordination",
+          "handoffs",
+          "synthesis"
+        ]
+      },
+      "role_instructions_path": "templates/core/dispatcher.md",
+      "extensions": {}
+    },
+    {
+      "id": "generalist",
+      "name": "Generalist",
+      "category": "Core",
+      "existing_specialty_fallback": "generalist",
+      "description": "Handles everyday tasks end to end and adapts depth and tools to the actual goal.",
+      "routing": {
+        "use_when": "A task spans several domains, is small enough for one agent, or does not fit a more specific specialty.",
+        "do_not_route_for": "unnecessary multi-agent orchestration or pretending to have expertise, tools, or access it lacks.",
+        "capability_tags": [
+          "general",
+          "execution",
+          "writing",
+          "analysis",
+          "problem-solving",
+          "assistance"
+        ]
+      },
+      "role_instructions_path": "templates/core/generalist.md",
+      "extensions": {}
+    },
+    {
+      "id": "implementer",
+      "name": "Implementer",
+      "category": "Core",
+      "existing_specialty_fallback": "implementer",
+      "description": "Builds focused, maintainable changes and verifies them against the task.",
+      "routing": {
+        "use_when": "The task calls for authorized creation or modification of software, configuration, or other technical artifacts.",
+        "do_not_route_for": "independent approval of its own work, broad redesign without need, or implementing a plan that is still awaiting approval.",
+        "capability_tags": [
+          "implementation",
+          "coding",
+          "features",
+          "fixes",
+          "configuration",
+          "integration"
+        ]
+      },
+      "role_instructions_path": "templates/core/implementer.md",
+      "extensions": {}
+    },
+    {
+      "id": "planner",
+      "name": "Planner",
+      "category": "Core",
+      "existing_specialty_fallback": "planner",
+      "description": "Turns a goal into an evidence-grounded, executable plan with acceptance criteria.",
+      "routing": {
+        "use_when": "Implementation has material uncertainty, multiple dependencies, migration risk, or an explicit request for a plan.",
+        "do_not_route_for": "performing the implementation, ongoing team coordination, or producing an elaborate plan for a trivial fix.",
+        "capability_tags": [
+          "planning",
+          "requirements",
+          "dependencies",
+          "acceptance-criteria",
+          "risk",
+          "handoff"
+        ]
+      },
+      "role_instructions_path": "templates/core/planner.md",
+      "extensions": {}
+    },
+    {
+      "id": "researcher",
+      "name": "Researcher",
+      "category": "Core",
+      "existing_specialty_fallback": "researcher",
+      "description": "Investigates questions, evaluates sources, and produces decision-ready findings.",
+      "routing": {
+        "use_when": "The task needs external research, source comparison, documentation investigation, or evidence beyond the current conversation.",
+        "do_not_route_for": "writing production code, local code mapping alone, or offering confident conclusions without source access.",
+        "capability_tags": [
+          "research",
+          "evidence",
+          "sources",
+          "comparison",
+          "fact-checking",
+          "discovery"
+        ]
+      },
+      "role_instructions_path": "templates/core/researcher.md",
+      "extensions": {}
+    },
+    {
+      "id": "reviewer",
+      "name": "Reviewer",
+      "category": "Core",
+      "existing_specialty_fallback": "reviewer",
+      "description": "Independently evaluates a change or artifact and reports actionable, evidence-backed findings.",
+      "routing": {
+        "use_when": "A completed or proposed artifact needs an independent correctness, quality, scope, or readiness assessment.",
+        "do_not_route_for": "implementing fixes while reviewing, stylistic nitpicking, or treating an author's explanation as proof.",
+        "capability_tags": [
+          "review",
+          "correctness",
+          "quality",
+          "risk",
+          "verification",
+          "readiness"
+        ]
+      },
+      "role_instructions_path": "templates/core/reviewer.md",
+      "extensions": {}
+    },
+    {
+      "id": "tester",
+      "name": "Tester",
+      "category": "Core",
+      "existing_specialty_fallback": "tester",
+      "description": "Checks observable behavior, builds regression coverage, and reports reproducible failures.",
+      "routing": {
+        "use_when": "The work needs independent functional verification, regression coverage, or a reproducible test of acceptance criteria.",
+        "do_not_route_for": "silently changing product behavior to match tests, a general code-style review, or unsupported claims that a product is correct.",
+        "capability_tags": [
+          "testing",
+          "qa",
+          "regression",
+          "acceptance",
+          "edge-cases",
+          "reproduction"
+        ]
+      },
+      "role_instructions_path": "templates/core/tester.md",
+      "extensions": {}
+    },
+    {
+      "id": "ai-agent-engineer",
+      "name": "AI & Agent Engineer",
+      "category": "Engineering",
+      "existing_specialty_fallback": "aiengineer",
+      "description": "Builds and evaluates agent prompts, routing, tools, memory, and execution behavior.",
+      "routing": {
+        "use_when": "The task involves an AI workflow, specialist template, model route, tool contract, retrieval, memory, or evaluation harness.",
+        "do_not_route_for": "prompt-only security enforcement, judging an agent from one impressive output, or guessing provider capabilities.",
+        "capability_tags": [
+          "agents",
+          "prompts",
+          "evaluations",
+          "tool-use",
+          "routing",
+          "memory",
+          "retrieval"
+        ]
+      },
+      "role_instructions_path": "templates/engineering/ai-agent-engineer.md",
+      "extensions": {
+        "capabilities": "ai.agent-design, ai.prompting, ai.tool-design, ai.evaluation, ai.context",
+        "skills_core": "agent-design, prompt-engineering, context-engineering",
+        "skills_preferred": "tool-design, structured-output, llm-observability",
+        "skills_optional": "memory-design, model-routing",
+        "skills_if_mcp_server": "mcp-design, anthropic-mcp-builder",
+        "skills_if_retrieval": "retrieval-rag",
+        "skills_if_security_sensitive": "prompt-injection-defense, agent-security",
+        "skills_if_authoring_skills": "anthropic-skill-creator, anthropic-agent-development",
+        "skills_if_anthropic_api": "anthropic-claude-api",
+        "mcp_recommended": "workspace, context7",
+        "recipes": "ship-feature, debug-application",
+        "verification": "agent-evals"
+      }
+    },
+    {
+      "id": "api-integration-engineer",
+      "name": "API & Integration Engineer",
+      "category": "Engineering",
+      "existing_specialty_fallback": "api",
+      "description": "Connects services with correct contracts, authorization, retry behavior, and failure handling.",
+      "routing": {
+        "use_when": "A feature needs a service connector, webhook, API client, synchronization path, or structured external data exchange.",
+        "do_not_route_for": "unverified API assumptions, broad account access, blind retries of actions with external side effects, or a scheduled pipeline that lands and reshapes that data for downstream consumers.",
+        "capability_tags": [
+          "api",
+          "integration",
+          "webhooks",
+          "connectors",
+          "contracts",
+          "idempotency"
+        ]
+      },
+      "role_instructions_path": "templates/engineering/api-integration-engineer.md",
+      "extensions": {}
+    },
+    {
+      "id": "architect",
+      "name": "Architect",
+      "category": "Engineering",
+      "existing_specialty_fallback": "architect",
+      "description": "Designs system boundaries, contracts, and tradeoffs that fit the existing product and constraints.",
+      "routing": {
+        "use_when": "A change spans components, data models, execution boundaries, or technical decisions with long-term consequences.",
+        "do_not_route_for": "routine implementation details, needless platform rewrites, or product prioritization.",
+        "capability_tags": [
+          "architecture",
+          "interfaces",
+          "system-design",
+          "tradeoffs",
+          "data-flow",
+          "reliability"
+        ]
+      },
+      "role_instructions_path": "templates/engineering/architect.md",
+      "extensions": {}
+    },
+    {
+      "id": "data-engineer",
+      "name": "Data Engineer",
+      "category": "Engineering",
+      "existing_specialty_fallback": "dataeng",
+      "description": "Builds and repairs the pipelines, jobs, and transforms that produce the data downstream consumers depend on.",
+      "routing": {
+        "use_when": "The task involves a data pipeline, scheduled job, transform, notebook promoted to production, or a backfill of produced data.",
+        "do_not_route_for": "code-level defects inside a failing job, destination schema design and its migrations, the scheduler platform or CI itself, or interpreting what the resulting numbers mean.",
+        "capability_tags": [
+          "data-pipeline",
+          "etl",
+          "lineage",
+          "backfill",
+          "idempotency",
+          "notebooks"
+        ]
+      },
+      "role_instructions_path": "templates/engineering/data-engineer.md",
+      "extensions": {}
+    },
+    {
+      "id": "database-engineer",
+      "name": "Database Engineer",
+      "category": "Engineering",
+      "existing_specialty_fallback": "database",
+      "description": "Designs and changes data storage with integrity, compatibility, and safe migration behavior.",
+      "routing": {
+        "use_when": "The task involves schemas, persistence, transactions, access rules, queries, or data migrations.",
+        "do_not_route_for": "casual production mutations, guessing at data distribution, treating a backup as a verified rollback, or reprocessing and backfilling rows through the pipeline that produces them.",
+        "capability_tags": [
+          "database",
+          "schema",
+          "queries",
+          "transactions",
+          "migrations",
+          "data-integrity"
+        ]
+      },
+      "role_instructions_path": "templates/engineering/database-engineer.md",
+      "extensions": {}
+    },
+    {
+      "id": "debugger",
+      "name": "Debugger",
+      "category": "Engineering",
+      "existing_specialty_fallback": "debugger",
+      "description": "Reproduces failures, tests hypotheses, and fixes the underlying cause with regression evidence.",
+      "routing": {
+        "use_when": "A defect, crash, inconsistent behavior, or failing test needs a disciplined root-cause investigation.",
+        "do_not_route_for": "random trial-and-error edits, speculative rewrites, treating a disappearing symptom as proof of a fix, or an outage still in progress, where mitigation comes before a complete causal explanation.",
+        "capability_tags": [
+          "debugging",
+          "root-cause",
+          "reproduction",
+          "logs",
+          "regression",
+          "diagnostics"
+        ]
+      },
+      "role_instructions_path": "templates/engineering/debugger.md",
+      "extensions": {}
+    },
+    {
+      "id": "devops-release",
+      "name": "DevOps & Release Engineer",
+      "category": "Engineering",
+      "existing_specialty_fallback": "devops",
+      "description": "Builds reproducible delivery workflows and prepares or executes authorized releases with recovery checks.",
+      "routing": {
+        "use_when": "The work involves builds, CI, packaging, environments, deployment configuration, observability, or release readiness.",
+        "do_not_route_for": "unapproved production changes, credential collection, claiming a healthy service from build success alone, or an outage in progress, where restoring service outranks the release process.",
+        "capability_tags": [
+          "devops",
+          "ci-cd",
+          "builds",
+          "deployment",
+          "release",
+          "observability"
+        ]
+      },
+      "role_instructions_path": "templates/engineering/devops-release.md",
+      "extensions": {}
+    },
+    {
+      "id": "explorer",
+      "name": "Explorer",
+      "category": "Engineering",
+      "existing_specialty_fallback": "explorer",
+      "description": "Maps an unfamiliar workspace and finds the exact code, files, and execution paths relevant to a task.",
+      "routing": {
+        "use_when": "Another agent needs to understand where behavior lives, how components connect, or where a change should begin.",
+        "do_not_route_for": "broad web research, product planning, or making code changes.",
+        "capability_tags": [
+          "codebase",
+          "navigation",
+          "discovery",
+          "dependencies",
+          "entry-points",
+          "impact-analysis"
+        ]
+      },
+      "role_instructions_path": "templates/engineering/explorer.md",
+      "extensions": {}
+    },
+    {
+      "id": "incident-responder",
+      "name": "Incident Responder",
+      "category": "Engineering",
+      "existing_specialty_fallback": "incident",
+      "description": "Stabilizes an actively failing system with the smallest reversible mitigation and a timestamped incident record.",
+      "routing": {
+        "use_when": "A production system is failing right now and time to mitigation matters more than a complete causal explanation.",
+        "do_not_route_for": "a defect that is not currently failing in production, release preparation and pipeline work, or a postmortem write-up after recovery.",
+        "capability_tags": [
+          "incident",
+          "triage",
+          "mitigation",
+          "rollback",
+          "outage",
+          "on-call"
+        ]
+      },
+      "role_instructions_path": "templates/engineering/incident-responder.md",
+      "extensions": {}
+    },
+    {
+      "id": "performance-engineer",
+      "name": "Performance Engineer",
+      "category": "Engineering",
+      "existing_specialty_fallback": "performance",
+      "description": "Measures bottlenecks and makes targeted improvements with reproducible before-and-after evidence.",
+      "routing": {
+        "use_when": "Latency, resource use, throughput, startup time, or responsiveness needs measurable improvement.",
+        "do_not_route_for": "speculative optimization, cherry-picked benchmarks, or reporting percentages without comparable measurements.",
+        "capability_tags": [
+          "performance",
+          "profiling",
+          "latency",
+          "benchmarking",
+          "memory-use",
+          "optimization"
+        ]
+      },
+      "role_instructions_path": "templates/engineering/performance-engineer.md",
+      "extensions": {
+        "capabilities": "quality.profiling, database.performance, frontend.performance, backend.caching",
+        "skills_core": "performance-profiling, query-optimization",
+        "skills_preferred": "caching, background-jobs, observability",
+        "skills_optional": "schema-design",
+        "skills_if_frontend": "frontend-performance",
+        "skills_if_postgres": "postgres",
+        "mcp_recommended": "workspace, sentry",
+        "mcp_conditional": "chrome-devtools, datadog, grafana",
+        "recipes": "debug-application",
+        "verification": "api-contract-verification, browser-verification"
+      }
+    },
+    {
+      "id": "refactoring-migration-specialist",
+      "name": "Refactoring & Migration Specialist",
+      "category": "Engineering",
+      "existing_specialty_fallback": "refactor",
+      "description": "Improves internal structure or moves systems to a new contract while preserving required behavior.",
+      "routing": {
+        "use_when": "The task is a deliberate refactor, dependency transition, compatibility upgrade, or staged migration.",
+        "do_not_route_for": "unrequested rewrites, hidden feature changes, or replacing a known system with an unproven abstraction.",
+        "capability_tags": [
+          "refactoring",
+          "migration",
+          "compatibility",
+          "modernization",
+          "deprecations",
+          "behavior-preservation"
+        ]
+      },
+      "role_instructions_path": "templates/engineering/refactoring-migration-specialist.md",
+      "extensions": {}
+    },
+    {
+      "id": "security-auditor",
+      "name": "Security Auditor",
+      "category": "Engineering",
+      "existing_specialty_fallback": "security",
+      "description": "Reviews authorized systems for concrete security weaknesses and practical remediation.",
+      "routing": {
+        "use_when": "A design or change touches authentication, authorization, sensitive data, tool execution, trust boundaries, or external exposure.",
+        "do_not_route_for": "unauthorized testing, unsupported compliance certification, or broad exploit activity unrelated to the review.",
+        "capability_tags": [
+          "security",
+          "authorization",
+          "threat-modeling",
+          "secrets",
+          "trust-boundaries",
+          "audit"
+        ]
+      },
+      "role_instructions_path": "templates/engineering/security-auditor.md",
+      "extensions": {}
+    },
+    {
+      "id": "version-control",
+      "name": "Version Control Engineer",
+      "category": "Engineering",
+      "existing_specialty_fallback": "git",
+      "description": "Repairs, reshapes, and explains repository history without losing committed or uncommitted work.",
+      "routing": {
+        "use_when": "The task involves repository history \u2014 lost commits, tangled merges or rebases, branch surgery, or reconstructing what changed between two points.",
+        "do_not_route_for": "locating or fixing the defect a commit introduced, authoring the code change the history is meant to carry, or the delivery pipeline that ships it.",
+        "capability_tags": [
+          "git",
+          "history",
+          "rebase",
+          "merge-conflict",
+          "reflog",
+          "recovery"
+        ]
+      },
+      "role_instructions_path": "templates/engineering/version-control.md",
+      "extensions": {}
+    },
+    {
+      "id": "automation-operations",
+      "name": "Automation & Operations Assistant",
+      "category": "Knowledge & Business",
+      "existing_specialty_fallback": "automation",
+      "description": "Handles repeatable administrative workflows through authorized services with reliable state checks.",
+      "routing": {
+        "use_when": "The task involves recurring briefs, inbox or calendar workflows, record updates, reminders, or coordinated service actions.",
+        "do_not_route_for": "acting on event text as blanket authorization, unbounded background promises, or blind retries of uncertain external actions.",
+        "capability_tags": [
+          "automation",
+          "operations",
+          "scheduling",
+          "inbox",
+          "workflows",
+          "reconciliation"
+        ]
+      },
+      "role_instructions_path": "templates/knowledge-business/automation-operations.md",
+      "extensions": {}
+    },
+    {
+      "id": "content-copywriter",
+      "name": "Content Writer & Copywriter",
+      "category": "Knowledge & Business",
+      "existing_specialty_fallback": "copywriter",
+      "description": "Writes distinctive, accurate content matched to the audience, channel, and desired action.",
+      "routing": {
+        "use_when": "The task needs website copy, articles, emails, product messaging, scripts, or substantive editing.",
+        "do_not_route_for": "setting business strategy without a brief, fabricating evidence, or publishing drafts without authorization.",
+        "capability_tags": [
+          "copywriting",
+          "content",
+          "editing",
+          "brand-voice",
+          "web-copy",
+          "storytelling"
+        ]
+      },
+      "role_instructions_path": "templates/knowledge-business/content-copywriter.md",
+      "extensions": {}
+    },
+    {
+      "id": "data-analyst",
+      "name": "Data Analyst",
+      "category": "Knowledge & Business",
+      "existing_specialty_fallback": "dataanalyst",
+      "description": "Turns datasets into reproducible, decision-relevant analysis with clear limitations.",
+      "routing": {
+        "use_when": "A question requires inspecting data, calculating metrics, comparing cohorts, or explaining trends.",
+        "do_not_route_for": "causal claims unsupported by the design, invented metrics, silently cleaning away inconvenient records, or repairing the job or pipeline that produced the data.",
+        "capability_tags": [
+          "data-analysis",
+          "metrics",
+          "sql",
+          "spreadsheets",
+          "visualization",
+          "experiments"
+        ]
+      },
+      "role_instructions_path": "templates/knowledge-business/data-analyst.md",
+      "extensions": {}
+    },
+    {
+      "id": "documentation-writer",
+      "name": "Documentation Writer",
+      "category": "Knowledge & Business",
+      "existing_specialty_fallback": "docs",
+      "description": "Produces accurate, task-oriented documentation grounded in the actual product.",
+      "routing": {
+        "use_when": "Users or developers need setup instructions, guides, reference material, release notes, or maintainable knowledge.",
+        "do_not_route_for": "inventing product behavior, rewriting source systems, or marketing copy that disguises missing functionality.",
+        "capability_tags": [
+          "documentation",
+          "guides",
+          "readme",
+          "reference",
+          "onboarding",
+          "release-notes"
+        ]
+      },
+      "role_instructions_path": "templates/knowledge-business/documentation-writer.md",
+      "extensions": {}
+    },
+    {
+      "id": "growth-marketing-strategist",
+      "name": "Growth & Marketing Strategist",
+      "category": "Knowledge & Business",
+      "existing_specialty_fallback": "marketing",
+      "description": "Develops evidence-grounded positioning, channel plans, and measurable marketing experiments.",
+      "routing": {
+        "use_when": "A product needs clearer positioning, acquisition strategy, launch planning, or a practical marketing test.",
+        "do_not_route_for": "unsupported growth promises, fabricated market research, or autonomous spending and campaign publication.",
+        "capability_tags": [
+          "marketing",
+          "growth",
+          "positioning",
+          "campaigns",
+          "acquisition",
+          "experimentation"
+        ]
+      },
+      "role_instructions_path": "templates/knowledge-business/growth-marketing-strategist.md",
+      "extensions": {}
+    },
+    {
+      "id": "product-manager",
+      "name": "Product Manager",
+      "category": "Product & Design",
+      "existing_specialty_fallback": "pm",
+      "description": "Turns a vague request into a focused product scope, user flow, and measurable success criteria.",
+      "routing": {
+        "use_when": "The team must decide what to build, for whom, why it matters, and what belongs in the first version.",
+        "do_not_route_for": "technical architecture ownership, detailed implementation sequencing alone, or inventing customer evidence.",
+        "capability_tags": [
+          "product",
+          "scope",
+          "requirements",
+          "user-stories",
+          "prioritization",
+          "acceptance"
+        ]
+      },
+      "role_instructions_path": "templates/product-design/product-manager.md",
+      "extensions": {
+        "capabilities": "product.discovery, product.definition, product.prioritization, product.analytics",
+        "skills_core": "product-discovery, prd-and-stories, prioritization",
+        "skills_preferred": "product-analytics",
+        "skills_optional": "competitive-analysis, experimentation, positioning",
+        "skills_if_ui_task": "ui-audit",
+        "mcp_recommended": "workspace",
+        "mcp_conditional": "linear, notion, github"
+      }
+    },
+    {
+      "id": "ui-ux-designer",
+      "name": "UI/UX Designer",
+      "category": "Product & Design",
+      "existing_specialty_fallback": "uidesigner",
+      "description": "Designs clear, distinctive interfaces and interaction flows, with implementation-ready details.",
+      "routing": {
+        "use_when": "A feature needs better information hierarchy, interaction design, visual coherence, or a polished prototype.",
+        "do_not_route_for": "generic decorative restyling, product requirements invented without context, or unverifiable claims of user validation.",
+        "capability_tags": [
+          "ui",
+          "ux",
+          "interaction",
+          "visual-design",
+          "prototyping",
+          "accessibility"
+        ]
+      },
+      "role_instructions_path": "templates/product-design/ui-ux-designer.md",
+      "extensions": {
+        "capabilities": "design.ui.direction, design.ux.audit, design.systems, design.responsive, design.accessibility",
+        "skills_core": "frontend-design, ui-audit, responsive-design, accessibility",
+        "skills_preferred": "anthropic-frontend-design, design-systems, design-to-code, ux-writing",
+        "skills_optional": "motion-design, component-architecture, community-frontend-ui-ux",
+        "skills_if_tailwind": "tailwind",
+        "skills_if_shadcn": "shadcn-ui",
+        "skills_if_react": "vercel-react-best-practices",
+        "skills_if_browser_available": "anthropic-webapp-testing",
+        "mcp_recommended": "workspace, playwright",
+        "mcp_conditional": "figma, axe-devtools, chrome-devtools",
+        "recipes": "build-production-ui, review-pull-request",
+        "verification": "browser-verification, visual-verification, accessibility-verification"
+      }
+    }
+  ]
+}

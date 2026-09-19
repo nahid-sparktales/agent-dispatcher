@@ -1,0 +1,14 @@
+{
+  "id": "performance-profiling",
+  "capability": "quality.profiling",
+  "category": "quality",
+  "use_when": "Something is slow, or an optimization is about to be written from a hunch rather than from a measurement.",
+  "not_for": "Correctness or crash investigation (systematic-debugging), capacity planning, or micro-tuning code with no measured user impact.",
+  "verifies": false,
+  "provides": ["baseline-measurement", "profile", "hotspot-confirmation", "before-after-comparison"],
+  "tools": ["workspace"],
+  "references": [],
+  "scripts": [],
+  "provenance": "local",
+  "tags": ["performance", "profiling", "benchmark", "baseline", "latency", "memory", "optimization"]
+}

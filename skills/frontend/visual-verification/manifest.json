@@ -1,0 +1,30 @@
+{
+  "id": "visual-verification",
+  "capability": "verification.visual",
+  "category": "frontend",
+  "use_when": "A change affects appearance and is about to be called done, or a screenshot-comparison result is about to be trusted as proof.",
+  "not_for": "A single rendered check of one change (browser-verification), judging whether a design is good (ui-audit), or behaviour with no visual surface.",
+  "verifies": true,
+  "provides": [
+    "visual-state-matrix",
+    "screenshot-comparison",
+    "responsive-visual-check",
+    "baseline-triage"
+  ],
+  "tools": [
+    "playwright",
+    "workspace"
+  ],
+  "references": [],
+  "scripts": [],
+  "provenance": "local",
+  "tags": [
+    "visual",
+    "screenshot",
+    "regression",
+    "baseline",
+    "responsive",
+    "states",
+    "verification"
+  ]
+}

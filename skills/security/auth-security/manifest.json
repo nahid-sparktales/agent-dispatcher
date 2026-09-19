@@ -1,0 +1,14 @@
+{
+  "id": "auth-security",
+  "capability": "security.auth",
+  "category": "security",
+  "use_when": "An existing auth path is reviewed, changed or doubted — sessions, tokens, reset and invite flows, impersonation, role elevation, MFA — or someone reports reaching another account's data.",
+  "not_for": "Designing the login mechanism or session model in the first place (authentication), choosing the permission model (authorization), infrastructure IAM and network policy, and any testing against a system you were not told you may test.",
+  "verifies": false,
+  "provides": ["auth-surface-map", "session-lifecycle-review", "token-verification-review", "escalation-test", "recovery-flow-review"],
+  "tools": ["workspace", "playwright"],
+  "references": [],
+  "scripts": [],
+  "provenance": "local",
+  "tags": ["auth", "session-fixation", "jwt", "privilege-escalation", "idor", "password-reset", "mfa", "account-takeover"]
+}

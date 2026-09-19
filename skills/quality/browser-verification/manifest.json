@@ -1,0 +1,31 @@
+{
+  "id": "browser-verification",
+  "capability": "verification.browser",
+  "category": "quality",
+  "use_when": "A change touches rendered UI and someone is about to claim it works, or you are asked whether a screen actually functions.",
+  "not_for": "Judging whether a design is good (ui-audit), covering a matrix of states x viewports x themes or comparing against a screenshot baseline (visual-verification), authoring test suites to keep (e2e-testing), or backend behaviour with no rendered surface.",
+  "verifies": true,
+  "provides": [
+    "rendered-check",
+    "responsive-check",
+    "interaction-check",
+    "console-check"
+  ],
+  "tools": [
+    "playwright",
+    "workspace"
+  ],
+  "references": [
+    "references/driving-the-browser.md"
+  ],
+  "scripts": [],
+  "provenance": "local",
+  "tags": [
+    "browser",
+    "rendering",
+    "responsive",
+    "console",
+    "screenshot",
+    "verification"
+  ]
+}

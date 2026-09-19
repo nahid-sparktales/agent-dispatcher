@@ -1,0 +1,14 @@
+{
+  "id": "database-migration-verification",
+  "capability": "verification.database",
+  "category": "database",
+  "use_when": "A migration has been applied to some environment and someone is about to report it as working, or that claim is being reviewed.",
+  "not_for": "Planning or sequencing the migration itself (migrations), ongoing correctness of data that no migration touched (data-integrity), or accepting a clean exit code as proof.",
+  "verifies": true,
+  "provides": ["row-count-check", "checksum-check", "constraint-check", "index-check", "invariant-check", "rollback-rehearsal"],
+  "tools": ["workspace", "supabase"],
+  "references": [],
+  "scripts": [],
+  "provenance": "local",
+  "tags": ["database", "migration", "verification", "checksum", "constraints", "rollback", "evidence"]
+}

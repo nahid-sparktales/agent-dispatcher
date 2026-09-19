@@ -1,0 +1,14 @@
+{
+  "id": "stack-detection",
+  "capability": "frontend.detection",
+  "category": "frontend",
+  "use_when": "You are about to work in a frontend repo whose stack you have not yet confirmed this session, or about to load framework-specific guidance.",
+  "not_for": "Choosing a stack for a greenfield project, evaluating dependency health, or replacing reading the specific code you are about to change.",
+  "verifies": false,
+  "provides": ["stack-profile", "package-manager-detection", "version-resolution"],
+  "tools": ["workspace"],
+  "references": [],
+  "scripts": [],
+  "provenance": "local",
+  "tags": ["frontend", "detection", "package-json", "lockfile", "monorepo", "conventions"]
+}

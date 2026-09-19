@@ -1,0 +1,14 @@
+{
+  "id": "prd-and-stories",
+  "capability": "product.definition",
+  "category": "product",
+  "use_when": "A settled problem needs a written scope others can build and check against — a brief, PRD, epic or stories — or a ticket is too vague to estimate or verify.",
+  "not_for": "Deciding whether the problem is real (product-discovery), ranking what to build first (prioritization), or choosing the implementation.",
+  "verifies": false,
+  "provides": ["product-brief", "user-flow", "acceptance-criteria", "non-goals", "user-stories"],
+  "tools": ["workspace", "github"],
+  "references": [],
+  "scripts": [],
+  "provenance": "local",
+  "tags": ["prd", "spec", "scope", "user-stories", "acceptance-criteria", "non-goals", "requirements"]
+}

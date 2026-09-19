@@ -1,0 +1,14 @@
+{
+  "id": "webhooks",
+  "capability": "backend.webhooks",
+  "category": "backend",
+  "use_when": "A webhook endpoint is being built, integrated or debugged, or the service has to deliver events to external consumers.",
+  "not_for": "Internal queue or event-bus consumers with no HTTP trust boundary, general outbound API retry policy (idempotency-and-retries), and ordinary request/response endpoint design (api-design).",
+  "verifies": false,
+  "provides": ["signature-verification", "delivery-contract", "dedupe-strategy", "retry-and-dlq"],
+  "tools": ["workspace"],
+  "references": [],
+  "scripts": [],
+  "provenance": "local",
+  "tags": ["webhooks", "signature", "replay", "at-least-once", "dead-letter", "ssrf", "events"]
+}

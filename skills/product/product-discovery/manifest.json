@@ -1,0 +1,14 @@
+{
+  "id": "product-discovery",
+  "capability": "product.discovery",
+  "category": "product",
+  "use_when": "A request arrives phrased as a solution, or a plan rests on a belief about users that nobody has checked, and the question is whether the problem is real.",
+  "not_for": "Writing the scope once the problem is settled (prd-and-stories), ranking work already understood (prioritization), or contacting users without approval.",
+  "verifies": false,
+  "provides": ["problem-statement", "evidence-grading", "falsifiable-assumption", "research-plan"],
+  "tools": ["workspace", "github"],
+  "references": [],
+  "scripts": [],
+  "provenance": "local",
+  "tags": ["discovery", "problem-framing", "jobs-to-be-done", "evidence", "assumptions", "validation"]
+}

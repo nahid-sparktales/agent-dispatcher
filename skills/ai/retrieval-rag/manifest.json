@@ -1,0 +1,14 @@
+{
+  "id": "retrieval-rag",
+  "capability": "ai.retrieval",
+  "category": "ai",
+  "use_when": "A retrieval-backed system returns wrong or thin answers, or an index is being designed, chunked, embedded or rebuilt.",
+  "not_for": "Prompt and output quality once the right passage is already in context, agent memory design (memory-design), model selection (model-routing), and choosing a vector database product.",
+  "verifies": false,
+  "provides": ["chunking-strategy", "hybrid-search", "reranking", "retrieval-evaluation"],
+  "tools": ["workspace", "context7"],
+  "references": [],
+  "scripts": [],
+  "provenance": "local",
+  "tags": ["rag", "retrieval", "chunking", "embeddings", "hybrid-search", "reranking", "recall", "evaluation"]
+}

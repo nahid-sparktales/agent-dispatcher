@@ -1,0 +1,14 @@
+{
+  "id": "secure-code-review",
+  "capability": "security.review",
+  "category": "security",
+  "use_when": "A pull request, feature or repository needs a security read before shipping — especially anything touching auth, money, tenancy, uploads, deserialization or secrets — or someone reports reaching data they should not have.",
+  "not_for": "Design-stage boundary and asset work (threat-modeling), the class-by-class pattern hunt itself (owasp-web), running scanners as a substitute for reading, or any form of live testing, which is separately authorized.",
+  "verifies": false,
+  "provides": ["review-reading-order", "source-to-sink-trace", "finding-report", "severity-ranking", "coverage-statement"],
+  "tools": ["workspace", "github"],
+  "references": [],
+  "scripts": [],
+  "provenance": "local",
+  "tags": ["code-review", "security-review", "source-to-sink", "findings", "severity", "reachability", "pull-request"]
+}

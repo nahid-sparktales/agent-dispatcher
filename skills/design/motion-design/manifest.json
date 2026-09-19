@@ -1,0 +1,14 @@
+{
+  "id": "motion-design",
+  "capability": "design.motion",
+  "category": "design",
+  "use_when": "Transitions, animated state changes, gesture movement or loading indicators are being added, tuned or reviewed, or an interface reads as janky or sluggish.",
+  "not_for": "Static visual design and layout, general performance profiling of non-animated code, or proving a screen works at all (browser-verification).",
+  "verifies": false,
+  "provides": ["motion-spec", "easing-and-duration", "reduced-motion-fallback", "interruption-behaviour"],
+  "tools": ["workspace", "playwright"],
+  "references": [],
+  "scripts": [],
+  "provenance": "local",
+  "tags": ["motion", "animation", "transitions", "easing", "reduced-motion", "interaction"]
+}

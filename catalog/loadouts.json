@@ -1,0 +1,1421 @@
+{
+  "schema_version": "2.0.0",
+  "generated_from": "templates/*/*.md",
+  "roles": [
+    {
+      "id": "ai-agent-engineer",
+      "slug": "aiengineer",
+      "name": "AI & Agent Engineer",
+      "category": "Engineering",
+      "capabilities": [
+        "ai.agent-design",
+        "ai.prompting",
+        "ai.tool-design",
+        "ai.evaluation",
+        "ai.context"
+      ],
+      "skills": {
+        "core": [
+          "agent-design",
+          "prompt-engineering",
+          "context-engineering"
+        ],
+        "preferred": [
+          "tool-design"
+        ],
+        "optional": [
+          "memory-design",
+          "model-routing"
+        ],
+        "conditional": {
+          "structured_output": [
+            "structured-output"
+          ],
+          "production_agent": [
+            "llm-observability"
+          ],
+          "mcp_server": [
+            "mcp-design",
+            "anthropic-mcp-builder"
+          ],
+          "retrieval": [
+            "retrieval-rag"
+          ],
+          "security_sensitive": [
+            "prompt-injection-defense",
+            "agent-security"
+          ],
+          "authoring_skills": [
+            "anthropic-skill-creator",
+            "anthropic-agent-development"
+          ],
+          "anthropic_api": [
+            "anthropic-claude-api"
+          ]
+        }
+      },
+      "mcps": {
+        "recommended": [
+          "workspace",
+          "context7"
+        ],
+        "conditional": []
+      },
+      "recipes": [
+        "ship-feature",
+        "debug-application"
+      ],
+      "verification": [
+        "agent-evals"
+      ],
+      "template": "templates/engineering/ai-agent-engineer.md"
+    },
+    {
+      "id": "api-integration-engineer",
+      "slug": "api",
+      "name": "API & Integration Engineer",
+      "category": "Engineering",
+      "capabilities": [
+        "backend.api",
+        "backend.webhooks",
+        "backend.reliability",
+        "backend.authn",
+        "verification.api"
+      ],
+      "skills": {
+        "core": [
+          "api-design",
+          "idempotency-and-retries"
+        ],
+        "preferred": [
+          "authentication",
+          "secrets-management"
+        ],
+        "optional": [
+          "caching",
+          "observability"
+        ],
+        "conditional": {
+          "webhooks": [
+            "webhooks"
+          ],
+          "background_processing": [
+            "background-jobs"
+          ],
+          "security_sensitive": [
+            "auth-security",
+            "owasp-web"
+          ],
+          "mcp_server": [
+            "mcp-design",
+            "anthropic-mcp-integration"
+          ]
+        }
+      },
+      "mcps": {
+        "recommended": [
+          "context7",
+          "github"
+        ],
+        "conditional": [
+          "supabase",
+          "cloudflare"
+        ]
+      },
+      "recipes": [
+        "ship-feature"
+      ],
+      "verification": [
+        "api-contract-verification"
+      ],
+      "template": "templates/engineering/api-integration-engineer.md"
+    },
+    {
+      "id": "architect",
+      "slug": "architect",
+      "name": "Architect",
+      "category": "Engineering",
+      "capabilities": [
+        "backend.api",
+        "database.schema",
+        "security.threat-modeling",
+        "backend.reliability"
+      ],
+      "skills": {
+        "core": [
+          "api-design",
+          "schema-design"
+        ],
+        "preferred": [
+          "threat-modeling",
+          "idempotency-and-retries"
+        ],
+        "optional": [
+          "caching",
+          "background-jobs",
+          "observability"
+        ],
+        "conditional": {
+          "technology_evaluation": [
+            "deep-research",
+            "competitive-analysis"
+          ],
+          "postgres": [
+            "postgres"
+          ],
+          "react": [
+            "component-architecture"
+          ],
+          "llm_app": [
+            "agent-design",
+            "mcp-design"
+          ]
+        }
+      },
+      "mcps": {
+        "recommended": [
+          "workspace"
+        ],
+        "conditional": [
+          "context7",
+          "github"
+        ]
+      },
+      "recipes": [
+        "research-technical-decision"
+      ],
+      "verification": [],
+      "template": "templates/engineering/architect.md"
+    },
+    {
+      "id": "automation-operations",
+      "slug": "automation",
+      "name": "Automation & Operations Assistant",
+      "category": "Knowledge & Business",
+      "capabilities": [
+        "backend.reliability",
+        "backend.jobs",
+        "ai.security"
+      ],
+      "skills": {
+        "core": [
+          "idempotency-and-retries",
+          "prompt-injection-defense"
+        ],
+        "preferred": [
+          "agent-security"
+        ],
+        "optional": [
+          "secrets-management",
+          "background-jobs"
+        ],
+        "conditional": {
+          "webhook_trigger": [
+            "webhooks"
+          ],
+          "github_actions": [
+            "github-actions"
+          ]
+        }
+      },
+      "mcps": {
+        "recommended": [
+          "workspace"
+        ],
+        "conditional": [
+          "linear",
+          "notion",
+          "slack",
+          "google-workspace"
+        ]
+      },
+      "recipes": [],
+      "verification": [
+        "api-contract-verification"
+      ],
+      "template": "templates/knowledge-business/automation-operations.md"
+    },
+    {
+      "id": "content-copywriter",
+      "slug": "copywriter",
+      "name": "Content Writer & Copywriter",
+      "category": "Knowledge & Business",
+      "capabilities": [
+        "knowledge.copywriting",
+        "design.ux-writing"
+      ],
+      "skills": {
+        "core": [
+          "copywriting",
+          "positioning"
+        ],
+        "preferred": [
+          "seo",
+          "source-evaluation"
+        ],
+        "optional": [
+          "technical-writing",
+          "anthropic-brand-guidelines"
+        ],
+        "conditional": {
+          "ui_copy": [
+            "ux-writing"
+          ]
+        }
+      },
+      "mcps": {
+        "recommended": [
+          "workspace"
+        ],
+        "conditional": []
+      },
+      "recipes": [],
+      "verification": [],
+      "template": "templates/knowledge-business/content-copywriter.md"
+    },
+    {
+      "id": "data-analyst",
+      "slug": "dataanalyst",
+      "name": "Data Analyst",
+      "category": "Knowledge & Business",
+      "capabilities": [
+        "data.analysis",
+        "product.analytics",
+        "product.experiments"
+      ],
+      "skills": {
+        "core": [
+          "data-analysis",
+          "data-quality"
+        ],
+        "preferred": [
+          "product-analytics"
+        ],
+        "optional": [
+          "source-evaluation",
+          "experimentation"
+        ],
+        "conditional": {
+          "postgres": [
+            "postgres"
+          ]
+        }
+      },
+      "mcps": {
+        "recommended": [
+          "workspace"
+        ],
+        "conditional": [
+          "postgres-community",
+          "supabase"
+        ]
+      },
+      "recipes": [],
+      "verification": [],
+      "template": "templates/knowledge-business/data-analyst.md"
+    },
+    {
+      "id": "data-engineer",
+      "slug": "dataeng",
+      "name": "Data Engineer",
+      "category": "Engineering",
+      "capabilities": [
+        "data.pipelines",
+        "data.quality",
+        "backend.jobs",
+        "backend.reliability"
+      ],
+      "skills": {
+        "core": [
+          "data-pipelines",
+          "data-quality",
+          "background-jobs"
+        ],
+        "preferred": [],
+        "optional": [
+          "test-design",
+          "observability",
+          "idempotency-and-retries"
+        ],
+        "conditional": {
+          "postgres": [
+            "postgres"
+          ]
+        }
+      },
+      "mcps": {
+        "recommended": [
+          "workspace"
+        ],
+        "conditional": [
+          "postgres-community",
+          "supabase",
+          "context7"
+        ]
+      },
+      "recipes": [
+        "ship-feature"
+      ],
+      "verification": [],
+      "template": "templates/engineering/data-engineer.md"
+    },
+    {
+      "id": "database-engineer",
+      "slug": "database",
+      "name": "Database Engineer",
+      "category": "Engineering",
+      "capabilities": [
+        "database.schema",
+        "database.migrations",
+        "database.integrity",
+        "database.performance",
+        "verification.database"
+      ],
+      "skills": {
+        "core": [
+          "schema-design",
+          "migrations",
+          "data-integrity"
+        ],
+        "preferred": [
+          "query-optimization"
+        ],
+        "optional": [
+          "authorization",
+          "rollback",
+          "test-design"
+        ],
+        "conditional": {
+          "slow_query": [
+            "query-optimization",
+            "postgres"
+          ],
+          "postgres": [
+            "postgres"
+          ]
+        }
+      },
+      "mcps": {
+        "recommended": [],
+        "conditional": [
+          "postgres-community",
+          "supabase",
+          "context7"
+        ]
+      },
+      "recipes": [
+        "database-migration"
+      ],
+      "verification": [
+        "database-migration-verification"
+      ],
+      "template": "templates/engineering/database-engineer.md"
+    },
+    {
+      "id": "debugger",
+      "slug": "debugger",
+      "name": "Debugger",
+      "category": "Engineering",
+      "capabilities": [
+        "quality.debugging",
+        "quality.regression",
+        "quality.tests"
+      ],
+      "skills": {
+        "core": [
+          "systematic-debugging",
+          "regression-testing"
+        ],
+        "preferred": [
+          "test-design",
+          "performance-profiling"
+        ],
+        "optional": [
+          "idempotency-and-retries",
+          "background-jobs",
+          "caching"
+        ],
+        "conditional": {
+          "browser_available": [
+            "browser-verification"
+          ],
+          "postgres": [
+            "query-optimization",
+            "postgres"
+          ],
+          "llm_app": [
+            "llm-observability"
+          ]
+        }
+      },
+      "mcps": {
+        "recommended": [
+          "workspace"
+        ],
+        "conditional": [
+          "github",
+          "sentry",
+          "playwright"
+        ]
+      },
+      "recipes": [
+        "debug-application"
+      ],
+      "verification": [
+        "browser-verification",
+        "api-contract-verification"
+      ],
+      "template": "templates/engineering/debugger.md"
+    },
+    {
+      "id": "devops-release",
+      "slug": "devops",
+      "name": "DevOps & Release Engineer",
+      "category": "Engineering",
+      "capabilities": [
+        "devops.pipeline",
+        "devops.deployment",
+        "devops.rollback",
+        "verification.deployment"
+      ],
+      "skills": {
+        "core": [
+          "ci-cd",
+          "deployment",
+          "rollback"
+        ],
+        "preferred": [],
+        "optional": [
+          "technical-writing",
+          "observability",
+          "secrets-management"
+        ],
+        "conditional": {
+          "github_actions": [
+            "github-actions"
+          ],
+          "docker": [
+            "docker"
+          ],
+          "vercel": [
+            "vercel-deploy-to-vercel"
+          ],
+          "schema_migration": [
+            "migrations"
+          ]
+        }
+      },
+      "mcps": {
+        "recommended": [
+          "github"
+        ],
+        "conditional": [
+          "vercel",
+          "cloudflare",
+          "sentry"
+        ]
+      },
+      "recipes": [
+        "investigate-incident"
+      ],
+      "verification": [
+        "release-verification"
+      ],
+      "template": "templates/engineering/devops-release.md"
+    },
+    {
+      "id": "dispatcher",
+      "slug": "orchestrator",
+      "name": "Dispatcher",
+      "category": "Core",
+      "capabilities": [
+        "ai.agent-design",
+        "ai.context",
+        "security.agents"
+      ],
+      "skills": {
+        "core": [
+          "agent-design",
+          "context-engineering"
+        ],
+        "preferred": [
+          "agent-security"
+        ],
+        "optional": [],
+        "conditional": {
+          "untrusted_content": [
+            "prompt-injection-defense"
+          ]
+        }
+      },
+      "mcps": {
+        "recommended": [
+          "workspace",
+          "github"
+        ],
+        "conditional": [
+          "linear"
+        ]
+      },
+      "recipes": [
+        "ship-feature"
+      ],
+      "verification": [],
+      "template": "templates/core/dispatcher.md"
+    },
+    {
+      "id": "documentation-writer",
+      "slug": "docs",
+      "name": "Documentation Writer",
+      "category": "Knowledge & Business",
+      "capabilities": [
+        "knowledge.writing",
+        "verification.documentation"
+      ],
+      "skills": {
+        "core": [
+          "technical-writing",
+          "documentation-verification"
+        ],
+        "preferred": [
+          "source-evaluation"
+        ],
+        "optional": [],
+        "conditional": {
+          "coauthoring_with_user": [
+            "anthropic-doc-coauthoring"
+          ],
+          "public_docs_site": [
+            "seo"
+          ]
+        }
+      },
+      "mcps": {
+        "recommended": [
+          "workspace",
+          "github"
+        ],
+        "conditional": [
+          "context7",
+          "notion"
+        ]
+      },
+      "recipes": [],
+      "verification": [
+        "documentation-verification"
+      ],
+      "template": "templates/knowledge-business/documentation-writer.md"
+    },
+    {
+      "id": "explorer",
+      "slug": "explorer",
+      "name": "Explorer",
+      "category": "Engineering",
+      "capabilities": [
+        "frontend.detection",
+        "frontend.architecture",
+        "knowledge.writing"
+      ],
+      "skills": {
+        "core": [
+          "stack-detection",
+          "technical-writing"
+        ],
+        "preferred": [
+          "component-architecture"
+        ],
+        "optional": [],
+        "conditional": {
+          "postgres": [
+            "postgres",
+            "schema-design"
+          ]
+        }
+      },
+      "mcps": {
+        "recommended": [
+          "workspace",
+          "github"
+        ],
+        "conditional": [
+          "context7"
+        ]
+      },
+      "recipes": [
+        "ship-feature"
+      ],
+      "verification": [
+        "documentation-verification"
+      ],
+      "template": "templates/engineering/explorer.md"
+    },
+    {
+      "id": "generalist",
+      "slug": "generalist",
+      "name": "Generalist",
+      "category": "Core",
+      "capabilities": [
+        "quality.debugging",
+        "quality.tests",
+        "knowledge.writing",
+        "research.deep"
+      ],
+      "skills": {
+        "core": [
+          "systematic-debugging",
+          "test-design"
+        ],
+        "preferred": [
+          "regression-testing"
+        ],
+        "optional": [],
+        "conditional": {
+          "research_question": [
+            "deep-research",
+            "source-evaluation"
+          ],
+          "writing_task": [
+            "technical-writing",
+            "copywriting"
+          ],
+          "data_question": [
+            "data-analysis"
+          ],
+          "ui_task": [
+            "frontend-design",
+            "accessibility",
+            "responsive-design"
+          ],
+          "security_sensitive": [
+            "owasp-web",
+            "secrets-management"
+          ]
+        }
+      },
+      "mcps": {
+        "recommended": [
+          "workspace"
+        ],
+        "conditional": [
+          "github",
+          "context7"
+        ]
+      },
+      "recipes": [
+        "ship-feature",
+        "debug-application"
+      ],
+      "verification": [
+        "browser-verification",
+        "documentation-verification"
+      ],
+      "template": "templates/core/generalist.md"
+    },
+    {
+      "id": "growth-marketing-strategist",
+      "slug": "marketing",
+      "name": "Growth & Marketing Strategist",
+      "category": "Knowledge & Business",
+      "capabilities": [
+        "knowledge.positioning",
+        "knowledge.seo",
+        "product.experiments"
+      ],
+      "skills": {
+        "core": [
+          "positioning",
+          "experimentation"
+        ],
+        "preferred": [
+          "copywriting",
+          "product-analytics"
+        ],
+        "optional": [
+          "seo"
+        ],
+        "conditional": {
+          "market_research": [
+            "deep-research",
+            "source-evaluation"
+          ]
+        }
+      },
+      "mcps": {
+        "recommended": [
+          "workspace"
+        ],
+        "conditional": [
+          "notion",
+          "google-workspace"
+        ]
+      },
+      "recipes": [],
+      "verification": [],
+      "template": "templates/knowledge-business/growth-marketing-strategist.md"
+    },
+    {
+      "id": "implementer",
+      "slug": "implementer",
+      "name": "Implementer",
+      "category": "Core",
+      "capabilities": [
+        "backend.api",
+        "frontend.architecture",
+        "database.schema",
+        "design.implementation"
+      ],
+      "skills": {
+        "core": [
+          "test-design",
+          "regression-testing"
+        ],
+        "preferred": [
+          "api-design"
+        ],
+        "optional": [],
+        "conditional": {
+          "shadcn": [
+            "shadcn-ui"
+          ],
+          "tailwind": [
+            "tailwind"
+          ],
+          "nextjs": [
+            "nextjs-next-dev-loop"
+          ],
+          "react": [
+            "vercel-react-best-practices"
+          ],
+          "ui_task": [
+            "component-architecture",
+            "accessibility"
+          ],
+          "frontend_stack": [
+            "stack-detection"
+          ],
+          "design_handoff": [
+            "design-to-code",
+            "responsive-design"
+          ],
+          "data_model": [
+            "schema-design",
+            "postgres"
+          ],
+          "security_sensitive": [
+            "authentication",
+            "authorization",
+            "owasp-web"
+          ],
+          "async_workload": [
+            "background-jobs"
+          ],
+          "cache_layer": [
+            "caching"
+          ]
+        }
+      },
+      "mcps": {
+        "recommended": [
+          "workspace",
+          "github",
+          "context7"
+        ],
+        "conditional": [
+          "playwright",
+          "supabase",
+          "vercel",
+          "figma"
+        ]
+      },
+      "recipes": [
+        "ship-feature",
+        "debug-application",
+        "build-production-ui"
+      ],
+      "verification": [
+        "api-contract-verification",
+        "browser-verification"
+      ],
+      "template": "templates/core/implementer.md"
+    },
+    {
+      "id": "incident-responder",
+      "slug": "incident",
+      "name": "Incident Responder",
+      "category": "Engineering",
+      "capabilities": [
+        "devops.incident",
+        "devops.rollback",
+        "devops.observability",
+        "verification.deployment"
+      ],
+      "skills": {
+        "core": [
+          "incident-response",
+          "rollback"
+        ],
+        "preferred": [
+          "observability",
+          "deployment"
+        ],
+        "optional": [
+          "background-jobs"
+        ],
+        "conditional": {
+          "recent_migration": [
+            "migrations",
+            "database-migration-verification"
+          ],
+          "security_incident": [
+            "secrets-management",
+            "auth-security"
+          ]
+        }
+      },
+      "mcps": {
+        "recommended": [
+          "workspace"
+        ],
+        "conditional": [
+          "sentry",
+          "grafana",
+          "datadog",
+          "github"
+        ]
+      },
+      "recipes": [
+        "investigate-incident"
+      ],
+      "verification": [
+        "release-verification"
+      ],
+      "template": "templates/engineering/incident-responder.md"
+    },
+    {
+      "id": "performance-engineer",
+      "slug": "performance",
+      "name": "Performance Engineer",
+      "category": "Engineering",
+      "capabilities": [
+        "quality.profiling",
+        "database.performance",
+        "frontend.performance",
+        "backend.caching"
+      ],
+      "skills": {
+        "core": [
+          "performance-profiling",
+          "query-optimization"
+        ],
+        "preferred": [
+          "observability"
+        ],
+        "optional": [
+          "schema-design",
+          "caching",
+          "background-jobs"
+        ],
+        "conditional": {
+          "recent_schema_change": [
+            "migrations"
+          ],
+          "frontend": [
+            "frontend-performance"
+          ],
+          "postgres": [
+            "postgres"
+          ]
+        }
+      },
+      "mcps": {
+        "recommended": [
+          "workspace",
+          "sentry"
+        ],
+        "conditional": [
+          "chrome-devtools",
+          "datadog",
+          "grafana"
+        ]
+      },
+      "recipes": [
+        "debug-application"
+      ],
+      "verification": [],
+      "template": "templates/engineering/performance-engineer.md"
+    },
+    {
+      "id": "planner",
+      "slug": "planner",
+      "name": "Planner",
+      "category": "Core",
+      "capabilities": [
+        "product.definition",
+        "quality.strategy",
+        "product.prioritization"
+      ],
+      "skills": {
+        "core": [
+          "prd-and-stories",
+          "test-strategy"
+        ],
+        "preferred": [
+          "prioritization"
+        ],
+        "optional": [],
+        "conditional": {
+          "schema_change": [
+            "migrations"
+          ],
+          "api_change": [
+            "api-design"
+          ],
+          "security_sensitive": [
+            "threat-modeling"
+          ]
+        }
+      },
+      "mcps": {
+        "recommended": [],
+        "conditional": [
+          "github",
+          "context7"
+        ]
+      },
+      "recipes": [
+        "ship-feature",
+        "database-migration"
+      ],
+      "verification": [],
+      "template": "templates/core/planner.md"
+    },
+    {
+      "id": "product-manager",
+      "slug": "pm",
+      "name": "Product Manager",
+      "category": "Product & Design",
+      "capabilities": [
+        "product.discovery",
+        "product.definition",
+        "product.prioritization",
+        "product.analytics"
+      ],
+      "skills": {
+        "core": [
+          "product-discovery",
+          "prd-and-stories",
+          "prioritization"
+        ],
+        "preferred": [
+          "product-analytics"
+        ],
+        "optional": [
+          "competitive-analysis",
+          "experimentation",
+          "positioning"
+        ],
+        "conditional": {
+          "ui_task": [
+            "ui-audit"
+          ]
+        }
+      },
+      "mcps": {
+        "recommended": [
+          "workspace"
+        ],
+        "conditional": [
+          "linear",
+          "notion",
+          "github"
+        ]
+      },
+      "recipes": [],
+      "verification": [],
+      "template": "templates/product-design/product-manager.md"
+    },
+    {
+      "id": "refactoring-migration-specialist",
+      "slug": "refactor",
+      "name": "Refactoring & Migration Specialist",
+      "category": "Engineering",
+      "capabilities": [
+        "quality.tests",
+        "backend.api",
+        "database.migrations",
+        "verification.api"
+      ],
+      "skills": {
+        "core": [
+          "test-design",
+          "api-design"
+        ],
+        "preferred": [
+          "test-strategy",
+          "dependency-security"
+        ],
+        "optional": [
+          "technical-writing"
+        ],
+        "conditional": {
+          "schema_migration": [
+            "migrations",
+            "data-integrity"
+          ],
+          "frontend_stack": [
+            "component-architecture",
+            "vercel-react-best-practices",
+            "nextjs-next-cache-components-adoption"
+          ]
+        }
+      },
+      "mcps": {
+        "recommended": [
+          "workspace"
+        ],
+        "conditional": [
+          "github",
+          "context7"
+        ]
+      },
+      "recipes": [
+        "database-migration"
+      ],
+      "verification": [
+        "api-contract-verification",
+        "database-migration-verification"
+      ],
+      "template": "templates/engineering/refactoring-migration-specialist.md"
+    },
+    {
+      "id": "researcher",
+      "slug": "researcher",
+      "name": "Researcher",
+      "category": "Core",
+      "capabilities": [
+        "research.deep",
+        "research.sources",
+        "knowledge.competitive"
+      ],
+      "skills": {
+        "core": [
+          "deep-research",
+          "source-evaluation"
+        ],
+        "preferred": [
+          "competitive-analysis"
+        ],
+        "optional": [
+          "data-analysis"
+        ],
+        "conditional": {
+          "claude_api": [
+            "anthropic-claude-api"
+          ]
+        }
+      },
+      "mcps": {
+        "recommended": [
+          "context7"
+        ],
+        "conditional": [
+          "github"
+        ]
+      },
+      "recipes": [
+        "research-technical-decision"
+      ],
+      "verification": [],
+      "template": "templates/core/researcher.md"
+    },
+    {
+      "id": "reviewer",
+      "slug": "reviewer",
+      "name": "Reviewer",
+      "category": "Core",
+      "capabilities": [
+        "security.review",
+        "quality.strategy",
+        "security.dependencies",
+        "verification.api"
+      ],
+      "skills": {
+        "core": [
+          "test-strategy"
+        ],
+        "preferred": [
+          "dependency-security"
+        ],
+        "optional": [
+          "performance-profiling"
+        ],
+        "conditional": {
+          "api_change": [
+            "api-design"
+          ],
+          "schema_change": [
+            "schema-design",
+            "data-integrity"
+          ],
+          "security_sensitive": [
+            "secure-code-review",
+            "owasp-web",
+            "auth-security"
+          ],
+          "ui_task": [
+            "component-architecture",
+            "ui-audit",
+            "accessibility-verification"
+          ],
+          "ai_system": [
+            "prompt-injection-defense"
+          ]
+        }
+      },
+      "mcps": {
+        "recommended": [
+          "workspace",
+          "github"
+        ],
+        "conditional": [
+          "playwright",
+          "axe-devtools"
+        ]
+      },
+      "recipes": [
+        "review-pull-request",
+        "security-review"
+      ],
+      "verification": [
+        "api-contract-verification",
+        "browser-verification",
+        "documentation-verification"
+      ],
+      "template": "templates/core/reviewer.md"
+    },
+    {
+      "id": "security-auditor",
+      "slug": "security",
+      "name": "Security Auditor",
+      "category": "Engineering",
+      "capabilities": [
+        "security.review",
+        "security.web",
+        "security.auth",
+        "security.threat-modeling"
+      ],
+      "skills": {
+        "core": [
+          "secure-code-review",
+          "owasp-web"
+        ],
+        "preferred": [
+          "secrets-management",
+          "dependency-security"
+        ],
+        "optional": [
+          "auth-security"
+        ],
+        "conditional": {
+          "architecture_review": [
+            "threat-modeling"
+          ],
+          "official_security_skill_installed": [
+            "anthropic-claude-security"
+          ],
+          "agent_system": [
+            "prompt-injection-defense",
+            "agent-security"
+          ]
+        }
+      },
+      "mcps": {
+        "recommended": [
+          "github"
+        ],
+        "conditional": [
+          "cloudflare"
+        ]
+      },
+      "recipes": [
+        "security-review",
+        "review-pull-request"
+      ],
+      "verification": [],
+      "template": "templates/engineering/security-auditor.md"
+    },
+    {
+      "id": "tester",
+      "slug": "tester",
+      "name": "Tester",
+      "category": "Core",
+      "capabilities": [
+        "quality.tests",
+        "quality.regression",
+        "quality.e2e",
+        "verification.browser"
+      ],
+      "skills": {
+        "core": [
+          "test-design",
+          "test-strategy",
+          "regression-testing"
+        ],
+        "preferred": [
+          "systematic-debugging"
+        ],
+        "optional": [
+          "performance-profiling",
+          "e2e-testing"
+        ],
+        "conditional": {
+          "ui_task": [
+            "accessibility-verification",
+            "visual-verification"
+          ],
+          "browser_available": [
+            "anthropic-webapp-testing",
+            "microsoft-playwright-cli"
+          ],
+          "ai_system": [
+            "agent-evals"
+          ]
+        }
+      },
+      "mcps": {
+        "recommended": [
+          "workspace",
+          "github"
+        ],
+        "conditional": [
+          "playwright",
+          "chrome-devtools",
+          "axe-devtools"
+        ]
+      },
+      "recipes": [
+        "ship-feature",
+        "debug-application"
+      ],
+      "verification": [
+        "browser-verification",
+        "api-contract-verification"
+      ],
+      "template": "templates/core/tester.md"
+    },
+    {
+      "id": "ui-ux-designer",
+      "slug": "uidesigner",
+      "name": "UI/UX Designer",
+      "category": "Product & Design",
+      "capabilities": [
+        "design.ui.direction",
+        "design.ux.audit",
+        "design.systems",
+        "design.responsive",
+        "design.accessibility"
+      ],
+      "skills": {
+        "core": [
+          "anthropic-frontend-design",
+          "accessibility"
+        ],
+        "preferred": [
+          "responsive-design",
+          "design-systems"
+        ],
+        "optional": [
+          "motion-design",
+          "component-architecture",
+          "community-frontend-ui-ux"
+        ],
+        "conditional": {
+          "shadcn": [
+            "shadcn-ui"
+          ],
+          "tailwind": [
+            "tailwind"
+          ],
+          "react": [
+            "vercel-react-best-practices"
+          ],
+          "existing_ui": [
+            "ui-audit"
+          ],
+          "official_design_skill_unavailable": [
+            "frontend-design"
+          ],
+          "implementing_ui": [
+            "design-to-code"
+          ],
+          "ui_copy": [
+            "ux-writing"
+          ],
+          "browser_available": [
+            "anthropic-webapp-testing"
+          ]
+        }
+      },
+      "mcps": {
+        "recommended": [
+          "workspace",
+          "playwright"
+        ],
+        "conditional": [
+          "figma",
+          "axe-devtools",
+          "chrome-devtools"
+        ]
+      },
+      "recipes": [
+        "build-production-ui",
+        "review-pull-request"
+      ],
+      "verification": [
+        "browser-verification",
+        "visual-verification",
+        "accessibility-verification"
+      ],
+      "template": "templates/product-design/ui-ux-designer.md"
+    },
+    {
+      "id": "version-control",
+      "slug": "git",
+      "name": "Version Control Engineer",
+      "category": "Engineering",
+      "capabilities": [
+        "devops.rollback",
+        "security.secrets",
+        "knowledge.writing"
+      ],
+      "skills": {
+        "core": [
+          "secrets-management",
+          "technical-writing"
+        ],
+        "preferred": [
+          "systematic-debugging",
+          "dependency-security"
+        ],
+        "optional": [
+          "rollback"
+        ],
+        "conditional": {
+          "github_actions": [
+            "github-actions"
+          ]
+        }
+      },
+      "mcps": {
+        "recommended": [
+          "workspace",
+          "github"
+        ],
+        "conditional": []
+      },
+      "recipes": [],
+      "verification": [],
+      "template": "templates/engineering/version-control.md"
+    }
+  ]
+}

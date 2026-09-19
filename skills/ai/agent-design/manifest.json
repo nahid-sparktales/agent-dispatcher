@@ -1,0 +1,14 @@
+{
+  "id": "agent-design",
+  "capability": "ai.agent-design",
+  "category": "ai",
+  "use_when": "An agent or subagent is being scoped, granted tools, or reviewed after looping, over-reaching or reporting work it did not do.",
+  "not_for": "Wording and measuring the prompt itself (prompt-engineering), deciding what occupies the window (context-engineering), and granting any permission the user has not already given.",
+  "verifies": false,
+  "provides": ["agent-boundary", "tool-loadout", "prohibition-list", "evidence-contract", "handoff-shape"],
+  "tools": ["workspace", "context7"],
+  "references": [],
+  "scripts": [],
+  "provenance": "local",
+  "tags": ["agent", "subagent", "tools", "autonomy", "boundaries", "handoff", "evidence"]
+}

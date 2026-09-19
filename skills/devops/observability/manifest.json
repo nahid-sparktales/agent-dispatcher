@@ -1,0 +1,14 @@
+{
+  "id": "observability",
+  "capability": "devops.observability",
+  "category": "devops",
+  "use_when": "A service or a new critical path is going to production, an incident ended with a question the data could not answer, or a dependency, queue or job is being added whose failure would otherwise be silent.",
+  "not_for": "Stabilizing a failure that is happening right now (incident-response), measuring a known-slow path you can already reproduce (performance-profiling), and tracing agent or LLM runs (llm-observability).",
+  "verifies": false,
+  "provides": ["signal-design", "structured-events", "correlation-propagation", "alert-thresholds"],
+  "tools": ["workspace", "context7"],
+  "references": [],
+  "scripts": [],
+  "provenance": "local",
+  "tags": ["observability", "logging", "metrics", "tracing", "alerting", "slo", "cardinality"]
+}

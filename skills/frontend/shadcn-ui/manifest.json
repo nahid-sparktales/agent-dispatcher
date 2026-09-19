@@ -1,0 +1,14 @@
+{
+  "id": "shadcn-ui",
+  "capability": "frontend.shadcn",
+  "category": "frontend",
+  "use_when": "Adding, customizing or debugging a shadcn/ui component in a repo with components.json and a vendored UI directory.",
+  "not_for": "Choosing a component library, general component boundaries and state (component-architecture), or a full accessibility audit.",
+  "verifies": false,
+  "provides": ["copy-in-model", "primitive-customization", "radix-accessibility-boundary"],
+  "tools": ["workspace", "context7"],
+  "references": [],
+  "scripts": [],
+  "provenance": "local",
+  "tags": ["frontend", "shadcn", "radix", "components", "accessibility", "vendored"]
+}

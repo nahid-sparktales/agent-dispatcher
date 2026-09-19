@@ -1,55 +1,143 @@
 #!/usr/bin/env python3
-"""Consistency check for the generated pack. Run after build.py; install.sh runs it for you."""
+"""Validation suite. Run directly, or via install.sh, which runs it before installing anything.
+
+Checks the structure the generator cannot check for itself: that generated artifacts agree with
+their canonical sources, that nothing references something that does not exist, that no secret or
+absolute local path leaked in, and that the docs do not contradict the catalog.
+"""
+import json
 import pathlib
 import re
+import sys
 
 import build
 
 ROOT = pathlib.Path(__file__).parent
+FAILURES = []
+
+
+def check(name, cond, detail=""):
+    if cond:
+        print(f"  ok   {name}")
+    else:
+        FAILURES.append(f"{name}: {detail}")
+        print(f"  FAIL {name} — {detail}")
+
+
+GENERATED = ["skills/agent-dispatcher/SKILL.md", "skills/agent-dispatcher/INDEX.md",
+             "catalog/skills.json", "catalog/loadouts.json", "README.md"]
+
+
+def drift():
+    """A generated file edited by hand is a change that the next build silently discards."""
+    before = {}
+    for rel in GENERATED:
+        p = ROOT / rel
+        if p.exists():
+            before[rel] = p.read_bytes()
+    for p in list((build.ADAPTER / "roles").glob("*.md")) + list(build.CMDS.glob("agent-*.md")) \
+            + list(build.HOOKS.glob("*")):
+        before[str(p.relative_to(ROOT))] = p.read_bytes()
+    build.main()
+    return [rel for rel, old in before.items()
+            if (ROOT / rel).exists() and (ROOT / rel).read_bytes() != old]
 
 
 def main():
-    roles = build.main()
+    print("building...")
+    changed = drift()
+    check("no generated file was hand-edited", not changed,
+          f"these differ from what build.py produces: {changed[:6]}")
+    d = build.load()
+    roles, skills, recipes = d["roles"], d["skills"], d["recipes"]
     ids = {r["id"] for r in roles}
     slugs = [r["slug"] for r in roles]
+    skill_ids = {s["id"] for s in skills}
 
-    assert len(slugs) == len(set(slugs)), "duplicate slug"
-    assert len(ids) == len(roles), "duplicate id"
+    print("\nidentity")
+    check("role ids unique", len(ids) == len(roles))
+    check("role slugs unique", len(set(slugs)) == len(slugs))
+    check("skill ids unique", len(skill_ids) == len(skills))
+    check("no id collides with an external skill",
+          not (skill_ids & set(d["external"])), str(skill_ids & set(d["external"])))
 
-    for r in roles:
-        assert (build.ROLES / f"{r['id']}.md").exists(), f"missing role file for {r['id']}"
-        for field in ("name", "summary", "use_when", "not_for"):
-            assert r[field].strip(), f"{r['id']}: empty {field}"
-            assert '"' not in r[field], f"{r['id']}: quote inside frontmatter {field}"
-        assert r["tags"], f"{r['id']}: no tags"
-
-    skill = (build.SKILL / "SKILL.md").read_text()
-    assert "{{" not in skill, "unreplaced placeholder in SKILL.md"
-    assert set(re.findall(r"^### `([a-z0-9-]+)`", skill, re.M)) == ids, "SKILL.md catalog != role files"
-
+    print("\ngenerated artifacts agree with sources")
+    router = (build.ADAPTER / "SKILL.md").read_text()
+    check("router has no unreplaced placeholder", "{{" not in router)
+    check("router catalog == templates",
+          set(re.findall(r"^### `([a-z0-9-]+)`", router, re.M)) == ids)
     cmds = sorted(build.CMDS.glob("agent-*.md"))
-    assert len(cmds) == len(roles), f"{len(cmds)} commands for {len(roles)} roles"
+    check("one command per role", len(cmds) == len(roles), f"{len(cmds)} vs {len(roles)}")
     for c in cmds:
-        body = c.read_text()
-        m = re.search(r"roles/([a-z0-9-]+)\.md", body)
-        assert m and m.group(1) in ids, f"{c.name} points at a role that does not exist"
-        assert c.stem == f"agent-{next(r['slug'] for r in roles if r['id'] == m.group(1))}"
-
+        m = re.search(r"roles/([a-z0-9-]+)\.md", c.read_text())
+        check(f"command {c.name} points at a real role", m and m.group(1) in ids)
     hook = (build.HOOKS / "agent-dispatcher-activate.sh").read_text()
-    assert set(re.findall(r"^- `([a-z0-9-]+)`", hook, re.M)) == ids, "hook index != role files"
+    check("hook index == templates", set(re.findall(r"^- `([a-z0-9-]+)`", hook, re.M)) == ids)
+    rendered = sorted((build.ADAPTER / "roles").glob("*.md"))
+    check("one rendered role per template", len(rendered) == len(roles))
 
+    print("\ncross-references resolve")
+    loadouts = json.loads((build.CATALOG / "loadouts.json").read_text())
+    empty = [r["id"] for r in loadouts["roles"]
+             if not any(r["skills"][t] for t in build.TIERS) and not r["skills"]["conditional"]]
+    check("every role has a loadout", not empty, f"empty: {empty}")
+    index = (build.ADAPTER / "INDEX.md").read_text()
+    check("index lists every local skill",
+          all(f"`{s['id']}`" in index for s in skills))
+    verifiers = {s["id"] for s in skills if s["verifies"]}
+    check("at least one verification skill exists per major area", len(verifiers) >= 5,
+          f"only {len(verifiers)}")
+
+    print("\nskill files")
+    for s in skills:
+        p = ROOT / s["path"]
+        fm, body = build.read_frontmatter(p)
+        extra = set(fm) - {"name", "description", "allowed-tools", "license"}
+        check(f"{s['id']} SKILL.md frontmatter is standard", not extra, f"extra keys {sorted(extra)}")
+        n = len(body.splitlines())
+        check(f"{s['id']} body is a skill, not a book", 30 <= n <= 220, f"{n} lines")
+
+    print("\nhygiene")
+    tracked = [p for p in ROOT.rglob("*")
+               if p.is_file() and ".git/" not in str(p) and "__pycache__" not in str(p)]
+    secret = re.compile(r"(gh[pousr]_[A-Za-z0-9]{20,}|sk-[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|"
+                        r"-----BEGIN [A-Z ]*PRIVATE KEY-----)")
+    hits = [str(p.relative_to(ROOT)) for p in tracked if p.suffix in (".md", ".json", ".sh", ".py")
+            and secret.search(p.read_text(errors="ignore"))]
+    check("no credentials committed", not hits, str(hits))
+    home = [str(p.relative_to(ROOT)) for p in tracked
+            if p.suffix in (".md", ".json") and "/Users/" in p.read_text(errors="ignore")
+            and not str(p).endswith("research.json")]
+    check("no absolute local paths in content", not home, str(home[:5]))
+
+    print("\ncatalogs")
+    for name in ("mcp.json", "external-skills.json", "skills.json", "loadouts.json"):
+        p = build.CATALOG / name
+        check(f"{name} parses", p.exists() and json.loads(p.read_text()) is not None)
+    mcp = json.loads((build.CATALOG / "mcp.json").read_text())["servers"]
+    check("every MCP records its risk and write posture",
+          all("writes" in m and "risk" in m and "fallback" in m for m in mcp))
+    ext = json.loads((build.CATALOG / "external-skills.json").read_text())["skills"]
+    check("every external skill records provenance",
+          all(all(k in e for k in ("repository", "license", "trust", "verified", "fallback"))
+              for e in ext))
+    check("no external skill is vendored", all(not e.get("vendored") for e in ext))
+
+    print("\ndocs match reality")
     readme = (ROOT / "README.md").read_text()
-    assert readme.count("<!-- roles:start -->") == 1 and readme.count("<!-- roles:end -->") == 1
-    table = readme.split("<!-- roles:start -->")[1].split("<!-- roles:end -->")[0]
-    assert set(re.findall(r"`/agent-([a-z0-9-]+)`", table)) == set(slugs), "README table != commands"
+    for n, label in ((len(roles), "roles"), (len(skills), "skills")):
+        check(f"README states {label} count {n}", str(n) in readme)
+    for doc in ("architecture.md", "security.md", "adding-a-skill.md"):
+        check(f"docs/{doc} exists", (ROOT / "docs" / doc).exists())
 
-    assert str(len(roles)) in readme.split("<!-- roles:start -->")[0], (
-        f"README prose does not mention the real role count ({len(roles)})")
-    for stale in re.findall(r"one of (\d+) specialist|The (\d+) roles", readme):
-        n = next(v for v in stale if v)
-        assert int(n) == len(roles), f"README says {n} roles, there are {len(roles)}"
-
-    print(f"ok — {len(roles)} roles, {len(cmds)} commands, hook and README all agree")
+    print()
+    if FAILURES:
+        print(f"{len(FAILURES)} FAILED")
+        for f in FAILURES:
+            print(f"  - {f}")
+        sys.exit(1)
+    print(f"all checks passed — {len(roles)} roles, {len(skills)} skills, {len(recipes)} recipes, "
+          f"{len(d['external'])} external, {len(mcp)} mcp")
 
 
 if __name__ == "__main__":

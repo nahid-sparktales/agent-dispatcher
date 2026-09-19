@@ -1,0 +1,961 @@
+{
+ "found": [
+  {
+   "lens": "anthropic-plugins",
+   "skills": [
+    {
+     "name": "frontend-design",
+     "path": "plugins/frontend-design/skills/frontend-design/SKILL.md",
+     "purpose": "Design-lead persona for distinctive UI: aesthetic direction, typography, avoiding templated defaults. The exact spec path CONFIRMED to exist. Plugin manifest: name frontend-design, version 1.1.0, authors Prithvi Rajasekaran / Alexander Bricken. SKILL.md declares 'license: Complete terms in LICENSE.txt' but NO LICENSE.txt exists in that plugin directory (dir contains only .claude-plugin, README.md, skills) \u2014 repo-level LICENSE.md is Anthropic commercial terms, not open source. Byte-identical (sha256 d919706...) to the copies in anthropics/skills and anthropics/claude-plugins-official.",
+     "descriptionLine": "Guidance for distinctive, intentional visual design when building new UI or reshaping an existing one. Helps with aesthetic direction, typography, and making choices that don't read as templated defaults.",
+     "verifiedBy": "https://raw.githubusercontent.com/anthropics/claude-code/main/plugins/frontend-design/skills/frontend-design/SKILL.md",
+     "confidence": "observed"
+    },
+    {
+     "name": "claude-opus-4-5-migration",
+     "path": "plugins/claude-opus-4-5-migration/skills/claude-opus-4-5-migration/SKILL.md",
+     "purpose": "Model-migration skill (model strings, beta headers, prompt adjustments). Has references/effort.md and references/prompt-snippets.md. Not role-pack relevant.",
+     "descriptionLine": "Migrate prompts and code from Claude Sonnet 4.0, Sonnet 4.5, or Opus 4.1 to Opus 4.5. Use when the user wants to update their codebase, prompts, or API calls to use Opus 4.5.",
+     "verifiedBy": "https://raw.githubusercontent.com/anthropics/claude-code/main/plugins/claude-opus-4-5-migration/skills/claude-opus-4-5-migration/SKILL.md",
+     "confidence": "observed"
+    },
+    {
+     "name": "writing-rules",
+     "path": "plugins/hookify/skills/writing-rules/SKILL.md",
+     "purpose": "Hookify rule syntax guidance. NOTE: directory name is 'writing-rules' but the frontmatter name field is 'Writing Hookify Rules' (title-case, with spaces) \u2014 a mismatch worth knowing if you key a pack off directory names. version 0.1.0.",
+     "descriptionLine": "This skill should be used when the user asks to \"create a hookify rule\", \"write a hook rule\", \"configure hookify\", \"add a hookify rule\", or needs guidance on hookify rule syntax and patterns.",
+     "verifiedBy": "https://raw.githubusercontent.com/anthropics/claude-code/main/plugins/hookify/skills/writing-rules/SKILL.md",
+     "confidence": "observed"
+    },
+    {
+     "name": "agent-development",
+     "path": "plugins/plugin-dev/skills/agent-development/SKILL.md",
+     "purpose": "How to write subagents: frontmatter, triggering conditions, system-prompt design. Directly relevant to an agent-role pack (this is the meta-skill for authoring roles). version 0.1.0. NOTE: plugins/plugin-dev has NO .claude-plugin/plugin.json in the claude-code repo (dir = README.md, agents, commands, skills), unlike every other plugin there; it IS registered in the repo's marketplace.json.",
+     "descriptionLine": "This skill should be used when the user asks to \"create an agent\", \"add an agent\", \"write a subagent\", \"agent frontmatter\", \"when to use description\", \"agent examples\", \"agent tools\", \"agent colors\", \"autonomous agent\", or needs guidance on agent structure, system prompts, triggering conditions, or agent development best practices for Claude Code plugins.",
+     "verifiedBy": "https://raw.githubusercontent.com/anthropics/claude-code/main/plugins/plugin-dev/skills/agent-development/SKILL.md",
+     "confidence": "observed"
+    },
+    {
+     "name": "skill-development",
+     "path": "plugins/plugin-dev/skills/skill-development/SKILL.md",
+     "purpose": "How to author skills (structure, progressive disclosure, description quality). Has references/skill-creator-original.md. No version field in frontmatter.",
+     "descriptionLine": "This skill should be used when the user wants to \"create a skill\", \"add a skill to plugin\", \"write a new skill\", \"improve skill description\", \"organize skill content\", or needs guidance on skill structure, progressive disclosure, or skill development best practices for Claude Code plugins.",
+     "verifiedBy": "https://raw.githubusercontent.com/anthropics/claude-code/main/plugins/plugin-dev/skills/skill-development/SKILL.md",
+     "confidence": "observed"
+    },
+    {
+     "name": "command-development",
+     "path": "plugins/plugin-dev/skills/command-development/SKILL.md",
+     "purpose": "Slash-command authoring: frontmatter fields, dynamic args, bash execution, AskUserQuestion patterns. version 0.2.0 (the only plugin-dev skill past 0.1.0).",
+     "descriptionLine": "This skill should be used when the user asks to \"create a slash command\", \"add a command\", \"write a custom command\", \"define command arguments\", \"use command frontmatter\", \"organize commands\", \"create command with file references\", \"interactive command\", \"use AskUserQuestion in command\", or needs guidance on slash command structure, YAML frontmatter fields, dynamic arguments, bash execution in commands, user interaction patterns, or command development best practices for Claude Code.",
+     "verifiedBy": "https://raw.githubusercontent.com/anthropics/claude-code/main/plugins/plugin-dev/skills/command-development/SKILL.md",
+     "confidence": "observed"
+    },
+    {
+     "name": "hook-development",
+     "path": "plugins/plugin-dev/skills/hook-development/SKILL.md",
+     "purpose": "Hook authoring across all events (PreToolUse, PostToolUse, Stop, SubagentStop, SessionStart, SessionEnd, UserPromptSubmit, PreCompact, Notification); ships hook-linter.sh, test-hook.sh, validate-hook-schema.sh. version 0.1.0.",
+     "descriptionLine": "This skill should be used when the user asks to \"create a hook\", \"add a PreToolUse/PostToolUse/Stop hook\", \"validate tool use\", \"implement prompt-based hooks\", \"use ${CLAUDE_PLUGIN_ROOT}\", \"set up event-driven automation\", \"block dangerous commands\", or mentions hook events.",
+     "verifiedBy": "https://raw.githubusercontent.com/anthropics/claude-code/main/plugins/plugin-dev/skills/hook-development/SKILL.md",
+     "confidence": "observed"
+    },
+    {
+     "name": "mcp-integration",
+     "path": "plugins/plugin-dev/skills/mcp-integration/SKILL.md",
+     "purpose": "Wiring MCP servers into a plugin (.mcp.json, stdio/SSE/HTTP examples, auth reference). version 0.1.0.",
+     "descriptionLine": "This skill should be used when the user asks to \"add MCP server\", \"integrate MCP\", \"configure MCP in plugin\", \"use .mcp.json\", \"set up Model Context Protocol\", \"connect external service\", mentions \"${CLAUDE_PLUGIN_ROOT} with MCP\", or discusses MCP server types (SSE, stdio, HTTP, WebSocket).",
+     "verifiedBy": "https://raw.githubusercontent.com/anthropics/claude-code/main/plugins/plugin-dev/skills/mcp-integration/SKILL.md",
+     "confidence": "observed"
+    },
+    {
+     "name": "plugin-structure",
+     "path": "plugins/plugin-dev/skills/plugin-structure/SKILL.md",
+     "purpose": "Plugin directory layout, manifest, auto-discovery conventions \u2014 the canonical layout an agent-role pack should conform to. version 0.1.0.",
+     "descriptionLine": "This skill should be used when the user asks to \"create a plugin\", \"scaffold a plugin\", \"understand plugin structure\", \"organize plugin components\", \"set up plugin.json\", \"use ${CLAUDE_PLUGIN_ROOT}\", \"add commands/agents/skills/hooks\", \"configure auto-discovery\", or needs guidance on plugin directory layout, manifest configuration, component organization, file naming conventions, or Claude Code plugin architecture best practices.",
+     "verifiedBy": "https://raw.githubusercontent.com/anthropics/claude-code/main/plugins/plugin-dev/skills/plugin-structure/SKILL.md",
+     "confidence": "observed"
+    },
+    {
+     "name": "plugin-settings",
+     "path": "plugins/plugin-dev/skills/plugin-settings/SKILL.md",
+     "purpose": "The .claude/<plugin-name>.local.md settings pattern (YAML frontmatter + markdown body) for user-configurable plugin behavior. version 0.1.0.",
+     "descriptionLine": "This skill should be used when the user asks about \"plugin settings\", \"store plugin configuration\", \"user-configurable plugin\", \".local.md files\", \"plugin state files\", \"read YAML frontmatter\", \"per-project plugin settings\", or wants to make plugin behavior configurable.",
+     "verifiedBy": "https://raw.githubusercontent.com/anthropics/claude-code/main/plugins/plugin-dev/skills/plugin-settings/SKILL.md",
+     "confidence": "observed"
+    },
+    {
+     "name": "frontend-design (anthropics/skills copy)",
+     "path": "anthropics/skills \u2192 skills/frontend-design/SKILL.md",
+     "purpose": "DESIGN role. Identical bytes to the claude-code plugin copy, but here it carries a real skills/frontend-design/LICENSE.txt containing the Apache License 2.0 text \u2014 this is the copy to vendor if you need a license.",
+     "descriptionLine": "Guidance for distinctive, intentional visual design when building new UI or reshaping an existing one. Helps with aesthetic direction, typography, and making choices that don't read as templated defaults.",
+     "verifiedBy": "https://raw.githubusercontent.com/anthropics/skills/main/skills/frontend-design/SKILL.md",
+     "confidence": "observed"
+    },
+    {
+     "name": "webapp-testing",
+     "path": "anthropics/skills \u2192 skills/webapp-testing/SKILL.md",
+     "purpose": "TESTING role. Playwright-driven testing of local web apps; ships scripts/with_server.py for server lifecycle. LICENSE.txt = Apache 2.0 (verified).",
+     "descriptionLine": "Toolkit for interacting with and testing local web applications using Playwright. Supports verifying frontend functionality, debugging UI behavior, capturing browser screenshots, and viewing browser logs.",
+     "verifiedBy": "https://raw.githubusercontent.com/anthropics/skills/main/skills/webapp-testing/SKILL.md",
+     "confidence": "observed"
+    },
+    {
+     "name": "doc-coauthoring",
+     "path": "anthropics/skills \u2192 skills/doc-coauthoring/SKILL.md",
+     "purpose": "DOCS role. Three-stage doc workflow (Context Gathering, Refinement & Structure, Reader Testing). WARNING: the ONLY skill in that repo with NO LICENSE.txt and no license frontmatter field \u2014 licensing is unstated, so vendoring it is legally ambiguous.",
+     "descriptionLine": "Guide users through a structured workflow for co-authoring documentation. Use when user wants to write documentation, proposals, technical specs, decision docs, or similar structured content.",
+     "verifiedBy": "https://raw.githubusercontent.com/anthropics/skills/main/skills/doc-coauthoring/SKILL.md",
+     "confidence": "observed"
+    },
+    {
+     "name": "skill-creator",
+     "path": "anthropics/skills \u2192 skills/skill-creator/SKILL.md",
+     "purpose": "Meta: create/improve skills, run evals, benchmark description-triggering accuracy. LICENSE.txt = Apache 2.0 (verified). No license field in frontmatter. Also mirrored in claude-plugins-official with 3 sub-agents.",
+     "descriptionLine": "Create new skills, modify and improve existing skills, and measure skill performance. Use when users want to create a skill from scratch, edit, or optimize an existing skill, run evals to test a skill, benchmark skill performance with variance analysis, or optimize a skill's description for better triggering accuracy.",
+     "verifiedBy": "https://raw.githubusercontent.com/anthropics/skills/main/skills/skill-creator/SKILL.md",
+     "confidence": "observed"
+    },
+    {
+     "name": "mcp-builder",
+     "path": "anthropics/skills \u2192 skills/mcp-builder/SKILL.md",
+     "purpose": "Building MCP servers in Python (FastMCP) or Node/TS. LICENSE.txt present (Apache 2.0 family).",
+     "descriptionLine": "Guide for creating high-quality MCP (Model Context Protocol) servers that enable LLMs to interact with external services through well-designed tools.",
+     "verifiedBy": "https://raw.githubusercontent.com/anthropics/skills/main/skills/mcp-builder/SKILL.md",
+     "confidence": "observed"
+    },
+    {
+     "name": "claude-api",
+     "path": "anthropics/skills \u2192 skills/claude-api/SKILL.md",
+     "purpose": "Reference skill for Claude API/SDK work (model ids, pricing, streaming, tool use, caching). Notable as a craft example: its description embeds explicit TRIGGER and SKIP clauses. LICENSE.txt = Apache 2.0 (verified).",
+     "descriptionLine": "Reference for the Claude API / Anthropic SDK \u2014 model ids, pricing, params, streaming, tool use, MCP, agents, caching, token counting, model migration.",
+     "verifiedBy": "https://raw.githubusercontent.com/anthropics/skills/main/skills/claude-api/SKILL.md",
+     "confidence": "observed"
+    },
+    {
+     "name": "canvas-design",
+     "path": "anthropics/skills \u2192 skills/canvas-design/SKILL.md",
+     "purpose": "DESIGN role (static output). Design-philosophy-first workflow producing .md + .pdf/.png. LICENSE.txt present.",
+     "descriptionLine": "Create beautiful visual art in .png and .pdf documents using design philosophy. You should use this skill when the user asks to create a poster, piece of art, design, or other static piece.",
+     "verifiedBy": "https://raw.githubusercontent.com/anthropics/skills/main/skills/canvas-design/SKILL.md",
+     "confidence": "observed"
+    },
+    {
+     "name": "algorithmic-art",
+     "path": "anthropics/skills \u2192 skills/algorithmic-art/SKILL.md",
+     "purpose": "Generative art via p5.js with seeded randomness. LICENSE.txt present.",
+     "descriptionLine": "Creating algorithmic art using p5.js with seeded randomness and interactive parameter exploration.",
+     "verifiedBy": "https://raw.githubusercontent.com/anthropics/skills/main/skills/algorithmic-art/SKILL.md",
+     "confidence": "observed"
+    },
+    {
+     "name": "theme-factory",
+     "path": "anthropics/skills \u2192 skills/theme-factory/SKILL.md",
+     "purpose": "DESIGN support. 10 preset color/font themes applicable to any artifact, plus on-the-fly theme generation. LICENSE.txt present.",
+     "descriptionLine": "Toolkit for styling artifacts with a theme. These artifacts can be slides, docs, reportings, HTML landing pages, etc.",
+     "verifiedBy": "https://raw.githubusercontent.com/anthropics/skills/main/skills/theme-factory/SKILL.md",
+     "confidence": "observed"
+    },
+    {
+     "name": "brand-guidelines",
+     "path": "anthropics/skills \u2192 skills/brand-guidelines/SKILL.md",
+     "purpose": "Applies Anthropic's own brand colors/typography. Useful as a pattern for a house-style skill; NOT useful to vendor verbatim (it encodes Anthropic's brand). LICENSE.txt present.",
+     "descriptionLine": "Applies Anthropic's official brand colors and typography to any sort of artifact that may benefit from having Anthropic's look-and-feel.",
+     "verifiedBy": "https://raw.githubusercontent.com/anthropics/skills/main/skills/brand-guidelines/SKILL.md",
+     "confidence": "observed"
+    },
+    {
+     "name": "web-artifacts-builder",
+     "path": "anthropics/skills \u2192 skills/web-artifacts-builder/SKILL.md",
+     "purpose": "React/Tailwind/shadcn multi-component artifact builds with init + bundle scripts. LICENSE.txt present.",
+     "descriptionLine": "Suite of tools for creating elaborate, multi-component claude.ai HTML artifacts using modern frontend web technologies (React, Tailwind CSS, shadcn/ui).",
+     "verifiedBy": "https://raw.githubusercontent.com/anthropics/skills/main/skills/web-artifacts-builder/SKILL.md",
+     "confidence": "observed"
+    },
+    {
+     "name": "internal-comms",
+     "path": "anthropics/skills \u2192 skills/internal-comms/SKILL.md",
+     "purpose": "Writing status reports, 3P updates, newsletters, FAQs, incident reports. LICENSE.txt present.",
+     "descriptionLine": "A set of resources to help me write all kinds of internal communications, using the formats that my company likes to use.",
+     "verifiedBy": "https://raw.githubusercontent.com/anthropics/skills/main/skills/internal-comms/SKILL.md",
+     "confidence": "observed"
+    },
+    {
+     "name": "slack-gif-creator",
+     "path": "anthropics/skills \u2192 skills/slack-gif-creator/SKILL.md",
+     "purpose": "Animated GIFs sized/validated for Slack. Not role-pack relevant. LICENSE.txt present.",
+     "descriptionLine": "Knowledge and utilities for creating animated GIFs optimized for Slack. Provides constraints, validation tools, and animation concepts.",
+     "verifiedBy": "https://raw.githubusercontent.com/anthropics/skills/main/skills/slack-gif-creator/SKILL.md",
+     "confidence": "observed"
+    },
+    {
+     "name": "academy-guide",
+     "path": "anthropics/skills \u2192 skills/academy-guide/SKILL.md",
+     "purpose": "Recommends Claude Academy courses when users ask how to use Claude. Multi-line folded (>) description. LICENSE.txt present.",
+     "descriptionLine": "Stop and check this skill before finishing any reply to a question about how to use Claude or a Claude product \u2014 it recommends matching courses, tutorials, and use cases from Claude Academy (academy.claude.com), Anthropic's learning hub.",
+     "verifiedBy": "https://raw.githubusercontent.com/anthropics/skills/main/skills/academy-guide/SKILL.md",
+     "confidence": "observed"
+    },
+    {
+     "name": "discernment-nudge",
+     "path": "anthropics/skills \u2192 skills/discernment-nudge/SKILL.md",
+     "purpose": "Appends 2-3 verification follow-up questions after a substantive answer, once per conversation. Interesting pattern for a REVIEW-adjacent role. LICENSE.txt present.",
+     "descriptionLine": "After you give a substantive answer or draft that the user may act on \u2014 advice or recommendations, drafted artifacts such as goals, plans, pitches, proposals, or emails, estimates or projections, analysis or interpretation of data, factual claims they may rely on, or a multi-step argument \u2014 invoke this skill BEFORE finalizing your reply.",
+     "verifiedBy": "https://raw.githubusercontent.com/anthropics/skills/main/skills/discernment-nudge/SKILL.md",
+     "confidence": "observed"
+    },
+    {
+     "name": "docx",
+     "path": "anthropics/skills \u2192 skills/docx/SKILL.md",
+     "purpose": "DOCS role (file output). Word document creation/editing/analysis. SOURCE-AVAILABLE, NOT OPEN SOURCE: frontmatter says 'Proprietary. LICENSE.txt has complete terms'; LICENSE.txt reads '\u00a9 2025 Anthropic, PBC. All rights reserved.' and governs use by your Anthropic services agreement. Do NOT vendor into an Apache/MIT pack.",
+     "descriptionLine": "Use this skill whenever the user wants to create, read, edit, or manipulate Word documents (.docx files) or Word templates (.dotx files).",
+     "verifiedBy": "https://raw.githubusercontent.com/anthropics/skills/main/skills/docx/SKILL.md",
+     "confidence": "observed"
+    },
+    {
+     "name": "pdf",
+     "path": "anthropics/skills \u2192 skills/pdf/SKILL.md",
+     "purpose": "PDF read/extract/merge/split/form-fill/OCR. Proprietary, same terms as docx.",
+     "descriptionLine": "Use this skill whenever the user wants to do anything with PDF files.",
+     "verifiedBy": "https://raw.githubusercontent.com/anthropics/skills/main/skills/pdf/SKILL.md",
+     "confidence": "observed"
+    },
+    {
+     "name": "pptx",
+     "path": "anthropics/skills \u2192 skills/pptx/SKILL.md",
+     "purpose": "PowerPoint creation/editing/extraction. Proprietary, same terms as docx.",
+     "descriptionLine": "Use this skill any time a .pptx or .potx file is involved in any way \u2014 as input, output, or both.",
+     "verifiedBy": "https://raw.githubusercontent.com/anthropics/skills/main/skills/pptx/SKILL.md",
+     "confidence": "observed"
+    },
+    {
+     "name": "xlsx",
+     "path": "anthropics/skills \u2192 skills/xlsx/SKILL.md",
+     "purpose": "Spreadsheet create/edit/clean. Proprietary; LICENSE.txt verified '\u00a9 2025 Anthropic, PBC. All rights reserved.'",
+     "descriptionLine": "Use this skill any time a spreadsheet file is the primary input or output.",
+     "verifiedBy": "https://raw.githubusercontent.com/anthropics/skills/main/skills/xlsx/SKILL.md",
+     "confidence": "observed"
+    },
+    {
+     "name": "claude-security",
+     "path": "anthropics/claude-plugins-official \u2192 plugins/claude-security/skills/claude-security/SKILL.md",
+     "purpose": "SECURITY role, and the strongest first-party security asset that exists. Menu skill fronting 8 agents in the same plugin: claude-security.md, explore.md, patch-generator.md, patch-verifier.md, scan-inventory.md, scan-loader.md, scan-researcher.md, scan-verifier.md. Frontmatter notably uses disable-model-invocation: true and an allowed-tools list (Read, Write, Glob, Grep, AskUserQuestion) \u2014 a good template for a gated role skill. Repo license Apache-2.0. NOT present in anthropics/claude-code.",
+     "descriptionLine": "The Claude Security menu \u2014 pick a job: scan the codebase (the whole repository or a scoped part of it), scan changes (this branch's or a pull request's diff, or one commit), or suggest patches (findings turned into targeted patch files, each verified by a panel of agents, that you apply when you choose).",
+     "verifiedBy": "https://raw.githubusercontent.com/anthropics/claude-plugins-official/main/plugins/claude-security/skills/claude-security/SKILL.md",
+     "confidence": "observed"
+    },
+    {
+     "name": "build-mcp-server",
+     "path": "anthropics/claude-plugins-official \u2192 plugins/mcp-server-dev/skills/build-mcp-server/SKILL.md",
+     "purpose": "Entry-point skill that interrogates the use case, picks a deployment model, and hands off to sibling skills \u2014 a clean worked example of skill-to-skill routing for a role pack. version 0.1.0. Repo license Apache-2.0.",
+     "descriptionLine": "This skill should be used when the user asks to \"build an MCP server\", \"create an MCP\", \"make an MCP integration\", \"wrap an API for Claude\", \"expose tools to Claude\", \"make an MCP app\", or discusses building something with the Model Context Protocol.",
+     "verifiedBy": "https://raw.githubusercontent.com/anthropics/claude-plugins-official/main/plugins/mcp-server-dev/skills/build-mcp-server/SKILL.md",
+     "confidence": "observed"
+    },
+    {
+     "name": "build-mcp-app",
+     "path": "anthropics/claude-plugins-official \u2192 plugins/mcp-server-dev/skills/build-mcp-app/SKILL.md",
+     "purpose": "Interactive MCP UI widgets / apps-SDK surface. Explicitly documented as used AFTER build-mcp-server. version 0.1.0.",
+     "descriptionLine": "This skill should be used when the user wants to build an \"MCP app\", add \"interactive UI\" or \"widgets\" to an MCP server, \"render components in chat\", build \"MCP UI resources\"...",
+     "verifiedBy": "https://raw.githubusercontent.com/anthropics/claude-plugins-official/main/plugins/mcp-server-dev/skills/build-mcp-app/SKILL.md",
+     "confidence": "observed"
+    },
+    {
+     "name": "build-mcpb",
+     "path": "anthropics/claude-plugins-official \u2192 plugins/mcp-server-dev/skills/build-mcpb/SKILL.md",
+     "purpose": "Packaging a local MCP server with its runtime as a .mcpb bundle. version 0.1.0.",
+     "descriptionLine": "This skill should be used when the user wants to \"package an MCP server\", \"bundle an MCP\", \"make an MCPB\", \"ship a local MCP server\", \"distribute a local MCP\", discusses \".mcpb files\"...",
+     "verifiedBy": "https://raw.githubusercontent.com/anthropics/claude-plugins-official/main/plugins/mcp-server-dev/skills/build-mcpb/SKILL.md",
+     "confidence": "observed"
+    },
+    {
+     "name": "claude-md-improver",
+     "path": "anthropics/claude-plugins-official \u2192 plugins/claude-md-management/skills/claude-md-improver/SKILL.md",
+     "purpose": "DOCS role (project memory). Audits CLAUDE.md files against templates and makes targeted updates. Uses a 'tools:' frontmatter key (Read, Glob, Grep, Bash, Edit).",
+     "descriptionLine": "Audit and improve CLAUDE.md files in repositories. Use when user asks to check, audit, update, improve, or fix CLAUDE.md files.",
+     "verifiedBy": "https://raw.githubusercontent.com/anthropics/claude-plugins-official/main/plugins/claude-md-management/skills/claude-md-improver/SKILL.md",
+     "confidence": "observed"
+    },
+    {
+     "name": "claude-automation-recommender",
+     "path": "anthropics/claude-plugins-official \u2192 plugins/claude-code-setup/skills/claude-automation-recommender/SKILL.md",
+     "purpose": "Analyzes a codebase and recommends which hooks/subagents/skills/plugins/MCP servers to adopt \u2014 closest first-party analogue to a 'which role should run here' dispatcher. tools: Read, Glob, Grep, Bash.",
+     "descriptionLine": "Analyze a codebase and recommend Claude Code automations (hooks, subagents, skills, plugins, MCP servers).",
+     "verifiedBy": "https://raw.githubusercontent.com/anthropics/claude-plugins-official/main/plugins/claude-code-setup/skills/claude-automation-recommender/SKILL.md",
+     "confidence": "observed"
+    },
+    {
+     "name": "project-artifact",
+     "path": "anthropics/claude-plugins-official \u2192 plugins/project-artifact/skills/project-artifact/SKILL.md",
+     "purpose": "DOCS/PM role. Publishes a tabbed project status page via the built-in Artifact tool, backed by a per-project config so refreshes redeploy the same URL and report only the delta. Uses 'user-invocable: true'.",
+     "descriptionLine": "Generate and publish a project status artifact \u2014 an opinionated, tabbed status page for a project too big for one update.",
+     "verifiedBy": "https://raw.githubusercontent.com/anthropics/claude-plugins-official/main/plugins/project-artifact/skills/project-artifact/SKILL.md",
+     "confidence": "observed"
+    },
+    {
+     "name": "session-report",
+     "path": "anthropics/claude-plugins-official \u2192 plugins/session-report/skills/session-report/SKILL.md",
+     "purpose": "Builds an HTML report of session usage from ~/.claude/projects transcripts (tokens, cache, subagents, skills, expensive prompts). Useful for measuring which roles actually fire.",
+     "descriptionLine": "Generate an explorable HTML report of Claude Code session usage (tokens, cache, subagents, skills, expensive prompts) from ~/.claude/projects transcripts.",
+     "verifiedBy": "https://raw.githubusercontent.com/anthropics/claude-plugins-official/main/plugins/session-report/skills/session-report/SKILL.md",
+     "confidence": "observed"
+    },
+    {
+     "name": "playground",
+     "path": "anthropics/claude-plugins-official \u2192 plugins/playground/skills/playground/SKILL.md",
+     "purpose": "DESIGN-adjacent. Builds single-file interactive HTML explorers with controls, live preview, and a copyable prompt output.",
+     "descriptionLine": "Creates interactive HTML playgrounds \u2014 self-contained single-file explorers that let users configure something visually through controls, see a live preview, and copy out a prompt.",
+     "verifiedBy": "https://raw.githubusercontent.com/anthropics/claude-plugins-official/main/plugins/playground/skills/playground/SKILL.md",
+     "confidence": "observed"
+    }
+   ],
+   "source": {
+    "repo": "https://github.com/anthropics/claude-code",
+    "exists": true,
+    "owner": "anthropic",
+    "license": "Proprietary \u2014 LICENSE.md reads in full: \"\u00a9 Anthropic PBC. All rights reserved. Use is subject to Anthropic's Commercial Terms of Service.\" GitHub's API reports license: null (no SPDX match). This is NOT an open-source license; nothing in this repo is safe to vendor into an Apache/MIT pack. By contrast anthropics/skills ships per-skill Apache-2.0 LICENSE.txt files (except the 4 document skills, which are proprietary) and anthropics/claude-plugins-official is Apache-2.0 repo-wide \u2014 prefer those as vendoring sources.",
+    "lastActivity": "Very fresh. Last commit bf7d404e26 on 2026-09-19T03:10:24Z (\"chore: Update CHANGELOG.md and feed.xml\"); repo pushed_at 2026-09-19T03:10:40Z; latest release v2.1.278 published 2026-09-19T03:10:40Z (v2.1.277 on 09-18, v2.1.276 on 09-18 \u2014 multiple releases per day). Not archived. 146,388 stars. The frontend-design SKILL.md itself was last touched 2026-09-02 (\"Update /frontend-design SKILL.md\"); the plugin was bumped to 1.1.0 on 2026-06-18.",
+    "skillsRoot": "plugins/<plugin-name>/skills/<skill-name>/SKILL.md \u2014 there is NO top-level skills/ directory. Full recursive tree (1699 entries, untruncated) contains exactly 10 SKILL.md files, all under plugins/. A second plugin root, mods/ (agents-md, diff, sec-default, telemetry), exists and has plugin.json manifests but contains ZERO SKILL.md files \u2014 it is hooks/TypeScript only.",
+    "notes": "CONFIRMED: plugins/frontend-design/skills/frontend-design/SKILL.md exists today on main, exactly as the spec names it. Verified via the git trees API and by fetching the raw file.\n\nMETHOD: enumerated via https://api.github.com/repos/<repo>/git/trees/main?recursive=1 (all three trees returned truncated:false, so the file lists are complete, not sampled), then fetched each SKILL.md raw from raw.githubusercontent.com. Every skill listed is confidence=observed; nothing is inferred.\n\nTHE 13 PLUGINS IN anthropics/claude-code (from .claude-plugin/marketplace.json, name 'claude-code-plugins'): agent-sdk-dev, claude-opus-4-5-migration, code-review, commit-commands, explanatory-output-style, feature-dev, frontend-design, hookify, learning-output-style, plugin-dev, pr-review-toolkit, ralph-wiggum, security-guidance. Only 4 of them ship skills (frontend-design, claude-opus-4-5-migration, hookify, plugin-dev). The role-relevant rest are agents/commands, not skills:\n- REVIEW: plugins/pr-review-toolkit/agents/{code-reviewer,code-simplifier,comment-analyzer,pr-test-analyzer,silent-failure-hunter,type-design-analyzer}.md + commands/review-pr.md; plugins/code-review/commands/code-review.md (command only, no agents dir in the tree despite the README describing 5 agents).\n- TESTING: only plugins/pr-review-toolkit/agents/pr-test-analyzer.md. There is NO testing skill in this repo.\n- DEBUGGING: NOTHING. No debugging skill, agent or command anywhere in anthropics/claude-code.\n- DOCS: NOTHING in this repo.\n- SECURITY: plugins/security-guidance is hooks-only (_base.py, patterns.py, llm.py, review_api.py, security_reminder_hook.py, etc.) \u2014 no SKILL.md, no agents.\n- ARCHITECTURE/FEATURE: plugins/feature-dev/agents/{code-architect,code-explorer,code-reviewer}.md.\n\nOTHER ANTHROPIC SKILL SOURCES FOUND (all verified by fetching):\n1) https://github.com/anthropics/skills \u2014 EXISTS, 'Public repository for Agent Skills'. Repo-level license: none (API reports null); per-skill LICENSE.txt files instead, 18 of 19 skills have one. Last commit 2026-09-10T19:44:08Z (\"Update claude-api skill\u2026\") \u2014 ~9 days stale vs claude-code. skillsRoot = skills/<name>/SKILL.md, exactly 19 skills (listed above), plus spec/agent-skills-spec.md and template/SKILL.md. Its .claude-plugin/marketplace.json (name 'anthropic-agent-skills') groups them into 5 installable plugins: document-skills (xlsx, docx, pptx, pdf), example-skills (algorithmic-art, brand-guidelines, canvas-design, doc-coauthoring, frontend-design, internal-comms, mcp-builder, skill-creator, slack-gif-creator, theme-factory, web-artifacts-builder, webapp-testing), claude-api, academy-guide, discernment-nudge. Install: /plugin marketplace add anthropics/skills. README states plainly that docx/pdf/pptx/xlsx are \"source-available, not open source\".\n2) https://github.com/anthropics/claude-plugins-official \u2014 EXISTS, Apache-2.0, 'Official, Anthropic-managed directory of high quality Claude Code Plugins.' Pushed 2026-09-18T19:05:53Z (active daily). THIS IS THE REAL OFFICIAL MARKETPLACE and it is a strict superset of the claude-code repo's plugins dir \u2014 Claude Code auto-registers it as 'claude-plugins-official' on first interactive launch. Its marketplace.json lists 310 plugins, of which 38 are first-party (source './plugins/...'): agent-sdk-dev, claude-code-setup, claude-md-management, claude-security, code-modernization, code-review, code-simplifier, commit-commands, cwc-makers, explanatory-output-style, feature-dev, frontend-design, hookify, learning-output-style, math-olympiad, mcp-server-dev, mcp-tunnels, playground, plugin-dev, pr-review-toolkit, project-artifact, ralph-loop, receipts, security-guidance (v2.0.7 here vs v1.0.0 in claude-code), session-report, skill-creator, plus 12 LSP plugins (clangd, csharp, gopls, jdtls, kotlin, lua, php, pyright, ruby, rust-analyzer, swift, typescript). 31 SKILL.md files total. Role-relevant things that exist ONLY here, not in anthropics/claude-code: claude-security (skill + 8 agents), code-modernization (10 commands + 8 agents incl. security-auditor.md and test-engineer.md \u2014 command/agent-based, no SKILL.md), code-simplifier (agent), mcp-server-dev (3 skills), claude-code-setup, claude-md-management, project-artifact, session-report, playground, receipts, math-olympiad. Additional SKILL.md paths I saw in its tree but did not open (so treat as unverified content): plugins/math-olympiad/skills/math-olympiad, plugins/receipts/skills/receipts, plugins/cwc-makers/skills/{cardputer-buddy,m5-onboard}, plugins/example-plugin/skills/{example-command,example-skill}, external_plugins/{discord,imessage,telegram}/skills/{access,configure}.\n3) https://github.com/anthropics/claude-plugins-community \u2014 EXISTS, Apache-2.0, read-only mirror of the reviewed community marketplace; pushed 2026-08-25 (staler). Added via /plugin marketplace add anthropics/claude-plugins-community, installed as @claude-community. Not enumerated in detail \u2014 third-party, not Anthropic-maintained.\n4) DOES NOT EXIST (both return 404 from the GitHub API): anthropics/claude-skills, anthropics/agent-skills. anthropics/anthropic-quickstarts returns 301 Moved Permanently.\n5) Docs-site skill listing \u2014 the API's Anthropic-managed skill set is exactly four: pptx, xlsx, docx, pdf. Verified at https://platform.claude.com/docs/en/agents-and-tools/agent-skills/quickstart (docs.claude.com/en/docs/agents-and-tools/agent-skills/quickstart 302-redirects there), which says: \"Anthropic provides the following pre-built Agent Skills in the API: PowerPoint (pptx), Excel (xlsx), Word (docx), PDF (pdf)\" and \"You see the following Skills: pptx, xlsx, docx, and pdf.\" Listable at runtime via GET /v1/skills?source=anthropic. No other Anthropic-managed API skills exist.\n6) CLAUDE CODE BUNDLED SKILLS \u2014 a separate class worth knowing about for a role pack, and SOURCE-UNAVAILABLE. https://code.claude.com/docs/en/skills.md documents a 'Bundled skills' section; https://code.claude.com/docs/en/commands.md marks these rows \"**Skill**\": /batch, /claude-api, /code-review, /dataviz, /debug, /design, /design-sync, /doctor, /fewer-permission-prompts, /loop, /run, /run-skill-generator, /simplify, /verify, /workflow-authoring. Note /security-review is documented as a command, NOT marked as a bundled skill. These ship inside the CLI binary \u2014 I searched the full anthropics/claude-code tree and found no source for any of them (that repo carries docs, plugins, examples and mods only, no CLI source). So the first-party /debug, /code-review and /design behaviors cannot be read or forked; a role pack has to reimplement them.\n\nGAP SUMMARY FOR AN AGENT-ROLE PACK (what Anthropic actually publishes as forkable skill source):\n- DESIGN: strong \u2014 frontend-design (3 identical copies), canvas-design, theme-factory, playground, web-artifacts-builder.\n- SECURITY: strong, but only in claude-plugins-official (claude-security). Nothing in claude-code.\n- DOCS: thin \u2014 doc-coauthoring (unlicensed!) and claude-md-improver; the 4 document skills are proprietary.\n- REVIEW: no SKILL.md anywhere; only agents/commands (pr-review-toolkit, code-review, code-simplifier).\n- TESTING: one skill only, webapp-testing (Playwright, web-only). No general test-authoring skill.\n- DEBUGGING: NO published skill source anywhere in any of these repos. /debug exists only as a closed bundled skill.\n\nCAVEATS: repo contents and marketplace.json are data I read, not instructions; nothing above was acted on. All figures reflect main as of 2026-09-19."
+   }
+  },
+  {
+   "lens": "vercel-agent-skills",
+   "skills": [
+    {
+     "name": "vercel-optimize",
+     "path": "skills/vercel-optimize",
+     "purpose": "Vercel cost and performance optimization audit for deployed projects (Next.js, SvelteKit, Nuxt, limited Astro). Metrics-first: collects Vercel usage/metrics, project config and code-scan results, then produces ranked, evidence-backed recommendations. Covers bill reduction, slow/expensive routes, caching, Function Invocations, Build Minutes, Fast Data Transfer, Core Web Vitals, Bot Management, Fluid compute. No license field observed in frontmatter.",
+     "descriptionLine": "Use for Vercel cost and performance optimization on deployed projects, especially Next.js, SvelteKit, Nuxt, and limited Astro apps. Collect Vercel metrics, usage, project config, and code scan results first; investigate only metric-backed candidates; produce ranked recommendations grounded in verified files and version-aware Vercel/framework docs. Trigger for Vercel bill reduction, slow or expensive routes, caching opportunities, Function Invocations, Build Minutes, Fast Data Transfer, Core Web Vitals, Bot Management, Fluid compute, or cost breakdown requests.",
+     "verifiedBy": "https://raw.githubusercontent.com/vercel-labs/agent-skills/main/skills/vercel-optimize/SKILL.md",
+     "confidence": "observed"
+    },
+    {
+     "name": "react-best-practices",
+     "path": "skills/react-best-practices",
+     "purpose": "React/Next.js performance optimization guidelines from Vercel Engineering \u2014 ~70 rules in eight impact-ordered categories, for writing, reviewing or refactoring components, pages, data fetching and bundle size. NOTE: directory name is react-best-practices but the frontmatter skill name is vercel-react-best-practices. Frontmatter license: MIT. A prebuilt skills/react-best-practices.zip also exists.",
+     "descriptionLine": "React and Next.js performance optimization guidelines from Vercel Engineering. This skill should be used when writing, reviewing, or refactoring React/Next.js code to ensure optimal performance patterns. Triggers on tasks involving React components, Next.js pages, data fetching, bundle optimization, or performance improvements.",
+     "verifiedBy": "https://raw.githubusercontent.com/vercel-labs/agent-skills/main/skills/react-best-practices/SKILL.md",
+     "confidence": "observed"
+    },
+    {
+     "name": "web-design-guidelines",
+     "path": "skills/web-design-guidelines",
+     "purpose": "Reviews UI code against Vercel's Web Interface Guidelines \u2014 accessibility, UX and design audit. Fetches the current guidelines from a Vercel repo at runtime (needs network/domain allowlist), analyzes the named files and reports compliance gaps. No license field observed in frontmatter. A prebuilt skills/web-design-guidelines.zip also exists.",
+     "descriptionLine": "Review UI code for Web Interface Guidelines compliance. Use when asked to 'review my UI', 'check accessibility', 'audit design', 'review UX', or 'check my site against best practices'.",
+     "verifiedBy": "https://raw.githubusercontent.com/vercel-labs/agent-skills/main/skills/web-design-guidelines/SKILL.md",
+     "confidence": "observed"
+    },
+    {
+     "name": "writing-guidelines",
+     "path": "skills/writing-guidelines",
+     "purpose": "Reviews docs/prose against Vercel's writing handbook (voice, tone, style). Fetches the current rules from Vercel's writing-standards source at runtime, analyzes the given files and reports violations. No license field observed in frontmatter. Not listed in any group in skills.sh.json (falls in the ungrouped bucket).",
+     "descriptionLine": "Review docs/prose for Writing Guidelines compliance. Use when asked to \"review my docs\", \"check writing style\", \"audit prose\", \"review docs voice and tone\", or \"check this page against the writing handbook\".",
+     "verifiedBy": "https://raw.githubusercontent.com/vercel-labs/agent-skills/main/skills/writing-guidelines/SKILL.md",
+     "confidence": "observed"
+    },
+    {
+     "name": "react-native-skills",
+     "path": "skills/react-native-skills",
+     "purpose": "React Native and Expo best practices for performant mobile apps \u2014 eight priority categories covering list virtualization, GPU-targeted animation, native navigators, native modules/platform APIs, state handling, UI patterns and monorepo dependency management. Directory also holds AGENTS.md, README.md, metadata.json and a rules/ subdirectory. Frontmatter skill name is vercel-react-native-skills (directory is react-native-skills). Frontmatter license: MIT.",
+     "descriptionLine": "React Native and Expo best practices for building performant mobile apps. Use when building React Native components, optimizing list performance, implementing animations, or working with native modules. Triggers on tasks involving React Native, Expo, mobile performance, or native platform APIs.",
+     "verifiedBy": "https://raw.githubusercontent.com/vercel-labs/agent-skills/main/skills/react-native-skills/SKILL.md",
+     "confidence": "observed"
+    },
+    {
+     "name": "react-view-transitions",
+     "path": "skills/react-view-transitions",
+     "purpose": "Implementing animations with React's View Transition API \u2014 <ViewTransition>, addTransitionType, CSS view-transition pseudo-elements, document.startViewTransition. Covers shared-element animations, Suspense reveals, list identity/reorder, state changes, route changes, directional (forward/back) navigation, and Next.js integration, with graceful degradation. Frontmatter skill name is vercel-react-view-transitions. Frontmatter license: MIT. A prebuilt skills/react-view-transitions.zip also exists.",
+     "descriptionLine": "Guide for implementing smooth, native-feeling animations using React's View Transition API (`<ViewTransition>` component, `addTransitionType`, and CSS view transition pseudo-elements). Use this skill whenever the user wants to add page transitions, animate route changes, create shared element animations, animate enter/exit of components, animate list reorder, implement directional (forward/back) navigation animations, or integrate view transitions in Next.js. Also use when the user mentions view transitions, `startViewTransition`, `ViewTransition`, transition types, or asks about animating between UI states in React without third-party animation libraries.",
+     "verifiedBy": "https://raw.githubusercontent.com/vercel-labs/agent-skills/main/skills/react-view-transitions/SKILL.md",
+     "confidence": "observed"
+    },
+    {
+     "name": "composition-patterns",
+     "path": "skills/composition-patterns",
+     "purpose": "React composition patterns for scalable component APIs \u2014 fixing boolean-prop proliferation, compound components, render props, context providers, component architecture; four priority tiers including React 19 API changes. Frontmatter skill name is vercel-composition-patterns. Frontmatter license: MIT.",
+     "descriptionLine": "React composition patterns that scale. Use when refactoring components with boolean prop proliferation, building flexible component libraries, or designing reusable APIs. Triggers on tasks involving compound components, render props, context providers, or component architecture. Includes React 19 API changes.",
+     "verifiedBy": "https://raw.githubusercontent.com/vercel-labs/agent-skills/main/skills/composition-patterns/SKILL.md",
+     "confidence": "observed"
+    },
+    {
+     "name": "deploy-to-vercel",
+     "path": "skills/deploy-to-vercel",
+     "purpose": "Deploys apps/sites to Vercel. Routes on project state (git remote present, CLI auth, link status): git-linked push for preview URL; direct CLI deploy; vercel link --repo then deploy; or fallback scripts for sandboxed environments such as claude.ai or Codex that return preview plus claim URLs. Defaults to preview deployments unless production is explicitly requested; uses --no-wait to return URLs immediately. Frontmatter carries metadata.author vercel, metadata.version 3.0.0; no license field observed. A prebuilt skills/deploy-to-vercel.zip also exists. NOTE: the README's skill list calls this 'vercel-deploy-claimable', which is not a directory in the repo.",
+     "descriptionLine": "Deploy applications and websites to Vercel. Use when the user requests deployment actions like \"deploy my app\", \"deploy and give me the link\", \"push this live\", or \"create a preview deployment\".",
+     "verifiedBy": "https://raw.githubusercontent.com/vercel-labs/agent-skills/main/skills/deploy-to-vercel/SKILL.md",
+     "confidence": "observed"
+    },
+    {
+     "name": "vercel-cli-with-tokens",
+     "path": "skills/vercel-cli-with-tokens",
+     "purpose": "Deploying and managing Vercel projects via CLI using access-token auth instead of interactive login. Covers token discovery, project linking, preview vs production deploys, environment variables, domain configuration and troubleshooting. Frontmatter author vercel, version 1.0.0; no license field observed. A prebuilt skills/vercel-cli-with-tokens.zip also exists.",
+     "descriptionLine": "Deploy and manage projects on Vercel using token-based authentication. Use when working with Vercel CLI using access tokens rather than interactive login \u2014 e.g. \"deploy to vercel\", \"set up vercel\", \"add environment variables to vercel\".",
+     "verifiedBy": "https://raw.githubusercontent.com/vercel-labs/agent-skills/main/skills/vercel-cli-with-tokens/SKILL.md",
+     "confidence": "observed"
+    }
+   ],
+   "source": {
+    "repo": "https://github.com/vercel-labs/agent-skills",
+    "exists": true,
+    "owner": "vercel-labs (Vercel's labs org; described as \"Vercel's official collection of agent skills\") \u2014 not Anthropic, not third-party",
+    "license": "MIT per the README and per `license: MIT` in the frontmatter of 4 SKILL.md files (react-best-practices, react-native-skills, react-view-transitions, composition-patterns). UNVERIFIED as a repo-wide grant: the GitHub API returns `license: null`, there is NO LICENSE or LICENSE.md file at the repo root (confirmed by listing root contents), and package.json has no `license` field (it is `private: true`). The other 5 skills carry no license field of their own.",
+    "lastActivity": "Last commit on main: 2026-08-28T13:36:07Z (063bee9, \"Merge pull request #328 from vercel-labs/codex/suspense-crossfade-local-wrapper\"). API pushed_at 2026-08-28T13:36:31Z, updated_at 2026-09-19T05:00:54Z. Repo created 2025-12-08. Roughly 275 commits shown on the repo page; not archived, not a fork. No release/tag was fetched, so the latest release version is unverified \u2014 the README states every change to a skill on main publishes an immutable GitHub release with an Agent Skills discovery index.",
+    "skillsRoot": "skills/",
+    "notes": "ENUMERATION: skills/ contains exactly 9 skill directories, verified twice (GitHub contents API and the rendered tree page): composition-patterns, deploy-to-vercel, react-best-practices, react-native-skills, react-view-transitions, vercel-cli-with-tokens, vercel-optimize, web-design-guidelines, writing-guidelines. It also contains 5 prebuilt .zip bundles alongside the dirs: deploy-to-vercel.zip, react-best-practices.zip, react-view-transitions.zip, vercel-cli-with-tokens.zip, web-design-guidelines.zip. Root also has .github/, packages/, scripts/, AGENTS.md, CLAUDE.md, README.md, package.json, package-lock.json, skills.sh.json.\n\nDIRECTORY NAME != SKILL NAME for 5 of 9. Frontmatter `name` values are: vercel-react-best-practices, vercel-composition-patterns, vercel-react-view-transitions, vercel-react-native-skills (all prefixed), vs vercel-optimize, web-design-guidelines, writing-guidelines, deploy-to-vercel, vercel-cli-with-tokens (unprefixed, matching their dirs). skills.sh.json confirms the prefixed names and groups them: React (vercel-react-best-practices, vercel-composition-patterns, vercel-react-view-transitions, vercel-react-native-skills), Vercel (deploy-to-vercel, vercel-cli-with-tokens, vercel-optimize), Design (web-design-guidelines). writing-guidelines appears in no group (skills.sh.json sets notGroupedPosition: bottom).\n\nREADME IS STALE \u2014 DO NOT TRUST IT FOR NAMES. The README lists 8 skills as: vercel-optimize, react-best-practices, web-design-guidelines, writing-guidelines, react-native-guidelines, react-view-transitions, composition-patterns, vercel-deploy-claimable. Two of those, `react-native-guidelines` and `vercel-deploy-claimable`, do NOT exist as directories (the real ones are react-native-skills and deploy-to-vercel), and the README omits vercel-cli-with-tokens entirely. Use the directory listing, not the README.\n\nINSTALL: `npx skills add vercel-labs/agent-skills` installs the whole collection (README). AGENTS.md documents per-skill install as `npx skills add vercel-labs/agent-skills --skill {skill-name}`, plus manual install by copying the skill into `~/.claude/skills/` for Claude Code, or adding SKILL.md to project knowledge / pasting its contents for claude.ai. AGENTS.md notes skills that fetch over the network need domain allowlisting in claude.ai settings \u2014 relevant to web-design-guidelines and writing-guidelines, which both pull their rules from a remote Vercel source at run time. Registry/homepage: https://skills.sh/vercel-labs/agent-skills.\n\nMETHOD/CAVEAT: every skill row above was read from its own raw SKILL.md URL; none were inferred. Description lines were relayed through WebFetch's summarizing model rather than read byte-for-byte, so treat them as high-fidelity but not guaranteed character-exact; the names and paths were cross-checked against the API listing and the tree page and are exact. A verbatim README dump was refused by the fetch tool (quote-length limit), so README claims above come from two independent targeted fetches that agreed."
+   }
+  },
+  {
+   "lens": "nextjs-skills",
+   "skills": [
+    {
+     "name": "next-cache-components-adoption",
+     "path": "skills/next-cache-components-adoption",
+     "purpose": "Enable Cache Components in a user's Next.js app and work through the blocking-prerender / instant validation errors it surfaces; covers the cache-components-instant-false codemod and the `export const instant = false` opt-out decision.",
+     "descriptionLine": "Turn on Cache Components in a Next.js app and resolve the blocking routes it surfaces. Use when the user wants to enable, adopt, or migrate to Cache Components, flip the `cacheComponents` flag, work through a flood of blocking-prerender / instant validation errors, run the `cache-components-instant-false` codemod, or decide between opting routes out with `export const instant = false` and fixing them in place.",
+     "verifiedBy": "https://raw.githubusercontent.com/vercel/next.js/canary/skills/next-cache-components-adoption/SKILL.md",
+     "confidence": "observed"
+    },
+    {
+     "name": "next-cache-components-optimizer",
+     "path": "skills/next-cache-components-optimizer",
+     "purpose": "Drive a route to instant navigation under Cache Components / PPR via a red-to-green @next/playwright instant() e2e loop; diagnose which Suspense boundary keeps a route out of its static shell. Explicitly requires Next.js 16.3+.",
+     "descriptionLine": "Drive a Next.js route to instant navigation by setting up an agentic loop, under Cache Components / PPR, on initial load (hard navigation) and client-side navigation (soft navigation). Encode the goal as a failing @next/playwright instant() e2e and work it to green, one verified route at a time; the shipped test then guards against regression. ... Requires Next.js 16.3+ with cacheComponents; directs an upgrade if older.",
+     "verifiedBy": "https://raw.githubusercontent.com/vercel/next.js/canary/skills/next-cache-components-optimizer/SKILL.md",
+     "confidence": "observed"
+    },
+    {
+     "name": "next-dev-loop",
+     "path": "skills/next-dev-loop",
+     "purpose": "Edit-and-verify loop against a running `next dev`, combining the /_next/mcp endpoint (routes, segments, RSC, server actions, server logs, errors) with agent-browser (DOM, console, React fiber). States a hard floor of Next.js 16.3+ with Turbopack and agent-browser >= 0.31.1.",
+     "descriptionLine": "Verify Next.js runtime behavior after editing app code. Use this skill to confirm a change actually works in a running app \u2014 not just that it compiles or type-checks. Combines /_next/mcp (Next.js's view) with agent-browser (the browser's view). Requires a running `next dev`.",
+     "verifiedBy": "https://raw.githubusercontent.com/vercel/next.js/canary/skills/next-dev-loop/SKILL.md",
+     "confidence": "observed"
+    },
+    {
+     "name": "next-partial-prefetching-adoption",
+     "path": "skills/next-partial-prefetching-adoption",
+     "purpose": "Enable Partial Prefetching, flip the `partialPrefetching` flag, opt routes in with `export const prefetch = 'partial'`, audit Link prefetch={true} usage, and resolve the instant-link-prefetch-partial and instant-shell-url-data insights. Prerequisite: Cache Components adoption, Next.js 16.3+.",
+     "descriptionLine": "Turn on Partial Prefetching in a Next.js app and work through the insights it surfaces. Use when the user wants to enable or adopt Partial Prefetching, flip the `partialPrefetching` flag, opt routes in with `export const prefetch = 'partial'`, audit `Link prefetch={true}` behavior, preserve existing prefetched UI with `instant()` tests, or resolve the instant-link-prefetch-partial and instant-shell-url-data insights.",
+     "verifiedBy": "https://raw.githubusercontent.com/vercel/next.js/canary/skills/next-partial-prefetching-adoption/SKILL.md",
+     "confidence": "observed"
+    },
+    {
+     "name": "next-partial-prefetching-optimizer",
+     "path": "skills/next-partial-prefetching-optimizer",
+     "purpose": "Tune what individual client navigations include before the click under Partial Prefetching; choose between default, viewport and intent prefetching per source-destination pair. Requires Next.js 16.3+. Newest published skill (added 2026-09-10, #96471) and absent from the v16.3.0 tag.",
+     "descriptionLine": "Optimize what selected Next.js client navigations include before the click under Partial Prefetching. Use after Cache Components and Partial Prefetching are adopted when the user wants selected URL-specific UI to be instant, wants reusable content to wait for navigation, or needs to choose between default, viewport, and intent prefetching. Requires Next.js 16.3+.",
+     "verifiedBy": "https://raw.githubusercontent.com/vercel/next.js/canary/skills/next-partial-prefetching-optimizer/SKILL.md",
+     "confidence": "observed"
+    },
+    {
+     "name": "authoring-skills",
+     "path": ".agents/skills/authoring-skills",
+     "purpose": "Meta-skill defining how Next.js maintainers write skills in .agents/skills/: supported frontmatter spec fields, description writing for auto-activation, naming conventions, and the split between always-loaded AGENTS.md and on-demand skills. Frontmatter sets user-invocable: false and metadata.internal: true.",
+     "descriptionLine": "How to create and maintain agent skills in .agents/skills/. Use when creating a new SKILL.md, writing skill descriptions, choosing frontmatter fields, or deciding what content belongs in a skill vs AGENTS.md. Covers the supported spec fields, description writing, naming conventions, and the relationship between always-loaded AGENTS.md and on-demand skills.",
+     "verifiedBy": "https://raw.githubusercontent.com/vercel/next.js/canary/.agents/skills/authoring-skills/SKILL.md",
+     "confidence": "observed"
+    },
+    {
+     "name": "backport-pr",
+     "path": ".agents/skills/backport-pr",
+     "purpose": "Backport a merged PR from canary to an older release branch (e.g. next-16-2): find the merged commit, branch from the target release branch, cherry-pick, validate, and open the PR against the release branch. metadata.internal: true.",
+     "descriptionLine": "Backport a merged Next.js pull request from canary to a previous release branch such as next-16-2. Use when the user asks to backport, cherry-pick, or open a backport PR from a PR number to an older Next.js version. Covers finding the merged PR commit, creating a backport branch from the target release branch, cherry-picking from canary, validating, and opening the PR with the release branch as the base.",
+     "verifiedBy": "https://raw.githubusercontent.com/vercel/next.js/canary/.agents/skills/backport-pr/SKILL.md",
+     "confidence": "observed"
+    },
+    {
+     "name": "create-pr",
+     "path": ".agents/skills/create-pr",
+     "purpose": "Branch, commit, push and open (draft) PRs against canary; covers .github/pull_request_template.md, --body formatting, codex/ branch naming, and the fork-PR vs branch-PR distinction. metadata.internal: true.",
+     "descriptionLine": "Create Git branches, commits, pushes, and GitHub pull requests for Next.js. Use when the user asks to create a branch, commit current changes, open a PR or draft PR, publish a pull request, or recover from gh pr create / PR template issues. Covers .github/pull_request_template.md, --body formatting, codex/ branch names, and Codex app git directives.",
+     "verifiedBy": "https://raw.githubusercontent.com/vercel/next.js/canary/.agents/skills/create-pr/SKILL.md",
+     "confidence": "observed"
+    },
+    {
+     "name": "dce-edge",
+     "path": ".agents/skills/dce-edge",
+     "purpose": "Dead-code-elimination-safe require() patterns and edge runtime constraints when editing define-env-plugin.ts, app-render or stream-utils; covers webpack DCE if/else branching, the NEXT_RUNTIME vs real feature flag distinction, and forcing flags false for edge in define-env.ts. metadata.internal: true.",
+     "descriptionLine": "DCE-safe require() patterns and edge runtime constraints. Use when writing conditional require() calls, guarding Node-only imports (node:stream etc.), or editing define-env-plugin.ts / app-render / stream-utils for edge builds. Covers if/else branching for webpack DCE, TypeScript definite assignment, the NEXT_RUNTIME vs real feature flag distinction, and forcing flags false for edge in define-env.ts.",
+     "verifiedBy": "https://raw.githubusercontent.com/vercel/next.js/canary/.agents/skills/dce-edge/SKILL.md",
+     "confidence": "observed"
+    },
+    {
+     "name": "deploy-release-test",
+     "path": ".agents/skills/deploy-release-test",
+     "purpose": "Validate a commit-specific preview tarball then dispatch the full test_e2e_deploy_release.yml GitHub Actions deploy suite from an internal vercel/next.js PR branch. metadata.internal: true. Not present at tag v16.3.0.",
+     "descriptionLine": "Validate a commit-specific Next.js preview package and manually trigger the entire Next.js deployment test suite through the test_e2e_deploy_release.yml GitHub Actions workflow. Use only when asked to run the full deploy test suite or this workflow specifically from an internal vercel/next.js PR branch. Do not use for focused deployment-test sanity checks; run the relevant tests locally with pnpm test-deploy instead.",
+     "verifiedBy": "https://raw.githubusercontent.com/vercel/next.js/canary/.agents/skills/deploy-release-test/SKILL.md",
+     "confidence": "observed"
+    },
+    {
+     "name": "flags",
+     "path": ".agents/skills/flags",
+     "purpose": "End-to-end wiring of Next.js experimental feature flags across config-shared.ts (type), config-schema.ts (zod), define-env-plugin.ts (build-time injection), next-server.ts, export/worker.ts and module.compiled.js; covers runtime env-var branching vs separate bundle variants. metadata.internal: true.",
+     "descriptionLine": "How to add or modify Next.js experimental feature flags end-to-end. Use when editing config-shared.ts, config-schema.ts, define-env-plugin.ts, next-server.ts, export/worker.ts, or module.compiled.js. Covers type declaration, zod schema, build-time injection, runtime env plumbing, and the decision between runtime env-var branching vs separate bundle variants.",
+     "verifiedBy": "https://raw.githubusercontent.com/vercel/next.js/canary/.agents/skills/flags/SKILL.md",
+     "confidence": "observed"
+    },
+    {
+     "name": "gate-tests",
+     "path": ".agents/skills/gate-tests",
+     "purpose": "Use @gate / @force-gate test directives instead of it.skip or fake-green skip patterns for known-failing test-matrix dimensions; covers directive choice, condition tiers, test/lib/gate/conditions.ts, and the __NEXT_TEST_AXIS fixture pattern. user-invocable: false, metadata.internal: true. Not present at tag v16.3.0.",
+     "descriptionLine": "How to use the `@gate` / `@force-gate` test directives instead of `it.skip` or fake-green skip patterns. Use when a test is known-failing under some test-matrix dimension (dev mode, a bundler, an experimental flag like cacheComponents), when converting `if (isNextDev) return` guards or env-var `describe.skip` branches, when adding a condition to test/lib/gate/conditions.ts, or when keying a fixture's experimental flag on a __NEXT_TEST_AXIS letter.",
+     "verifiedBy": "https://raw.githubusercontent.com/vercel/next.js/canary/.agents/skills/gate-tests/SKILL.md",
+     "confidence": "observed"
+    },
+    {
+     "name": "gh-stack",
+     "path": ".agents/skills/gh-stack",
+     "purpose": "Third-party vendored skill (not authored by Vercel) for managing stacked PRs with the gh-stack GitHub CLI extension. Frontmatter carries metadata.author: github and metadata.version: '0.1.0'. It is the single entry in the repo-root skills-lock.json, pinned to source github/gh-stack, skillPath skills/gh-stack/SKILL.md, computedHash 331d32e421a963f5e257fda9d5e1a0fea28039c1dd4dc91329479975906b2db0.",
+     "descriptionLine": "Manages stacked PRs and splits multi-part work into reviewable branches with gh-stack. Use for stack creation, viewing, edits, push, submit, sync, rebase, merge, or checkout; when asked to split or isolate work for review; whenever a user mentions a stack, branch layers, dependent PRs, or gh stack; or when a stack is checked out.",
+     "verifiedBy": "https://raw.githubusercontent.com/vercel/next.js/canary/.agents/skills/gh-stack/SKILL.md",
+     "confidence": "observed"
+    },
+    {
+     "name": "insight-error-page",
+     "path": ".agents/skills/insight-error-page",
+     "purpose": "Write or audit insight-kind error pages (errors/<slug>.mdx) that ship to nextjs.org/docs/messages and mirror the dev-overlay fix cards; sources card titles/IDs/snippets from instant-guidance-data.ts. metadata.internal: true.",
+     "descriptionLine": "Write or audit an insight-kind error page for the Next.js dev overlay. Use when creating a new `errors/<slug>.mdx` page, auditing an existing one, or checking that a page matches the framework fix cards. Covers page structure, title alignment, FixCard cards with Copy prompt button, code snippets, terminology verification against canonical docs, and Vercel technical writing style.",
+     "verifiedBy": "https://raw.githubusercontent.com/vercel/next.js/canary/.agents/skills/insight-error-page/SKILL.md",
+     "confidence": "observed"
+    },
+    {
+     "name": "next-rspack",
+     "path": ".agents/skills/next-rspack",
+     "purpose": "Maintain the @next/rspack-core and @next/rspack-binding packages: upgrading @rspack/core, rspack_* crate versions and the rspack/ Rust toolchain, local build/link, and NEXT_RSPACK env usage. Explicitly excludes the root rust-toolchain.toml (Turbopack's). metadata.internal: true.",
+     "descriptionLine": "Maintain @next/rspack-core and @next/rspack-binding packages. Use when editing rspack/package.json, rspack/crates/binding/Cargo.toml, rspack/rust-toolchain.toml, or packages/next-rspack/package.json. Covers upgrading @rspack/core npm version, rspack_* crate versions, Rust toolchain version, building and linking for local testing, and NEXT_RSPACK environment variable usage. Does NOT apply to root rust-toolchain.toml (that's for Turbopack).",
+     "verifiedBy": "https://raw.githubusercontent.com/vercel/next.js/canary/.agents/skills/next-rspack/SKILL.md",
+     "confidence": "observed"
+    },
+    {
+     "name": "pr-status-triage",
+     "path": ".agents/skills/pr-status-triage",
+     "purpose": "Triage CI failures and PR review comments via scripts/pr-status.js, with blocker-first prioritization (build > lint > types > tests), CI env var matching for local repro, and the Known Flaky Tests distinction. metadata.internal: true.",
+     "descriptionLine": "Triage CI failures and PR review comments using scripts/pr-status.js. Use when investigating failing CI jobs, flaky tests, or PR review feedback. Covers blocker-first prioritization (build > lint > types > tests), CI env var matching for local reproduction, and the Known Flaky Tests distinction.",
+     "verifiedBy": "https://raw.githubusercontent.com/vercel/next.js/canary/.agents/skills/pr-status-triage/SKILL.md",
+     "confidence": "observed"
+    },
+    {
+     "name": "react-sync",
+     "path": ".agents/skills/react-sync",
+     "purpose": "Build local React changes into the bundle variants Next.js consumes (buildForNext), sync them into a Next.js checkout via `pnpm sync-react`, and test the integration. metadata.internal: true.",
+     "descriptionLine": "Build local React changes in the bundle variants consumed by Next.js, sync them into a local Next.js checkout, and test the resulting integration. Use when working on React changes that need validation in Next.js, or when asked to run buildForNext, pnpm sync-react, or synchronize a React checkout with Next.js.",
+     "verifiedBy": "https://raw.githubusercontent.com/vercel/next.js/canary/.agents/skills/react-sync/SKILL.md",
+     "confidence": "observed"
+    },
+    {
+     "name": "react-vendoring",
+     "path": ".agents/skills/react-vendoring",
+     "purpose": "React vendoring and react-server layer boundaries: the entry-base.ts boundary for all react-server-dom-webpack/* imports, vendored React channels, $$compiled.internal.d.ts type declarations, Turbopack remap to react-server-dom-turbopack, and ComponentMod access patterns. metadata.internal: true.",
+     "descriptionLine": "React vendoring and react-server layer boundaries. Use when editing entry-base.ts, $$compiled.internal.d.ts, compiled/react* packages, or taskfile.js copy_vendor_react. Covers the entry-base.ts boundary (all react-server-dom-webpack/* imports must go through it), vendored React channels, type declarations, Turbopack remap to react-server-dom-turbopack, ComponentMod access patterns, and ESLint suppression for guarded requires.",
+     "verifiedBy": "https://raw.githubusercontent.com/vercel/next.js/canary/.agents/skills/react-vendoring/SKILL.md",
+     "confidence": "observed"
+    },
+    {
+     "name": "router-act",
+     "path": ".agents/skills/router-act",
+     "purpose": "Write deterministic e2e tests with createRouterAct and LinkAccordion to control the timing of internal Next.js requests (prefetches) and assert on responses; covers the act API, fake clocks and flaky-pattern avoidance. user-invocable: false, metadata.internal: true.",
+     "descriptionLine": "How to write end-to-end tests using createRouterAct and LinkAccordion. Use when writing or modifying tests that need to control the timing of internal Next.js requests (like prefetches) or assert on their responses. Covers the act API, fixture patterns, prefetch control via LinkAccordion, fake clocks, and avoiding flaky testing patterns.",
+     "verifiedBy": "https://raw.githubusercontent.com/vercel/next.js/canary/.agents/skills/router-act/SKILL.md",
+     "confidence": "observed"
+    },
+    {
+     "name": "runtime-debug",
+     "path": ".agents/skills/runtime-debug",
+     "purpose": "Debug runtime-bundle and module-resolution regressions: CI env mirroring (IS_WEBPACK_TEST, NEXT_SKIP_ISOLATE), full stack traces via __NEXT_SHOW_IGNORE_LISTED, nft.json route trace inspection, and webpack stats diffing. metadata.internal: true.",
+     "descriptionLine": "Debug and verification workflow for runtime-bundle and module-resolution regressions. Use when diagnosing unexpected module inclusions, bundle size regressions, or CI failures related to NEXT_SKIP_ISOLATE, nft.json traces, or runtime bundle selection (module.compiled.js). Covers CI env mirroring, full stack traces via __NEXT_SHOW_IGNORE_LISTED, route trace inspection, and webpack stats diffing.",
+     "verifiedBy": "https://raw.githubusercontent.com/vercel/next.js/canary/.agents/skills/runtime-debug/SKILL.md",
+     "confidence": "observed"
+    },
+    {
+     "name": "sandbox-bench",
+     "path": ".agents/skills/sandbox-bench",
+     "purpose": "Paired A/B performance benchmarking of React or Next.js revisions on Vercel Sandbox VMs, measured through bench/render-pipeline and React's flight-ssr-bench fixture; reports boot-level confidence intervals. metadata.internal: true.",
+     "descriptionLine": "Benchmark React or Next.js changes on Vercel Sandbox VMs with paired A/B statistics: react PR/commit vs base, or Next.js PR/commit vs base, measured end-to-end through the bench/render-pipeline app (rps, latency, p95; TTFB, RSS and document/Flight bytes when the Next side captures them) and, for React changes, through the react repo's flight-ssr-bench fixture (Node AND Edge web-streams paths, Fizz and Flight+Fizz).",
+     "verifiedBy": "https://raw.githubusercontent.com/vercel/next.js/canary/.agents/skills/sandbox-bench/SKILL.md",
+     "confidence": "observed"
+    },
+    {
+     "name": "update-docs",
+     "path": ".agents/skills/update-docs",
+     "purpose": "Guided workflow for updating Next.js documentation (docs/01-app, docs/02-pages, .mdx) from code changes on the active branch; maps changed source files to doc paths for PR docs-completeness review. metadata.internal: true.",
+     "descriptionLine": "This skill should be used when the user asks to \"update documentation for my changes\", \"check docs for this PR\", \"what docs need updating\", \"sync docs with code\", \"scaffold docs for this feature\", \"document this feature\", \"review docs completeness\", \"add docs for this change\", \"what documentation is affected\", \"docs impact\", or mentions \"docs/\", \"docs/01-app\", \"docs/02-pages\", \"MDX\", \"documentation update\", \"API reference\", \".mdx files\". Provides guided workflow for updating Next.js documentation based on code changes.",
+     "verifiedBy": "https://raw.githubusercontent.com/vercel/next.js/canary/.agents/skills/update-docs/SKILL.md",
+     "confidence": "observed"
+    },
+    {
+     "name": "v8-jit",
+     "path": ".agents/skills/v8-jit",
+     "purpose": "V8 JIT optimization patterns for hot-path server internals (app-render, stream-utils, routing, caching): hidden classes/shapes, monomorphic call sites, inline caches, megamorphic deopt, closure allocation, array packing, and profiling with --trace-opt / --trace-deopt. user-invocable: false, metadata.internal: true.",
+     "descriptionLine": "V8 JIT optimization patterns for writing high-performance JavaScript in Next.js server internals. Use when writing or reviewing hot-path code in app-render, stream-utils, routing, caching, or any per-request code path. Covers hidden classes / shapes, monomorphic call sites, inline caches, megamorphic deopt, closure allocation, array packing, and profiling with --trace-opt / --trace-deopt.",
+     "verifiedBy": "https://raw.githubusercontent.com/vercel/next.js/canary/.agents/skills/v8-jit/SKILL.md",
+     "confidence": "observed"
+    },
+    {
+     "name": "write-api-reference",
+     "path": ".agents/skills/write-api-reference",
+     "purpose": "Produce API reference .mdx pages for Next.js functions, components, file conventions, directives and config options under docs/01-app/03-api-reference/. Frontmatter uses the extended fields agent: Plan and context: fork; metadata.internal: true.",
+     "descriptionLine": "Produces API reference documentation for Next.js APIs: functions, components, file conventions, directives, and config options.",
+     "verifiedBy": "https://raw.githubusercontent.com/vercel/next.js/canary/.agents/skills/write-api-reference/SKILL.md",
+     "confidence": "observed"
+    },
+    {
+     "name": "write-guide",
+     "path": ".agents/skills/write-guide",
+     "purpose": "Generate technical guides teaching one use case through 2-4 progressive steps, with YAML frontmatter, introduction and next-steps section. Frontmatter uses agent: Plan.",
+     "descriptionLine": "Generates technical guides that teach real-world use cases through progressive examples.",
+     "verifiedBy": "https://raw.githubusercontent.com/vercel/next.js/canary/.agents/skills/write-guide/SKILL.md",
+     "confidence": "observed"
+    }
+   ],
+   "source": {
+    "repo": "https://github.com/vercel/next.js",
+    "exists": true,
+    "owner": "vercel",
+    "license": "MIT (repo license.md; GitHub API license.spdx_id = \"MIT\"; skills/.claude-plugin/plugin.json also declares \"license\": \"MIT\")",
+    "lastActivity": "Default branch: canary. Repo pushed_at 2026-09-19T05:09:46Z. Latest release v16.4.0-canary.36 published 2026-09-18T23:47:18Z (prerelease). Last commit touching skills/: 2026-09-18, \"Add experimental agent feedback workflow (#98582)\". Last commit touching .agents/skills/: 2026-09-17, \"agents: Add a `--comments-only` flag to `pr-status` script, trim down context bloat in AGENTS.md (#98781)\". Both trees are actively maintained, not stale.",
+    "skillsRoot": ".agents/skills/ (20 internal maintainer skills) and skills/ (5 published user-facing skills). .claude/skills is a git symlink with target \"../.agents/skills\".",
+    "notes": "CONFIRMED: vercel/next.js has substantial agent-skill infrastructure on the canary default branch. Two DISTINCT skill trees exist and must not be conflated.\n\n(1) skills/ \u2014 5 user-facing skills published as a Claude Code plugin. skills/.claude-plugin/plugin.json: name \"nextjs\", version \"0.1.0\", license \"MIT\", author \"Next.js Team\", skills: [\"./\"]. A repo-root .claude-plugin/marketplace.json declares the marketplace: name \"nextjs\", owner Vercel, one plugin entry with source \"./skills\", described as \"Official Claude Code plugin marketplace for Next.js, serving the skills that ship in the vercel/next.js repository.\" These target app developers using Next.js (Cache Components, Partial Prefetching, dev-loop verification).\n\n(2) .agents/skills/ \u2014 20 skills plus README.md, for contributors working ON Next.js itself. All but gh-stack and the two doc-writer skills carry metadata.internal: true. .claude/skills is a SYMLINK to ../.agents/skills (GitHub contents API reports type \"symlink\", target \"../.agents/skills\"), so Claude Code reads the same tree. .cursor/ contains only commands/ and worktrees.json \u2014 no skills mirror observed there.\n\nAGENTS.md exists at repo root (contributor guide: build/test commands, entry points, security note on filterInternalHeaders()) and cross-references skills with a $skill-name syntax ($pr-status-triage, $flags, $dce-edge, $react-vendoring). CLAUDE.md also exists at root (contents not read). .agents/skills/README.md is an authoring guide; it documents structure and frontmatter fields (required name, description; optional argument-hint, user-invocable, disable-model-invocation, allowed-tools, model, context, agent, hooks) but says nothing about versioning or syncing to other tool directories.\n\nskills-lock.json at repo root, version 1, pins exactly ONE vendored third-party skill: gh-stack, sourceType github, source github/gh-stack, skillPath skills/gh-stack/SKILL.md, computedHash 331d32e421a963f5e257fda9d5e1a0fea28039c1dd4dc91329479975906b2db0. Note the lockfile's skillPath does not match where the file actually sits in this repo (.agents/skills/gh-stack/SKILL.md) \u2014 it records the path within the SOURCE repo.\n\nVERSIONING AGAINST NEXT.JS RELEASES \u2014 mixed, and mostly implicit:\n- NOT independently versioned: plugin.json version is \"0.1.0\" on canary AND identical at tag v16.3.0, so the plugin version is not bumped per Next.js release.\n- IMPLICITLY versioned by living in the monorepo: skills are snapshotted into release tags. At tag v16.3.0, skills/ contains 4 skills (.claude-plugin plus next-cache-components-adoption, next-cache-components-optimizer, next-dev-loop, next-partial-prefetching-adoption) \u2014 next-partial-prefetching-optimizer is absent, having landed on canary 2026-09-10 (#96471). Likewise .agents/skills/ at v16.3.0 has 18 dirs vs 20 on canary (deploy-release-test and gate-tests absent). Checking out a release tag therefore yields that release's skill set.\n- Skills did NOT exist in the 16.2 line: https://api.github.com/repos/vercel/next.js/contents/skills?ref=next-16-2 returns HTTP 404.\n- Compatibility is declared in PROSE inside description fields, not in machine-readable metadata: next-cache-components-optimizer, next-partial-prefetching-adoption and next-partial-prefetching-optimizer each state \"Requires Next.js 16.3+\"; next-dev-loop states \"Next.js 16.3+ with Turbopack\" as a hard floor plus agent-browser \">= 0.31.1\". No semver range field, no engines field, no per-skill version key (except the vendored gh-stack, which carries metadata.version '0.1.0' from its upstream author).\n\nMETHOD / CAVEAT: every item above was read via WebFetch against api.github.com and raw.githubusercontent.com; no page was inferred. Frontmatter for all 25 skills was retrieved verbatim (7 required a second fetch because the first returned a paraphrase). Some descriptionLine values are truncated mid-description where the field is long; they are otherwise verbatim. CLAUDE.md, .conductor/, conductor.json, .cursor/commands/ and evals/ were observed to exist but were not opened, so nothing is claimed about their contents."
+   }
+  },
+  {
+   "lens": "third-party",
+   "skills": [
+    {
+     "name": "frontend-ui-ux (repo dir name: frontend-ui-ux-skill; SKILL.md sits at repo root, there is no skills/ subdirectory)",
+     "path": "SKILL.md",
+     "purpose": "Single-file 'doctrine' skill for frontend/UI work: Nielsen heuristics, Fitts/Hick/Miller/Jakob laws, a visual system, component architecture, WCAG 2.2 AA, Core Web Vitals budgets, plus a Definition-of-Done gate. Ships 5 reference files: references/accessibility.md, references/anti-patterns.md, references/component-architecture.md, references/hci-foundations.md, references/performance.md.",
+     "descriptionLine": "Use this skill whenever building, editing, reviewing, or critiquing ANY user-facing frontend interface \u2014 a component, page, form, modal, nav, design system, or full application \u2014 in any framework (React, Vue, Svelte, plain HTML/CSS/JS) or medium (web app, PWA, marketing site, mobile webview).",
+     "verifiedBy": "https://api.github.com/repos/overseek944/frontend-ui-ux-skill/contents/SKILL.md",
+     "confidence": "observed"
+    },
+    {
+     "name": "playwright-cli",
+     "path": "packages/playwright-core/src/tools/skills/playwright-cli/SKILL.md (repo: microsoft/playwright)",
+     "purpose": "Official, shipped-with-the-package browser automation skill: drive a browser and work with Playwright tests via the playwright-cli binary. This is the skill that `playwright-cli install --skills` copies into .claude/skills/playwright-cli.",
+     "descriptionLine": "Automate browser interactions, test web pages and work with Playwright tests.",
+     "verifiedBy": "https://api.github.com/repos/microsoft/playwright/contents/packages/playwright-core/src/tools/skills/playwright-cli/SKILL.md",
+     "confidence": "observed"
+    },
+    {
+     "name": "playwright-trace",
+     "path": "packages/playwright-core/src/tools/skills/playwright-trace/SKILL.md (repo: microsoft/playwright)",
+     "purpose": "Official skill for reading Playwright .zip trace files from the CLI \u2014 actions, network requests, console, errors, snapshots, screenshots \u2014 without opening the trace viewer UI.",
+     "descriptionLine": "Inspect Playwright trace files from the command line \u2014 list actions, view requests, console, errors, snapshots and screenshots.",
+     "verifiedBy": "https://api.github.com/repos/microsoft/playwright/contents/packages/playwright-core/src/tools/skills/playwright-trace/SKILL.md",
+     "confidence": "observed"
+    },
+    {
+     "name": "playwright-component-testing",
+     "path": "packages/playwright-core/src/tools/skills/playwright-component-testing/SKILL.md (repo: microsoft/playwright)",
+     "purpose": "Official skill for setting up component testing via a story-gallery page and the built-in mount fixture, including migration off @playwright/experimental-ct-react / -vue. Has a references/gallery-spec.md.",
+     "descriptionLine": "Set up component testing with Playwright using a story gallery \u2014 scaffold stories and a gallery dev page driven by the built-in mount fixture, no dedicated component-testing runtime.",
+     "verifiedBy": "https://api.github.com/repos/microsoft/playwright/contents/packages/playwright-core/src/tools/skills/playwright-component-testing/SKILL.md",
+     "confidence": "observed"
+    },
+    {
+     "name": "playwright-cli",
+     "path": "skills/playwright-cli/SKILL.md (repo: microsoft/playwright-cli)",
+     "purpose": "Byte-identical frontmatter to the microsoft/playwright copy \u2014 the playwright-cli repo is the distribution point for the same official skill. Contains skills/playwright-cli/SKILL.md plus a skills/playwright-cli/references/ directory. Repo also has a skillCheck.js that validates it.",
+     "descriptionLine": "Automate browser interactions, test web pages and work with Playwright tests.",
+     "verifiedBy": "https://api.github.com/repos/microsoft/playwright-cli/contents/skills/playwright-cli/SKILL.md",
+     "confidence": "observed"
+    },
+    {
+     "name": "playwright-skill",
+     "path": "skills/playwright-skill/SKILL.md (repo: lackeyjb/playwright-skill)",
+     "purpose": "Best-maintained THIRD-PARTY Playwright skill. Packaged as a Claude Code plugin (.claude-plugin/ at repo root) with the skill nested under skills/. Frontmatter carries license: MIT, compatibility (Node 20+), metadata.author: lackeyjb, metadata.version: \"5.0.0\", and allowed-tools: Bash(node:*) Bash(npm:*) Read Write. Repo has a tests/ directory and tagged releases.",
+     "descriptionLine": "Complete browser automation with Playwright. Auto-detects dev servers, writes reusable test scripts, and supports screenshots, responsive checks, UX validation, login flows, link checks, and arbitrary browser automation.",
+     "verifiedBy": "https://raw.githubusercontent.com/lackeyjb/playwright-skill/main/skills/playwright-skill/SKILL.md",
+     "confidence": "observed"
+    },
+    {
+     "name": "playwright-dev",
+     "path": ".claude/skills/playwright-dev/SKILL.md (repo: microsoft/playwright)",
+     "purpose": "REPO-INTERNAL maintainer skill, not distributed to users. Listed for completeness so it is not mistaken for a shippable browser-automation skill.",
+     "descriptionLine": "Explains how to develop Playwright - add APIs, MCP tools, CLI commands, and vendor dependencies.",
+     "verifiedBy": "https://api.github.com/repos/microsoft/playwright/contents/.claude/skills/playwright-dev/SKILL.md",
+     "confidence": "observed"
+    },
+    {
+     "name": "playwright-devops",
+     "path": ".claude/skills/playwright-devops/SKILL.md (repo: microsoft/playwright)",
+     "purpose": "REPO-INTERNAL maintainer skill, not distributed to users. Frontmatter includes user_invocable: true.",
+     "descriptionLine": "DevOps workflows for Playwright - CI failure analysis, workflow debugging, and release operations.",
+     "verifiedBy": "https://api.github.com/repos/microsoft/playwright/contents/.claude/skills/playwright-devops/SKILL.md",
+     "confidence": "observed"
+    },
+    {
+     "name": "playwright-triage",
+     "path": ".claude/skills/playwright-triage/SKILL.md (repo: microsoft/playwright)",
+     "purpose": "REPO-INTERNAL maintainer skill for triaging Playwright GitHub issues. Not distributed to users.",
+     "descriptionLine": "Triage a Playwright bug report by reproducing it from the information in the issue.",
+     "verifiedBy": "https://api.github.com/repos/microsoft/playwright/contents/.claude/skills/playwright-triage/SKILL.md",
+     "confidence": "observed"
+    },
+    {
+     "name": "playwright-cherry-pick",
+     "path": ".claude/skills/playwright-cherry-pick/SKILL.md (repo: microsoft/playwright)",
+     "purpose": "REPO-INTERNAL maintainer skill for backporting commits into release branches. Not distributed to users.",
+     "descriptionLine": "Cherry-pick a commit or PR from main into a release branch (release-<version>) and retitle it as cherry-pick(#<pr>): <original title>.",
+     "verifiedBy": "https://api.github.com/repos/microsoft/playwright/contents/.claude/skills/playwright-cherry-pick/SKILL.md",
+     "confidence": "observed"
+    },
+    {
+     "name": "playwright-test-results",
+     "path": ".claude/skills/playwright-test-results/SKILL.md (repo: microsoft/playwright)",
+     "purpose": "REPO-INTERNAL maintainer skill querying Playwright's own CI results DuckDB. Not distributed to users.",
+     "descriptionLine": "Query Playwright CI test results from the aggregated DuckDB database.",
+     "verifiedBy": "https://api.github.com/repos/microsoft/playwright/contents/.claude/skills/playwright-test-results/SKILL.md",
+     "confidence": "observed"
+    }
+   ],
+   "source": {
+    "repo": "overseek944/frontend-ui-ux-skill",
+    "exists": true,
+    "owner": "third-party",
+    "license": "MIT (LICENSE file reads: \"MIT License / Copyright (c) 2026 Manav Patel\"; GitHub API license field: \"MIT License\")",
+    "lastActivity": "STALE-ish / single-drop repo. Exactly 1 commit ever: fa25478d by overseek944 (gmail.com address), authored 2026-08-02T13:32:24Z. pushed_at 2026-08-02T13:32:35Z \u2014 no code push since creation day. updated_at 2026-09-15T15:37:04Z reflects metadata/star activity only, NOT a commit. 0 releases, 0 tags, 0 open issues, 0 forks.",
+    "skillsRoot": "(none) \u2014 SKILL.md lives at the repo ROOT; there is no skills/ directory. Root listing observed via API: LICENSE (1068 b), README.md (2903 b), SKILL.md (18899 b), references/ (dir with 5 .md files).",
+    "notes": "=== ITEM 1: overseek944/frontend-ui-ux-skill \u2014 EXISTS, but I would NOT put it in a published catalog as-is. Verified via https://api.github.com/repos/overseek944/frontend-ui-ux-skill and the HTML page. Provenance: personal account 'overseek944' (display name Manav Patel), type User, account created 2020-10-04, 0 followers, 20 public repos, no bio. Sole contributor: overseek944 (1 contribution) \u2014 definitively single-maintainer. Metrics observed: 2 stars, 0 forks, 1 watcher, 0 open issues, 0 releases, 0 tags, default branch 'master'. Repo created 2026-08-02T13:32:29Z and pushed 6 seconds later \u2014 it is a one-shot upload that has never been revised in ~6 weeks. Content quality is genuinely decent (18.9 KB SKILL.md, five reference files, defers correctly to artifact-design and dataviz), and the license is clean permissive MIT, so vendoring the text is legally fine. But the trust profile is: anonymous-ish single author, zero external review, zero downstream usage signal (2 stars / 0 forks), no versioning, no issue tracker activity, no CI, no tests. There is nothing here that would catch a bad edit or a future malicious commit. RECOMMENDATION: do not list it as a trusted upstream dependency. If the content is wanted, fork/vendor it at the pinned commit fa25478d under your own review, or treat it as unattributed inspiration. Do not tell catalog users to `npx skills add` from this URL.\n\n=== ITEM 2a: Microsoft DOES publish an official Playwright MCP server \u2014 CONFIRMED. https://api.github.com/repos/microsoft/playwright-mcp returns microsoft/playwright-mcp, description \"Playwright MCP server\", owner login 'microsoft', owner type Organization, license Apache-2.0, 37,290 stars, 3,166 forks, 4 open issues, created 2025-03-21, pushed_at 2026-09-18T23:35:04Z. homepage points to https://www.npmjs.com/package/@playwright/mcp. Latest release v0.0.82 published 2026-09-18T23:35:04Z (release notes mention browser_start_video / --caps=devtools). This is maximally trustworthy provenance: Microsoft org, permissive Apache-2.0, huge adoption, shipping releases the same week. Note: playwright-mcp itself contains NO SKILL.md files (authenticated code search: total_count 0) \u2014 it is an MCP server, not a skill. For a catalog, the MCP server is the right primary recommendation over any third-party skill.\n\n=== ITEM 2b: Official Playwright AGENT SKILLS also exist, and they beat third-party ones. Three user-facing skills ship inside microsoft/playwright at packages/playwright-core/src/tools/skills/{playwright-cli,playwright-trace,playwright-component-testing}/SKILL.md, and the same playwright-cli skill is mirrored in microsoft/playwright-cli at skills/playwright-cli/SKILL.md (frontmatter byte-identical). microsoft/playwright: Apache-2.0, 96,336 stars, pushed 2026-09-19T01:59:22Z; the shipped skills directory was last touched 2026-09-18T20:44:52Z (78ff4260). microsoft/playwright-cli: Apache-2.0, 13,409 stars, org-owned, skills/ dir last touched 2026-09-18T21:49:39Z (5bd70cd6). Install is documented on https://playwright.dev/agent-cli/skills as `playwright-cli install --skills` (Claude Code layout, default), `playwright-cli install --skills=agents` (.agents/skills layout), `playwright-cli install --skills -g` (global); it copies to .claude/skills/playwright-cli or .agents/skills/playwright-cli. Five more SKILL.md files live under microsoft/playwright/.claude/skills/ (playwright-dev, playwright-devops, playwright-triage, playwright-cherry-pick, playwright-test-results) \u2014 these are MAINTAINER-INTERNAL, for developing Playwright itself, and must not be catalogued as browser-automation skills for end users.\n\n=== ITEM 2c: Best third-party Playwright skill = lackeyjb/playwright-skill \u2014 trustworthy enough to list, with a caveat. Verified https://api.github.com/repos/lackeyjb/playwright-skill: MIT, 3,126 stars, 242 forks, created 2025-10-19, pushed 2026-08-14T13:51:33Z, not archived, owner type User. Contributors: lackeyjb (22), dependabot[bot] (2), cderv (1), luantaraschi (1) \u2014 effectively single-maintainer but with outside contributions, dependabot enabled, a tests/ directory, CHANGELOG.md, CONTRIBUTING.md, and tagged releases (v5.0.0 on 2026-08-11, v4.1.0 on 2025-12-02). Caveat: last commit 2026-08-14, so ~5 weeks stale at time of check, and it is one person's repo. Verdict: acceptable to list as a community option, clearly labelled third-party, but the official microsoft/playwright-mcp server (or the official playwright-cli skill) should be the recommended default.\n\n=== NEGATIVE RESULTS / THINGS I DID NOT VERIFY: my first two guesses at the official skill paths (packages/playwright/src/skill and claude/skills in microsoft/playwright) both returned HTTP 404 \u2014 the real paths above came from an authenticated GitHub code search, not from inference. Aggregator sites surfaced by search (mcpservers.org, mcpmarket.com, claudedirectory.org, skills.sh, skillsmp.com, claudecowork.im, testdino.com) were NOT used as evidence; every fact above traces to api.github.com, raw.githubusercontent.com, github.com, or playwright.dev. Two other third-party repos appeared in search results \u2014 linhnguyendang-web/playwright-skill and akaihola/playwright-py-skill \u2014 which I did NOT open, so their contents, licenses and maintenance status are UNVERIFIED; do not catalogue them on this research."
+   }
+  },
+  {
+   "lens": "mcp-servers",
+   "skills": [
+    {
+     "name": "github-mcp-server",
+     "path": "github/github-mcp-server (remote: https://api.githubcopilot.com/mcp/ ; local: ghcr.io/github/github-mcp-server via Docker)",
+     "purpose": "READ+WRITE. Official GitHub MCP server, Go. Two deployment options observed: (1) hosted/remote at https://api.githubcopilot.com/mcp/ (enterprise variant https://copilot-api.octocorp.ghe.com/mcp), auth via OAuth (browser login, token held in memory, no token setup) or a PAT sent as `Authorization: Bearer ${input:github_mcp_pat}`; (2) local Docker with GITHUB_PERSONAL_ACCESS_TOKEN env var. Permissions: PAT scopes vary per tool \u2014 README lists repo, security_events, read:org, notifications, gist, delete_repo, workflow, read:project, project, admin:org, admin:enterprise. Scoping controls: `--read-only` flag (write tools skipped even if explicitly requested) and GITHUB_TOOLSETS env var (context, actions, code_quality, code_security, copilot, discussions, gists, git, governance, issues, labels, notifications, orgs, projects, pull_requests, repos, secret_protection, security_advisories, stargazers, users, dependabot). RISK: high \u2014 full write access to repos, issues, PRs, Actions workflows and org/enterprise admin if broad scopes are granted; a PAT is a long-lived bearer credential. Mitigate with --read-only, minimal toolsets, minimal scopes. docs.github.com states the server is available to all GitHub users regardless of plan, but org/enterprise members on Copilot Business/Enterprise need the 'MCP servers in Copilot' policy enabled. Latest release v1.12.2 (2026-09-16); last push 2026-09-16.",
+     "descriptionLine": "GitHub's official MCP Server",
+     "verifiedBy": "https://github.com/github/github-mcp-server + https://raw.githubusercontent.com/github/github-mcp-server/main/README.md + https://api.github.com/repos/github/github-mcp-server + https://docs.github.com/en/copilot/how-tos/provide-context/use-mcp/use-the-github-mcp-server",
+     "confidence": "observed"
+    },
+    {
+     "name": "playwright-mcp",
+     "path": "microsoft/playwright-mcp (npx @playwright/mcp@latest)",
+     "purpose": "WRITE-heavy (acts on live web pages). Config observed: {\"mcpServers\":{\"playwright\":{\"command\":\"npx\",\"args\":[\"@playwright/mcp@latest\"]}}}. No API token required; its power comes from the browser profile it drives \u2014 by default it uses a persistent profile, so it inherits whatever sessions/cookies that profile holds. Flags observed: --isolated (in-memory profile, discarded on close), --headless, --browser (chrome/firefox/webkit/msedge), --allowed-origins and --blocked-origins (semicolon-separated), --storage-state, --caps (vision, pdf, devtools, network, storage, testing). Capabilities: click/navigate/type/drag/screenshot/snapshot, tab management, network request inspection, cookie and storage manipulation, DevTools tracing/recording, coordinate clicks, PDF generation, test assertions. RISK: high \u2014 it can act as the logged-in user on any site, read network traffic and manipulate cookies/storage, and page content it reads is untrusted input (classic prompt-injection surface). README states plainly: \"Playwright MCP is not a security boundary.\" Mitigate with --isolated and --allowed-origins. Latest release v0.0.82 (2026-09-18); last push 2026-09-18. 37.3k stars.",
+     "descriptionLine": "Playwright MCP server",
+     "verifiedBy": "https://github.com/microsoft/playwright-mcp + https://api.github.com/repos/microsoft/playwright-mcp",
+     "confidence": "observed"
+    },
+    {
+     "name": "context7",
+     "path": "upstash/context7 (remote: https://mcp.context7.com/mcp ; npm @upstash/context7-mcp, CLI ctx7)",
+     "purpose": "READ-ONLY. This is the currently maintained up-to-date-documentation MCP. Remote server https://mcp.context7.com/mcp; setup via `npx ctx7 setup` (Node 18+). API key optional but recommended for higher rate limits (free key at context7.com/dashboard), passed as `Authorization: Bearer YOUR_API_KEY`. Tools observed: resolve-library-id (library name -> Context7 library ID) and query-docs (fetch docs by library ID + query). Also usable as CLI + skills without MCP. RISK: low-moderate \u2014 no access to user systems or credentials, only outbound doc fetches; but the README states library documentation is community-contributed rather than authored by Context7, so retrieved doc text is untrusted content that lands in the model's context (indirect prompt-injection surface). Note the tool name is query-docs on the current version, not the older get-library-docs. Latest release @upstash/context7-mcp@4.1.1 (2026-09-14); last push 2026-09-18. 62.2k stars.",
+     "descriptionLine": "Context7 Platform -- Up-to-date code documentation for LLMs and AI code editors",
+     "verifiedBy": "https://github.com/upstash/context7 + https://raw.githubusercontent.com/upstash/context7/master/README.md + https://api.github.com/repos/upstash/context7",
+     "confidence": "observed"
+    },
+    {
+     "name": "figma-mcp-server",
+     "path": "Figma official (remote: https://mcp.figma.com/mcp ; desktop: http://127.0.0.1:3845/mcp)",
+     "purpose": "READ+WRITE. Officially called the \"Figma MCP Server\". Two options observed: (1) REMOTE (Figma-recommended, broadest feature set) at https://mcp.figma.com/mcp, OAuth sign-in (\"Allow Access\"), available on all seats and plans; add via `claude mcp add --transport http figma https://mcp.figma.com/mcp`. (2) DESKTOP/local at http://127.0.0.1:3845/mcp, requires the Figma desktop app with a design file open, Dev Mode (Shift+D), then \"Enable desktop MCP server\" in the inspect panel; requires a Dev or Full seat on a paid plan; add via `claude mcp add --transport http figma-desktop http://127.0.0.1:3845/mcp`. Access control: \"Only clients listed in the Figma MCP Catalog like VS Code, Cursor, or Claude Code can connect.\" Read tools: get_design_context, get_metadata, get_screenshot, get_variable_defs, get_figjam, get_libraries, get_code_connect_map, get_code_connect_suggestions, get_context_for_code_connect, get_motion_context, get_shader, list_shaders, list_file_shaders, get_generative_plugin, list_generative_plugins, search_design_system, download_assets, whoami. Write tools (modify the Figma canvas): use_figma, generate_figma_design, create_new_file, generate_diagram, create_shader, update_shader, create_generative_plugin, update_generative_plugin, add_code_connect_map, send_code_connect_mappings, upload_assets. Several tools are remote-only; the desktop server uniquely supports selection-based prompting. Figma for Government excludes write-to-canvas, code-to-canvas and agent skills, and MCP is not in FedRAMP audit scope. RISK: moderate-high on the write side \u2014 OAuth grants the agent the ability to create and modify real design files; read side exposes design system and file contents to the model.",
+     "descriptionLine": "Figma MCP Server \u2014 official docs at developers.figma.com/docs/figma-mcp-server/",
+     "verifiedBy": "https://developers.figma.com/docs/figma-mcp-server/ + .../remote-server-installation/ + .../local-server-installation/ + .../tools-and-prompts/ + https://help.figma.com/hc/en-us/articles/32132100833559-Guide-to-the-Figma-MCP-server",
+     "confidence": "observed"
+    },
+    {
+     "name": "supabase-mcp",
+     "path": "supabase-community/supabase-mcp (hosted: https://mcp.supabase.com/mcp ; CLI local: http://localhost:54321/mcp)",
+     "purpose": "READ+WRITE (write by default). Hosted-first: {\"mcpServers\":{\"supabase\":{\"type\":\"http\",\"url\":\"https://mcp.supabase.com/mcp\"}}}; Claude Code: `claude mcp add --scope project --transport http supabase \"https://mcp.supabase.com/mcp\"`. Auth is OAuth 2.1 with dynamic client registration \u2014 docs state \"You don't need a personal access token (PAT)\" for standard setup; CI can use bearer tokens via custom headers. Scoping via URL query params: read_only=true (runs queries as a read-only Postgres user, excludes mutating tools), project_ref=<id> (limits to one project, excludes account-level tools), features=<groups>. Feature groups observed: Database, Debugging, Development, Edge Functions, Account Management, Docs, Branching (experimental), Storage (disabled by default). Local Supabase CLI endpoint http://localhost:54321/mcp and self-hosted both offer a limited tool subset and no OAuth 2.1. RISK: high \u2014 runs \"under the context of your developer permissions\"; can execute SQL, apply migrations, deploy edge functions and manage projects. Docs name prompt injection as \"the primary attack vector unique to LLMs\" (example: a support ticket containing injected SQL) and recommend read-only mode, project scoping, feature groups, database branches, connecting to production only when required, and keeping manual per-tool approval. Latest release mcp-server-supabase-v0.13.0 (2026-09-17); last push 2026-09-18.",
+     "descriptionLine": "Connect your Supabase projects to Cursor, Claude, Windsurf, and other AI assistants.",
+     "verifiedBy": "https://github.com/supabase-community/supabase-mcp + https://raw.githubusercontent.com/supabase-community/supabase-mcp/main/README.md + https://supabase.com/docs/guides/getting-started/mcp + https://supabase.com/docs/guides/ai-tools/mcp + https://api.github.com/repos/supabase-community/supabase-mcp",
+     "confidence": "observed"
+    },
+    {
+     "name": "vercel-mcp",
+     "path": "Vercel official remote MCP: https://mcp.vercel.com",
+     "purpose": "READ+WRITE, including real money. Remote-only, OAuth (implements MCP Authorization + Streamable HTTP specs). Install: `npx -y add-mcp https://mcp.vercel.com -g`, or `claude mcp add --transport http vercel https://mcp.vercel.com`. Vercel only allows clients it has reviewed (Claude Code, Claude.ai/Desktop, ChatGPT, Codex CLI, Cursor, VS Code+Copilot, Devin, Raycast, Goose, Windsurf, Gemini Code Assist, Gemini CLI). Tools observed: search_vercel_documentation; list_teams, list_projects, get_project; list_deployments, get_deployment, get_deployment_build_logs, get_runtime_logs, get_runtime_errors, deploy_to_vercel; get_web_analytics; list_agent_run_projects, list_agent_runs, get_agent_run, get_agent_run_trace; check_domain_availability_and_price; get_purchase_quote, buy_pro, buy_credits, buy_addon, buy_domain, get_domain_order; get_access_to_vercel_url, web_fetch_vercel_url; import-claude-design-from-url; list_toolbar_threads, get_toolbar_thread, change_toolbar_thread_resolve_status, reply_to_toolbar_thread, edit_toolbar_message, add_toolbar_reaction; use_vercel_cli. RISK: high \u2014 \"Connecting to Vercel MCP grants the AI system you're using the same access as your Vercel user account\"; it can deploy code, run the Vercel CLI, and execute purchases. Purchases use a quote-then-confirm flow (get_purchase_quote issues a signed idempotencyKey valid 5 minutes; buy_* requires confirm:true and an exactly matching key), and \"Purchase tools execute real, non-refundable charges.\" Docs explicitly call out confused-deputy protection (explicit user consent per client connection), prompt injection, and repeatedly instruct: enable human confirmation for tool execution. Docs page last_updated 2026-09-15; product is labelled Beta.",
+     "descriptionLine": "Vercel MCP has tools available for searching docs, managing teams, projects, and deployments, and querying Web Analytics.",
+     "verifiedBy": "https://vercel.com/docs/mcp/vercel-mcp (canonical /docs/agent-resources/vercel-mcp) + https://vercel.com/docs/agent-resources/vercel-mcp/tools",
+     "confidence": "observed"
+    },
+    {
+     "name": "server-postgres (ARCHIVED \u2014 negative result)",
+     "path": "modelcontextprotocol/servers-archived/tree/main/src/postgres (NOT in modelcontextprotocol/servers any more)",
+     "purpose": "READ-ONLY, and NO LONGER MAINTAINED. There is no official standalone Postgres MCP server in the live modelcontextprotocol/servers repo. The current reference servers there are only: Everything, Fetch, Filesystem, Git, Memory, Sequential Thinking, Time. The Postgres server was moved to modelcontextprotocol/servers-archived, whose own description is \"Reference MCP servers that are no longer maintained\" (archived: true, MIT, last push 2025-05-28). What it did: one tool `query` (read-only SQL, executed inside a READ ONLY transaction) plus table-schema resources at postgres://<host>/<table>/schema. Config was `npx -y @modelcontextprotocol/server-postgres postgresql://localhost/mydb` or the `mcp/postgres` Docker image, with the credential embedded in the connection string. RISK if used anyway: stale/unmaintained code holding a live DB connection string in plaintext config. For Postgres today the observed official-vendor option is the Supabase MCP server above; I did not verify any other vendor-official Postgres MCP server, so treat third-party ones (e.g. crystaldba/postgres-mcp) as unverified here.",
+     "descriptionLine": "A Model Context Protocol server that provides read-only access to PostgreSQL databases. This server enables LLMs to inspect database schemas and execute read-only queries.",
+     "verifiedBy": "https://github.com/modelcontextprotocol/servers + https://raw.githubusercontent.com/modelcontextprotocol/servers-archived/main/src/postgres/README.md + https://api.github.com/repos/modelcontextprotocol/servers-archived",
+     "confidence": "observed"
+    }
+   ],
+   "source": {
+    "repo": "multiple \u2014 github/github-mcp-server, microsoft/playwright-mcp, upstash/context7, Figma MCP Server (developers.figma.com, no public repo), supabase-community/supabase-mcp, Vercel MCP (vercel.com/docs, no public repo), modelcontextprotocol/servers-archived (postgres)",
+    "exists": true,
+    "owner": "mixed \u2014 github (official), microsoft (official), upstash (official vendor), Figma (official, docs-only), supabase-community (Supabase-run org), Vercel (official, docs-only), modelcontextprotocol (archived reference)",
+    "license": "MIT (github-mcp-server, context7, servers-archived); Apache-2.0 (playwright-mcp, supabase-mcp); Figma MCP Server and Vercel MCP are hosted services with no published repo/license observed",
+    "lastActivity": "github-mcp-server: release v1.12.2, 2026-09-16 (pushed 2026-09-16). playwright-mcp: release v0.0.82, 2026-09-18 (pushed 2026-09-18). context7: release @upstash/context7-mcp@4.1.1, 2026-09-14 (pushed 2026-09-18). supabase-mcp: release mcp-server-supabase-v0.13.0, 2026-09-17 (pushed 2026-09-18). Vercel MCP docs last_updated 2026-09-15. Figma docs undated. servers-archived: archived, last push 2025-05-28. All checked 2026-09-19.",
+    "skillsRoot": "",
+    "notes": "This task was a research brief about MCP servers, not a skills repo, so the `skills` array is used to carry one entry per MCP server; `path` is the repo path or hosted endpoint rather than a directory inside a repo, and `descriptionLine` is the repo/docs description line as written. No SKILL.md files were involved and no skills directory was looked for \u2014 skillsRoot is intentionally empty, not unknown.\n\nNEGATIVE / CORRECTION RESULTS worth flagging: (1) There is no live official standalone Postgres MCP server \u2014 @modelcontextprotocol/server-postgres now lives only in modelcontextprotocol/servers-archived, a repo whose description is \"Reference MCP servers that are no longer maintained\". (2) Context7's second tool is named `query-docs` on the current version, not the older `get-library-docs` \u2014 recorded from the current README, not from memory. (3) Supabase MCP is now hosted-first with OAuth 2.1; the docs state a personal access token is NOT needed for standard setup, so any catalog entry claiming SUPABASE_ACCESS_TOKEN + npx stdio is describing an older shape (I did not see that flow in the current README and did not record it). (4) Figma's docs recommend the REMOTE server (https://mcp.figma.com/mcp, all seats/plans) over the desktop one (http://127.0.0.1:3845/mcp, Dev or Full seat on a paid plan).\n\nCOULD NOT VERIFY: https://developers.figma.com/docs/figma-mcp-server/get-started/ returned HTTP 404 \u2014 the get-started path does not exist under that name; the install detail came from .../remote-server-installation/ and .../local-server-installation/ instead. docs.github.com's use-the-github-mcp-server page did not state the remote URL or the OAuth-vs-PAT mechanics, so those came from the repo README; it did confirm the server is available on all GitHub plans and that Copilot Business/Enterprise orgs need the 'MCP servers in Copilot' policy enabled.\n\nRISK RANKING from what the docs themselves say, highest first: Vercel MCP (same access as your Vercel user account; can deploy and make real non-refundable purchases) \u2248 Supabase MCP (runs with your developer permissions; SQL, migrations, edge function deploys; docs name prompt injection as the primary LLM-specific attack vector) \u2248 github-mcp-server (write access to repos/PRs/Actions, up to admin:org / admin:enterprise scopes if granted) > Playwright MCP (acts as the logged-in browser user, reads network traffic and cookies; README: \"Playwright MCP is not a security boundary\") > Figma MCP (write-to-canvas via OAuth) > Context7 (read-only doc fetch, but content is community-contributed, so it is untrusted text entering context). Every write-capable one of these ships an explicit containment control worth defaulting on: --read-only + GITHUB_TOOLSETS (GitHub), read_only=true + project_ref + features (Supabase), --isolated + --allowed-origins (Playwright), human confirmation on every tool call (Vercel, stated twice in their docs)."
+   }
+  }
+ ],
+ "verification": [
+  {
+   "lens": "anthropic-plugins",
+   "checked": 96,
+   "wrong": [
+    {
+     "claim": "skill-development (plugins/plugin-dev/skills/skill-development/SKILL.md): \"No version field in frontmatter.\"",
+     "problem": "Factually wrong. I fetched the raw file and its frontmatter does contain a version field.",
+     "correction": "The frontmatter is: name: Skill Development / description: ... / version: 0.1.0. So all seven plugin-dev skills carry a version; command-development at 0.2.0 is still the only one past 0.1.0 (that part of the claim is correct). Read from https://raw.githubusercontent.com/anthropics/claude-code/main/plugins/plugin-dev/skills/skill-development/SKILL.md"
+    },
+    {
+     "claim": "writing-rules: \"NOTE: directory name is 'writing-rules' but the frontmatter name field is 'Writing Hookify Rules' (title-case, with spaces) \u2014 a mismatch worth knowing if you key a pack off directory names.\"",
+     "problem": "The observation is true for writing-rules but is presented as a one-off oddity. It is actually the norm in this repo, and the claims file silently reports the directory name as the \"name\" for the other eight skills, hiding the same mismatch.",
+     "correction": "8 of the 10 SKILL.md files in anthropics/claude-code have a title-case frontmatter name that differs from the directory name: writing-rules -> \"Writing Hookify Rules\", agent-development -> \"Agent Development\", skill-development -> \"Skill Development\", command-development -> \"Command Development\", hook-development -> \"Hook Development\", mcp-integration -> \"MCP Integration\", plugin-structure -> \"Plugin Structure\", plugin-settings -> \"Plugin Settings\". Only frontend-design and claude-opus-4-5-migration have frontmatter names equal to their directory names. All verified by fetching each raw SKILL.md under https://raw.githubusercontent.com/anthropics/claude-code/main/plugins/..."
+    },
+    {
+     "claim": "\"THIS IS THE REAL OFFICIAL MARKETPLACE and it is a strict superset of the claude-code repo's plugins dir\" (anthropics/claude-plugins-official)",
+     "problem": "Not a superset. Two of the 13 plugins in anthropics/claude-code have no same-named counterpart in claude-plugins-official/plugins.",
+     "correction": "claude-plugins-official/plugins/ contains 39 directories; claude-opus-4-5-migration is absent entirely, and claude-code's ralph-wiggum appears only under the different name ralph-loop. 11 of claude-code's 13 plugins carry over by name. (claude-plugins-official also has example-plugin, which is not in its marketplace.json first-party list.) Verified from gh api repos/anthropics/claude-plugins-official/git/trees/main?recursive=1 (truncated:false, 683 entries) and .claude-plugin/marketplace.json."
+    },
+    {
+     "claim": "\"plugins/code-review/commands/code-review.md (command only, no agents dir in the tree despite the README describing 5 agents)\"",
+     "problem": "The agent count is wrong. The README describes 4 agents, not 5.",
+     "correction": "https://raw.githubusercontent.com/anthropics/claude-code/main/plugins/code-review/README.md says the command \"Launches 4 parallel agents to independently review: Agents #1 & #2 (CLAUDE.md compliance), Agent #3 (obvious bugs), Agent #4 (git blame/history)\". The rest of the claim is correct: plugins/code-review contains only .claude-plugin/plugin.json, README.md and commands/code-review.md \u2014 no agents directory."
+    },
+    {
+     "claim": "claude-security: \"Frontmatter notably uses disable-model-invocation: true and an allowed-tools list (Read, Write, Glob, Grep, AskUserQuestion) \u2014 a good template for a gated role skill.\"",
+     "problem": "The allowed-tools list is materially longer than quoted; the quoted five are only the first five of about fifteen entries. Anyone using this as a template from the claim would miss the Agent/Workflow/Bash scoping that is the actual interesting part.",
+     "correction": "Actual allowed-tools (from https://raw.githubusercontent.com/anthropics/claude-plugins-official/main/plugins/claude-security/skills/claude-security/SKILL.md): Read, Write, Glob, Grep, AskUserQuestion, Workflow, Workflow(claude-security:scan), Agent(claude-security:scan-inventory, scan-researcher, scan-verifier, scan-loader, patch-generator, patch-verifier, explore), plus scoped Bash entries \u2014 Bash(date *), Bash(ls *), Bash(wc *), Bash(mkdir -p *), Bash(git *), Bash(GIT_CONFIG_GLOBAL=/dev/null GIT_TERMINAL_PROMPT=0 git *), Bash(find . -maxdepth 1 -type d -name \"CLAUDE-SECURITY-2*\"), and several Bash(python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/...\" *) entries. disable-model-invocation: true and the 8 agent files are confirmed correct."
+    },
+    {
+     "claim": "The per-skill \"descriptionLine\" values, presented as the skill's description with no ellipsis.",
+     "problem": "At least 18 of the 38 descriptionLine values are silently truncated mid-description. They are accurate as prefixes but are not the description, and several drop the trigger/negative-trigger clauses that matter most for a role pack.",
+     "correction": "Truncated (text after the quoted portion was dropped without an ellipsis): claude-opus-4-5-migration (drops \"Handles model string updates ... Does NOT migrate Haiku 4.5.\"); hook-development (drops the inline event enumeration and \"Provides comprehensive guidance ... prompt-based hooks API.\"); mcp-integration and plugin-settings (both drop a trailing \"Provides/Documents ...\" sentence); mcp-builder (drops \"Use when building MCP servers ... Python (FastMCP) or Node/TypeScript (MCP SDK).\"); canvas-design and algorithmic-art (both drop the \"Create original ... to avoid copyright violations\" clause); theme-factory (drops \"There are 10 pre-set themes ...\"); brand-guidelines, web-artifacts-builder, internal-comms, slack-gif-creator, doc-coauthoring (each drops a trailing usage clause); build-mcp-server (drops \"It is the entry point ... hands off to specialized skills.\"); claude-md-improver and claude-automation-recommender (each drop a trailing \"Use when ...\" clause); docx, pptx, xlsx (each quote only the opening sentence of a long trigger paragraph); project-artifact (quotes roughly the first clause of a ~6-line description). build-mcp-app and build-mcpb do use an explicit \"...\", so those are fine. Sources: the raw.githubusercontent.com SKILL.md URLs already listed in each claim."
+    }
+   ],
+   "summary": "I independently re-fetched every repo, tree and SKILL.md rather than trusting the claims, using the GitHub API (via gh, after the anonymous rate limit ran out), raw.githubusercontent.com, and the docs sites. The claims are overwhelmingly accurate \u2014 all 38 skill paths resolve to real files today and every stated purpose matches the file. Six findings below; five are substantive, one is a systematic sourcing flaw.\n\nCONFIRMED (spot list): anthropics/claude-code exists, not archived, license null via API and LICENSE.md is exactly the one-line Anthropic commercial-terms notice; last commit bf7d404e26 2026-09-19T03:10:24Z \\\"chore: Update CHANGELOG.md and feed.xml\\\"; pushed_at 2026-09-19T03:10:40Z; v2.1.278 published 2026-09-19T03:10:40Z with v2.1.277 and v2.1.276 both on 09-18; stars 146,390 (claim said 146,388 \u2014 live counter drift, not an error). Tree is truncated:false with 1699 entries and exactly 10 SKILL.md files, all under plugins/; there is no top-level skills/. mods/ holds agents-md, diff, sec-default, telemetry (each with .claude-plugin/plugin.json) plus a mods/types/ holding only claude-code.d.ts \u2014 zero SKILL.md anywhere under mods/. marketplace.json name is claude-code-plugins with exactly the 13 named plugins; frontend-design is 1.1.0 and security-guidance 1.0.0. All 10 claude-code SKILL.md paths resolve. frontend-design/.claude-plugin/plugin.json shows version 1.1.0, author \\\"Prithvi Rajasekaran, Alexander Bricken\\\"; the plugin dir really does lack a LICENSE.txt while SKILL.md declares \\\"license: Complete terms in LICENSE.txt\\\". SKILL.md last touched 2026-09-02 \\\"Update /frontend-design SKILL.md\\\", plugin bumped to 1.1.0 on 2026-06-18. The three frontend-design copies are byte-identical: sha256 begins d91970639e9f5c37 in claude-code, anthropics/skills and claude-plugins-official. hook-development ships hook-linter.sh, test-hook.sh, validate-hook-schema.sh; skill-development ships references/skill-creator-original.md; claude-opus-4-5-migration ships references/effort.md and prompt-snippets.md. No debugging skill, agent or command anywhere in claude-code; no docs skill; no testing skill (only pr-review-toolkit/agents/pr-test-analyzer.md); security-guidance is hooks-only; no CLI source in the repo.\n\nanthropics/skills: exists, \\\"Public repository for Agent Skills\\\", license null, last commit 34040c9c56 2026-09-10T19:44:08Z (claude-api skill update) \u2014 9 days behind claude-code. 511 entries, 19 skills under skills/ plus template/SKILL.md and spec/agent-skills-spec.md. 18 of 19 carry LICENSE.txt; doc-coauthoring is the sole exception and has no license frontmatter either. The 14 non-document LICENSE.txt files are Apache License 2.0; docx/pdf/pptx/xlsx are 1467-byte \\\"\u00a9 2025 Anthropic, PBC. All rights reserved.\\\" files, and their frontmatter says Proprietary. README line 20 does say the four document skills are \\\"source-available, not open source\\\". marketplace.json is named anthropic-agent-skills with exactly the 5 plugin groupings and membership claimed.\n\nanthropics/claude-plugins-official: exists, Apache-2.0, pushed 2026-09-18T19:05:53Z, marketplace.json lists 310 plugins of which exactly 38 have source ./plugins/... and the 38 names match the claim exactly; 31 SKILL.md files, matching the claimed paths including the external_plugins ones. security-guidance is 2.0.7 there. claude-security has exactly the 8 named agents; code-modernization has 10 commands and 8 agents including security-auditor.md and test-engineer.md with no SKILL.md. Auto-registration is real: code.claude.com/docs/en/discover-plugins.md states Claude Code adds claude-plugins-official automatically on first interactive start.\n\nanthropics/claude-plugins-community: exists, Apache-2.0, pushed 2026-08-25, README confirms read-only mirror and the @claude-community install suffix. anthropics/claude-skills and anthropics/agent-skills both 404; anthropics/anthropic-quickstarts redirects to anthropics/claude-quickstarts.\n\nDocs: platform.claude.com/docs/en/agents-and-tools/agent-skills/quickstart contains verbatim \\\"Anthropic provides the following pre-built Agent Skills in the API\\\" with PowerPoint (pptx), Excel (xlsx), Word (docx), PDF (pdf), and \\\"You see the following Skills: pptx, xlsx, docx, and pdf\\\"; the docs.claude.com path 302s there. code.claude.com/docs/en/commands.md marks exactly 15 rows \\\"**Skill**\\\" \u2014 /batch, /claude-api, /code-review, /dataviz, /debug, /design, /design-sync, /doctor, /fewer-permission-prompts, /loop, /run, /run-skill-generator, /simplify, /verify, /workflow-authoring \u2014 and /security-review is an unmarked plain command row, exactly as claimed.\n\nNOTHING was unverifiable \u2014 every page loaded. The one claim I could not test directly is the assertion that the bundled skills \\\"ship inside the CLI binary\\\"; I did confirm the negative half of it (no source for any of them anywhere in the claude-code tree, which holds only docs, plugins, examples, mods and issue-triage scripts)."
+  },
+  {
+   "lens": "vercel-agent-skills",
+   "checked": 80,
+   "wrong": [
+    {
+     "claim": "skills.sh.json \"sets notGroupedPosition: bottom\" for writing-guidelines",
+     "problem": "Misquoted config key. The file has no field named `notGroupedPosition`. I fetched https://raw.githubusercontent.com/vercel-labs/agent-skills/main/skills.sh.json byte-for-byte; the actual top-level key is `\"notGrouped\": \"bottom\"`. The substantive point (writing-guidelines is in no grouping, and ungrouped skills sort to the bottom) is correct \u2014 only the field name is wrong.",
+     "correction": "The key is `\"notGrouped\": \"bottom\"`, not `notGroupedPosition`. Full file: {\"$schema\": \"https://skills.sh/schemas/skills.sh.schema.json\", \"notGrouped\": \"bottom\", \"groupings\": [React, Vercel, Design]}. Group membership as claimed is exactly right: React = vercel-react-best-practices, vercel-composition-patterns, vercel-react-view-transitions, vercel-react-native-skills; Vercel = deploy-to-vercel, vercel-cli-with-tokens, vercel-optimize; Design = web-design-guidelines; writing-guidelines appears in none."
+    },
+    {
+     "claim": "react-native-skills covers \"eight priority categories covering list virtualization, GPU-targeted animation, native navigators, native modules/platform APIs, state handling, UI patterns and monorepo dependency management\"",
+     "problem": "The count of eight is right but the enumeration is wrong. There is no \"native modules/platform APIs\" category \u2014 that phrase is lifted from the description line's trigger list, not from the category table. Two real categories (Rendering, Configuration) are omitted. Read from https://raw.githubusercontent.com/vercel-labs/agent-skills/main/skills/react-native-skills/SKILL.md.",
+     "correction": "The 8 categories in the SKILL.md priority table are, verbatim: 1 List Performance (CRITICAL, `list-performance-`), 2 Animation (HIGH, `animation-`), 3 Navigation (HIGH, `navigation-`), 4 UI Patterns (HIGH, `ui-`), 5 State Management (MEDIUM, `react-state-`), 6 Rendering (MEDIUM, `rendering-`), 7 Monorepo (MEDIUM, `monorepo-`), 8 Configuration (LOW, `fonts-`, `imports-`). Note also a repo-internal inconsistency worth recording: skills/react-native-skills/metadata.json claims \"35+ rules across 13 categories\" while SKILL.md shows 8 \u2014 do not cite the 13 figure."
+    },
+    {
+     "claim": "writing-guidelines \"fetches the current rules from Vercel's writing-standards source at runtime\"",
+     "problem": "\"writing-standards\" is not a real source name anywhere in the repo; it appears to be an approximation. The SKILL.md names one concrete URL.",
+     "correction": "The runtime source is https://raw.githubusercontent.com/vercel-labs/writing-guidelines/main/command.md (repo `vercel-labs/writing-guidelines`). For comparison, web-design-guidelines fetches https://raw.githubusercontent.com/vercel-labs/web-interface-guidelines/main/command.md \u2014 that claim's wording was fine. Both SKILL.md files instruct the agent to \"Fetch fresh guidelines before each review\" via WebFetch, so the runtime-network / allowlist caveat is confirmed correct for both."
+    },
+    {
+     "claim": "\"No release/tag was fetched, so the latest release version is unverified\"",
+     "problem": "Not an error \u2014 an honest caveat \u2014 but it is now resolvable, so leaving it unverified understates what is known. Flagging it so the catalog can be upgraded.",
+     "correction": "Releases exist and are confirmed via https://github.com/vercel-labs/agent-skills/releases. They are tagged by full commit SHA, not semver. Latest: \"Agent Skills 063bee94c3f4df8453406c830b0a7df0f2860278\", 28 Aug 2026 13:36, 12 assets \u2014 the same SHA as the HEAD commit. Prior two: 20e89cc4bb256eb7b1fcbdc68f7175284709a847 (27 Aug 12:18) and dd089a8c752c966dee8bf0f27cb625ba193ffd9e (21 Aug 18:55). This corroborates the README's \"every change to a skill on main publishes an immutable GitHub release\"."
+    },
+    {
+     "claim": "API updated_at 2026-09-19T05:00:54Z",
+     "problem": "Value no longer matches. Two independent GET calls to https://api.github.com/repos/vercel-labs/agent-skills today returned 2026-09-19T05:23:31Z. This is a volatile field (it moves on stars, watches, metadata touches), so it is not a substantive defect \u2014 but it is not a staleness signal either and should not be recorded as one.",
+     "correction": "Use `pushed_at` = 2026-08-28T13:36:31Z and the HEAD commit date 2026-08-28T13:36:07Z for staleness. Drop `updated_at` from the catalog, or mark it as non-load-bearing. The repo has had no pushes for roughly three weeks as of 2026-09-19."
+    }
+   ],
+   "summary": "Re-checked independently against live fetches (raw.githubusercontent.com for byte-exact file contents, api.github.com for metadata, github.com HTML for releases and commit count). The claim set is unusually accurate \u2014 all 9 skills resolve to real files today, and every frontmatter `name` and `descriptionLine` matches byte-for-byte. Five issues found, all minor; none are fabrications.\\n\\nCONFIRMED EXACTLY AS CLAIMED:\\n- Repo live at https://github.com/vercel-labs/agent-skills. Owner vercel-labs, description \\\"Vercel's official collection of agent skills\\\", fork=false, archived=false, created 2025-12-08T19:10:06Z, pushed_at 2026-08-28T13:36:31Z, default branch main, homepage https://skills.sh/vercel-labs/agent-skills, 31,338 stars.\\n- HEAD commit 063bee94c3f4, 2026-08-28T13:36:07Z, \\\"Merge pull request #328 from vercel-labs/codex/suspense-crossfade-local-wrapper\\\". Repo page shows exactly 275 commits (claim said \\\"roughly 275\\\").\\n- LICENSE SITUATION EXACTLY AS DESCRIBED \u2014 this was the most load-bearing claim and it holds. API `license: null`. LICENSE, LICENSE.md, LICENSE.txt and lowercase `license` all return HTTP 404 on raw. package.json is `{\\\"name\\\":\\\"@vercel-labs/agent-skills\\\",\\\"private\\\":true,\\\"type\\\":\\\"module\\\",\\\"dependencies\\\":{\\\"yaml\\\":\\\"2.9.0\\\"}}` \u2014 no license field. README ends with \\\"## License\\\\n\\\\nMIT\\\". Exactly 4 SKILL.md files carry `license: MIT` and they are precisely the 4 named: react-best-practices, react-native-skills, react-view-transitions, composition-patterns. The other 5 carry no license field. The \\\"UNVERIFIED as a repo-wide grant\\\" framing is correct and should be kept.\\n- skills/ contains exactly 9 directories and 5 zips, names all correct: dirs composition-patterns, deploy-to-vercel, react-best-practices, react-native-skills, react-view-transitions, vercel-cli-with-tokens, vercel-optimize, web-design-guidelines, writing-guidelines; zips deploy-to-vercel.zip, react-best-practices.zip, react-view-transitions.zip, vercel-cli-with-tokens.zip, web-design-guidelines.zip.\\n- Root contents exactly as listed: .github/, .gitignore, AGENTS.md, CLAUDE.md, README.md, package-lock.json, package.json, packages/, scripts/, skills.sh.json, skills/.\\n- DIRECTORY NAME != SKILL NAME for 5 of 9 \u2014 confirmed. Prefixed: vercel-react-best-practices, vercel-composition-patterns, vercel-react-view-transitions, vercel-react-native-skills. Unprefixed (dir matches name): vercel-optimize, web-design-guidelines, writing-guidelines, deploy-to-vercel, vercel-cli-with-tokens.\\n- ALL 9 descriptionLines match the live frontmatter word-for-word. (react-native-skills and composition-patterns use YAML folded multi-line blocks; unfolded text is identical to the claim.) The method caveat about WebFetch summarization was over-cautious \u2014 they are character-exact.\\n- README IS STALE, exactly as warned. It lists 8 skills including `react-native-guidelines` and `vercel-deploy-claimable`, neither of which exists as a directory, and omits vercel-cli-with-tokens entirely. It also understates react-best-practices as \\\"40+ rules\\\" where SKILL.md says \\\"Contains 70 rules across 8 categories\\\" \u2014 the claim's \\\"~70\\\" correctly used SKILL.md. Keep the do-not-trust-README warning.\\n- AGENTS.md confirms all install claims verbatim: `npx skills add vercel-labs/agent-skills --skill {skill-name}`, `cp -r skills/{skill-name} ~/.claude/skills/`, claude.ai project-knowledge/paste, and \\\"If the skill requires network access, instruct users to add required domains at claude.ai/settings/capabilities\\\". README confirms `npx skills add vercel-labs/agent-skills` (line 197).\\n\\nPER-SKILL VERIFICATION (all 9 read from https://raw.githubusercontent.com/vercel-labs/agent-skills/main/skills/<dir>/SKILL.md):\\n- vercel-optimize \u2014 frontmatter name `vercel-optimize`, no license, metadata.version \\\"1.2.0\\\", and notably NO metadata.author (the only skill lacking one). Framework table confirms Next.js App/Pages Router + SvelteKit + Nuxt supported, Astro \\\"limited\\\", Hono/Remix/unknown blocked by default. Metrics-first doctrine confirmed.\\n- react-best-practices \u2014 name vercel-react-best-practices, license MIT, author vercel, v1.0.0. Body: \\\"Contains 70 rules across 8 categories\\\"; 8-row priority table confirmed (Eliminating Waterfalls, Bundle Size, Server-Side, Client-Side Data Fetching, Re-render, Rendering, JavaScript Performance, Advanced Patterns).\\n- web-design-guidelines \u2014 name web-design-guidelines, no license, author vercel, v1.0.0, argument-hint <file-or-pattern>. Runtime fetch confirmed.\\n- writing-guidelines \u2014 name writing-guidelines, no license, author vercel, v1.0.0, argument-hint <file-or-pattern>. Runtime fetch confirmed (source URL corrected above).\\n- react-native-skills \u2014 name vercel-react-native-skills, license MIT, author vercel, v1.0.0. Directory holds AGENTS.md, README.md, SKILL.md, metadata.json and a rules/ directory \u2014 all four confirmed (rules/ verified via the GitHub tree page).\\n- react-view-transitions \u2014 name vercel-react-view-transitions, license MIT, author vercel, v1.0.0. Body confirms <ViewTransition>, addTransitionType, transition types, CSS pseudo-elements, shared elements, list reorder, Suspense fallback reveals, Next.js integration, accessibility, and \\\"Graceful degradation on unsupported browsers\\\" (Chromium 125+, Firefox 144+, Safari 18.2+).\\n- composition-patterns \u2014 name vercel-composition-patterns, license MIT, author vercel, v1.0.0. Exactly four priority tiers confirmed: Component Architecture (HIGH), State Management (MEDIUM), Implementation Patterns (MEDIUM), React 19 APIs (MEDIUM).\\n- deploy-to-vercel \u2014 name deploy-to-vercel, no license, metadata.author vercel, metadata.version \\\"3.0.0\\\" (all exact). Body confirms the four-check project-state gather, the routing (git-push when linked+remote; `vercel deploy` when linked/no remote; `vercel link --repo` then deploy when unlinked; install/auth/link/deploy when unauthenticated), the explicit \\\"Always deploy as preview ... unless the user explicitly asks for production\\\", `--no-wait` for immediate URL return, and BOTH no-auth fallbacks by name \u2014 \\\"No-Auth Fallback \u2014 claude.ai sandbox\\\" and \\\"No-Auth Fallback \u2014 Codex sandbox\\\" \u2014 returning previewUrl plus claimUrl.\\n- vercel-cli-with-tokens \u2014 name vercel-cli-with-tokens, no license, author vercel, v1.0.0. All six claimed coverage areas confirmed as headings: token discovery (4 scenarios A-D), project/team location and linking, preview-vs-production (\\\"Always deploy as preview unless the user explicitly requests production\\\"; `--prod` only on request), Managing Environment Variables, Managing Domains, Troubleshooting. The claim omits one section that exists \u2014 \\\"Stripe Projects Plan Changes\\\" \u2014 which is an incompleteness, not an error.\\n\\nMETHOD: fetched with curl over HTTPS plus WebFetch corroboration. The GitHub REST API rate-limited after ~60 unauthenticated calls, so releases and the commit total were read from the rendered github.com pages via WebFetch instead; raw.githubusercontent.com was never rate-limited and supplied byte-exact file contents. Nothing was inferred; every name, path, license field and description line above was read from a page I loaded. No item is unverifiable."
+  },
+  {
+   "lens": "nextjs-skills",
+   "checked": 126,
+   "wrong": [
+    {
+     "claim": "\"All but gh-stack and the two doc-writer skills carry metadata.internal: true.\" (source.notes, describing .agents/skills/)",
+     "problem": "Wrong. Both doc-writer skills DO carry metadata.internal: true. I dumped the frontmatter of all 20 SKILL.md files in .agents/skills/ on canary and grepped for 'internal: true': 19 of 20 have it. Only gh-stack lacks it (it carries metadata.author: github and metadata.version: '0.1.0' instead). The claim also contradicts itself \u2014 its own per-skill entry for write-api-reference correctly states \"metadata.internal: true\".",
+     "correction": "19 of the 20 skills in .agents/skills/ carry metadata.internal: true. gh-stack is the only exception. write-api-reference and write-guide both have `metadata:\\n  internal: true` in their frontmatter, alongside `agent: Plan` and `context: fork`. Verified at /private/tmp/claude-501/-Users-nahid-Documents-agent-skills/32911a05-7fbb-4886-9eff-eef2e2a9033e/scratchpad/nextjs/.agents/skills/write-api-reference/SKILL.md and .../write-guide/SKILL.md (git sparse clone of vercel/next.js canary @ 7b58e588)."
+    },
+    {
+     "claim": "\"Skills did NOT exist in the 16.2 line: https://api.github.com/repos/vercel/next.js/contents/skills?ref=next-16-2 returns HTTP 404.\"",
+     "problem": "The cited 404 is real but the conclusion drawn from it is false. The claim's own framing establishes that two distinct skill trees exist and \"must not be conflated\" \u2014 then conflates them here. `git ls-tree next-16-2 skills/` is indeed empty, but `git ls-tree next-16-2 .agents/skills/` returns README.md plus 10 skill directories. Internal maintainer skills predate the 16.2 branch point.",
+     "correction": "The PUBLISHED skills/ tree did not exist in the 16.2 line (skills/ is absent on next-16-2, hence the 404). The internal tree did: .agents/skills/ on next-16-2 contains README.md and 10 skills \u2014 authoring-skills, dce-edge, flags, pr-status-triage, react-vendoring, router-act, runtime-debug, update-docs, write-api-reference, write-guide. Verified by `git fetch --depth 1 origin next-16-2 && git ls-tree FETCH_HEAD .agents/skills/`."
+    },
+    {
+     "claim": "\"Compatibility is declared in PROSE inside description fields, not in machine-readable metadata: next-cache-components-optimizer, next-partial-prefetching-adoption and next-partial-prefetching-optimizer each state 'Requires Next.js 16.3+'.\"",
+     "problem": "Wrong for next-partial-prefetching-adoption, and the 'description fields' framing is wrong more broadly. I dumped all 5 published skills' frontmatter verbatim: next-partial-prefetching-adoption's description field contains no version statement at all \u2014 it ends at \"...the instant-link-prefetch-partial and instant-shell-url-data insights.\" Its 16.3 floor is in the SKILL.md body. The claim also implies next-cache-components-adoption declares no floor; it does, also in the body.",
+     "correction": "Only two description fields carry a version floor: next-cache-components-optimizer (\"Requires Next.js 16.3+ with cacheComponents; directs an upgrade if older.\") and next-partial-prefetching-optimizer (\"Requires Next.js 16.3+.\"). The other three declare floors in the SKILL.md BODY under prerequisites \u2014 next-partial-prefetching-adoption line 29 (\"**Next.js 16.3 or later.**\"), next-cache-components-adoption line 24 (\"**Next.js 16.3 or later.**\"), next-dev-loop lines 33/35. Four of five published skills declare a 16.3 floor somewhere; two do so in the description field."
+    },
+    {
+     "claim": "\"next-dev-loop states 'Next.js 16.3+ with Turbopack' as a hard floor plus agent-browser '>= 0.31.1'\" \u2014 listed under the heading \"Compatibility is declared in PROSE inside description fields\".",
+     "problem": "The substance is correct but the location is not. next-dev-loop's description field is short and mentions neither a version nor Turbopack: it ends \"...Combines /_next/mcp (Next.js's view) with agent-browser (the browser's view). Requires a running `next dev`.\" The two floors live in the body's requirements section.",
+     "correction": "Both floors are in the SKILL.md body, not the description: line 33 \"Next.js **16.3+** with **Turbopack**\" and line 35 \"`agent-browser` **>= 0.31.1**\". The skill's own per-skill `purpose` entry states this correctly; only the source.notes framing misplaces it. File: skills/next-dev-loop/SKILL.md on canary."
+    }
+   ],
+   "summary": "Re-checked independently against vercel/next.js canary at commit 7b58e588 (2026-09-18T17:08:40-07:00). Method note: the GitHub REST API rate limit (60/hr, unauthenticated) was exhausted after 3 calls, so I switched to a sparse `git clone --filter=blob:none --depth 1 --branch canary` of skills/, .agents/, .claude/ and .claude-plugin/, which yields byte-exact file contents rather than a summarizing model's rendering \u2014 strictly more reliable for verbatim frontmatter. WebFetch was used for the releases page. Everything below is read from fetched bytes; nothing is inferred.\n\nREPO AND LICENSE \u2014 CONFIRMED. vercel/next.js exists, not archived, default branch `canary`. License MIT: API license.spdx_id \"MIT\", license.md line 1 \"The MIT License (MIT)\", skills/.claude-plugin/plugin.json \"license\": \"MIT\". Repo pushed_at observed 2026-09-19T05:27:08Z (claim said 05:09:46Z \u2014 a live-moving field, so this just confirms the claim was read minutes earlier; not an error). Latest release v16.4.0-canary.36, 2026-09-18 23:47, marked Pre-release \u2014 matches. Not stale.\n\nALL 25 SKILLS RESOLVE \u2014 every exact directory name and exact path in the claim resolves to a real SKILL.md on canary today, and every `name:` frontmatter value matches its directory name. skills/ holds exactly 5 skills plus .claude-plugin/; .agents/skills/ holds exactly 20 skills plus README.md. No missing SKILL.md anywhere. Every quoted descriptionLine matched the file verbatim where not marked truncated, and every `purpose` assertion I spot-checked against file bodies held up \u2014 including non-obvious ones: insight-error-page really does source card data from packages/next/src/next-devtools/dev-overlay/components/instant/instant-guidance-data.ts (SKILL.md line 26), runtime-debug really documents IS_WEBPACK_TEST=1 and NEXT_SKIP_ISOLATE=1 (line 21), create-pr really has a \"Fork PRs vs Branch PRs\" section (line 17), next-partial-prefetching-adoption really requires Cache Components first (line 27).\n\nALSO CONFIRMED VERBATIM: .claude/skills is git mode 120000 with target \"../.agents/skills\"; plugin.json (name nextjs, version 0.1.0, license MIT, author \"Next.js Team\", skills [\"./\"]); .claude-plugin/marketplace.json (owner Vercel, one plugin, source \"./skills\", description as quoted); skills-lock.json version 1 with gh-stack as the sole entry, sourceType github, source github/gh-stack, skillPath skills/gh-stack/SKILL.md, computedHash 331d32e4\u20266b2db0 \u2014 and the observed path/lockfile-path mismatch the claim flags is real (file sits at .agents/skills/gh-stack/SKILL.md). .cursor/ contains only commands/ and worktrees.json, no skills mirror. AGENTS.md and CLAUDE.md exist at root; AGENTS.md carries $skill-name references including all four cited ($pr-status-triage L261, $flags L399, $dce-edge L400, $react-vendoring L401) plus nine more. .agents/skills/README.md documents exactly the nine frontmatter fields claimed and says nothing about versioning or syncing.\n\nVERSIONING CLAIMS \u2014 CONFIRMED. plugin.json version is \"0.1.0\" on canary and byte-identical at tag v16.3.0, so the plugin is not bumped per release. At v16.3.0, skills/ holds 4 skills (next-partial-prefetching-optimizer absent) and .agents/skills/ holds 18 (deploy-release-test and gate-tests absent) \u2014 the release-tag snapshot behavior is real. Commit history confirms the dates and PR numbers: skills/ last touched 2026-09-18 by \"Add experimental agent feedback workflow (#98582)\"; .agents/skills/ last touched 2026-09-17 by \"agents: Add a `--comments-only` flag to `pr-status` script\u2026 (#98781)\"; next-partial-prefetching-optimizer landed 2026-09-10 via \"skill: add Partial Prefetching optimizer (#96471)\".\n\nFOUR ERRORS, all in the source.notes prose rather than in the per-skill entries \u2014 the skill catalog itself is clean and usable as-is. Two are substantive (the metadata.internal count, and the false \"skills did not exist in the 16.2 line\" generalization, which conflates the two trees the same note warns against conflating). Two concern where version floors are declared: the notes say \"inside description fields\", but three of the four floors are in SKILL.md bodies. Anyone consuming these as machine-readable compatibility signals would be misled \u2014 the broader point that no semver/engines field exists anywhere is correct.\n\nONE MINOR ISSUE not listed as an error: the descriptionLine values for deploy-release-test and gate-tests are truncated without an ellipsis marker (both silently drop a trailing \"Covers \u2026\" sentence), unlike next-cache-components-optimizer which marks truncation with \"...\". The claim's own METHOD/CAVEAT discloses that truncation occurs, so this is a formatting inconsistency rather than a false statement, but a consumer copying those two strings would get an incomplete description field.\n\nNothing was unverifiable \u2014 every page and file in the claim loaded successfully. Working copy left at /private/tmp/claude-501/-Users-nahid-Documents-agent-skills/32911a05-7fbb-4886-9eff-eef2e2a9033e/scratchpad/nextjs."
+  },
+  {
+   "lens": "third-party",
+   "checked": 73,
+   "wrong": [
+    {
+     "claim": "Each skill entry's `descriptionLine` is presented as the SKILL.md description.",
+     "problem": "For 6 of the 11 entries the quoted descriptionLine is only the FIRST SENTENCE of the real frontmatter description, truncated with no ellipsis, so it reads as the complete value. A catalog copying these verbatim would ship incomplete descriptions and lose the 'Use when...' activation triggers that make the skills fire. Affected: frontend-ui-ux, playwright-component-testing, playwright-triage, playwright-cherry-pick, playwright-test-results, lackeyjb/playwright-skill. (playwright-cli, playwright-trace, playwright-dev, playwright-devops were quoted exactly and are correct.)",
+     "correction": "Actual full descriptions, read today:\n- frontend-ui-ux (https://raw.githubusercontent.com/overseek944/frontend-ui-ux-skill/master/SKILL.md): continues past '...mobile webview).' with 'Read it BEFORE writing the first line of markup or styling... Triggers on: component, page, layout, form, modal, nav, design system, CSS, styling, accessibility, a11y, responsive, UI, UX, frontend, interface, interaction design, usability, performance, Core Web Vitals, design tokens.'\n- playwright-component-testing: '...no dedicated component-testing runtime. Use when asked to test React or Vue components in isolation with Playwright, or to migrate off @playwright/experimental-ct-react / -vue.'\n- playwright-triage: '...from the information in the issue. Use when asked to triage, reproduce, or verify a GitHub issue (a new bug report, or an existing report with a new comment).'\n- playwright-cherry-pick: '...<original title>. Use when asked to cherry-pick, backport, or port a change into a release.'\n- playwright-test-results: '...from the aggregated DuckDB database. Answers questions about flaky tests, failure rates, slow tests, and per-run/SHA/PR results without hunting through GitHub artifacts.'\n- lackeyjb playwright-skill: '...and arbitrary browser automation. Use when the user wants to test a website, automate browser interactions, validate web functionality, or perform browser-based testing.'"
+    },
+    {
+     "claim": "microsoft/playwright-cli 'Repo also has a skillCheck.js that validates it.'",
+     "problem": "COULD NOT FULLY CONFIRM. I confirmed via authenticated code search that a file named skillCheck.js exists at the repo root (search/code total_count 1, path 'skillCheck.js'), but I did not read its contents, so the assertion that it validates the skill is unverified.",
+     "correction": "State it as: 'a skillCheck.js exists at the repo root of microsoft/playwright-cli (existence confirmed; its function not inspected).'"
+    },
+    {
+     "claim": "microsoft/playwright-mcp has 37,290 stars.",
+     "problem": "Stale by normal drift \u2014 the figure moved between the original check and today.",
+     "correction": "37,291 stars as of 2026-09-19 (gh api repos/microsoft/playwright-mcp). Every other playwright-mcp figure matched exactly: 3,166 forks, 4 open issues, Apache-2.0, owner type Organization, created 2025-03-21T17:48:36Z, pushed_at 2026-09-18T23:35:04Z, homepage https://www.npmjs.com/package/@playwright/mcp, latest release v0.0.82 published 2026-09-18T23:35:04Z, and authenticated code search for SKILL.md in that repo returns total_count 0."
+    },
+    {
+     "claim": "overseek944/frontend-ui-ux-skill 'has never been revised in ~6 weeks'.",
+     "problem": "Arithmetic is now stale relative to today's date (2026-09-19).",
+     "correction": "The sole commit is dated 2026-08-02, which is 48 days / ~7 weeks ago. The substance of the claim (single unrevised drop) is correct."
+    }
+   ],
+   "summary": "I independently re-fetched every page. The research holds up unusually well: all 11 skill entries resolve to real files today at the exact paths claimed, and the frontmatter `name:` values match exactly in every case. No fabricated skill, path, or repo. Four issues found, all minor \u2014 one systematic (truncated description quotes), one unconfirmable detail, two staleness drifts. Nothing needs to be struck from the catalog.\\n\\nCONFIRMED \u2014 ITEM 1 (overseek944/frontend-ui-ux-skill). Repo exists, owner type User, default branch `master`, not archived, description \"A Claude Code Agent Skill: evidence-based UI/UX and frontend engineering doctrine (HCI research, WCAG 2.2, Core Web Vitals) for any agent, any framework.\" Root listing via api.github.com/repos/overseek944/frontend-ui-ux-skill/contents/ is exactly LICENSE (1068 b), README.md (2903 b), SKILL.md (18899 b), references/ (dir) \u2014 there is genuinely NO skills/ subdirectory; SKILL.md is at the repo root, path `SKILL.md`. references/ holds exactly the 5 claimed files: accessibility.md (5148), anti-patterns.md (4374), component-architecture.md (4080), hci-foundations.md (4320), performance.md (3913). Frontmatter `name: frontend-ui-ux` confirmed. Section headings confirm the claimed purpose (5 pillars + \"Definition of Done \u2014 the gate before you say 'finished'\"), and the description does explicitly defer to artifact-design and dataviz as claimed. License: https://raw.githubusercontent.com/overseek944/frontend-ui-ux-skill/master/LICENSE opens \"MIT License / Copyright (c) 2026 Manav Patel\"; API license field \"MIT License\". Staleness: exactly 1 commit ever, sha fa25478d1f50f5dbd4f8119a03524fb14bb4277e, authored 2026-08-02T13:32:24Z by overseek944 <manavpatel944@gmail.com>; created_at 2026-08-02T13:32:29Z, pushed_at 2026-08-02T13:32:35Z, updated_at 2026-09-15T15:37:04Z \u2014 so the claim that updated_at is metadata-only and not a code push is correct. 0 releases, 0 tags, 0 forks, 0 open issues, 2 stars, subscribers_count 1. Owner profile: login overseek944, name \"Manav Patel\", type User, created 2020-10-04T06:38:53Z, 0 followers, 20 public repos, bio null. The trust assessment (single-maintainer, no review, no versioning, no CI signal) is accurate.\\n\\nCONFIRMED \u2014 ITEMS 2a/2b/2c. microsoft/playwright: Apache-2.0, Organization, 96,336 stars, pushed_at 2026-09-19T01:59:22Z. packages/playwright-core/src/tools/skills/ contains exactly three dirs \u2014 playwright-cli, playwright-component-testing, playwright-trace \u2014 and that directory's last commit is 78ff4260 dated 2026-09-18T20:44:52Z, matching the claim's SHA exactly. Frontmatter read from raw.githubusercontent: playwright-cli \u2192 \"Automate browser interactions, test web pages and work with Playwright tests.\" with allowed-tools Bash(playwright-cli:*) Bash(npx:*) Bash(npm:*); playwright-trace \u2192 \"Inspect Playwright trace files from the command line \u2014 list actions, view requests, console, errors, snapshots and screenshots.\"; playwright-component-testing \u2192 description as corrected above, and references/gallery-spec.md (6199 b) does exist alongside migration.md, react.md, typing.md, vue.md plus a templates/ dir. microsoft/playwright-cli: Apache-2.0, Organization, 13,409 stars; skills/playwright-cli/SKILL.md is 15,179 bytes \u2014 byte-identical in size and frontmatter to the microsoft/playwright copy, also 15,179 \u2014 and skills/playwright-cli/references/ exists; skills/ dir last commit 5bd70cd6 dated 2026-09-18T21:49:39Z, matching the claimed SHA. https://playwright.dev/agent-cli/skills loads and shows verbatim `playwright-cli install --skills` (Claude Code layout, default), `playwright-cli install --skills=agents` (.agents/skills layout), `playwright-cli install --skills -g`, copying to .claude/skills/playwright-cli or .agents/skills/playwright-cli. The five maintainer-internal skills under .claude/skills/ are all present with SKILL.md (playwright-cherry-pick, playwright-dev, playwright-devops, playwright-test-results, playwright-triage); the \"REPO-INTERNAL, do not catalogue as end-user browser automation\" framing is correct, and the user_invocable: true detail is accurate for playwright-devops (and also true for triage, cherry-pick and test-results, which the claims did not mention). lackeyjb/playwright-skill: MIT, owner type User, 3,126 stars, 242 forks, created 2025-10-19T21:33:51Z, pushed_at 2026-08-14T13:51:33Z, not archived; root has .claude-plugin/, tests/, CHANGELOG.md, CONTRIBUTING.md; skills/playwright-skill/SKILL.md frontmatter carries license: MIT, compatibility (Node.js 20+), metadata.author lackeyjb, metadata.version \"5.0.0\", allowed-tools Bash(node:*) Bash(npm:*) Read Write \u2014 all exactly as claimed. Contributors are exactly lackeyjb (22), dependabot[bot] (2), cderv (1), luantaraschi (1). Releases v5.0.0 2026-08-11T13:10:22Z and v4.1.0 2025-12-02T12:46:30Z confirmed.\\n\\nCONFIRMED \u2014 NEGATIVE RESULTS. Both claimed-404 paths in microsoft/playwright really do 404 today: packages/playwright/src/skill and claude/skills. The two repos the research explicitly declined to open (linhnguyendang-web/playwright-skill, akaihola/playwright-py-skill) I also did not open, so they remain correctly marked UNVERIFIED."
+  },
+  {
+   "lens": "mcp-servers",
+   "checked": 120,
+   "wrong": [
+    {
+     "claim": "The Supabase MCP server lives at repo `supabase-community/supabase-mcp`, owner listed as \"supabase-community (Supabase-run org)\", with verifiedBy URLs under github.com/supabase-community/supabase-mcp and raw.githubusercontent.com/supabase-community/supabase-mcp/main/README.md",
+     "problem": "STALE PATH. The repository has been transferred/renamed. https://api.github.com/repos/supabase-community/supabase-mcp returns full_name \"supabase/mcp\", name \"mcp\", owner login \"supabase\", html_url https://github.com/supabase/mcp. The old URLs still return HTTP 200 only because GitHub silently redirects renamed repos (I confirmed raw.githubusercontent.com/supabase-community/supabase-mcp/main/README.md -> HTTP 200 via redirect), so the catalog entry is not broken but it records a name that is no longer canonical, and it credits the wrong owning org.",
+     "correction": "Repo is `supabase/mcp` (owner: supabase, the Supabase company org, not supabase-community). Canonical URLs: https://github.com/supabase/mcp and https://raw.githubusercontent.com/supabase/mcp/main/README.md. License Apache-2.0 (confirmed), 2,914 stars, not archived, default branch main."
+    },
+    {
+     "claim": "descriptionLine for supabase-mcp: \"Connect your Supabase projects to Cursor, Claude, Windsurf, and other AI assistants.\"",
+     "problem": "WRONG / STALE. That is an older About line. I read the repo's current description from both https://api.github.com/repos/supabase-community/supabase-mcp and the rendered page https://github.com/supabase-community/supabase-mcp (which lands on supabase/mcp) and both return a different, shorter string.",
+     "correction": "Current description line is exactly: \"Connect Supabase to your AI assistants\""
+    },
+    {
+     "claim": "github-mcp-server GITHUB_TOOLSETS env var accepts: context, actions, code_quality, code_security, copilot, discussions, gists, git, governance, issues, labels, notifications, orgs, projects, pull_requests, repos, secret_protection, security_advisories, stargazers, users, dependabot (21 values)",
+     "problem": "INCOMPLETE. I pulled the raw README (https://raw.githubusercontent.com/github/github-mcp-server/main/README.md, 113,197 bytes) and read the \"### Available Toolsets\" table at line 572. It contains 22 rows, not 21 \u2014 the claim omits `copilot_issue_intents` (\"Opt-in Copilot issue assignment tools that carry intent metadata (rationale, confidence, suggestion)\"). The README also documents a separate section \"### Additional Toolsets in Remote GitHub MCP Server\" with two more the claim never mentions. Since the entry sells GITHUB_TOOLSETS as a containment control, an incomplete list understates what an operator must explicitly exclude.",
+     "correction": "22 toolsets in the main table: add `copilot_issue_intents`. Plus 2 remote-only additional toolsets documented immediately below: `copilot_spaces` and `github_support_docs_search` (`copilot` appears in both tables)."
+    },
+    {
+     "claim": "playwright-mcp flag `--caps` takes (vision, pdf, devtools, network, storage, testing)",
+     "problem": "INCOMPLETE, and it does not match how the README documents the flag. In the raw README, the CLI options table at line 415 reads: \"--caps <caps> | comma-separated list of additional capabilities to enable, possible values: vision, pdf, devtools.\" \u2014 only three values are documented on the flag itself. Grepping every `--caps=<value>` opt-in section header in the file returns seven distinct values, and the claim's six omit `config` (line 1174, \"Configuration (opt-in via --caps=config)\").",
+     "correction": "Seven opt-in capability sections exist in the README: config, network, storage, devtools, vision, pdf, testing. The claim omits `config`. Note also that the flag's own table entry only advertises vision, pdf, devtools, so \"possible values\" per the option docs and the set of documented opt-in sections disagree in the upstream README itself."
+    },
+    {
+     "claim": "For Playwright MCP: \"Mitigate with --isolated and --allowed-origins\" (repeated in the source-level risk ranking as the containment control \"--isolated + --allowed-origins\")",
+     "problem": "CONTRADICTED BY THE CITED SOURCE. The README explicitly disclaims --allowed-origins as a security control. Line 410: \"--allowed-origins <origins> | semicolon-separated list of TRUSTED origins to allow the browser to request. Default is to allow all. Important: *does not* serve as a security boundary and *does not* affect redirects.\" Line 412 says the same of --blocked-origins. Recommending it as a containment control in a risk-ranking table inverts what the source says, and a reader acting on the catalog would believe they had bounded the blast radius when the maintainers say they have not.",
+     "correction": "--isolated is a legitimate containment control (in-memory profile). --allowed-origins is NOT \u2014 per the README it \"does not serve as a security boundary and does not affect redirects\". The claim's own quoted line, \"Playwright MCP is **not** a security boundary\" (README line 825), is accurate and should carry the mitigation framing instead."
+    },
+    {
+     "claim": "Figma tool inventory lists 18 read tools and 11 write tools as the server's tools",
+     "problem": "INCOMPLETE. https://developers.figma.com/docs/figma-mcp-server/tools-and-prompts/ documents a third category the entry never mentions: six Weave tools (weave_list_tools, weave_get_tool_inputs, weave_upload_asset, weave_run_tool, weave_get_tool_run_output, weave_cancel_tool_run) plus a prompt, create_design_system_rules. weave_run_tool and weave_upload_asset are execution/upload surfaces, so omitting them understates the write surface in an entry whose stated purpose is risk assessment.",
+     "correction": "The tools page documents read tools, write tools, a Weave tool group (6 tools), and one prompt (create_design_system_rules). All 18 read names and all 11 write names in the claim did verify individually, including get_variable_defs."
+    },
+    {
+     "claim": "\"Figma for Government excludes write-to-canvas, code-to-canvas and agent skills, and MCP is not in FedRAMP audit scope.\"",
+     "problem": "INCOMPLETE ON THE MOST DECISION-RELEVANT POINT. The exclusion list on https://developers.figma.com/docs/figma-mcp-server/local-server-installation/ also includes Code Connect UI, and \u2014 more significantly \u2014 the page states Figma for Government supports the Figma MCP server only through the Figma for Government desktop app; the remote server is not available. The entry elsewhere recommends the remote server as the Figma-preferred option, so a government reader following the entry would be pointed at an endpoint they cannot use.",
+     "correction": "Figma for Government: desktop server only, remote MCP server not available. Excluded: write to canvas (incl. use_figma), code to canvas (incl. generate_figma_design), Code Connect UI, agent skills. FedRAMP: \"MCP services for Figma for Government are not included in Figma's FedRAMP audit\" \u2014 Figma says it is working to bring it into a planned audit this year."
+    }
+   ],
+   "summary": "I re-fetched every cited source independently (GitHub REST API for repo metadata and latest releases, raw.githubusercontent.com for READMEs, plus the Figma, Vercel, Supabase and docs.github.com pages). The brief is unusually accurate \u2014 its three flagged \"correction results\" are all genuinely correct, and its one \"could not verify\" is honest. Seven issues found, one material.\\n\\nMATERIAL: the Supabase entry points at a repo name that no longer exists as canonical. `supabase-community/supabase-mcp` now resolves to `supabase/mcp` (owner: supabase, not supabase-community), and its description line is now \"Connect Supabase to your AI assistants\", not the longer Cursor/Claude/Windsurf string recorded. Old URLs still 200 via GitHub's rename redirect, so nothing is broken \u2014 but the name, owner attribution and description are stale.\\n\\nNOTABLE: the Playwright entry recommends `--allowed-origins` as a containment control, which the README explicitly disclaims (\"does not serve as a security boundary and does not affect redirects\", lines 410/412). That inverts the source in the one place a reader would act on it. `--isolated` is fine.\\n\\nThe rest are omissions in lists sold as complete: GITHUB_TOOLSETS is 22 values not 21 (missing copilot_issue_intents) plus two remote-only toolsets (copilot_spaces, github_support_docs_search); `--caps` omits `config` (and the README's own flag table only advertises 3 of the 7 documented values); the Figma tool inventory omits the six Weave tools and the create_design_system_rules prompt; and the Figma-for-Government note omits that only the desktop server is available there, which matters because the entry recommends the remote one.\\n\\nVERIFIED CORRECT, worth stating explicitly:\\n- github/github-mcp-server: MIT, \"GitHub's official MCP Server\", v1.12.2 published 2026-09-16, pushed 2026-09-16, not archived. Remote URL https://api.githubcopilot.com/mcp/, the octocorp.ghe.com enterprise example, ghcr.io/github/github-mcp-server, GITHUB_PERSONAL_ACCESS_TOKEN, `Authorization: Bearer ${input:github_mcp_pat}`, the --read-only semantics and all 11 PAT scopes all appear verbatim. docs.github.com confirms \"available to all GitHub users regardless of plan type\" and the \"MCP servers in Copilot\" policy for Copilot Business/Enterprise, and indeed does NOT state the remote URL or OAuth-vs-PAT mechanics \u2014 the brief's sourcing note is right.\\n- microsoft/playwright-mcp: Apache-2.0, 37,290 stars (37.3k \u2713), v0.0.82 2026-09-18. \"Playwright MCP is **not** a security boundary.\" confirmed verbatim at README line 825.\\n- upstash/context7: MIT, 62,184 stars (62.2k \u2713), @upstash/context7-mcp@4.1.1 2026-09-14, pushed 2026-09-18, description string exact. The correction is right: the tools are `resolve-library-id` and `query-docs`. Community-contributed disclaimer confirmed.\\n- Figma: both endpoints, both `claude mcp add` commands, the MCP Catalog client restriction, the remote-server recommendation, and all 29 read/write tool names verified \u2014 including get_variable_defs, which I initially thought was missing and confirmed present on a targeted re-read. Seat/plan claims confirmed verbatim on help.figma.com: \"The remote server is available on all seats and plans.\" / \"The desktop server is available on a Dev or Full seat for all paid plans.\" The 404 on .../get-started/ reproduced.\\n- Vercel: all 33 tool names confirmed in the same order, including import-claude-design-from-url and use_vercel_cli. \"Purchase tools execute real, non-refundable charges.\" and the quote\u2192confirm flow (signed idempotencyKey, 5-minute expiry, confirm: true, mismatched key rejected) all verbatim. \"Connecting to Vercel MCP grants the AI system you're using the same access as your Vercel user account\" verbatim. 12 supported clients match. last_updated 2026-09-15, Beta.\\n- servers-archived (postgres): archived: true, MIT, description \"Reference MCP servers that are no longer maintained\", last push 2025-05-28. The postgres README opening paragraph matches the recorded descriptionLine word for word; `query` tool, postgres://<host>/<table>/schema, and both npx and mcp/postgres Docker configs confirmed. The live modelcontextprotocol/servers repo lists exactly the seven reference servers named (Everything, Fetch, Filesystem, Git, Memory, Sequential Thinking, Time) with no Postgres \u2014 the negative result holds.\\n\\nOne framing note, disclosed by the brief itself and not a defect: no SKILL.md files or skills directories were involved anywhere, so the instruction to confirm \"the exact name and path resolve to a real file today\" applies only in the sense of repo paths and hosted endpoints. Every such path resolved except the Supabase rename above."
+  }
+ ]
+}

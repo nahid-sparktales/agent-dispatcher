@@ -1,0 +1,14 @@
+{
+  "id": "structured-output",
+  "capability": "ai.structured-output",
+  "category": "ai",
+  "use_when": "A model's output feeds code rather than a human — extraction, classification, routing, scoring — or parsing keeps failing, fields arrive invented, or a schema is being designed for a model to fill.",
+  "not_for": "Designing the tools an agent calls (tool-design), building the server that hosts them (mcp-design), or the quality of prose a human will read.",
+  "verifies": false,
+  "provides": ["output-schema", "enforcement-choice", "validation-boundary", "retry-policy", "accuracy-measurement"],
+  "tools": ["workspace", "context7"],
+  "references": [],
+  "scripts": [],
+  "provenance": "local",
+  "tags": ["json-schema", "structured-output", "extraction", "validation", "retry", "classification", "evaluation"]
+}

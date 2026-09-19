@@ -1,0 +1,14 @@
+{
+  "id": "background-jobs",
+  "capability": "backend.jobs",
+  "category": "backend",
+  "use_when": "Work is being moved off a request path onto a queue or scheduler, or a job ran twice, never ran, ran out of order, or is stuck retrying.",
+  "not_for": "Concurrency inside a single request, streaming topology design, or CI/cron pipeline configuration in the delivery system.",
+  "verifies": false,
+  "provides": ["job-design", "idempotency-strategy", "retry-policy", "schedule-design"],
+  "tools": ["workspace", "context7"],
+  "references": [],
+  "scripts": [],
+  "provenance": "local",
+  "tags": ["queue", "worker", "cron", "retry", "idempotency", "dead-letter", "scheduling"]
+}

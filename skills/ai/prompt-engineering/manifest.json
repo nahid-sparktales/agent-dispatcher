@@ -1,0 +1,14 @@
+{
+  "id": "prompt-engineering",
+  "capability": "ai.prompting",
+  "category": "ai",
+  "use_when": "A prompt is being written or patched, its output is inconsistent or the wrong shape, a model version changed, or someone has declared a prompt improved.",
+  "not_for": "Scoping an agent's job, tools and prohibitions (agent-design), choosing what material to load into the window (context-engineering), and model selection or fine-tuning.",
+  "verifies": false,
+  "provides": ["output-contract", "prompt-revision", "case-set", "prompt-measurement"],
+  "tools": ["workspace", "context7"],
+  "references": [],
+  "scripts": [],
+  "provenance": "local",
+  "tags": ["prompt", "instructions", "examples", "output-format", "evaluation", "regression", "measurement"]
+}

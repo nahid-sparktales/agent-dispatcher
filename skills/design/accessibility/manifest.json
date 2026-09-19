@@ -1,0 +1,14 @@
+{
+  "id": "accessibility",
+  "capability": "design.accessibility",
+  "category": "design",
+  "use_when": "UI is being built, changed or repaired and it has to be operable by keyboard and assistive technology — including turning an audit finding into an actual code change.",
+  "not_for": "Proving the result holds (accessibility-verification), layout across viewports (responsive-design), or general visual critique.",
+  "verifies": false,
+  "provides": ["semantic-structure", "keyboard-path", "focus-management", "accessible-naming", "contrast-choice", "live-region-design"],
+  "tools": ["workspace", "context7"],
+  "references": [],
+  "scripts": [],
+  "provenance": "local",
+  "tags": ["accessibility", "a11y", "wcag", "keyboard", "focus", "aria", "contrast", "forms"]
+}

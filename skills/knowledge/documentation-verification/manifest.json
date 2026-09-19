@@ -1,0 +1,14 @@
+{
+  "id": "documentation-verification",
+  "capability": "verification.documentation",
+  "category": "knowledge",
+  "use_when": "Documentation is about to be called correct, current or ready to publish, or a setup guide, quickstart or onboarding path fails at an unidentified step.",
+  "not_for": "Judging whether the writing is clear or well structured (technical-writing), and standing in for the project's own test suite (test-strategy).",
+  "verifies": true,
+  "provides": ["executed-commands", "example-execution", "link-resolution", "identifier-check"],
+  "tools": ["workspace", "playwright"],
+  "references": [],
+  "scripts": [],
+  "provenance": "local",
+  "tags": ["documentation", "verification", "readme", "links", "examples", "onboarding", "clean-environment"]
+}

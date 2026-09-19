@@ -1,0 +1,14 @@
+{
+  "id": "experimentation",
+  "capability": "product.experiments",
+  "category": "product",
+  "use_when": "An A/B or online experiment is being designed, sized, sanity-checked or interpreted — including deciding whether the traffic can support one at all.",
+  "not_for": "Defining the metric being tested (product-analytics), choosing which ideas to test (prioritization), or authorizing a rollout once a result is in.",
+  "verifies": false,
+  "provides": ["experiment-design", "power-analysis", "pre-registration", "result-interpretation"],
+  "tools": ["workspace"],
+  "references": [],
+  "scripts": [],
+  "provenance": "local",
+  "tags": ["experiment", "ab-test", "hypothesis", "power", "sample-size", "null-result", "statistics"]
+}

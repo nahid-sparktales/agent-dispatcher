@@ -1,0 +1,14 @@
+{
+  "id": "data-pipelines",
+  "capability": "data.pipelines",
+  "category": "database",
+  "use_when": "A batch or streaming pipeline, scheduled transform or ingestion job is being built, repaired or backfilled, or a run dropped, duplicated or reshaped rows.",
+  "not_for": "Destination schema design (schema-design) and its migrations (migrations), the standing assertions that guard produced data (data-quality), or interpreting what the resulting numbers mean.",
+  "verifies": false,
+  "provides": ["lineage-trace", "pipeline-contract", "windowing-plan", "rerun-semantics", "backfill-plan", "source-reconciliation"],
+  "tools": ["workspace", "supabase"],
+  "references": [],
+  "scripts": [],
+  "provenance": "local",
+  "tags": ["data", "pipeline", "etl", "streaming", "lineage", "windowing", "late-arrivals", "idempotency", "backfill", "reconciliation"]
+}

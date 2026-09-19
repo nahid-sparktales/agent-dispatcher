@@ -1,0 +1,14 @@
+{
+  "id": "schema-design",
+  "capability": "database.schema",
+  "category": "database",
+  "use_when": "New tables are being designed, ORM models or migration DDL are under review, or a defect traces back to the data model permitting a state that should be impossible.",
+  "not_for": "Tuning a slow statement (query-optimization), engine-specific types, indexes and features (postgres), or writing and running the migration that ships the change.",
+  "verifies": false,
+  "provides": ["data-model", "constraint-design", "schema-review"],
+  "tools": ["workspace"],
+  "references": [],
+  "scripts": [],
+  "provenance": "local",
+  "tags": ["schema", "normalization", "keys", "constraints", "naming", "data-integrity"]
+}

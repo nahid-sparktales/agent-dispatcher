@@ -1,0 +1,14 @@
+{
+  "id": "deep-research",
+  "capability": "research.deep",
+  "category": "knowledge",
+  "use_when": "An open question's answer will change a decision and the evidence is not already in the conversation — unfamiliar, contested or fast-moving material that needs framing, primary sources and a stopping rule.",
+  "not_for": "Looking up a single fact with one authoritative home, mapping the local codebase, judging an individual source (source-evaluation), or comparing named products against criteria (competitive-analysis).",
+  "verifies": false,
+  "provides": ["research-question", "primary-source-sweep", "evidence-ledger", "stopping-rule"],
+  "tools": ["workspace", "context7", "github"],
+  "references": [],
+  "scripts": [],
+  "provenance": "local",
+  "tags": ["research", "evidence", "primary-sources", "investigation", "synthesis", "uncertainty"]
+}

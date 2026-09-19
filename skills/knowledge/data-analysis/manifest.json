@@ -1,0 +1,14 @@
+{
+  "id": "data-analysis",
+  "capability": "data.analysis",
+  "category": "knowledge",
+  "use_when": "A dataset has to answer a question, a reported number needs explaining or reconciling, or a finding from data is about to reach someone who will act on it.",
+  "not_for": "Defining product metrics and their instrumentation (product-analytics), designing or sizing an experiment (experimentation), building or repairing the pipeline that produced the data (data-pipelines), or writing standing quality assertions (data-quality).",
+  "verifies": false,
+  "provides": ["dataset-profile", "denominator-check", "segment-analysis", "reproducible-analysis"],
+  "tools": ["workspace", "supabase"],
+  "references": [],
+  "scripts": [],
+  "provenance": "local",
+  "tags": ["analysis", "denominator", "missing-data", "confounding", "causation", "reproducibility", "segmentation"]
+}

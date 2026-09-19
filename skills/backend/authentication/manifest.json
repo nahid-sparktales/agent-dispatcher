@@ -1,0 +1,14 @@
+{
+  "id": "authentication",
+  "capability": "backend.authn",
+  "category": "backend",
+  "use_when": "A credential is issued, accepted, refreshed or revoked — login, logout, sessions, tokens, API keys, or an OAuth/OIDC integration.",
+  "not_for": "Deciding what an authenticated caller may do (authorization), the login screen's design and copy, or secret storage and rotation policy at the infrastructure level.",
+  "verifies": false,
+  "provides": ["session-design", "token-validation", "oauth-flow", "credential-handling"],
+  "tools": ["workspace", "context7"],
+  "references": [],
+  "scripts": [],
+  "provenance": "local",
+  "tags": ["auth", "authentication", "session", "cookie", "jwt", "token", "oauth", "oidc", "login", "refresh"]
+}

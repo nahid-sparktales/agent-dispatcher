@@ -1,0 +1,14 @@
+{
+  "id": "frontend-design",
+  "capability": "design.ui.direction",
+  "category": "design",
+  "use_when": "A new or reshaped UI surface needs a visual direction decided — hierarchy, type, colour, spacing, density — and no design system already decides it.",
+  "not_for": "Critiquing an interface that already exists (ui-audit), working inside an established design system (design-systems), or proving a change renders and works (browser-verification).",
+  "verifies": false,
+  "provides": ["visual-direction", "type-scale", "colour-roles", "spacing-density"],
+  "tools": ["workspace", "figma"],
+  "references": [],
+  "scripts": [],
+  "provenance": "local",
+  "tags": ["visual-design", "typography", "colour", "spacing", "hierarchy", "density"]
+}

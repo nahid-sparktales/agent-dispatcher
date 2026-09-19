@@ -1,0 +1,14 @@
+{
+  "id": "model-routing",
+  "capability": "ai.routing",
+  "category": "ai",
+  "use_when": "More than one model is in play and a call has to be assigned to one, or cost, latency or a silently firing fallback has become a problem.",
+  "not_for": "Prompt authoring and output quality for a single model, retrieval tuning (retrieval-rag), agent memory (memory-design), and infrastructure capacity planning.",
+  "verifies": false,
+  "provides": ["model-selection", "routing-rule", "fallback-policy", "routing-measurement"],
+  "tools": ["workspace", "context7"],
+  "references": [],
+  "scripts": [],
+  "provenance": "local",
+  "tags": ["routing", "model-selection", "cost", "latency", "fallback", "evaluation", "degradation"]
+}

@@ -1,0 +1,30 @@
+{
+  "id": "seo",
+  "capability": "knowledge.seo",
+  "category": "knowledge",
+  "use_when": "A page is written or revised to be found in search, search traffic drops, a page is missing from results, or someone asks which query to target.",
+  "not_for": "Writing the copy itself (copywriting), page-speed and Core Web Vitals work (frontend-performance), paid search, social distribution, or pages deliberately kept out of search.",
+  "verifies": false,
+  "provides": [
+    "search-intent-match",
+    "page-structure",
+    "indexability-check",
+    "search-reporting"
+  ],
+  "tools": [
+    "workspace",
+    "playwright"
+  ],
+  "references": [],
+  "scripts": [],
+  "provenance": "local",
+  "tags": [
+    "seo",
+    "search-intent",
+    "indexing",
+    "crawlability",
+    "canonical",
+    "internal-links",
+    "search-console"
+  ]
+}

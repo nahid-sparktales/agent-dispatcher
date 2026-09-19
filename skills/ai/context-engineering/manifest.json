@@ -1,0 +1,14 @@
+{
+  "id": "context-engineering",
+  "capability": "ai.context",
+  "category": "ai",
+  "use_when": "A prompt, agent or session loads substantial material, quality decays as context grows, or context has to be trimmed, summarized or split between inlining and retrieval.",
+  "not_for": "Wording and measuring the prompt itself (prompt-engineering), scoping an agent's job and tools (agent-design), and choosing retrieval or vector-store infrastructure.",
+  "verifies": false,
+  "provides": ["context-budget", "disclosure-index", "retrieval-policy", "compaction-procedure"],
+  "tools": ["workspace"],
+  "references": [],
+  "scripts": [],
+  "provenance": "local",
+  "tags": ["context", "progressive-disclosure", "retrieval", "compaction", "summarization", "token-budget", "provenance"]
+}

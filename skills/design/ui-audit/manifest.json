@@ -1,0 +1,14 @@
+{
+  "id": "ui-audit",
+  "capability": "design.ux.audit",
+  "category": "design",
+  "use_when": "An interface already exists and someone needs to know what is wrong with it, ranked and concrete enough to act on.",
+  "not_for": "Proving a change renders and functions (browser-verification), setting a visual direction where none exists (frontend-design), or a formal accessibility conformance audit.",
+  "verifies": false,
+  "provides": ["usability-findings", "hierarchy-review", "state-coverage-report"],
+  "tools": ["workspace", "playwright"],
+  "references": [],
+  "scripts": [],
+  "provenance": "local",
+  "tags": ["usability", "audit", "critique", "hierarchy", "states", "review"]
+}

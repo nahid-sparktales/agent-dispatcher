@@ -1,0 +1,14 @@
+{
+  "id": "accessibility-verification",
+  "capability": "verification.accessibility",
+  "category": "design",
+  "use_when": "Someone is about to claim a screen or flow is accessible, keyboard-operable, screen-reader usable or WCAG-conformant, or an accessibility fix needs re-checking.",
+  "not_for": "Making the fixes (accessibility), general rendered-UI checks (browser-verification), or authoring a conformance statement — which is a separate, authorized act.",
+  "verifies": true,
+  "provides": ["automated-a11y-scan", "keyboard-pass", "screen-reader-pass", "zoom-reflow-check", "contrast-measurement"],
+  "tools": ["playwright", "workspace"],
+  "references": ["references/screen-reader-passes.md"],
+  "scripts": [],
+  "provenance": "local",
+  "tags": ["accessibility", "a11y", "wcag", "verification", "screen-reader", "keyboard", "axe", "contrast"]
+}

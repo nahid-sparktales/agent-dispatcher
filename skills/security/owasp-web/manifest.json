@@ -1,0 +1,14 @@
+{
+  "id": "owasp-web",
+  "capability": "security.web",
+  "category": "security",
+  "use_when": "Web code that takes requests, builds queries, renders output, fetches URLs, deserializes data, handles sessions or accepts files is being written or reviewed, or an app needs a sweep for the recurring vulnerability classes.",
+  "not_for": "Design-stage boundary and asset work (threat-modeling), the reading order and reporting discipline of a review pass (secure-code-review), infrastructure and network hardening, or reciting a compliance list without reading code.",
+  "verifies": false,
+  "provides": ["access-control-check", "injection-check", "xss-context-check", "ssrf-check", "deserialization-check", "secrets-check"],
+  "tools": ["workspace", "context7"],
+  "references": [],
+  "scripts": [],
+  "provenance": "local",
+  "tags": ["owasp", "injection", "xss", "ssrf", "access-control", "deserialization", "secrets", "web-security"]
+}

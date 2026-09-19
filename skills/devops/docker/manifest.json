@@ -1,0 +1,14 @@
+{
+  "id": "docker",
+  "capability": "devops.containers",
+  "category": "devops",
+  "use_when": "A Dockerfile is being written, changed or reviewed, an image build is slow, bloated or non-deterministic, or configuration and secrets need a route into a container.",
+  "not_for": "Orchestration, compose or cluster topology; CI workflow authoring (github-actions); pipeline stage design (ci-cd); or debugging application code that merely happens to be containerized.",
+  "verifies": false,
+  "provides": ["dockerfile-review", "layer-cache-analysis", "image-size-reduction", "container-runtime-posture"],
+  "tools": ["workspace", "context7"],
+  "references": [],
+  "scripts": [],
+  "provenance": "local",
+  "tags": ["docker", "containers", "dockerfile", "image-size", "build-cache", "multi-stage", "reproducible-build"]
+}

@@ -1,0 +1,14 @@
+{
+  "id": "caching",
+  "capability": "backend.caching",
+  "category": "backend",
+  "use_when": "A cache is about to be added to a read path, or existing cached data is stale, leaking across users, or being blamed for a bug.",
+  "not_for": "Fixing the slow query or N+1 underneath (do that first), pure HTTP header tuning with no server-side store, or general performance profiling.",
+  "verifies": false,
+  "provides": ["cache-layer-choice", "cache-key-design", "invalidation-strategy", "staleness-analysis"],
+  "tools": ["workspace", "context7"],
+  "references": [],
+  "scripts": [],
+  "provenance": "local",
+  "tags": ["cache", "ttl", "invalidation", "redis", "cdn", "staleness", "performance"]
+}

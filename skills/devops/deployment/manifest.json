@@ -1,0 +1,14 @@
+{
+  "id": "deployment",
+  "capability": "devops.deployment",
+  "category": "devops",
+  "use_when": "A change is going to an environment other people use, or the path that takes it there is being built or changed.",
+  "not_for": "Proving the deployed revision is healthy (release-verification), getting back to a known-good state (rollback), schema sequencing itself (migrations), or an outage in progress where restoring service outranks release process.",
+  "verifies": false,
+  "provides": ["artifact-identity", "environment-parity", "config-reconciliation", "rollout-strategy", "preflight", "release-record"],
+  "tools": ["workspace", "github", "vercel"],
+  "references": [],
+  "scripts": [],
+  "provenance": "local",
+  "tags": ["devops", "deployment", "release", "rollout", "canary", "blue-green", "config", "preflight"]
+}

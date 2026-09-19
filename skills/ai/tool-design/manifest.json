@@ -1,0 +1,14 @@
+{
+  "id": "tool-design",
+  "capability": "ai.tool-design",
+  "category": "ai",
+  "use_when": "A tool or function an LLM calls is being added or reshaped, or an agent is selecting the wrong tool, passing malformed arguments, looping, or stalling after a call.",
+  "not_for": "Building or integrating the MCP server that hosts the tools (mcp-design), constraining a model's final answer to a schema (structured-output), general prompt wording, or internal functions no model invokes.",
+  "verifies": false,
+  "provides": ["tool-surface", "parameter-schema", "error-contract", "result-shape"],
+  "tools": ["workspace", "context7"],
+  "references": [],
+  "scripts": [],
+  "provenance": "local",
+  "tags": ["tools", "function-calling", "agents", "schema", "errors", "tool-selection"]
+}

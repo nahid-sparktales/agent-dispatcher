@@ -1,0 +1,14 @@
+{
+  "id": "product-analytics",
+  "capability": "product.analytics",
+  "category": "product",
+  "use_when": "A product metric, funnel or dashboard number is being defined, disputed, or about to be instrumented — including before tracking is added to a feature.",
+  "not_for": "Deciding what to build next (prioritization), designing or reading an A/B test (experimentation), or analysing a dataset whose definitions are already settled.",
+  "verifies": false,
+  "provides": ["metric-definition", "event-spec", "funnel-definition", "instrumentation-check"],
+  "tools": ["workspace"],
+  "references": [],
+  "scripts": [],
+  "provenance": "local",
+  "tags": ["metrics", "events", "funnel", "instrumentation", "denominator", "analytics", "tracking"]
+}

@@ -27,7 +27,8 @@ if [ "$1" = "--uninstall" ]; then
     t="$D/commands/$(basename "$f")"
     [ -f "$t" ] && grep -q "agent-dispatcher skill's" "$t" 2>/dev/null && rm -f "$t"
   done
-  rm -rf "$D/skills/agent-dispatcher" "$D/hooks/agent-dispatcher-activate.sh"
+  rm -rf "$D/skills/agent-dispatcher"
+  rm -f "$D/hooks/agent-dispatcher-activate.sh"
   python3 - "$D" <<'PY'
 import json, pathlib, shutil, sys
 p = pathlib.Path(sys.argv[1]) / "settings.json"
@@ -52,8 +53,17 @@ python3 -c "import json,pathlib,sys; p=pathlib.Path(sys.argv[1])/'settings.json'
 
 uninstall_previous
 mkdir -p "$D/skills" "$D/commands" "$D/hooks"
+# Everything the pack owns lives under one directory. Category names like "security" and
+# "design" are far too collision-prone to claim at the top level of someone's skills dir.
 rm -rf "$D/skills/agent-dispatcher"
-cp -R skills/agent-dispatcher "$D/skills/agent-dispatcher"
+mkdir -p "$D/skills/agent-dispatcher/lib"
+cp -R skills/agent-dispatcher/. "$D/skills/agent-dispatcher/"
+for dir in skills/*/; do
+  name=$(basename "$dir")
+  [ "$name" = "agent-dispatcher" ] && continue
+  cp -R "$dir" "$D/skills/agent-dispatcher/lib/$name"
+done
+cp -R recipes "$D/skills/agent-dispatcher/recipes"
 cp hooks/agent-dispatcher-activate.sh "$D/hooks/"
 chmod +x "$D/hooks/agent-dispatcher-activate.sh"
 : > "$MANIFEST"

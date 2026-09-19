@@ -14,7 +14,13 @@ Route each request to one specialist role, load that role, work as it. 27 roles.
 2. **Role argument** (`/agent-dispatcher reviewer`, `/agent-uidesigner`, "be the tester") — that role is forced; skip routing. Match loosely: `uidesigner` → `ui-ux-designer`, `security` → `security-auditor`, `docs` → `documentation-writer`, `coder`/`dev` → `implementer`. If nothing matches, say so and list the closest ids. A forced role holds until the user names another role or says to stop — you do not release it on your own judgement, and you do not chain out of it. When a request falls outside it, do the work as asked and note in one line which role fits better, if that would materially change the answer.
 3. **`on`** / "always on" / "make this perpetual" — arm the dispatcher for future sessions, at the scope they asked for. Plain `on` means everywhere.
 
-   - **This project only** — `touch .agent-dispatcher-on` in the project root. New sessions started here are armed; other projects are untouched.
+   - **This project only** — two steps, because a flag file alone would let any cloned repository arm itself:
+
+     ```bash
+     D="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"; touch .agent-dispatcher-on && pwd >> "$D/.agent-dispatcher-projects"
+     ```
+
+     The hook arms here only when the project's path is in that allow-list, which only the user's own config dir holds.
    - **Everywhere** (the default reading of `on`) — every future session, in every project:
 
    ```bash
@@ -80,19 +86,29 @@ When you fan out — the Agent tool, a Workflow, any parallel work — route eac
 - The three-role ceiling counts chain hops in your own turn. Parallel subagents are not chained and don't count against it — a fan-out is as wide as the work is separable.
 - Under a forced role, fan out **that** role over disjoint slices rather than routing around the user's instruction. Only the verifier is exempt.
 
+### The handoff
+
+For substantial delegated work, a subagent's prompt carries: the **objective**, its **scope**, the
+**evidence** it needs, the **artifacts it owns**, its **constraints** and **dependencies**, the
+**expected output**, the **acceptance checks**, and what **verification** is expected of it. What
+comes back adds: the verification actually performed, and what remains **unresolved**.
+
+Pass the smallest context that is sufficient. Do not dump conversation history into a handoff, and
+do not make a two-line job carry a ten-field contract — the ceremony is for work that warrants it.
+
 ## Perpetual mode
 
 When `~/.claude/.agent-dispatcher-active` exists, a SessionStart hook arms the dispatcher at the start of every session with a compact role index, so the user never types the command. In that mode you route from the index and read `roles/<id>.md` before working as a role; read this SKILL.md only when you need the full catalog, the chaining rules, or a role's **Not for** line to break a tie.
 
 Perpetual mode is a routing default, not a mandate: a plain question still gets a plain answer.
 
-## Skills and commands outrank routing
+## Skills supply the method; the role still owns the outcome
 
-An installed skill or a slash command that covers the request owns the turn. Load it, work inside its procedure, and keep the role as posture only — no role announcement, no competing deliverable. Never hand-roll what an installed skill already encodes.
+An installed skill or a slash command that covers the request supplies the **method** for the turn: load it and work inside its procedure rather than hand-rolling what it already encodes, and skip the role announcement. The role still owns **scope, deliverable and what done means** — a skill narrows how the work is done, it does not redefine what was asked for. Neither grants permission.
 
 This is about skills that do the *work* — not about this pack's own `/agent-*` commands, which are just these roles in another wrapper. They never suppress a route or an announcement.
 
-That means `dataviz` before the first line of chart code even under `data-analyst`; `code-review` rather than `reviewer`'s generic method when reviewing a diff; `frontend-design` or `apple-design` alongside `ui-ux-designer`; `run` when a role needs the app actually started. If a skill and a role disagree on method, the skill wins; the role only decides what "done" looks like.
+That means `dataviz` before the first line of chart code even under `data-analyst`; `code-review` rather than `reviewer`'s generic method when reviewing a diff; `frontend-design` or `apple-design` alongside `ui-ux-designer`; `run` when a role needs the app actually started. When a skill's procedure and a role's working method disagree on *how*, the purpose-built skill is the better procedure — but the role's boundaries, deliverable and definition of done still hold, and so do runtime policy, the user's instructions and the repository's rules.
 
 ## What the role does and does not change
 

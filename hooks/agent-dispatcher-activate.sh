@@ -26,23 +26,31 @@ fi
 [ -f "$PWD/.agent-dispatcher-off" ] && exit 0
 
 # armed? globally by ~/.claude/.agent-dispatcher-active, or per project by ./.agent-dispatcher-on
+# A project arms itself only if the user allow-listed it. Silencing stays repo-local because it
+# can only ever reduce behaviour; arming from a cloned repo would not be the user's choice.
 armed=""
 [ -f "$D/.agent-dispatcher-active" ] && armed=1
-[ -n "$cwd" ] && [ -f "$cwd/.agent-dispatcher-on" ] && armed=1
-[ -f "$PWD/.agent-dispatcher-on" ] && armed=1
+for p in "$cwd" "$PWD"; do
+  [ -n "$p" ] && [ -f "$p/.agent-dispatcher-on" ]     && [ -f "$D/.agent-dispatcher-projects" ]     && grep -qxF "$p" "$D/.agent-dispatcher-projects" && armed=1
+done
 [ -n "$armed" ] || exit 0
 # forget session silences older than a week
 [ -d "$D/.agent-dispatcher-off" ] && find "$D/.agent-dispatcher-off" -type f -mtime +7 -delete 2>/dev/null
 
-printf 'AGENT DISPATCHER ACTIVE (perpetual mode) — this pack lives at %s
-
-' "$pack"
+printf 'AGENT DISPATCHER ACTIVE (perpetual mode) — this pack lives at %s\n\n' "$pack"
 cat <<'DISPATCH'
 
 Route each request that involves real work to the best-fit specialist role below, then work as that
 role. Match the "not for" line as carefully as the "route here when" line.
 Read PACK/roles/<id>.md before acting as one; read PACK/SKILL.md for the full catalog, the
 chaining rules, or to break a tie.
+
+A role's frontmatter names its skills (skills_core, skills_preferred, skills_if_<condition>), its
+MCPs, its recipes and its verification. Read a local skill by globbing **/<id>/SKILL.md —
+every id is its own directory name; PACK/INDEX.md covers external ids and glob misses. One to five for
+ordinary work, not everything that exists. A skill supplies the method; the role still owns scope,
+deliverable and what done means, and neither grants permission. A skill or MCP that is missing is
+not a blocker: say what could not be checked and continue with the role's own method.
 
 A slash command or an installed skill that covers the request owns the turn: load it, work inside
 its procedure, keep the role as posture only, and skip the role announcement.
@@ -66,16 +74,11 @@ requests that follow, and do not route or chain out of it until they name anothe
 DISPATCH
 
 if [ -n "$sid" ]; then
-  printf 'To stop routing: this session only, run
-  mkdir -p "%s/.agent-dispatcher-off" && touch "%s/.agent-dispatcher-off/%s"
-' "$D" "$D" "$sid"
+  printf 'To stop routing: this session only, run\n  mkdir -p "%s/.agent-dispatcher-off" && touch "%s/.agent-dispatcher-off/%s"\n' "$D" "$D" "$sid"
 else
-  printf 'To stop routing this session, ask the user for the session id first (the payload carried none).
-'
+  printf 'To stop routing this session, ask the user for the session id first (the payload carried none).\n'
 fi
-printf 'For this project, touch .agent-dispatcher-off in its root; everywhere, rm -f "%s/.agent-dispatcher-active".
-
-' "$D"
+printf 'For this project, touch .agent-dispatcher-off in its root; everywhere, rm -f "%s/.agent-dispatcher-active".\n\n' "$D"
 
 cat <<'DISPATCH'
 ROLES

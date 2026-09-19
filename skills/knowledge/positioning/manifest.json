@@ -1,0 +1,29 @@
+{
+  "id": "positioning",
+  "capability": "knowledge.positioning",
+  "category": "knowledge",
+  "use_when": "The product must be described to people who do not know it \u2014 homepage, deck, launch, a new segment \u2014 or \"who is this for\" and \"how is this different\" have no crisp, evidenced answer.",
+  "not_for": "Writing the final copy (copywriting), interface strings (ux-writing), pricing strategy, deciding what to build next (prioritization), or running the customer interviews themselves (product-discovery).",
+  "verifies": false,
+  "provides": [
+    "segment-definition",
+    "competitive-alternatives",
+    "differentiator-analysis",
+    "positioning-statement"
+  ],
+  "tools": [
+    "workspace"
+  ],
+  "references": [],
+  "scripts": [],
+  "provenance": "local",
+  "tags": [
+    "positioning",
+    "segment",
+    "differentiation",
+    "competitive-alternative",
+    "category",
+    "messaging",
+    "value-proposition"
+  ]
+}

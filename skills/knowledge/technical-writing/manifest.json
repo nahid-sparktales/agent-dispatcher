@@ -1,0 +1,14 @@
+{
+  "id": "technical-writing",
+  "capability": "knowledge.writing",
+  "category": "knowledge",
+  "use_when": "Documentation is being written, restructured or repaired — README, setup guide, how-to, reference, architecture note, release notes, runbook — or a reader cannot get from the docs to a working result.",
+  "not_for": "Interface strings inside the product (ux-writing), persuasive or marketing copy (copywriting), and proving the documented commands actually run (documentation-verification).",
+  "verifies": false,
+  "provides": ["audience-framing", "document-structure", "grounded-claims", "example-discipline"],
+  "tools": ["workspace", "context7"],
+  "references": [],
+  "scripts": [],
+  "provenance": "local",
+  "tags": ["documentation", "readme", "guide", "reference", "release-notes", "runbook", "accuracy"]
+}
