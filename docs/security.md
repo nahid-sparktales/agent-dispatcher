@@ -3,9 +3,11 @@
 ## What this repository is and is not
 
 It ships text: role definitions, procedures, and registries describing external software. It
-contains no credentials, pulls nothing from the network, and runs no third-party installer.
+contains no credentials and runs no third-party installer, and it reaches the network only if you
+configure the optional decision engine to — by default nothing in it runs.
 
-It does have two scripts of its own, and they are the ones to read before trusting it:
+It does have two scripts of its own and one optional Python package, and they are the ones to
+read before trusting it:
 
 - **`install.sh`** copies the pack into `${CLAUDE_CONFIG_DIR:-$HOME/.claude}` — one directory,
   `skills/agent-dispatcher/`, plus `commands/agent-*.md` and one hook — records every command file

@@ -11,7 +11,13 @@ skills/<category>/<id>/SKILL.md       a skill, plus its manifest.json sidecar
 recipes/<id>.md                       a workflow shape
 catalog/mcp.json                      the MCP registry
 catalog/external-skills.json          externally maintained skills
+catalog/signals.json                  how each conditional skill bucket is decided
+catalog/context-plan.schema.json      the shape of a context plan
 SKILL.template.md                     the router body
+CONTEXT.template.md                   the context engine
+HOOK.template.sh                      the perpetual-mode SessionStart hook
+decision/                             the optional decision engine
+evals/decision/                       decision fixtures and the comparison harness
 docs/*.md                             prose only — the tables inside markers are generated
 ```
 

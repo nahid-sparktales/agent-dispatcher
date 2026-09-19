@@ -104,9 +104,7 @@ def main():
     for key in [k for k in os.environ if k.startswith("AGENT_DISPATCHER_")]:
         os.environ.pop(key)
     os.environ.pop("TYPESAFE_API_KEY", None)
-    os.environ.pop("AI_GATEWAY_API_KEY", None)
     os.environ.pop("TYPESAFE_BASE_URL", None)
-    os.environ.pop("AI_GATEWAY_BASE_URL", None)
 
     registry = Registry()
     cands = registry.agent_candidates()
@@ -140,7 +138,7 @@ def main():
 
     # ---------------------------------------------------------------- off mode
     print("\noff mode — no request, no credential, no change")
-    with env(TYPESAFE_API_KEY=None, AI_GATEWAY_API_KEY=None):
+    with env(TYPESAFE_API_KEY=None):
         probe = MockProvider(load_config(project_root=CFG))
         service = svc(registry, provider=probe, mode="off")
         result = plan(service, TASK)
@@ -159,7 +157,7 @@ def main():
 
     # ---------------------------------------------------------------- auto mode
     print("\nauto mode — use Jev when it is there, otherwise carry on")
-    with env(TYPESAFE_API_KEY=None, AI_GATEWAY_API_KEY=None):
+    with env(TYPESAFE_API_KEY=None):
         probe = MockProvider(load_config(project_root=CFG))
         service = svc(registry, provider=probe, mode="auto")
         result = plan(service, TASK)
@@ -251,7 +249,7 @@ def main():
 
     # ---------------------------------------------------------------- required
     print("\nrequired mode — fail clearly, never silently")
-    with env(TYPESAFE_API_KEY=None, AI_GATEWAY_API_KEY=None):
+    with env(TYPESAFE_API_KEY=None):
         try:
             plan(svc(registry, provider=None, mode="required"), TASK)
             check("required with no credential errors", False, "it returned instead")
@@ -680,7 +678,6 @@ def _clean_import():
     import subprocess
     code = ("import sys, os;"
             "os.environ.pop('TYPESAFE_API_KEY', None);"
-            "os.environ.pop('AI_GATEWAY_API_KEY', None);"
             "import decision;"
             "mods=[m for m in sys.modules if m.startswith('decision.providers')];"
             "print('LEAK' if mods else 'CLEAN')")

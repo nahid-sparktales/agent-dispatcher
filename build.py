@@ -12,6 +12,7 @@ Canonical, hand-edited, never written by this script:
     catalog/external-skills.json                 skills maintained outside this repo
     catalog/signals.json                SIGNAL  — what makes a conditional skill applicable
     catalog/context-plan.schema.json             the shape of a context plan
+    SKILL.template.md                            the router body, rendered into the adapter
     CONTEXT.template.md                          the context engine, rendered into the adapter
     HOOK.template.sh                             the perpetual-mode hook, role index substituted
 

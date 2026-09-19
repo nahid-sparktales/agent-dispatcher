@@ -9,13 +9,22 @@ Useful in a report: what an attacker controls, what they gain, and the smallest 
 
 ## What this repository is
 
-Text and two scripts of its own. It contains no credentials, fetches nothing at runtime, and runs
-no third-party installer.
+Text, two scripts of its own, and one optional Python package. It contains no credentials and
+runs no third-party installer. It makes no network request unless you configure one — see the
+third bullet.
 
 - **`install.sh`** copies the pack into `${CLAUDE_CONFIG_DIR:-$HOME/.claude}` — one directory,
   `skills/agent-dispatcher/`, plus `commands/agent-*.md` and one hook. It records every command
   file it writes, refuses to overwrite one it did not write, backs up `settings.json` before adding
   a `SessionStart` entry, and `--uninstall` removes only what its manifest lists.
+- **`decision/`** is the optional decision engine. It ships **inert**: no decision scope is
+  enabled by default, so nothing in it runs, no credential is read and no socket opens. Enabling
+  a scope (`AGENT_DISPATCHER_DECISION_SCOPES`) with a credential in `TYPESAFE_API_KEY` sends the
+  scrubbed task text and compact registry metadata to TypeSafe over HTTPS — one or two requests
+  per task, never repository source, file contents, environment or conversation. The credential
+  is read from the environment at request time and is never stored, logged, rendered or written
+  to a file. It cannot grant a permission: relevance and authorization are separate layers, and
+  the runtime never consults this one. [docs/jev.md](docs/jev.md) has the full account.
 - **`hooks/agent-dispatcher-activate.sh`** runs at `SessionStart` when perpetual mode is armed and
   prints a routing preamble. It reads flag files, writes nothing but a weekly prune of its own
   session-silence directory, makes no network call, and its output is a fixed heredoc — a

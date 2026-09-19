@@ -134,7 +134,7 @@ class Config:
         return True
 
     def status(self):
-        """What `/agent-dispatcher jev` and `/agent-context` render. No secret, by construction."""
+        """What `/agent-decision` and `/agent-context` render. No secret, by construction."""
         spec = PROVIDERS[self.provider]
         if self.mode == "off":
             state = "disabled"

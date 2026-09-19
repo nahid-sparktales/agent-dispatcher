@@ -5,7 +5,7 @@ where it gets one.
 
 ```bash
 python3 evals/decision/run.py                  # the keyword baseline — free, no network
-python3 evals/decision/run.py --engine claude --routes routes-claude.json   # also free
+python3 evals/decision/run.py --engine claude --routes evals/decision/routes-claude.json
 python3 evals/decision/run.py --engine all --routes evals/decision/routes-claude.json
 ```
 
@@ -26,8 +26,9 @@ owner) and `not_routes` (owners that would be clearly wrong), and one of four ki
 - **obvious** — unmistakably one role's territory.
 - **near-neighbour** — a sibling role looks right and is not. `debugger` vs `implementer`,
   `architect` vs `planner`, `database-engineer` vs `data-engineer`, `reviewer` vs `tester`,
-  `devops-release` vs `incident-responder`, `security-auditor` vs `reviewer`. Two thirds of the
-  set, because telling close specialist territories apart is the actual job.
+  `devops-release` vs `incident-responder`, `security-auditor` vs `reviewer`. A third of the set
+  on its own — two thirds of it is non-obvious in some way — because telling close specialist
+  territories apart is the actual job.
 - **ambiguous** — several owners are genuinely defensible. Scored against `acceptable`, because
   forcing one gold label on a real tie measures the fixture, not the engine.
 - **negative** — a keyword matcher sends it to the wrong role; the gold is elsewhere.

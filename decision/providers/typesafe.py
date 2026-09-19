@@ -14,8 +14,8 @@ Documented status codes: 401 invalid key, 422 bad body, 429 rate limited, 529 ov
 Reference: https://docs.typesafe.ai/api — checked against the published contract, not assumed.
 
 stdlib `urllib` on purpose. Five small JSON posts do not justify adding an AI framework to a
-repository whose whole promise is that it installs nothing. `send()` below is shared with the
-gateway provider and is where every credential-safety rule actually lives.
+repository whose whole promise is that it installs nothing. `send()` below is the one place
+every credential-safety rule lives, and the seam a second transport would reuse.
 """
 import json
 import os

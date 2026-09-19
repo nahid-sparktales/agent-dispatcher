@@ -35,7 +35,7 @@ def render_status(cfg):
              "Decision scopes"]
     for name, on in st["scopes"].items():
         lines.append(f"  {name:<13}{'on' if on else 'off'}")
-    lines += ["", "Thresholds (provisional — see evals/decision)"]
+    lines += ["", "Thresholds (calibrated — see docs/jev.md)"]
     for name, val in st["thresholds"].items():
         lines.append(f"  {name:<20}{val:g}")
     lines += ["", "Config from   " + ", ".join(st["config_sources"])]

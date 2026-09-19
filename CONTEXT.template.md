@@ -109,9 +109,9 @@ are two of them.
 engine. You decide the role from `SKILL.md`; skills come from the loadout's `skills_core` and
 `skills_preferred`; tools from its `mcp_recommended`. No account, no key, no network call.
 
-**Jev** — optional, and only when a user supplied their own provider credential. It returns one
-typed choice over the role roster with a confidence, and a relevance score per candidate skill
-and per registered server. The runtime exposes it as a program rather than a tool: run
+**Jev** — optional, and inert unless a user supplied a credential *and* enabled a decision scope;
+a credential alone changes nothing. Then it returns a typed choice over the role roster with a
+confidence, and a relevance score per candidate skill and per registered server. The runtime exposes it as a program rather than a tool: run
 `python3 -m decision plan --task "<the request>"` from the pack directory — or from anywhere
 with `PYTHONPATH=<pack> python3 -m decision …` — adding `--agent <id>` when the user named a
 role and `--stack next.js,tailwind` when detection found one. Read the result and carry it into
