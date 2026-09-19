@@ -176,6 +176,23 @@ def main():
             f"specialist would materially change the answer, say so in one line and keep going.\n\n"
             f"$ARGUMENTS\n")
 
+    # README role table, regenerated between markers so command names never drift.
+    readme = ROOT / "README.md"
+    if readme.exists():
+        txt = readme.read_text()
+        a, b = "<!-- roles:start -->", "<!-- roles:end -->"
+        if a in txt and b in txt:
+            out = []
+            for cat in ["Core", "Engineering", "Product & Design", "Knowledge & Business"]:
+                rows = [t for t in tpls if t["category"] == cat]
+                out += [f"### {cat}", "", "| Command | Role | What it does |",
+                        "| --- | --- | --- |"]
+                out += [f"| `/agent-{SLUG.get(t['id'], t['id'])}` | {t['name']} | {t['description']} |"
+                        for t in rows]
+                out += [""]
+            txt = txt[:txt.index(a) + len(a)] + "\n\n" + "\n".join(out) + txt[txt.index(b):]
+            readme.write_text(txt)
+
     # SessionStart hook: perpetual mode, armed by ~/.claude/.agent-dispatcher-active
     HOOKS.mkdir(parents=True, exist_ok=True)
     index = "\n".join(
