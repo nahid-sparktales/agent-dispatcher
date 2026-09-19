@@ -1,5 +1,63 @@
 # Changelog
 
+## 2.3.4 — 2026-09-19
+
+2.3.3 claimed the silent-no-op class was addressed by running the hook. It was not, and the
+claim is withdrawn.
+
+Running the output catches a hook that is *broken*. It cannot catch an edit that never applied,
+because the old behaviour was working — nothing is broken, so nothing fails. Moving the shell
+into `HOOK.template.sh` did not fix it either: `build.py` still substitutes into that file, and
+a `.replace()` whose search string stops matching misses exactly as quietly against a `.sh` file
+as against an f-string. The file extension changes nothing about that.
+
+### The actual fix
+
+`sub()` and `render()` in `build.py`. A substitution that matches nothing is now fatal:
+
+    build.py: {{ROLEZ}} is not in the text it was about to replace —
+    the substitution would have silently applied to nothing
+
+That is the one place the miss *can* be noticed, because it is the only place that knows a
+replacement was intended. The artifact cannot show it — it keeps its old content, so the drift
+check compares it against a rebuild that also kept the old content, and the two agree. Every
+template substitution in the generator now goes through `sub()`.
+
+It found four of these the moment it was added. `write_router` had been substituting
+`{{SKILL_COUNT}}`, `{{EXTERNAL_COUNT}}`, `{{RECIPE_COUNT}}` and `{{MCP_COUNT}}` into
+`SKILL.template.md`, which has not contained any of them for several releases. Four calls
+quietly doing nothing, across eight commits, with a green suite the whole time.
+
+### Also
+
+- **`HOOK.template.sh`** — the perpetual-mode hook is a shell file rather than a Python
+  f-string. That does not make failed edits louder, and the docstring now says so; what it does
+  remove is the second escaping layer that produced a `printf` rendering its own escape
+  sequences. It was also untracked while `build.py` hard-required it — a fresh clone would have
+  died in `install.sh` before installing anything. A new check fails if any template the build
+  reads is present locally but not committed, which is the only way to catch that: it builds
+  fine for whoever has the file.
+- **The preamble budget check was measuring the wrong thing.** It scraped the generated script
+  for heredocs and counted those, missing ~1,000 bytes of `printf` output, and — being a regex
+  over generated text — it would have passed at *zero bytes measured* if the heredoc marker were
+  ever renamed. It now measures the hook's real stdout, with a lower bound so empty output fails.
+- **Frontmatter quoting.** Values were emitted with an f-string and parsed by stripping the outer
+  quote pair, so `name: "The "Fixer""` round-tripped through this repo agreeing with itself while
+  being invalid YAML to anything else. `json.dumps` on the way out, `json.loads` on the way in,
+  and an unescaped quote is now rejected with the fix in the message.
+- **`--uninstall` deregistered the hook after deleting the script**, leaving `settings.json`
+  starting a file that was gone. It also dropped the whole `SessionStart` entry, taking any hook
+  of the user's own that shared it. Both fixed, and both pinned by tests that run the real script.
+- `install.sh`'s two embedded Python blocks had never been checked to be valid Python, and the
+  install and uninstall paths had never been executed by any test. Both now are.
+
+### On the method
+
+Every fix above came from an adversarial review that was told to verify rather than trust, and
+several findings were refuted on inspection. The two that mattered most — the no-op guard and
+the budget check measuring its own source — were confirmed by reintroducing the defect and
+watching the suite go red. An assertion nobody has watched fail is a guess about what it covers.
+
 ## 2.3.3 — 2026-09-19
 
 The SessionStart hook was checked by reading it. It is now checked by running it.
@@ -21,14 +79,42 @@ The SessionStart hook was checked by reading it. It is now checked by running it
     garbage. Caught now by asserting the rendered output contains no literal escape sequences.
     Reintroducing that bug fails the suite.
   - **The silent no-op.** An edit to the generator whose search string does not match leaves the
-    artifact unchanged, and drift *passes*, because nothing changed. The test suite was never
-    going to catch that on its own; running the output is what does.
+    artifact unchanged, and drift *passes*, because nothing changed. Running the output catches
+    the ones that change behaviour, and only those. Moving the shell into `HOOK.template.sh`
+    does not help here at all: a `.replace` against a `.sh` file misses exactly as quietly as one
+    against an f-string.
   - **The security one.** The two-step project allow-list is the reason a cloned repository
     cannot switch your sessions into perpetual mode. That property had no test. Removing the
     allow-list check from the generator now fails two checks by name.
 
 Each of the three was verified by reintroducing the defect and watching the suite go red, rather
 than by assuming the assertion covers it.
+
+### Fixed
+
+- **Every substitution in `build.py` now refuses to be a no-op.** `sub()`/`render()` raise when
+  the search string is absent, and `marked()` raises instead of returning the text when a
+  `<!-- name:start -->` region is missing. This is the actual fix for the class above, and the
+  only place it can be fixed: the generator is the one component that knows a substitution was
+  intended. Nothing downstream can tell "the artifact is correct" from "the artifact was never
+  touched" — the drift check compares stale content against a rebuild that is equally stale.
+
+  It found four dead substitutions on its first run. `write_router` had been replacing
+  `{{SKILL_COUNT}}`, `{{EXTERNAL_COUNT}}`, `{{RECIPE_COUNT}}` and `{{MCP_COUNT}}` in
+  `SKILL.template.md` for several releases after the template stopped containing them. Removed.
+
+  What this still cannot detect: a change someone meant to make and never wrote. That is not
+  reachable from anything in the repository.
+
+- **Role frontmatter is emitted and parsed as YAML, not assembled with literal quotes.**
+  `write_roles` was building `name: "{value}"` by hand, so a `"` inside a template value produced
+  `name: "The "Fixer""` — not YAML. It round-tripped clean: `read_frontmatter` stripped the outer
+  pair whenever the first and last characters matched, handed the original string back, and the
+  drift check compared a rebuild that made the same mistake. The generator now emits each quoted
+  value with `json.dumps` (a JSON string is what YAML means by a double-quoted scalar) and
+  `read_frontmatter` parses one with `json.loads`, so an unescaped quote in a template fails the
+  build by name instead of shipping. No template carries a quote today, which is exactly why
+  nothing static could see it: the check emits a quote-bearing role and parses the file back.
 
 ## 2.3.2 — 2026-09-19
 

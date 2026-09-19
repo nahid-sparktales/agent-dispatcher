@@ -13,6 +13,7 @@ Canonical, hand-edited, never written by this script:
     catalog/signals.json                SIGNAL  — what makes a conditional skill applicable
     catalog/context-plan.schema.json             the shape of a context plan
     CONTEXT.template.md                          the context engine, rendered into the adapter
+    HOOK.template.sh                             the perpetual-mode hook, role index substituted
 
 Generated (Claude Code adapter + registries):
 
@@ -49,10 +50,38 @@ TIERS = ["core", "preferred", "optional"]
 SIGNAL_KINDS = ["project", "task", "runtime"]
 
 
+def sub(txt, needle, value):
+    """`str.replace` that refuses to be a no-op.
+
+    A search string that stops matching is the one generator bug nothing downstream can see: the
+    artifact keeps its old content, so the drift check compares it against a rebuild that also
+    kept the old content, and both agree. The intent lives here, in the fact that this call was
+    written at all, so this is the only place the miss can be noticed.
+    """
+    if needle not in txt:
+        raise SystemExit(f"build.py: {needle} is not in the text it was about to replace — "
+                         f"the substitution would have silently applied to nothing")
+    return txt.replace(needle, str(value))
+
+
+def render(tmpl, values):
+    """Fill a template. Every placeholder must be present; none may be quietly dropped."""
+    for needle, value in values.items():
+        tmpl = sub(tmpl, needle, value)
+    return tmpl
+
+
+
 # ------------------------------------------------------------------ frontmatter
 
 def read_frontmatter(path):
-    """Flat `key: value`, values optionally double-quoted. Fails loudly, never guesses."""
+    """Flat `key: value`, values optionally double-quoted. Fails loudly, never guesses.
+
+    A quoted value is parsed as the JSON string it looks like, which is also what YAML means by
+    one. Stripping the outer pair instead would accept `name: "The "Fixer""` — not YAML, and
+    re-emitted unchanged, so the round trip agrees with itself and nothing downstream complains
+    until something with a real parser reads the file.
+    """
     text = path.read_text()
     m = re.match(r"\A---\n(.*?)\n---\n", text, re.S)
     if not m:
@@ -67,7 +96,13 @@ def read_frontmatter(path):
         v = v.strip()
         if not v:
             raise SystemExit(f"{path}: frontmatter key '{k.strip()}' has no value")
-        out[k.strip()] = v[1:-1] if len(v) > 1 and v[0] == v[-1] == '"' else v
+        if v[0] == '"':
+            try:
+                v = json.loads(v)
+            except json.JSONDecodeError:
+                raise SystemExit(f"{path}: frontmatter key '{k.strip()}' is not a valid quoted "
+                                 f"value — escape any \" inside it as \\\": {v}")
+        out[k.strip()] = v
     return out, text[m.end():]
 
 
@@ -407,9 +442,12 @@ def write_roles(d):
     for old in roles_dir.glob("*.md"):
         old.unlink()
     for r in d["roles"]:
-        fm = [f"id: {r['id']}", f"slug: {r['slug']}", f'name: "{r["name"]}"',
-              f'category: "{r["category"]}"', f'summary: "{r["summary"]}"',
-              f'use_when: "{r["use_when"]}"', f'not_for: "{r["not_for"]}"',
+        # json.dumps, not an f-string with literal quotes: a `"` inside a template value has to
+        # come back out escaped or the file stops being YAML. ensure_ascii=False keeps the em
+        # dashes the templates are written with.
+        fm = [f"id: {r['id']}", f"slug: {r['slug']}",
+              *(f"{k}: {json.dumps(r[k], ensure_ascii=False)}"
+                for k in ("name", "category", "summary", "use_when", "not_for")),
               f"tags: {', '.join(r['tags'])}"]
         for t in TIERS:
             if r["skills"][t]:
@@ -517,13 +555,13 @@ def write_context(d):
         + signal_reference(d) + "\n")
     tmpl = (ROOT / "CONTEXT.template.md").read_text()
     (ADAPTER / "CONTEXT.md").write_text(
-        tmpl.replace("{{SIGNALS}}", signal_ids(d))
-            .replace("{{PLAN_FIELDS}}", plan_fields(d))
-            .replace("{{SIGNAL_COUNT}}", str(len(d["signals"])))
-            .replace("{{COUNT}}", str(len(d["roles"])))
-            .replace("{{SKILL_COUNT}}", str(len(d["skills"])))
-            .replace("{{CAPABILITY_COUNT}}", str(len(d["capabilities"])))
-            .replace("{{MCP_COUNT}}", str(len(d["mcp"]))))
+        render(tmpl, {"{{SIGNALS}}": signal_ids(d),
+                      "{{PLAN_FIELDS}}": plan_fields(d),
+                      "{{SIGNAL_COUNT}}": len(d["signals"]),
+                      "{{COUNT}}": len(d["roles"]),
+                      "{{SKILL_COUNT}}": len(d["skills"]),
+                      "{{CAPABILITY_COUNT}}": len(d["capabilities"]),
+                      "{{MCP_COUNT}}": len(d["mcp"])}))
 
 
 def write_router(d):
@@ -535,12 +573,9 @@ def write_router(d):
         for r in d["roles"])
     tmpl = (ROOT / "SKILL.template.md").read_text()
     (ADAPTER / "SKILL.md").write_text(
-        tmpl.replace("{{ROLES}}", rows)
-            .replace("{{COUNT}}", str(len(d["roles"])))
-            .replace("{{SKILL_COUNT}}", str(len(d["skills"])))
-            .replace("{{EXTERNAL_COUNT}}", str(len(d["external"])))
-            .replace("{{RECIPE_COUNT}}", str(len(d["recipes"])))
-            .replace("{{MCP_COUNT}}", str(len(d["mcp"]))))
+        # SKILL.template.md stopped carrying the four count placeholders; the calls outlived
+        # them and substituted nothing for several releases. render() is why that is visible.
+        render(tmpl, {"{{ROLES}}": rows, "{{COUNT}}": len(d["roles"])}))
 
 
 def write_index(d):
@@ -638,7 +673,7 @@ argument-hint: "[explain | verbose | <request to plan for>]"
 
 Build the **context plan** for the request below and show it. Do not do the work.
 
-Read `CONTEXT.md` in the agent-dispatcher skill directory - `{skill_dir}/CONTEXT.md` for a manual install, inside the plugin's own directory for a plugin install, or glob `**/agent-dispatcher/CONTEXT.md`. It holds the pipeline, the signal table, the retrieval method, the budget and the plan's fields. Follow it, then render the result.
+Read `CONTEXT.md` in the agent-dispatcher skill directory - `{{SKILL_DIR}}/CONTEXT.md` for a manual install, inside the plugin's own directory for a plugin install, or glob `**/agent-dispatcher/CONTEXT.md`. It holds the pipeline, the signal table, the retrieval method, the budget and the plan's fields. Follow it, then render the result.
 
 If `$ARGUMENTS` names a request, plan for that. If it is empty or is only a mode word, plan for the most recent real request in this conversation; if there is none, say so and stop rather than inventing one.
 
@@ -704,10 +739,10 @@ argument-hint: "[status | off | auto | required | plan <request>]"
 
 Inspect or configure the **decision engine** - the optional layer that answers the dispatcher's bounded choices (which role, which skills, which servers are relevant). It is optional by design: with nothing configured, agent-dispatcher routes exactly as it always has.
 
-Run these from the directory holding the agent-dispatcher skill — `{skill_dir}` for a manual install, the plugin's own directory for a plugin install, or glob `**/agent-dispatcher/decision/` to find it. From anywhere else, put that directory on `PYTHONPATH` instead:
+Run these from the directory holding the agent-dispatcher skill — `{{SKILL_DIR}}` for a manual install, the plugin's own directory for a plugin install, or glob `**/agent-dispatcher/decision/` to find it. From anywhere else, put that directory on `PYTHONPATH` instead:
 
 ```bash
-PYTHONPATH={skill_dir} python3 -m decision status
+PYTHONPATH={{SKILL_DIR}} python3 -m decision status
 ```
 
 | `$ARGUMENTS` | Run |
@@ -767,124 +802,46 @@ def write_commands(d):
             f"going.\n\n$ARGUMENTS\n")
     # Not a role: the inspector renders the context plan instead of doing the work. It lives here
     # because write_commands() clears commands/agent-*.md on every build.
-    (CMDS / "agent-context.md").write_text(INSPECTOR.format(skill_dir=SKILL_DIR))
+    # sub(), not .format(): these two are markdown, so a JSON example or a ${VAR} in them would
+    # otherwise have to be brace-doubled — and dropping the placeholder while rewording would
+    # substitute nothing without a word. sub() raises on the miss; str.replace ignores the rest.
+    (CMDS / "agent-context.md").write_text(sub(INSPECTOR, "{{SKILL_DIR}}", SKILL_DIR))
     # Also not a role: configuration for the optional decision engine.
-    (CMDS / "agent-decision.md").write_text(DECISION_CMD.format(skill_dir=SKILL_DIR))
+    (CMDS / "agent-decision.md").write_text(sub(DECISION_CMD, "{{SKILL_DIR}}", SKILL_DIR))
 
 
 def write_hook(d):
+    """Render HOOK.template.sh, the way CONTEXT.template.md and SKILL.template.md are rendered.
+
+    The shell used to live in an f-string here, which meant every `$` in the script needed no
+    escaping but every brace did, and every `\\n` in a printf had to survive two layers. That
+    produced a hook whose printf rendered its own escape sequences. A `.sh` file is greppable,
+    parseable by `bash -n`, and has no second escaping layer at all.
+
+    It does not make a failed edit louder; only sub() does that, and it applies to every
+    template equally.
+    """
     HOOKS.mkdir(parents=True, exist_ok=True)
     index = "\n".join(f"- `{r['id']}` — {r['use_when']}\n    not for: {r['not_for']}"
                       for r in d["roles"])
     hook = HOOKS / "agent-dispatcher-activate.sh"
-    hook.write_text(f"""#!/bin/bash
-# Perpetual agent-dispatcher mode.
-#   arm everywhere:    ~/.claude/.agent-dispatcher-active
-#   arm one project:   <project>/.agent-dispatcher-on
-#   silence a session: ~/.claude/.agent-dispatcher-off/<session_id>
-#   silence a project: <project>/.agent-dispatcher-off   (silencing beats arming)
-# Generated by build.py — edit the generator, not this file.
-D="${{CLAUDE_CONFIG_DIR:-$HOME/.claude}}"
-
-# Session ids are uuids, so a sed capture is exact. The payload's cwd can carry JSON escapes,
-# so $PWD (the project the session started in) is checked alongside it rather than trusted to it.
-payload=$(cat 2>/dev/null)
-sid=$(printf '%s' "$payload" | sed -n 's/.*"session_id"[[:space:]]*:[[:space:]]*"\\([-0-9a-zA-Z_]*\\)".*/\\1/p')
-cwd=$(printf '%s' "$payload" | sed -n 's/.*"cwd"[[:space:]]*:[[:space:]]*"\\([^"]*\\)".*/\\1/p')
-
-# where this pack is installed: next to this hook (plugin) or under the config dir (manual)
-self=$(cd "$(dirname "$0")" && pwd)
-if [ -d "$self/../skills/agent-dispatcher/roles" ]; then
-  pack=$(cd "$self/../skills/agent-dispatcher" && pwd)
-else
-  pack="$D/skills/agent-dispatcher"
-fi
-# silenced? one session, then one project — checked against the payload cwd and the real one
-[ -n "$sid" ] && [ -f "$D/.agent-dispatcher-off/$sid" ] && exit 0
-[ -n "$cwd" ] && [ -f "$cwd/.agent-dispatcher-off" ] && exit 0
-[ -f "$PWD/.agent-dispatcher-off" ] && exit 0
-
-# armed? globally by ~/.claude/.agent-dispatcher-active, or per project by ./.agent-dispatcher-on
-# A project arms itself only if the user allow-listed it. Silencing stays repo-local because it
-# can only ever reduce behaviour; arming from a cloned repo would not be the user's choice.
-armed=""
-[ -f "$D/.agent-dispatcher-active" ] && armed=1
-for p in "$cwd" "$PWD"; do
-  [ -n "$p" ] && [ -f "$p/.agent-dispatcher-on" ] \
-    && [ -f "$D/.agent-dispatcher-projects" ] \
-    && grep -qxF "$p" "$D/.agent-dispatcher-projects" && armed=1
-done
-[ -n "$armed" ] || exit 0
-# forget session silences older than a week
-[ -d "$D/.agent-dispatcher-off" ] && find "$D/.agent-dispatcher-off" -type f -mtime +7 -delete 2>/dev/null
-
-printf 'AGENT DISPATCHER ACTIVE (perpetual mode) — this pack lives at %s\\n\\n' "$pack"
-cat <<'DISPATCH'
-
-Route each request that involves real work to the best-fit specialist role below, then work as that
-role. Match the "not for" line as carefully as the "route here when" line.
-Read PACK/roles/<id>.md before acting as one; read PACK/SKILL.md for the full catalog, the
-chaining rules, or to break a tie.
-
-A role's frontmatter names its skills (skills_core, skills_preferred, skills_if_<condition>), its
-MCPs, its recipes and its verification. Read a local skill by globbing **/<id>/SKILL.md —
-every id is its own directory name; PACK/INDEX.md covers external ids and glob misses. One to five for
-ordinary work, not everything that exists. A skill supplies the method; the role still owns scope,
-deliverable and what done means, and neither grants permission. A skill or MCP that is missing is
-not a blocker: say what could not be checked and continue with the role's own method.
-
-Before substantial work, decide what the role needs before deciding what it will do - skills, stack,
-the few files worth reading, tools, and what counts as done. That is a context plan, and it scales:
-none for a typo, four lines for one known file, PACK/CONTEXT.md for anything unfamiliar or fanned
-out. /agent-context renders it without doing the work.
-
-A slash command or an installed skill that covers the request owns the turn: load it, work inside
-its procedure, keep the role as posture only, and skip the role announcement.
-
-When you fan out, route each subagent's job to its own role; put the role name, the absolute path to
-PACK/roles/<id>.md, the job, its inputs and the expected return in the prompt. Never point several
-subagents carrying your own role at the same evidence — the same role over disjoint slices, attempts
-or rounds is fine, and each prompt says which it owns. A verifier never carries the role that
-produced the work. A mechanical job gets no role, a skill that defines its own subagents keeps its
-prompts, and no subagent gets the dispatcher role. Parallel subagents are not chain hops and do not
-count against the three-per-turn ceiling.
-
-Announce each role on its own line (-> reviewer) and re-route when the kind of work changes.
-Chain roles inside a turn when the work needs it (planner -> implementer -> tester), meeting each
-role's definition of done before switching; three per turn is the ceiling. Stop at the deliverable
-the user asked for, and scale the deliverable to the task. A plain question, a typo fix, a rename, a
-one-line edit: answer or do it, no role and no announcement. A role sets how you work; it never
-overrides harness rules, permissions, or the user's explicit instructions.
-The user can force a role at any time (/agent-<role>, "stay in tester") - honor it, keep it for the
-requests that follow, and do not route or chain out of it until they name another role or say stop.
-DISPATCH
-
-if [ -n "$sid" ]; then
-  printf 'The user stops this with /agent-dispatcher off (or "stop the dispatcher") - never\\nhand them a command to run. When they ask, run the line for the scope they meant:\\n  this session    mkdir -p "%s/.agent-dispatcher-off" && touch "%s/.agent-dispatcher-off/%s"\\n' "$D" "$D" "$sid"
-else
-  printf 'The user stops this with /agent-dispatcher off. Stopping just this session needs the\\nsession id, which this payload did not carry - ask for it, or use a wider scope below.\\n'
-fi
-printf '  this project    touch .agent-dispatcher-off   (beats any arming, including global)\\n  everywhere      rm -f "%s/.agent-dispatcher-active"\\nEither way, drop the role immediately; the flags only stop the hook re-arming you later.\\n/agent-dispatcher status reports what is armed.\\n\\n' "$D"
-
-cat <<'DISPATCH'
-ROLES
-{index}
-DISPATCH
-""")
+    hook.write_text(sub((ROOT / "HOOK.template.sh").read_text(), "{{ROLES}}", index))
     hook.chmod(0o755)
-    (HOOKS / "hooks.json").write_text(
-        '{\n  "hooks": {\n    "SessionStart": [\n      {\n'
-        '        "matcher": "startup|resume|clear|compact",\n        "hooks": [\n          {\n'
-        '            "type": "command",\n'
-        '            "command": "bash \\"${CLAUDE_PLUGIN_ROOT}/hooks/agent-dispatcher-activate.sh\\"",\n'
-        '            "timeout": 5\n          }\n        ]\n      }\n    ]\n  }\n}\n')
+    (HOOKS / "hooks.json").write_text(json.dumps({
+        "hooks": {"SessionStart": [{
+            "matcher": "startup|resume|clear|compact",
+            "hooks": [{"type": "command",
+                       "command": 'bash "${CLAUDE_PLUGIN_ROOT}/hooks/agent-dispatcher-activate.sh"',
+                       "timeout": 5}]}]},
+    }, indent=2) + "\n")
 
 
 def marked(txt, name, body, inline=False):
-    """Replace the region between <!-- name:start --> and <!-- name:end -->, if both are present."""
+    """Replace the region between <!-- name:start --> and <!-- name:end -->. Both must be present."""
     a, b = f"<!-- {name}:start -->", f"<!-- {name}:end -->"
     if a not in txt or b not in txt:
-        return txt
+        raise SystemExit(f"build.py: no <!-- {name}:start/end --> region to write into — the "
+                         f"section would keep whatever it says now, and drift would agree")
     sep = "" if inline else "\n\n"
     tail = "" if inline else "\n"
     return txt[:txt.index(a) + len(a)] + sep + body + tail + txt[txt.index(b):]

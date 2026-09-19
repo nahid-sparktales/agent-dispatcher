@@ -28,6 +28,18 @@ python3 test_build.py     # validate
 python3 test_decision.py  # the decision engine — deterministic, offline, no credential
 ```
 
+Editing the perpetual-mode hook means editing `HOOK.template.sh`, not
+`hooks/agent-dispatcher-activate.sh` — the second is generated from the first with the role
+index substituted in. The template is an ordinary shell file, so `bash -n HOOK.template.sh`
+parses it — which catches a syntax error and nothing else. What catches behaviour is the suite
+running the rendered hook against a temporary config dir instead of only reading it.
+
+Substitutions in `build.py` go through `sub()`/`render()`, and generated regions of a hand-edited
+file through `marked()`. All three raise when their search string or marker is absent. Do not
+route around them with a bare `str.replace`: a replace that matches nothing leaves the artifact
+as it was, and the drift check then compares stale content against an equally stale rebuild and
+passes.
+
 All three must pass. `test_decision.py` needs no network and no key: every external answer comes
 from a mock provider, so CI stays free and deterministic. The build is a validator as much as a generator — it rejects an unknown category, a
 loadout pointing at a skill that does not exist, a capability no skill provides, an unknown tool id,

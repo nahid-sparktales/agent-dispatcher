@@ -70,6 +70,13 @@ Hand-edited, and the only things worth editing:
     catalog/signals.json                  how each skills_if_<condition> bucket is decided
     catalog/context-plan.schema.json      the shape of a context plan
     CONTEXT.template.md                   the context engine, rendered into the adapter
+    HOOK.template.sh                      the perpetual-mode SessionStart hook, with the role
+                                          index substituted in. A shell file rather than a
+                                          string inside build.py, so it carries no second
+                                          escaping layer and can be parsed by bash -n. It is
+                                          still substituted into, so it is no safer than any
+                                          other template against a search string that stops
+                                          matching — sub() in build.py is what guards that
     decision/                             the decision engine: contract, default and Jev
                                           implementations, provider transports, CLI
     evals/decision/                       routing, skill and tool fixtures, and the harness that

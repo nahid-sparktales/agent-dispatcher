@@ -551,6 +551,7 @@ catalog/signals.json                  SOURCE — how each conditional skill buck
 catalog/context-plan.schema.json      SOURCE — the shape of a context plan
 SKILL.template.md                     SOURCE — the router body
 CONTEXT.template.md                   SOURCE — the context engine
+HOOK.template.sh                      SOURCE — the perpetual-mode SessionStart hook
 decision/                             SOURCE — the decision engine: contract, default and Jev
                                                implementations, provider transports, CLI
 evals/decision/                       SOURCE — routing/skill/tool fixtures, the comparison

@@ -135,8 +135,9 @@ def run_hook(config_dir, project_dir, session_id=None, cwd=None):
     return out.returncode, out.stdout
 
 
-def hook_behaviour(ids):
+def hook_behaviour(roles):
     """The arm/silence matrix, executed rather than read."""
+    ids = {r["id"] for r in roles}
     with tempfile.TemporaryDirectory() as tmp:
         root = pathlib.Path(tmp)
         cfg, proj, other = root / "config", root / "project", root / "other"
@@ -150,9 +151,21 @@ def hook_behaviour(ids):
         code, out = run_hook(cfg, proj, "s-1", str(proj))
         check("arming everywhere injects the preamble",
               "AGENT DISPATCHER ACTIVE" in out, repr(out[:80]))
+        # Billed to every armed session without the agent choosing to read it.
+        check("perpetual-mode preamble stays affordable", 0 < len(out) < 12000,
+              f"{len(out)} bytes injected into every armed session")
         check("the injected preamble carries the role index",
               set(re.findall(r"^- `([a-z0-9-]+)`", out, re.M)) == ids,
               "the roles the hook prints are not the roles that exist")
+        # Ids alone are not routing. The preamble tells the agent to match "not for" as carefully
+        # as "route here when", so both texts have to survive into what the hook actually prints.
+        # Asserting the text rather than the line format keeps this independent of build.py's
+        # f-string: editing the index format in build.py and in the drift check together still
+        # fails here if a field stops being printed.
+        thin = [r["id"] for r in roles
+                if r["use_when"] not in out or r["not_for"] not in out]
+        check("the injected index carries each role's route-here and not-for text", not thin,
+              f"printed without their routing text: {thin[:4]}")
         check("the injected preamble has no unreplaced placeholder",
               "{" not in out.replace("${", ""), "a generator placeholder reached the output")
 
@@ -197,11 +210,173 @@ def hook_behaviour(ids):
         code, out = run_hook(cfg, other, "s-3", str(other))
         check("arming one project does not arm another", out == "")
 
+        # Role metadata is substituted into the hook, so it is a shell-injection surface if
+        # the heredoc around it is ever unquoted. A malicious role file in a PR is the threat.
+        hostile = ("- `evil` \u2014 $(touch " + str(root / "PWNED") + ") `id` \"q\u2019 "
+                   "{{ROLES}} ${HOME} " + chr(92) + " tail")
+        probe = root / "hostile.sh"
+        probe.write_text((ROOT / "HOOK.template.sh").read_text().replace("{{ROLES}}", hostile))
+        (cfg / ".agent-dispatcher-active").touch()          # arm, so there is output to inspect
+        out = subprocess.run(["bash", str(probe)], input='{"session_id":"s","cwd":"/tmp"}',
+                             capture_output=True, text=True, cwd=str(root),
+                             env=dict(os.environ, CLAUDE_CONFIG_DIR=str(cfg)))
+        (cfg / ".agent-dispatcher-active").unlink()
+        check("role metadata cannot inject shell into the hook",
+              not (root / "PWNED").exists() and hostile in out.stdout,
+              "the role index is expanded rather than printed — the heredoc lost its quotes")
+
         # A payload with no session id still has to work; only the stop line changes.
         code, out = run_hook(cfg, proj, None, str(proj))
         check("a payload with no session id still arms", "AGENT DISPATCHER" in out)
         check("and says the session id is missing rather than printing an empty path",
               "did not carry" in out, repr(out[-400:]))
+
+
+def install_heredocs():
+    """The two Python blocks in install.sh, executed rather than parsed.
+
+    Parsing them only catches a syntax error. The worse failure is the one that parses: a
+    filter that stops matching, or a lookup that stops writing through to `s`, leaves
+    install.sh exiting 0 having registered nothing — or, on uninstall, having left
+    settings.json pointing at the hook script the same run already deleted, so every later
+    session start errors. Nothing static sees that, because nothing changed. Only running the
+    blocks against a real settings.json and reading it back does.
+    """
+    blocks = re.findall(r"<<'PY'\n(.*?)\nPY\n", (ROOT / "install.sh").read_text(), re.S)
+    check("install.sh's two Python heredocs are still found", len(blocks) == 2,
+          f"{len(blocks)} found — the extraction, not install.sh, is probably what broke")
+    if len(blocks) != 2:
+        return
+    uninstall, install = blocks
+    script = (build.HOOKS / "agent-dispatcher-activate.sh").name
+
+    def run(block, d):
+        return subprocess.run([sys.executable, "-c", block, str(d)],
+                              capture_output=True, text=True)
+
+    def entries(d):
+        """settings.json as it stands, and the entries in it that belong to this pack."""
+        s = json.loads((d / "settings.json").read_text())
+        return s, [e for e in s.get("hooks", {}).get("SessionStart", [])
+                   if any(script[:-3] in h.get("command", "") for h in e.get("hooks", []))]
+
+    theirs = {"matcher": "startup", "hooks": [{"type": "command", "command": "echo theirs"}]}
+    # The three states a real machine presents. They matter separately: only the last one has
+    # `hooks` already in place, so a read that stops writing through to `s` still appends to a
+    # live list there and no-ops on the first two — which are the ordinary case.
+    seeds = {"no settings.json": None,
+             "settings.json without hooks": {"model": "opus"},
+             "settings.json with another hook": {"model": "opus",
+                                                 "hooks": {"SessionStart": [theirs]}}}
+    for label, seed in seeds.items():
+        with tempfile.TemporaryDirectory() as tmp:
+            d = pathlib.Path(tmp)
+            if seed is not None:
+                (d / "settings.json").write_text(json.dumps(seed) + "\n")
+
+            r = run(install, d)
+            s, ours = entries(d)
+            check(f"install.sh's block registers the SessionStart hook — {label}",
+                  r.returncode == 0 and len(ours) == 1,
+                  f"rc={r.returncode} {(r.stderr or r.stdout).strip()[:160]} — "
+                  f"{len(ours)} registered, so the installer reported success and armed nothing")
+            # The path it registers has to be the path the `cp` above it writes to, or the hook
+            # is registered under a name that does not exist the first time it is called.
+            check(f"and registers the path install.sh copies the script to — {label}",
+                  bool(ours) and f'"{d}/hooks/{script}"' in ours[0]["hooks"][0].get("command", ""),
+                  repr(ours[0]["hooks"][0].get("command", "") if ours else None))
+
+            r = run(install, d)
+            _, ours = entries(d)
+            check(f"a second install registers it once, not twice — {label}",
+                  r.returncode == 0 and len(ours) == 1,
+                  f"rc={r.returncode} — {len(ours)} registered")
+
+            r = run(uninstall, d)
+            s, ours = entries(d)
+            # The one that matters: this block runs *after* `rm -f` has deleted the script.
+            check(f"install.sh's uninstall block removes it again — {label}",
+                  r.returncode == 0 and not ours,
+                  f"rc={r.returncode} {(r.stderr or r.stdout).strip()[:160]} — {len(ours)} left "
+                  "registered against a script --uninstall has already deleted")
+            if seed:
+                check(f"and leaves the rest of settings.json alone — {label}",
+                      s.get("model") == "opus"
+                      and ("hooks" not in seed or theirs in s["hooks"]["SessionStart"]),
+                      str(s)[:200])
+                check(f"having backed it up first — {label}",
+                      (d / "settings.json.bak-agent-dispatcher").exists())
+    return install
+
+
+def install_script(install_block):
+    """`./install.sh --uninstall` itself, run — not only the Python inside it.
+
+    The blocks alone cannot show the order the shell runs them in, and the order is the sharp
+    edge: the settings.json rewrite sits in the same branch as the `rm -f` that deletes the hook
+    script, so with the rewrite second, anything stopping it — a hand-edited settings.json is
+    enough — leaves every session start pointing at a file the same run has already deleted.
+    Running `--uninstall` here is safe: that branch exits long before install.sh reaches this
+    suite, so there is no recursion.
+    """
+    if not install_block:
+        return
+    script_name = (build.HOOKS / "agent-dispatcher-activate.sh").name
+    theirs = {"type": "command", "command": "bash /theirs.sh"}
+    with tempfile.TemporaryDirectory() as tmp:
+        d = pathlib.Path(tmp)
+        script = d / "hooks" / script_name
+
+        def armed(settings):
+            """What a finished install leaves behind, minus the file copying."""
+            script.parent.mkdir(exist_ok=True)
+            script.write_text("#!/bin/bash\n")
+            (d / "settings.json").write_text(json.dumps(settings) + "\n")
+            subprocess.run([sys.executable, "-c", install_block, str(d)], capture_output=True)
+            return json.loads((d / "settings.json").read_text())
+
+        def uninstall():
+            return subprocess.run(["bash", str(ROOT / "install.sh"), "--uninstall"],
+                                  capture_output=True, text=True,
+                                  env=dict(os.environ, CLAUDE_CONFIG_DIR=str(d)))
+
+        # A hook of the user's own, sharing the entry ours was appended to. Filtering by entry
+        # rather than by hook deletes it, and the user's settings.json is the one place nothing
+        # can be restored from.
+        s = armed({"model": "opus"})
+        s["hooks"]["SessionStart"][0]["hooks"].append(theirs)
+        (d / "settings.json").write_text(json.dumps(s) + "\n")
+        uninstall()
+        left = [h for e in json.loads((d / "settings.json").read_text())["hooks"]["SessionStart"]
+                for h in e.get("hooks", [])]
+        check("--uninstall removes our hook and leaves a user hook sharing its entry alone",
+              left == [theirs], f"{left} — the filter is dropping the entry, not our hook")
+
+        # settings.json hand-edited since the install into something that will not parse.
+        armed({"model": "opus"})
+        (d / "settings.json").write_text('{"model": "opus",}\n')
+        r = uninstall()
+        check("--uninstall changes nothing when settings.json will not parse",
+              r.returncode != 0 and script.exists(),
+              "the hook script was deleted before the settings.json rewrite that failed — "
+              "settings.json is now left starting a script that is no longer there")
+        check("and says so rather than printing a traceback",
+              "not valid JSON" in r.stdout + r.stderr, (r.stdout + r.stderr).strip()[-160:])
+
+        # The ordering itself, which the check above cannot pin: it trips the guard at the top
+        # of the branch, so it passes whichever side of the `rm -f` the rewrite sits on. A
+        # settings.json can be valid JSON and still be one the rewrite chokes on — `"command":
+        # null` from a hand edit is enough — and then only the order decides what is left.
+        armed({"model": "opus"})
+        s = json.loads((d / "settings.json").read_text())
+        s["hooks"]["SessionStart"][0]["hooks"].append({"type": "command", "command": None})
+        (d / "settings.json").write_text(json.dumps(s) + "\n")
+        uninstall()
+        still_registered = script_name[:-3] in (d / "settings.json").read_text()
+        check("--uninstall never leaves settings.json starting a script it has already deleted",
+              not (still_registered and not script.exists()),
+              "the settings.json rewrite ran after the `rm -f` and did not finish — every "
+              "session start from here on errors on a hook script that is gone")
 
 
 def main():
@@ -250,6 +425,16 @@ def main():
           all(f"`{m}`" in switch for m in ("off", "auto", "required")))
     check("the decision switch never asks for a credential in chat",
           "Never ask the user to paste a credential" in switch)
+    # These two are the only commands built by substitution rather than by f-string, so they are
+    # the only ones where the placeholder can go missing and leave the text standing. Asserting
+    # the path literal here rather than build.py's SKILL_DIR is the point: comparing the artifact
+    # to the generator agrees with itself when the substitution silently applied to nothing.
+    for name, txt in (("agent-context.md", inspector), ("agent-decision.md", switch)):
+        check(f"{name} has no unreplaced placeholder", "{{" not in txt and "{skill_dir}" not in txt,
+              re.findall(r"\{\{?[A-Za-z_]+\}?\}", txt)[:3])
+        check(f"{name} says where the skill is installed",
+              "~/.claude/skills/agent-dispatcher" in txt,
+              "the skill path was substituted into nothing")
     hook = (build.HOOKS / "agent-dispatcher-activate.sh").read_text()
     check("hook index == templates", set(re.findall(r"^- `([a-z0-9-]+)`", hook, re.M)) == ids)
     rendered = sorted((build.ADAPTER / "roles").glob("*.md"))
@@ -312,13 +497,74 @@ def main():
           f"fired on a repo with no such stack: {sorted(fired)}")
 
     print("\ncontext cost of what is read")
-    hook_out = "".join(re.findall(r"<<'DISPATCH'\n(.*?)\nDISPATCH", hook, re.S))
-    # The two artefacts billed without the agent choosing to read them.
-    check("perpetual-mode preamble stays affordable", len(hook_out) < 12000,
-          f"{len(hook_out)} bytes injected into every armed session")
+    # The preamble's cost is billed against what the hook prints, not against the heredocs in its
+    # source: scraping the source misses the printf'd stop guidance, and a renamed heredoc marker
+    # would scrape nothing and pass the budget at zero bytes. Measured in hook_behaviour instead.
+
+    # A substitution whose search string stops matching leaves the artifact alone, so the drift
+    # check compares two copies of the stale content and passes. build.py is the only place that
+    # knows a substitution was meant to happen; these two pin that it still says so out loud.
+    try:
+        build.sub("nothing here", "{{MISSING}}", "x")
+        check("a substitution that matches nothing is fatal", False, "sub() returned quietly")
+    except SystemExit as e:
+        check("a substitution that matches nothing is fatal", "{{MISSING}}" in str(e), str(e))
+    try:
+        build.marked("no markers here", "roles", "body")
+        check("a generated region with no markers is fatal", False, "marked() returned the text")
+    except SystemExit as e:
+        check("a generated region with no markers is fatal", "roles:start" in str(e), str(e))
+
+    tmpl = (ROOT / "HOOK.template.sh").read_text()
+
+    # Grepping build.py for a quote style, and comparing the hook to the template, both pass when
+    # the generator has stopped reading the template and ships its own byte-identical copy: the
+    # template is then decoration, and the next edit to it does nothing. Drift cannot see that —
+    # the rebuild produces the same bytes it did before — and the comparison only fails later,
+    # after someone has already made the edit that vanished. Rebuilding from a template that was
+    # changed on purpose is the only check that fails while the copy is still identical.
+    with tempfile.TemporaryDirectory() as tmp:
+        sandbox = pathlib.Path(tmp)
+        (sandbox / "HOOK.template.sh").write_text(tmpl + "# edit-reaches-the-hook\n")
+        saved = build.ROOT, build.HOOKS
+        build.ROOT, build.HOOKS = sandbox, sandbox / "hooks"
+        try:
+            build.write_hook(d)
+            rebuilt = (sandbox / "hooks" / "agent-dispatcher-activate.sh").read_text()
+        except (SystemExit, OSError) as exc:  # no longer reading a template at that path
+            rebuilt = f"write_hook failed: {exc}"
+        finally:
+            build.ROOT, build.HOOKS = saved
+    check("an edit to HOOK.template.sh reaches the generated hook",
+          "# edit-reaches-the-hook" in rebuilt,
+          f"build.py is not rendering the template — editing it does nothing ({rebuilt[:80]!r})")
+
+    with tempfile.NamedTemporaryFile("w", suffix=".sh", delete=False) as fh:
+        fh.write(tmpl.replace("{{ROLES}}", "- `placeholder` — x"))
+        probe = fh.name
+    syntax = subprocess.run(["bash", "-n", probe], capture_output=True, text=True)
+    pathlib.Path(probe).unlink()
+    # bash -n parses; it does not run. It would not have caught the printf escaping bug — only
+    # hook_behaviour below does that. It is here for the clearer message, not the coverage.
+    check("the hook template parses as bash", syntax.returncode == 0,
+          syntax.stderr.strip()[:200])
+    check("the generated hook is the template plus the index",
+          (build.HOOKS / "agent-dispatcher-activate.sh").read_text().replace(
+              "\n".join(f"- `{r['id']}` — {r['use_when']}\n    not for: {r['not_for']}"
+                        for r in roles), "{{ROLES}}") == tmpl,
+          "the generator is doing something to the shell beyond substituting the index")
+
+    # A source file that exists locally but was never `git add`ed builds fine for whoever has it
+    # and dies in every fresh clone. Reading the file cannot catch that; only asking git can.
+    ls = subprocess.run(["git", "ls-files", "-z"], cwd=ROOT, capture_output=True, text=True)
+    if ls.returncode == 0:
+        known = set(ls.stdout.split("\0"))
+        loose = [f.name for f in sorted(ROOT.glob("*.template.*")) if f.name not in known]
+        check("every template the build reads is committed, not just present locally",
+              not loose, f"{loose} would be missing from a fresh clone")
 
     print("\nthe hook, actually run")
-    hook_behaviour(ids)
+    hook_behaviour(roles)
     check("router stays affordable", len(router) < 34000, f"{len(router)} bytes")
     # CONTEXT.md is read on demand, but it defines a ~12k-token standard budget; reading it must
     # not eat that budget.
@@ -350,6 +596,54 @@ def main():
     noisy = [sig for sig, n in shared.items() if n > 2]
     check("task signals discriminate between skills", not noisy,
           f"{noisy} fire for three or more skills, so they route nothing")
+
+    print("\nthe generator refuses to substitute into nothing")
+    # build.sub/build.marked raising is the only thing standing between a search string that
+    # stopped matching and an artifact that stays stale while every check agrees with it. Drift
+    # cannot catch that class — it compares a rebuild that also did nothing — so the guard itself
+    # is what gets pinned here. Reverting either to `return txt` fails this.
+    def refuses(fn):
+        try:
+            fn()
+        except SystemExit:
+            return True
+        return False
+    check("a replace that matches nothing stops the build",
+          refuses(lambda: build.sub("no placeholder here", "{{ROLES}}", "x")),
+          "build.sub substituted into nothing and let the build succeed")
+    check("a missing generated region stops the build",
+          refuses(lambda: build.marked("no markers here", "counts", "x")),
+          "build.marked left the file stale and let the build succeed")
+
+    # Same class again, in the frontmatter the roles are emitted with. A `"` inside a template
+    # value used to be pasted straight into `name: "..."`, and the reader stripped the outer pair
+    # back off, so template and artifact agreed while the file was no longer YAML. No template
+    # carries a quote today, so nothing static sees it: the only check that can is emitting a
+    # quote-bearing role and parsing the file back.
+    r = dict(roles[0], name='The "Fixer"', not_for='not a "quick" fix.')
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp = pathlib.Path(tmp)
+        real, build.ADAPTER = build.ADAPTER, tmp
+        try:
+            build.write_roles({**d, "roles": [r]})
+            fm, _ = build.read_frontmatter(tmp / "roles" / f"{r['id']}.md")
+        except SystemExit as exc:
+            fm = {"name": f"unreadable — {exc}", "not_for": ""}
+        finally:
+            build.ADAPTER = real
+        bad = tmp / "bad.md"
+        bad.write_text('---\nname: "The "Fixer""\n---\n')
+        check("an unescaped quote in a template is rejected, not round-tripped",
+              refuses(lambda: build.read_frontmatter(bad)),
+              "read_frontmatter stripped the outer pair and handed malformed YAML back as a value")
+    check("a quote inside a role value survives the emit/parse round trip",
+          (fm["name"], fm["not_for"]) == (r["name"], r["not_for"]),
+          f"{fm['name']!r} / {fm['not_for']!r}")
+
+    # Same class, one layer out: install.sh's two Python blocks are Python inside a quoted bash
+    # heredoc, and `bash -n` only ever sees the shell. Compiling them would catch a syntax error
+    # and nothing else, so they get run against a throwaway settings.json instead.
+    install_script(install_heredocs())
 
     print("\nhygiene")
     tracked = [p for p in ROOT.rglob("*")

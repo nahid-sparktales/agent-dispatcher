@@ -24,7 +24,35 @@ uninstall_previous() {
   rm -f "$MANIFEST"
 }
 
+# A settings.json that will not parse is the one thing that stops either path part-way. Both
+# check before touching anything, so a failure is always "nothing happened" rather than half.
+require_valid_settings() {
+  python3 -c "import json,pathlib,sys; p=pathlib.Path(sys.argv[1])/'settings.json'; p.exists() and json.loads(p.read_text())" "$D" 2>/dev/null \
+    || { echo "$D/settings.json is not valid JSON — fix it first; nothing was changed"; exit 1; }
+}
+
 if [ "$1" = "--uninstall" ]; then
+  require_valid_settings
+  # Deregister before deleting. The other order leaves settings.json starting a hook script the
+  # same run has already removed, and every later session errors on it.
+  python3 - "$D" <<'PY'
+import json, pathlib, sys
+p = pathlib.Path(sys.argv[1]) / "settings.json"
+if p.exists():
+    s = json.loads(p.read_text())
+    starts = s.get("hooks", {}).get("SessionStart", [])
+    kept = []
+    for e in starts:
+        # Drop our hook, not the entry around it — a hook of the user's own may share it.
+        hooks = [h for h in e.get("hooks", [])
+                 if "agent-dispatcher-activate" not in h.get("command", "")]
+        if hooks or not e.get("hooks"):
+            kept.append(e if hooks == e.get("hooks", []) else {**e, "hooks": hooks})
+    if kept != starts:
+        s["hooks"]["SessionStart"] = kept
+        p.write_text(json.dumps(s, indent=2) + "\n")
+        print("removed SessionStart hook")
+PY
   uninstall_previous
   for f in commands/agent-*.md; do
     t="$D/commands/$(basename "$f")"
@@ -32,19 +60,6 @@ if [ "$1" = "--uninstall" ]; then
   done
   rm -rf "$D/skills/agent-dispatcher"
   rm -f "$D/hooks/agent-dispatcher-activate.sh"
-  python3 - "$D" <<'PY'
-import json, pathlib, shutil, sys
-p = pathlib.Path(sys.argv[1]) / "settings.json"
-if p.exists():
-    s = json.loads(p.read_text())
-    starts = s.get("hooks", {}).get("SessionStart", [])
-    kept = [e for e in starts
-            if not any("agent-dispatcher-activate" in h.get("command", "") for h in e.get("hooks", []))]
-    if len(kept) != len(starts):
-        s["hooks"]["SessionStart"] = kept
-        p.write_text(json.dumps(s, indent=2) + "\n")
-        print("removed SessionStart hook")
-PY
   echo "uninstalled from $D (flag files left alone)"
   exit 0
 fi
@@ -52,8 +67,7 @@ fi
 python3 build.py
 python3 test_build.py
 python3 test_decision.py
-python3 -c "import json,pathlib,sys; p=pathlib.Path(sys.argv[1])/'settings.json'; p.exists() and json.loads(p.read_text())" "$D" \
-  || { echo "$D/settings.json is not valid JSON — fix it first; nothing was installed"; exit 1; }
+require_valid_settings
 
 uninstall_previous
 mkdir -p "$D/skills" "$D/commands" "$D/hooks"
