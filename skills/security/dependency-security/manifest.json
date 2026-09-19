@@ -4,6 +4,15 @@
   "category": "security",
   "use_when": "An advisory or audit finding needs judging, a dependency is being added or bumped, a lockfile diff needs review, or someone asks whether a named CVE affects this project.",
   "not_for": "Finding vulnerabilities in first-party code, secret and credential exposure (secrets-management), auth weaknesses (auth-security), and treating a clean audit as proof the application is secure.",
+  "task_signals": [
+    "cve",
+    "npm audit",
+    "dependabot alert",
+    "vulnerable package",
+    "lockfile review",
+    "bump dependency",
+    "does this affect us"
+  ],
   "verifies": false,
   "tools": [
     "workspace",

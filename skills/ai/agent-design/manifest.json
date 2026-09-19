@@ -4,6 +4,14 @@
   "category": "ai",
   "use_when": "An agent or subagent is being scoped, granted tools, or reviewed after looping, over-reaching or reporting work it did not do.",
   "not_for": "Wording and measuring the prompt itself (prompt-engineering), deciding what occupies the window (context-engineering), and granting any permission the user has not already given.",
+  "task_signals": [
+    "build an agent",
+    "subagent",
+    "agent keeps looping",
+    "agent does too much",
+    "agent tool permissions",
+    "multi agent system"
+  ],
   "verifies": false,
   "tools": [
     "workspace",

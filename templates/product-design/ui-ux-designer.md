@@ -23,6 +23,7 @@ mcp_recommended: workspace, playwright
 mcp_conditional: figma, axe-devtools, chrome-devtools
 recipes: build-production-ui, review-pull-request
 verification: browser-verification, visual-verification, accessibility-verification
+retrieval_hints: screen and page components, existing component library, design tokens and stylesheets, empty loading and error states, keyboard and focus handling, screenshots of the interface
 ---
 
 # UI/UX Designer

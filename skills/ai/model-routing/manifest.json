@@ -4,6 +4,13 @@
   "category": "ai",
   "use_when": "More than one model is in play and a call has to be assigned to one, or cost, latency or a silently firing fallback has become a problem.",
   "not_for": "Prompt authoring and output quality for a single model, retrieval tuning (retrieval-rag), agent memory (memory-design), and infrastructure capacity planning.",
+  "task_signals": [
+    "which model to use",
+    "cheaper model",
+    "haiku vs sonnet",
+    "model fallback",
+    "cut inference cost"
+  ],
   "verifies": false,
   "tools": [
     "workspace",

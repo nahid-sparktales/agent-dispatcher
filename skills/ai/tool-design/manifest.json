@@ -4,6 +4,14 @@
   "category": "ai",
   "use_when": "A tool or function an LLM calls is being added or reshaped, or an agent is selecting the wrong tool, passing malformed arguments, looping, or stalling after a call.",
   "not_for": "Building or integrating the MCP server that hosts the tools (mcp-design), constraining a model's final answer to a schema (structured-output), general prompt wording, or internal functions no model invokes.",
+  "task_signals": [
+    "tool description",
+    "agent picks wrong tool",
+    "malformed arguments",
+    "function calling",
+    "too many tools",
+    "tool error messages"
+  ],
   "verifies": false,
   "tools": [
     "workspace",

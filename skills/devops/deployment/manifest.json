@@ -4,6 +4,15 @@
   "category": "devops",
   "use_when": "A change is going to an environment other people use, or the path that takes it there is being built or changed.",
   "not_for": "Proving the deployed revision is healthy (release-verification), getting back to a known-good state (rollback), schema sequencing itself (migrations), or an outage in progress where restoring service outranks release process.",
+  "task_signals": [
+    "deploy to production",
+    "ship it",
+    "release plan",
+    "rollout strategy",
+    "canary release",
+    "blue green deploy",
+    "how do we deploy"
+  ],
   "verifies": false,
   "tools": [
     "workspace",

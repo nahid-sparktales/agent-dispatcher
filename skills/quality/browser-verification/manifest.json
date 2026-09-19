@@ -4,6 +4,15 @@
   "category": "quality",
   "use_when": "A change touches rendered UI and someone is about to claim it works, or you are asked whether a screen actually functions.",
   "not_for": "Judging whether a design is good (ui-audit), covering a matrix of states x viewports x themes or comparing against a screenshot baseline (visual-verification), authoring test suites to keep (e2e-testing), or backend behaviour with no rendered surface.",
+  "task_signals": [
+    "check in the browser",
+    "does it render",
+    "blank screen",
+    "console errors",
+    "screenshot the page",
+    "verify the ui",
+    "check on mobile"
+  ],
   "verifies": true,
   "tools": [
     "playwright",

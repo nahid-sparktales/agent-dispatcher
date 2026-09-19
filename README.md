@@ -6,12 +6,15 @@ Routes each request to one of 27 specialist roles, keeps the role focused on res
 composes only the skills, tools and verification the job actually needs. Roles chain inside a turn
 when a handoff materially improves the outcome; simple tasks stay simple.
 
-<!-- counts:start -->**27 roles · 79 local skills · 31 external skills · 8 recipes · 19 MCP servers**<!-- counts:end -->
+<!-- counts:start -->**27 roles · 79 local skills · 31 external skills · 8 recipes · 19 MCP servers · 50 detection signals**<!-- counts:end -->
 
 ```text
 request
   → smallest suitable specialist
-  → relevant skills          (1–5, not everything installed)
+  → context plan             what that specialist needs, before what it will do
+  → relevant skills          (1–5, by capability, not by what is installed)
+  → project stack            detected from the repo; activates guidance, never permission
+  → workspace retrieval      the few files that matter, ranked, with provenance
   → available MCPs/tools     within existing permission
   → execution
   → verification             evidence, not confidence
@@ -32,6 +35,9 @@ Knowledge is not capability, and capability is not authorization.
 /agent-dispatcher            route this request and the rest of the session
 /agent-dispatcher on         perpetual mode, every future session
 /agent-dispatcher off        stop for this session
+/agent-context               show the context plan behind the current request
+/agent-context explain       ...and why this role, these skills, these tools
+/agent-context verbose       ...plus the candidates, the dropped files and the budget split
 ```
 
 Perpetual mode runs through a `SessionStart` hook. Scopes:
@@ -103,6 +109,30 @@ permission.
 The build enforces the restraint the design depends on: no role may carry more than five, or more
 than 30KB of, always-on skills, and two skills providing the same capability cannot both sit in
 tiers that load unconditionally.
+
+## The context engine decides what the specialist is given
+
+Routing picks who. The context engine picks what they work with, and it runs *before* any plan of
+action exists — those are two different documents:
+
+| | Context plan | Execution plan |
+| --- | --- | --- |
+| Question | What do I need to do this correctly? | What steps will I perform? |
+| Owner | The dispatcher, before the work | The specialist, during the work |
+
+It resolves the role, asks for capabilities rather than skills, decides the conditional buckets
+from real project signals, searches the workspace lexically and keeps the few results that matter
+with their provenance, resolves which servers are actually present, records what is genuinely known
+about authorization, fixes the verification contract before the work rather than after, and holds
+the whole thing to a budget. A rename gets no plan at all; the ceremony scales with the work.
+
+It claims nothing the runtime cannot support. There is no way to enumerate installed skills,
+configured servers, or the active permission mode, so a permission is `known` only with the
+observation behind it, and `unknown` is the common and correct answer. `/agent-context` renders the
+whole thing — including what it could not establish.
+
+[docs/context-engine.md](docs/context-engine.md) · the procedure itself ships as
+[`CONTEXT.md`](skills/agent-dispatcher/CONTEXT.md) inside the skill.
 
 ## MCPs and tools provide real capability
 

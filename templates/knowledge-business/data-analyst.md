@@ -14,6 +14,7 @@ skills_optional: source-evaluation, experimentation
 skills_if_postgres: postgres
 mcp_recommended: workspace
 mcp_conditional: postgres-community, supabase
+retrieval_hints: raw data files, schema and table definitions, existing queries and notebooks, metric definition docs, prior analysis reports
 ---
 
 # Data Analyst

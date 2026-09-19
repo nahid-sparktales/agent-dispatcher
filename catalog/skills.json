@@ -1,5 +1,5 @@
 {
-  "schema_version": "2.0.0",
+  "schema_version": "2.1.0",
   "generated_from": "skills/*/*/SKILL.md + manifest.json",
   "capabilities": [
     "ai.agent-design",
@@ -89,6 +89,15 @@
       "category": "design",
       "use_when": "UI is being built, changed or repaired and it has to be operable by keyboard and assistive technology \u2014 including turning an audit finding into an actual code change.",
       "not_for": "Proving the result holds (accessibility-verification), layout across viewports (responsive-design), or general visual critique.",
+      "task_signals": [
+        "screen reader",
+        "keyboard navigation",
+        "aria label",
+        "make it accessible",
+        "focus trap",
+        "alt text",
+        "a11y fix"
+      ],
       "verifies": false,
       "tools": [
         "workspace",
@@ -108,6 +117,14 @@
       "category": "design",
       "use_when": "Someone is about to claim a screen or flow is accessible, keyboard-operable, screen-reader usable or WCAG-conformant, or an accessibility fix needs re-checking.",
       "not_for": "Making the fixes (accessibility), general rendered-UI checks (browser-verification), or authoring a conformance statement \u2014 which is a separate, authorized act.",
+      "task_signals": [
+        "is this accessible",
+        "verify accessibility",
+        "wcag compliant",
+        "accessibility audit",
+        "axe scan",
+        "accessibility sign off"
+      ],
       "verifies": true,
       "tools": [
         "playwright",
@@ -129,6 +146,14 @@
       "category": "ai",
       "use_when": "An agent or subagent is being scoped, granted tools, or reviewed after looping, over-reaching or reporting work it did not do.",
       "not_for": "Wording and measuring the prompt itself (prompt-engineering), deciding what occupies the window (context-engineering), and granting any permission the user has not already given.",
+      "task_signals": [
+        "build an agent",
+        "subagent",
+        "agent keeps looping",
+        "agent does too much",
+        "agent tool permissions",
+        "multi agent system"
+      ],
       "verifies": false,
       "tools": [
         "workspace",
@@ -148,6 +173,14 @@
       "category": "ai",
       "use_when": "A prompt, model, tool definition or retrieval change is about to be called an improvement, agent behaviour must not silently regress, or a production failure needs to become a case that cannot come back.",
       "not_for": "Tracing or explaining what a single run did (llm-observability), red-teaming injection resistance (prompt-injection-defense), and testing deterministic code, which is tests.",
+      "task_signals": [
+        "evals",
+        "eval suite",
+        "did this improve",
+        "seems better",
+        "agent regression",
+        "llm as judge"
+      ],
       "verifies": true,
       "tools": [
         "workspace",
@@ -167,6 +200,15 @@
       "category": "security",
       "use_when": "An agent or subagent is being granted tools, credentials or MCP access, is about to reach a shared or production system, or acted beyond what the requester could have done.",
       "not_for": "The detailed ingestion trust boundary for untrusted content (prompt-injection-defense), scoping what an agent is for (agent-design), building the MCP server itself (mcp-design), and granting any permission the user has not already given.",
+      "task_signals": [
+        "agent permissions",
+        "mcp server access",
+        "subagent tools",
+        "agent credentials",
+        "tool approval",
+        "agent went rogue",
+        "give agent access"
+      ],
       "verifies": false,
       "tools": [
         "workspace"
@@ -185,6 +227,14 @@
       "category": "backend",
       "use_when": "An endpoint, API client or third-party integration is about to be reported as working, or someone asks whether an integration is actually verified.",
       "not_for": "Load and performance testing, rendered UI verification (browser-verification), and authoring a project's general test strategy.",
+      "task_signals": [
+        "verify the integration",
+        "does this endpoint work",
+        "contract test",
+        "hit the real api",
+        "confirm it actually works",
+        "check someone elses integration"
+      ],
       "verifies": true,
       "tools": [
         "workspace",
@@ -204,6 +254,15 @@
       "category": "backend",
       "use_when": "An HTTP endpoint is being added or reshaped, a response or error shape has to be decided, or a change to a published API has to be judged for breakage.",
       "not_for": "Choosing between REST, GraphQL and RPC (architecture), database schema design, webhook delivery contracts (webhooks), or making a POST safe to repeat (idempotency-and-retries).",
+      "task_signals": [
+        "new endpoint",
+        "rest api design",
+        "status codes",
+        "error response shape",
+        "pagination",
+        "openapi spec",
+        "breaking change for consumers"
+      ],
       "verifies": false,
       "tools": [
         "workspace",
@@ -223,6 +282,15 @@
       "category": "security",
       "use_when": "An existing auth path is reviewed, changed or doubted \u2014 sessions, tokens, reset and invite flows, impersonation, role elevation, MFA \u2014 or someone reports reaching another account's data.",
       "not_for": "Designing the login mechanism or session model in the first place (authentication), choosing the permission model (authorization), infrastructure IAM and network policy, and any testing against a system you were not told you may test.",
+      "task_signals": [
+        "account takeover",
+        "another users data",
+        "session hijacking",
+        "password reset flow",
+        "mfa bypass",
+        "jwt verification",
+        "privilege escalation"
+      ],
       "verifies": false,
       "tools": [
         "workspace",
@@ -242,6 +310,15 @@
       "category": "backend",
       "use_when": "A credential is issued, accepted, refreshed or revoked \u2014 login, logout, sessions, tokens, API keys, or an OAuth/OIDC integration.",
       "not_for": "Deciding what an authenticated caller may do (authorization), the login screen's design and copy, or secret storage and rotation policy at the infrastructure level.",
+      "task_signals": [
+        "add login",
+        "jwt token",
+        "session cookie",
+        "oauth sign in",
+        "refresh token",
+        "who is the user",
+        "api keys"
+      ],
       "verifies": false,
       "tools": [
         "workspace",
@@ -261,6 +338,14 @@
       "category": "backend",
       "use_when": "A rule of the form 'only X may do Y to Z' is added, changed or doubted \u2014 roles, permissions, per-owner or per-tenant scoping, admin paths.",
       "not_for": "Establishing who the caller is (authentication), UI affordances that merely hide controls, or infrastructure-level network and IAM policy, or investigating a live report that one caller reached another's data (auth-security).",
+      "task_signals": [
+        "roles and permissions",
+        "admin only",
+        "rbac",
+        "per tenant scoping",
+        "restrict access",
+        "permission check"
+      ],
       "verifies": false,
       "tools": [
         "workspace"
@@ -279,6 +364,15 @@
       "category": "backend",
       "use_when": "Work is being moved off a request path onto a queue or scheduler, or a job ran twice, never ran, ran out of order, or is stuck retrying.",
       "not_for": "Concurrency inside a single request, streaming topology design, or CI/cron pipeline configuration in the delivery system.",
+      "task_signals": [
+        "background job",
+        "queue worker",
+        "cron job",
+        "job ran twice",
+        "stuck in retry",
+        "move off request path",
+        "dead letter queue"
+      ],
       "verifies": false,
       "tools": [
         "workspace",
@@ -298,6 +392,15 @@
       "category": "quality",
       "use_when": "A change touches rendered UI and someone is about to claim it works, or you are asked whether a screen actually functions.",
       "not_for": "Judging whether a design is good (ui-audit), covering a matrix of states x viewports x themes or comparing against a screenshot baseline (visual-verification), authoring test suites to keep (e2e-testing), or backend behaviour with no rendered surface.",
+      "task_signals": [
+        "check in the browser",
+        "does it render",
+        "blank screen",
+        "console errors",
+        "screenshot the page",
+        "verify the ui",
+        "check on mobile"
+      ],
       "verifies": true,
       "tools": [
         "playwright",
@@ -319,6 +422,14 @@
       "category": "backend",
       "use_when": "A cache is about to be added to a read path, or existing cached data is stale, leaking across users, or being blamed for a bug.",
       "not_for": "Fixing the slow query or N+1 underneath (do that first), pure HTTP header tuning with no server-side store, or general performance profiling.",
+      "task_signals": [
+        "add caching",
+        "redis cache",
+        "stale data",
+        "cache invalidation",
+        "ttl",
+        "cdn caching"
+      ],
       "verifies": false,
       "tools": [
         "workspace",
@@ -338,6 +449,15 @@
       "category": "devops",
       "use_when": "A delivery pipeline is being designed or restructured, something broken reached an environment through a passing pipeline, or a stage is claiming more than it actually ran.",
       "not_for": "Provider-specific workflow syntax (github-actions), image authoring (docker), writing the tests themselves (test-design, test-strategy), or an outage in progress where restoring service comes first.",
+      "task_signals": [
+        "build pipeline",
+        "pipeline stages",
+        "what blocks merge",
+        "merge gate",
+        "green build shipped broken",
+        "restructure our ci",
+        "delivery pipeline"
+      ],
       "verifies": false,
       "tools": [
         "workspace",
@@ -357,6 +477,15 @@
       "category": "knowledge",
       "use_when": "A choice between real alternatives \u2014 library, service, vendor, build versus buy \u2014 has to be defended, or someone arrives with a comparison table and a conclusion.",
       "not_for": "General investigation method (deep-research), judging an individual source (source-evaluation), or writing positioning and marketing copy.",
+      "task_signals": [
+        "build vs buy",
+        "compare these tools",
+        "which library",
+        "vendor evaluation",
+        "alternatives to",
+        "comparison table",
+        "stacks up against"
+      ],
       "verifies": false,
       "tools": [
         "workspace",
@@ -378,6 +507,15 @@
       "category": "frontend",
       "use_when": "A component is being added, has grown props or responsibilities, or a structure is under review for whether it will hold.",
       "not_for": "Visual design and layout judgement, styling-system work (tailwind), or restructuring code the current task did not ask you to touch.",
+      "task_signals": [
+        "split this component",
+        "too many props",
+        "where should state live",
+        "prop drilling",
+        "component is huge",
+        "lift state up",
+        "restructure this component"
+      ],
       "verifies": false,
       "tools": [
         "workspace"
@@ -396,6 +534,14 @@
       "category": "ai",
       "use_when": "A prompt, agent or session loads substantial material, quality decays as context grows, or context has to be trimmed, summarized or split between inlining and retrieval.",
       "not_for": "Wording and measuring the prompt itself (prompt-engineering), scoping an agent's job and tools (agent-design), and choosing retrieval or vector-store infrastructure.",
+      "task_signals": [
+        "context window",
+        "too much context",
+        "running out of context",
+        "context rot",
+        "compaction",
+        "inline or retrieve"
+      ],
       "verifies": false,
       "tools": [
         "workspace"
@@ -414,6 +560,15 @@
       "category": "knowledge",
       "use_when": "Copy aimed at an audience outside the product is being written or rewritten \u2014 landing page, product messaging, email, ad, announcement \u2014 or an existing draft's claims need auditing before it ships.",
       "not_for": "Interface strings inside the product (ux-writing), documentation (technical-writing), and publishing or sending anything, which stays with the user.",
+      "task_signals": [
+        "landing page copy",
+        "marketing email",
+        "ad copy",
+        "launch announcement",
+        "rewrite this headline",
+        "punchier copy",
+        "sales page"
+      ],
       "verifies": false,
       "tools": [
         "workspace"
@@ -432,6 +587,15 @@
       "category": "knowledge",
       "use_when": "A dataset has to answer a question, a reported number needs explaining or reconciling, or a finding from data is about to reach someone who will act on it.",
       "not_for": "Defining product metrics and their instrumentation (product-analytics), designing or sizing an experiment (experimentation), building or repairing the pipeline that produced the data (data-pipelines), or writing standing quality assertions (data-quality).",
+      "task_signals": [
+        "analyze this dataset",
+        "two numbers disagree",
+        "what the data shows",
+        "reconcile these numbers",
+        "csv analysis",
+        "explain this number",
+        "spreadsheet numbers"
+      ],
       "verifies": false,
       "tools": [
         "workspace",
@@ -451,6 +615,15 @@
       "category": "database",
       "use_when": "A rule about what must always be true of the data needs to be enforced in a live schema, or an invariant that was enforced has drifted.",
       "not_for": "Asserting freshness, volume or distribution of produced data (data-quality), designing the schema in the first place (schema-design), or repairing rows without authorization.",
+      "task_signals": [
+        "data looks wrong",
+        "orphaned rows",
+        "duplicate records",
+        "reconciliation query",
+        "enforce this rule",
+        "inconsistent data",
+        "detect drift"
+      ],
       "verifies": false,
       "tools": [
         "workspace"
@@ -469,6 +642,15 @@
       "category": "database",
       "use_when": "A batch or streaming pipeline, scheduled transform or ingestion job is being built, repaired or backfilled, or a run dropped, duplicated or reshaped rows.",
       "not_for": "Destination schema design (schema-design) and its migrations (migrations), the standing assertions that guard produced data (data-quality), or interpreting what the resulting numbers mean.",
+      "task_signals": [
+        "etl job",
+        "pipeline failed",
+        "backfill",
+        "rerun duplicated rows",
+        "ingestion job",
+        "late events",
+        "scheduled transform"
+      ],
       "verifies": false,
       "tools": [
         "workspace",
@@ -488,6 +670,15 @@
       "category": "database",
       "use_when": "Checks on a dataset are being written or reviewed, a wrong value reached a consumer with nothing catching it, or an existing check is noisy enough to be ignored.",
       "not_for": "Proving one migration did what it claimed (database-migration-verification), building or repairing the pipeline that produces the data (data-pipelines), enforcing an invariant in the schema's own design (schema-design), or interpreting what the numbers mean, or enforcing an invariant inside a live schema (data-integrity).",
+      "task_signals": [
+        "data quality checks",
+        "stale data",
+        "freshness check",
+        "wrong number shipped",
+        "noisy alerts",
+        "row count dropped",
+        "dbt tests"
+      ],
       "verifies": false,
       "tools": [
         "workspace",
@@ -507,6 +698,14 @@
       "category": "database",
       "use_when": "A migration has been applied to some environment and someone is about to report it as working, or that claim is being reviewed.",
       "not_for": "Planning or sequencing the migration itself (migrations), ongoing correctness of data that no migration touched (data-integrity), or accepting a clean exit code as proof.",
+      "task_signals": [
+        "did the migration work",
+        "verify the migration",
+        "migration already ran",
+        "confirm backfill completed",
+        "migration succeeded",
+        "check before signing off"
+      ],
       "verifies": true,
       "tools": [
         "workspace",
@@ -526,6 +725,14 @@
       "category": "knowledge",
       "use_when": "An open question's answer will change a decision and the evidence is not already in the conversation \u2014 unfamiliar, contested or fast-moving material that needs framing, primary sources and a stopping rule.",
       "not_for": "Looking up a single fact with one authoritative home, mapping the local codebase, judging an individual source (source-evaluation), or comparing named products against criteria (competitive-analysis).",
+      "task_signals": [
+        "research this",
+        "look into",
+        "investigate this",
+        "find evidence",
+        "what are the tradeoffs",
+        "background reading"
+      ],
       "verifies": false,
       "tools": [
         "workspace",
@@ -546,6 +753,15 @@
       "category": "security",
       "use_when": "An advisory or audit finding needs judging, a dependency is being added or bumped, a lockfile diff needs review, or someone asks whether a named CVE affects this project.",
       "not_for": "Finding vulnerabilities in first-party code, secret and credential exposure (secrets-management), auth weaknesses (auth-security), and treating a clean audit as proof the application is secure.",
+      "task_signals": [
+        "cve",
+        "npm audit",
+        "dependabot alert",
+        "vulnerable package",
+        "lockfile review",
+        "bump dependency",
+        "does this affect us"
+      ],
       "verifies": false,
       "tools": [
         "workspace",
@@ -565,6 +781,15 @@
       "category": "devops",
       "use_when": "A change is going to an environment other people use, or the path that takes it there is being built or changed.",
       "not_for": "Proving the deployed revision is healthy (release-verification), getting back to a known-good state (rollback), schema sequencing itself (migrations), or an outage in progress where restoring service outranks release process.",
+      "task_signals": [
+        "deploy to production",
+        "ship it",
+        "release plan",
+        "rollout strategy",
+        "canary release",
+        "blue green deploy",
+        "how do we deploy"
+      ],
       "verifies": false,
       "tools": [
         "workspace",
@@ -585,6 +810,14 @@
       "category": "design",
       "use_when": "The project already has design tokens, a component library or a shared theme, and UI is being added or changed inside it.",
       "not_for": "Establishing a visual direction where no system exists (frontend-design), or judging an interface's usability (ui-audit).",
+      "task_signals": [
+        "design tokens",
+        "component library",
+        "our design system",
+        "new button variant",
+        "theme tokens",
+        "reuse existing component"
+      ],
       "verifies": false,
       "tools": [
         "workspace",
@@ -605,6 +838,15 @@
       "category": "design",
       "use_when": "A design, mockup, Figma frame or screenshot is the source for a UI change, or an existing implementation is being compared against one.",
       "not_for": "Deciding what the design should be (ui-design), judging whether a design is good (design critique), or proving the built screen renders and works (browser-verification).",
+      "task_signals": [
+        "figma",
+        "build this mockup",
+        "screenshot to code",
+        "match the design",
+        "implement this design",
+        "pixel perfect",
+        "design handoff"
+      ],
       "verifies": false,
       "tools": [
         "workspace",
@@ -625,6 +867,14 @@
       "category": "devops",
       "use_when": "A Dockerfile is being written, changed or reviewed, an image build is slow, bloated or non-deterministic, or configuration and secrets need a route into a container.",
       "not_for": "Orchestration, compose or cluster topology; CI workflow authoring (github-actions); pipeline stage design (ci-cd); or debugging application code that merely happens to be containerized.",
+      "task_signals": [
+        "dockerfile",
+        "container image",
+        "image is huge",
+        "docker build slow",
+        "multi stage build",
+        "containerize this app"
+      ],
       "verifies": false,
       "tools": [
         "workspace",
@@ -644,6 +894,15 @@
       "category": "knowledge",
       "use_when": "Documentation is about to be called correct, current or ready to publish, or a setup guide, quickstart or onboarding path fails at an unidentified step.",
       "not_for": "Judging whether the writing is clear or well structured (technical-writing), and standing in for the project's own test suite (test-strategy).",
+      "task_signals": [
+        "docs still accurate",
+        "setup guide fails",
+        "readme is stale",
+        "quickstart broken",
+        "broken links",
+        "onboarding fails",
+        "verify the docs"
+      ],
       "verifies": true,
       "tools": [
         "workspace",
@@ -663,6 +922,15 @@
       "category": "quality",
       "use_when": "An automated end-to-end suite is being created, extended, triaged for flake, or pruned, or a case has to be placed at or below this level.",
       "not_for": "Manually confirming one change renders and works (browser-verification), unit and integration coverage (test-design), choosing overall coverage levels (test-strategy), and load or performance testing.",
+      "task_signals": [
+        "e2e tests",
+        "playwright suite",
+        "cypress",
+        "flaky specs",
+        "end to end",
+        "intermittently red",
+        "user journey test"
+      ],
       "verifies": false,
       "tools": [
         "playwright",
@@ -682,6 +950,15 @@
       "category": "product",
       "use_when": "An A/B or online experiment is being designed, sized, sanity-checked or interpreted \u2014 including deciding whether the traffic can support one at all.",
       "not_for": "Defining the metric being tested (product-analytics), choosing which ideas to test (prioritization), or authorizing a rollout once a result is in.",
+      "task_signals": [
+        "ab test",
+        "split test",
+        "sample size",
+        "statistically significant",
+        "how long to run",
+        "stop the test early",
+        "result is flat"
+      ],
       "verifies": false,
       "tools": [
         "workspace"
@@ -700,6 +977,14 @@
       "category": "design",
       "use_when": "A new or reshaped UI surface needs a visual direction decided \u2014 hierarchy, type, colour, spacing, density \u2014 and no design system already decides it.",
       "not_for": "Critiquing an interface that already exists (ui-audit), working inside an established design system (design-systems), or proving a change renders and works (browser-verification).",
+      "task_signals": [
+        "looks generic",
+        "feels templated",
+        "visual direction",
+        "make it look good",
+        "style from scratch",
+        "new landing page"
+      ],
       "verifies": false,
       "tools": [
         "workspace",
@@ -719,6 +1004,15 @@
       "category": "frontend",
       "use_when": "A page is reported slow, a Core Web Vital or bundle size is named, or a change is about to be described as a performance improvement.",
       "not_for": "Backend, query or API latency; framework selection; and it does not replace rendered verification after the optimization lands.",
+      "task_signals": [
+        "page is slow",
+        "lcp",
+        "bundle size",
+        "lighthouse score",
+        "core web vitals",
+        "layout shift",
+        "slow first load"
+      ],
       "verifies": false,
       "tools": [
         "playwright",
@@ -738,6 +1032,15 @@
       "category": "devops",
       "use_when": "A GitHub Actions workflow is being added, changed or reviewed, or CI is slow, flaky, or reporting green when it should be red.",
       "not_for": "Provider-neutral pipeline and gate design (ci-cd), container image authoring (docker), writing the tests a workflow runs (test-design, e2e-testing), or authorizing a deployment.",
+      "task_signals": [
+        "github actions",
+        "workflow yaml",
+        "flaky ci",
+        "ci takes forever",
+        "actions secrets",
+        "ci passed but broken",
+        "cache in ci"
+      ],
       "verifies": false,
       "tools": [
         "workspace",
@@ -757,6 +1060,14 @@
       "category": "backend",
       "use_when": "An operation with an external side effect has to survive being repeated, a caller needs a retry policy, or duplicate effects have appeared and must be prevented.",
       "not_for": "Webhook receipt and delivery mechanics (webhooks), endpoint and error shape design (api-design), database transaction or locking design, and picking a queue technology.",
+      "task_signals": [
+        "charged twice",
+        "idempotency key",
+        "safe to retry",
+        "duplicate side effects",
+        "exponential backoff",
+        "timed out but maybe succeeded"
+      ],
       "verifies": false,
       "tools": [
         "workspace"
@@ -775,6 +1086,15 @@
       "category": "devops",
       "use_when": "Production is failing or degraded right now and stopping the ongoing harm matters more than a complete causal explanation.",
       "not_for": "A defect that is not currently failing in production (systematic-debugging), the root-cause investigation after recovery, release preparation and pipeline work, and the postmortem write-up.",
+      "task_signals": [
+        "production is down",
+        "site is down",
+        "outage right now",
+        "users are affected",
+        "prod degraded",
+        "got paged",
+        "everything is 500ing"
+      ],
       "verifies": false,
       "tools": [
         "workspace",
@@ -794,6 +1114,14 @@
       "category": "ai",
       "use_when": "An agent fails in ways that will not reproduce, cost or latency is unaccounted for, or failure modes must be found before evals can be written.",
       "not_for": "Deciding whether an output is correct or whether a change is an improvement (agent-evals), hardening against injected instructions (prompt-injection-defense), and general application monitoring.",
+      "task_signals": [
+        "tracing",
+        "cannot reproduce",
+        "sometimes fails",
+        "where cost is going",
+        "slow agent runs",
+        "instrument llm calls"
+      ],
       "verifies": false,
       "tools": [
         "workspace",
@@ -813,6 +1141,14 @@
       "category": "ai",
       "use_when": "An MCP server is being written, an internal system is being wrapped as one, or a third-party server is being assessed before it is wired into a project.",
       "not_for": "Designing the signature, parameters and error text of an individual tool (tool-design), constraining model output to a schema (structured-output), or authorizing the installation and configuration of any server.",
+      "task_signals": [
+        "mcp server",
+        "build an mcp",
+        "wrap api as mcp",
+        "mcp transport",
+        "third party mcp",
+        "mcp credentials"
+      ],
       "verifies": false,
       "tools": [
         "workspace",
@@ -832,6 +1168,14 @@
       "category": "ai",
       "use_when": "An agent must carry facts, preferences or decisions past the current context, or an existing memory store has become noisy, contradictory or wrongly scoped.",
       "not_for": "Retrieval over a document corpus (retrieval-rag), context-window packing and prompt construction, model selection (model-routing), and raw transcript logging.",
+      "task_signals": [
+        "agent forgets",
+        "remember across sessions",
+        "persistent memory",
+        "stale memories",
+        "memory leaking between users",
+        "store user preferences"
+      ],
       "verifies": false,
       "tools": [
         "workspace"
@@ -850,6 +1194,15 @@
       "category": "database",
       "use_when": "A schema or data migration is being written, reviewed or sequenced against a database that holds real data and has live readers.",
       "not_for": "Greenfield schema design, query tuning with no DDL, or proving after the fact that a migration did what it claimed (database-migration-verification).",
+      "task_signals": [
+        "write a migration",
+        "zero downtime migration",
+        "add a column safely",
+        "drop a column",
+        "rename column",
+        "rollback plan",
+        "alter table lock"
+      ],
       "verifies": false,
       "tools": [
         "workspace",
@@ -869,6 +1222,13 @@
       "category": "ai",
       "use_when": "More than one model is in play and a call has to be assigned to one, or cost, latency or a silently firing fallback has become a problem.",
       "not_for": "Prompt authoring and output quality for a single model, retrieval tuning (retrieval-rag), agent memory (memory-design), and infrastructure capacity planning.",
+      "task_signals": [
+        "which model to use",
+        "cheaper model",
+        "haiku vs sonnet",
+        "model fallback",
+        "cut inference cost"
+      ],
       "verifies": false,
       "tools": [
         "workspace",
@@ -888,6 +1248,14 @@
       "category": "design",
       "use_when": "Transitions, animated state changes, gesture movement or loading indicators are being added, tuned or reviewed, or an interface reads as janky or sluggish.",
       "not_for": "Static visual design and layout, general performance profiling of non-animated code, or proving a screen works at all (browser-verification).",
+      "task_signals": [
+        "animation",
+        "transition",
+        "feels janky",
+        "hover effect",
+        "loading spinner",
+        "reduced motion"
+      ],
       "verifies": false,
       "tools": [
         "workspace",
@@ -907,6 +1275,15 @@
       "category": "devops",
       "use_when": "A service or a new critical path is going to production, an incident ended with a question the data could not answer, or a dependency, queue or job is being added whose failure would otherwise be silent.",
       "not_for": "Stabilizing a failure that is happening right now (incident-response), measuring a known-slow path you can already reproduce (performance-profiling), and tracing agent or LLM runs (llm-observability).",
+      "task_signals": [
+        "add monitoring",
+        "metrics and alerts",
+        "no visibility",
+        "we had no data",
+        "structured logging",
+        "tracing setup",
+        "alert on errors"
+      ],
       "verifies": false,
       "tools": [
         "workspace",
@@ -926,6 +1303,15 @@
       "category": "security",
       "use_when": "Web code that takes requests, builds queries, renders output, fetches URLs, deserializes data, handles sessions or accepts files is being written or reviewed, or an app needs a sweep for the recurring vulnerability classes.",
       "not_for": "Design-stage boundary and asset work (threat-modeling), the reading order and reporting discipline of a review pass (secure-code-review), infrastructure and network hardening, or reciting a compliance list without reading code.",
+      "task_signals": [
+        "sql injection",
+        "xss",
+        "ssrf",
+        "mass assignment",
+        "insecure deserialization",
+        "common vulnerabilities",
+        "unsafe input"
+      ],
       "verifies": false,
       "tools": [
         "workspace",
@@ -945,6 +1331,15 @@
       "category": "quality",
       "use_when": "Something is slow, or an optimization is about to be written from a hunch rather than from a measurement.",
       "not_for": "Correctness or crash investigation (systematic-debugging), capacity planning, or micro-tuning code with no measured user impact.",
+      "task_signals": [
+        "its slow",
+        "profile this",
+        "p95 latency",
+        "bottleneck",
+        "speed this up",
+        "high memory usage",
+        "optimize performance"
+      ],
       "verifies": false,
       "tools": [
         "workspace"
@@ -963,6 +1358,14 @@
       "category": "knowledge",
       "use_when": "The product must be described to people who do not know it \u2014 homepage, deck, launch, a new segment \u2014 or \"who is this for\" and \"how is this different\" have no crisp, evidenced answer.",
       "not_for": "Writing the final copy (copywriting), interface strings (ux-writing), pricing strategy, deciding what to build next (prioritization), or running the customer interviews themselves (product-discovery).",
+      "task_signals": [
+        "who is this for",
+        "how are we different",
+        "value proposition",
+        "homepage messaging",
+        "target segment",
+        "losing to competitor"
+      ],
       "verifies": false,
       "tools": [
         "workspace"
@@ -981,6 +1384,15 @@
       "category": "database",
       "use_when": "The project runs on Postgres and the decision depends on engine behaviour \u2014 a column type, an index kind, a plan to read, an isolation level, DDL lock behaviour, or a row-level security policy.",
       "not_for": "Engine-neutral modelling decisions (schema-design), the measure-fix-measure loop on one slow statement (query-optimization), or another database engine.",
+      "task_signals": [
+        "postgres",
+        "row level security",
+        "rls policy",
+        "isolation level",
+        "jsonb",
+        "which index type",
+        "supabase database"
+      ],
       "verifies": false,
       "tools": [
         "workspace",
@@ -1001,6 +1413,14 @@
       "category": "product",
       "use_when": "A settled problem needs a written scope others can build and check against \u2014 a brief, PRD, epic or stories \u2014 or a ticket is too vague to estimate or verify.",
       "not_for": "Deciding whether the problem is real (product-discovery), ranking what to build first (prioritization), or choosing the implementation.",
+      "task_signals": [
+        "write a prd",
+        "user stories",
+        "acceptance criteria",
+        "spec this out",
+        "ticket too vague",
+        "write the epic"
+      ],
       "verifies": false,
       "tools": [
         "workspace",
@@ -1020,6 +1440,14 @@
       "category": "product",
       "use_when": "The candidate list is longer than the capacity, someone asks what to cut or what ships first, or an existing order cannot be justified.",
       "not_for": "Establishing whether a problem is real (product-discovery), specifying what wins (prd-and-stories), or committing the team to dates and customers.",
+      "task_signals": [
+        "what to cut",
+        "what ships first",
+        "too much backlog",
+        "rank these",
+        "cant do everything",
+        "why did we pick"
+      ],
       "verifies": false,
       "tools": [
         "workspace",
@@ -1039,6 +1467,14 @@
       "category": "product",
       "use_when": "A product metric, funnel or dashboard number is being defined, disputed, or about to be instrumented \u2014 including before tracking is added to a feature.",
       "not_for": "Deciding what to build next (prioritization), designing or reading an A/B test (experimentation), or analysing a dataset whose definitions are already settled.",
+      "task_signals": [
+        "how do we measure",
+        "funnel drop off",
+        "retention rate",
+        "dashboards disagree",
+        "add tracking",
+        "define the metric"
+      ],
       "verifies": false,
       "tools": [
         "workspace"
@@ -1057,6 +1493,14 @@
       "category": "product",
       "use_when": "A request arrives phrased as a solution, or a plan rests on a belief about users that nobody has checked, and the question is whether the problem is real.",
       "not_for": "Writing the scope once the problem is settled (prd-and-stories), ranking work already understood (prioritization), or contacting users without approval.",
+      "task_signals": [
+        "worth building",
+        "customer asked for",
+        "do users need this",
+        "nobody validated this",
+        "why are we building",
+        "users keep complaining"
+      ],
       "verifies": false,
       "tools": [
         "workspace",
@@ -1076,6 +1520,14 @@
       "category": "ai",
       "use_when": "A prompt is being written or patched, its output is inconsistent or the wrong shape, a model version changed, or someone has declared a prompt improved.",
       "not_for": "Scoping an agent's job, tools and prohibitions (agent-design), choosing what material to load into the window (context-engineering), and model selection or fine-tuning.",
+      "task_signals": [
+        "write a prompt",
+        "improve this prompt",
+        "system prompt",
+        "model ignores instructions",
+        "inconsistent output",
+        "few shot examples"
+      ],
       "verifies": false,
       "tools": [
         "workspace",
@@ -1095,6 +1547,14 @@
       "category": "ai",
       "use_when": "An agent ingests content it did not author \u2014 retrieval, browsing, email, files, MCP tool results, subagent output \u2014 and also holds tools that can act.",
       "not_for": "Authentication and authorization design, secret and credential management, general input validation of user-supplied data, and building the eval suite that holds the regression cases (agent-evals).",
+      "task_signals": [
+        "prompt injection",
+        "jailbreak",
+        "untrusted content",
+        "agent reads web pages",
+        "data exfiltration",
+        "is my agent safe"
+      ],
       "verifies": false,
       "tools": [
         "workspace"
@@ -1113,6 +1573,14 @@
       "category": "database",
       "use_when": "A specific statement is slow and the database is the suspect, a query plan needs interpreting, or an index is being proposed without evidence.",
       "not_for": "Deciding table and constraint structure (schema-design), engine feature reference (postgres), or system-wide performance work before the database has been shown to be the bottleneck.",
+      "task_signals": [
+        "slow query",
+        "explain plan",
+        "should i add an index",
+        "query times out",
+        "endpoint is slow",
+        "report takes forever"
+      ],
       "verifies": false,
       "tools": [
         "workspace",
@@ -1132,6 +1600,14 @@
       "category": "quality",
       "use_when": "A bug has just been fixed, or keeps coming back, and the fix needs a test that is proven to fail without it.",
       "not_for": "Designing a test strategy or a new feature's suite, coverage for code with no known defect, or diagnosing the bug in the first place (systematic-debugging).",
+      "task_signals": [
+        "regression test",
+        "test for the fix",
+        "bug came back",
+        "keeps regressing",
+        "stays fixed",
+        "cover this defect"
+      ],
       "verifies": false,
       "tools": [
         "workspace"
@@ -1150,6 +1626,14 @@
       "category": "devops",
       "use_when": "A deploy has completed to a shared environment and someone is about to call the release good, or that claim is being checked.",
       "not_for": "Planning or executing the rollout (deployment), deciding and running a revert (rollback), rendered-UI checking (browser-verification), or accepting a green pipeline and a 200 health response as proof.",
+      "task_signals": [
+        "did the deploy work",
+        "verify the release",
+        "is it actually live",
+        "smoke test production",
+        "which version is serving",
+        "confirm it is healthy"
+      ],
       "verifies": true,
       "tools": [
         "workspace",
@@ -1170,6 +1654,14 @@
       "category": "design",
       "use_when": "A layout has to hold across viewport widths \u2014 building it, repairing an overflow or collapse at some size, or filling in the sizes a single-width design never specified.",
       "not_for": "Proving the rendered result (browser-verification), semantics and assistive-technology behaviour (accessibility), or visual style direction.",
+      "task_signals": [
+        "mobile layout",
+        "breakpoint",
+        "overflows on mobile",
+        "responsive",
+        "media query",
+        "doesnt fit on phone"
+      ],
       "verifies": false,
       "tools": [
         "playwright",
@@ -1189,6 +1681,14 @@
       "category": "ai",
       "use_when": "A retrieval-backed system returns wrong or thin answers, or an index is being designed, chunked, embedded or rebuilt.",
       "not_for": "Prompt and output quality once the right passage is already in context, agent memory design (memory-design), model selection (model-routing), and choosing a vector database product.",
+      "task_signals": [
+        "rag",
+        "chunking",
+        "embeddings",
+        "vector search",
+        "retrieval misses",
+        "hallucinating from docs"
+      ],
       "verifies": false,
       "tools": [
         "workspace",
@@ -1208,6 +1708,14 @@
       "category": "devops",
       "use_when": "A release plan needs its way back written and rehearsed, or a deploy is going wrong and someone is deciding whether it can be undone.",
       "not_for": "Proving recovery actually happened (release-verification), planning the forward rollout (deployment), schema sequencing itself (migrations), root-cause analysis after the bleeding stops (systematic-debugging), or executing a production revert without explicit confirmation.",
+      "task_signals": [
+        "roll back",
+        "undo the deploy",
+        "revert the release",
+        "can we undo this",
+        "back to previous version",
+        "way back out"
+      ],
       "verifies": false,
       "tools": [
         "workspace",
@@ -1228,6 +1736,15 @@
       "category": "database",
       "use_when": "New tables are being designed, ORM models or migration DDL are under review, or a defect traces back to the data model permitting a state that should be impossible.",
       "not_for": "Tuning a slow statement (query-optimization), engine-specific types, indexes and features (postgres), or writing and running the migration that ships the change.",
+      "task_signals": [
+        "design the tables",
+        "data model",
+        "new table",
+        "normalize",
+        "foreign key",
+        "orm models",
+        "nullable column"
+      ],
       "verifies": false,
       "tools": [
         "workspace"
@@ -1246,6 +1763,15 @@
       "category": "security",
       "use_when": "A credential is added, moved, shared or due for rotation, or one has turned up in code, history, logs or a client bundle.",
       "not_for": "Deciding what a valid credential may access (authorization), auth flow weaknesses (auth-security), dependency advisories, and executing a revocation or a history rewrite without the owner's decision.",
+      "task_signals": [
+        "hardcoded api key",
+        "secret committed",
+        "rotate credentials",
+        "leaked token",
+        "key in logs",
+        "env file",
+        "secret in bundle"
+      ],
       "verifies": false,
       "tools": [
         "workspace",
@@ -1265,6 +1791,14 @@
       "category": "security",
       "use_when": "A pull request, feature or repository needs a security read before shipping \u2014 especially anything touching auth, money, tenancy, uploads, deserialization or secrets \u2014 or someone reports reaching data they should not have.",
       "not_for": "Design-stage boundary and asset work (threat-modeling), the class-by-class pattern hunt itself (owasp-web), running scanners as a substitute for reading, or any form of live testing, which is separately authorized.",
+      "task_signals": [
+        "security review",
+        "review this pr",
+        "security pass",
+        "before we ship",
+        "audit this change",
+        "look for security bugs"
+      ],
       "verifies": false,
       "tools": [
         "workspace",
@@ -1284,6 +1818,15 @@
       "category": "knowledge",
       "use_when": "A page is written or revised to be found in search, search traffic drops, a page is missing from results, or someone asks which query to target.",
       "not_for": "Writing the copy itself (copywriting), page-speed and Core Web Vitals work (frontend-performance), paid search, social distribution, or pages deliberately kept out of search.",
+      "task_signals": [
+        "rank for",
+        "search traffic dropped",
+        "not showing in google",
+        "keyword to target",
+        "meta description",
+        "seo audit",
+        "get indexed"
+      ],
       "verifies": false,
       "tools": [
         "workspace",
@@ -1303,6 +1846,14 @@
       "category": "frontend",
       "use_when": "Adding, customizing or debugging a shadcn/ui component in a repo with components.json and a vendored UI directory.",
       "not_for": "Choosing a component library, general component boundaries and state (component-architecture), or a full accessibility audit.",
+      "task_signals": [
+        "shadcn",
+        "radix",
+        "shadcn component",
+        "aschild",
+        "vendored ui folder",
+        "shadcn cli overwrote"
+      ],
       "verifies": false,
       "tools": [
         "workspace",
@@ -1322,6 +1873,15 @@
       "category": "knowledge",
       "use_when": "A claim is about to be relied on, quoted or cited \u2014 or sources disagree, a number arrives without its method, or a 'widely reported' fact needs its origin traced.",
       "not_for": "Running the overall investigation (deep-research), comparing named products on criteria (competitive-analysis), or facts verifiable directly in the workspace.",
+      "task_signals": [
+        "is this source reliable",
+        "cite this claim",
+        "conflicting sources",
+        "is this true",
+        "citations",
+        "trace the claim",
+        "trustworthy source"
+      ],
       "verifies": false,
       "tools": [
         "workspace",
@@ -1341,6 +1901,14 @@
       "category": "frontend",
       "use_when": "You are about to work in a frontend repo whose stack you have not yet confirmed this session, or about to load framework-specific guidance.",
       "not_for": "Choosing a stack for a greenfield project, evaluating dependency health, or replacing reading the specific code you are about to change.",
+      "task_signals": [
+        "what stack",
+        "which framework",
+        "unfamiliar repo",
+        "package manager",
+        "project conventions",
+        "new codebase"
+      ],
       "verifies": false,
       "tools": [
         "workspace"
@@ -1359,6 +1927,14 @@
       "category": "ai",
       "use_when": "A model's output feeds code rather than a human \u2014 extraction, classification, routing, scoring \u2014 or parsing keeps failing, fields arrive invented, or a schema is being designed for a model to fill.",
       "not_for": "Designing the tools an agent calls (tool-design), building the server that hosts them (mcp-design), or the quality of prose a human will read.",
+      "task_signals": [
+        "json output",
+        "invalid json",
+        "parsing fails",
+        "json schema",
+        "extract fields",
+        "classify into categories"
+      ],
       "verifies": false,
       "tools": [
         "workspace",
@@ -1378,6 +1954,15 @@
       "category": "quality",
       "use_when": "Something is broken, the cause is not yet known, and someone is about to start editing code to find out.",
       "not_for": "An outage still in progress (investigate-incident \u2014 mitigate before explaining), a cause already diagnosed that only needs implementing, or writing the regression test itself (regression-testing).",
+      "task_signals": [
+        "bug",
+        "crash",
+        "why is this failing",
+        "intermittent failure",
+        "unexpected behaviour",
+        "still broken",
+        "root cause"
+      ],
       "verifies": false,
       "tools": [
         "workspace",
@@ -1397,6 +1982,15 @@
       "category": "frontend",
       "use_when": "Writing or editing Tailwind utility classes in a project that already uses Tailwind.",
       "not_for": "Deciding whether to adopt Tailwind, visual design direction (design skills), or checking what actually rendered (browser-verification).",
+      "task_signals": [
+        "tailwind",
+        "utility classes",
+        "arbitrary value",
+        "class conflict",
+        "dark mode classes",
+        "tailwind config",
+        "cn helper"
+      ],
       "verifies": false,
       "tools": [
         "workspace",
@@ -1416,6 +2010,15 @@
       "category": "knowledge",
       "use_when": "Documentation is being written, restructured or repaired \u2014 README, setup guide, how-to, reference, architecture note, release notes, runbook \u2014 or a reader cannot get from the docs to a working result.",
       "not_for": "Interface strings inside the product (ux-writing), persuasive or marketing copy (copywriting), and proving the documented commands actually run (documentation-verification).",
+      "task_signals": [
+        "write a readme",
+        "document this",
+        "release notes",
+        "write a runbook",
+        "api reference",
+        "docs are confusing",
+        "restructure the docs"
+      ],
       "verifies": false,
       "tools": [
         "workspace",
@@ -1435,6 +2038,14 @@
       "category": "quality",
       "use_when": "Unit or integration tests are being written or repaired \u2014 new coverage, pinning a reported bug, or a suite that stays green while the behaviour is wrong.",
       "not_for": "Choosing what to cover and at which level (test-strategy), end-to-end browser journeys (e2e-testing), and concluding that a shipped change is verified (browser-verification, api-contract-verification).",
+      "task_signals": [
+        "write unit tests",
+        "integration tests",
+        "add tests",
+        "mock this",
+        "green but broken",
+        "test this function"
+      ],
       "verifies": false,
       "tools": [
         "workspace"
@@ -1453,6 +2064,14 @@
       "category": "quality",
       "use_when": "Coverage has to be planned or defended \u2014 before writing a batch of tests, when a suite is slow and nobody can say what it buys, or after a bug escaped and nothing caught it.",
       "not_for": "Writing the tests themselves (test-design, e2e-testing), and proving a specific finished change works (browser-verification, api-contract-verification).",
+      "task_signals": [
+        "test plan",
+        "what should we test",
+        "coverage gaps",
+        "testing approach",
+        "tests missed it",
+        "how much testing"
+      ],
       "verifies": false,
       "tools": [
         "workspace",
@@ -1472,6 +2091,14 @@
       "category": "security",
       "use_when": "A system's shape is being designed or changed \u2014 new service, integration, tenancy model, uploads, payments or auth \u2014 and someone needs to know which few things are actually worth defending.",
       "not_for": "Finding defects in existing code (secure-code-review), enumerating web bug classes in a codebase (owasp-web), compliance questionnaires, or responding to a live incident.",
+      "task_signals": [
+        "threat model",
+        "is this design safe",
+        "trust boundaries",
+        "new integration",
+        "what could go wrong",
+        "before we build"
+      ],
       "verifies": false,
       "tools": [
         "workspace"
@@ -1490,6 +2117,14 @@
       "category": "ai",
       "use_when": "A tool or function an LLM calls is being added or reshaped, or an agent is selecting the wrong tool, passing malformed arguments, looping, or stalling after a call.",
       "not_for": "Building or integrating the MCP server that hosts the tools (mcp-design), constraining a model's final answer to a schema (structured-output), general prompt wording, or internal functions no model invokes.",
+      "task_signals": [
+        "tool description",
+        "agent picks wrong tool",
+        "malformed arguments",
+        "function calling",
+        "too many tools",
+        "tool error messages"
+      ],
       "verifies": false,
       "tools": [
         "workspace",
@@ -1509,6 +2144,14 @@
       "category": "design",
       "use_when": "An interface already exists and someone needs to know what is wrong with it, ranked and concrete enough to act on.",
       "not_for": "Proving a change renders and functions (browser-verification), setting a visual direction where none exists (frontend-design), or a formal accessibility conformance audit.",
+      "task_signals": [
+        "review this screen",
+        "critique this ui",
+        "feels off",
+        "design feedback",
+        "usability issues",
+        "ux review"
+      ],
       "verifies": false,
       "tools": [
         "workspace",
@@ -1528,6 +2171,14 @@
       "category": "design",
       "use_when": "Interface strings are being written, reviewed or repaired \u2014 labels, errors, empty states, confirmations, form hints \u2014 or a control's wording is causing hesitation.",
       "not_for": "Marketing and landing-page copy, documentation and release notes, or deciding layout and visual treatment (ui-design).",
+      "task_signals": [
+        "error message",
+        "button label",
+        "empty state copy",
+        "microcopy",
+        "confirmation wording",
+        "tooltip text"
+      ],
       "verifies": false,
       "tools": [
         "workspace"
@@ -1546,6 +2197,15 @@
       "category": "frontend",
       "use_when": "A change affects appearance and is about to be called done, or a screenshot-comparison result is about to be trusted as proof.",
       "not_for": "A single rendered check of one change (browser-verification), judging whether a design is good (ui-audit), or behaviour with no visual surface.",
+      "task_signals": [
+        "visual regression",
+        "screenshot comparison",
+        "across viewports",
+        "light and dark",
+        "baseline screenshots",
+        "still looks correct",
+        "every breakpoint"
+      ],
       "verifies": true,
       "tools": [
         "playwright",
@@ -1565,6 +2225,15 @@
       "category": "backend",
       "use_when": "A webhook endpoint is being built, integrated or debugged, or the service has to deliver events to external consumers.",
       "not_for": "Internal queue or event-bus consumers with no HTTP trust boundary, general outbound API retry policy (idempotency-and-retries), and ordinary request/response endpoint design (api-design).",
+      "task_signals": [
+        "webhook endpoint",
+        "stripe webhook",
+        "signature verification",
+        "callback url",
+        "provider events",
+        "notify other services",
+        "webhook fired twice"
+      ],
       "verifies": false,
       "tools": [
         "workspace"

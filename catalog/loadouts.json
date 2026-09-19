@@ -1,5 +1,5 @@
 {
-  "schema_version": "2.0.0",
+  "schema_version": "2.1.0",
   "generated_from": "templates/*/*.md",
   "roles": [
     {
@@ -68,6 +68,23 @@
       "verification": [
         "agent-evals"
       ],
+      "retrieval_hints": [
+        "agent prompt templates",
+        "tool schema definitions",
+        "model routing config",
+        "evaluation cases and fixtures",
+        "memory and context stores",
+        "runtime permission config"
+      ],
+      "conditions": [
+        "anthropic_api",
+        "authoring_skills",
+        "mcp_server",
+        "production_agent",
+        "retrieval",
+        "security_sensitive",
+        "structured_output"
+      ],
       "template": "templates/engineering/ai-agent-engineer.md"
     },
     {
@@ -128,6 +145,20 @@
       "verification": [
         "api-contract-verification"
       ],
+      "retrieval_hints": [
+        "integration client modules",
+        "webhook receivers",
+        "auth scopes and secret config",
+        "retry and idempotency code",
+        "contract and sandbox tests",
+        "integration setup docs"
+      ],
+      "conditions": [
+        "background_processing",
+        "mcp_server",
+        "security_sensitive",
+        "webhooks"
+      ],
       "template": "templates/engineering/api-integration-engineer.md"
     },
     {
@@ -185,6 +216,20 @@
         "research-technical-decision"
       ],
       "verification": [],
+      "retrieval_hints": [
+        "existing decision records",
+        "service and module boundaries",
+        "interface and contract definitions",
+        "data model and ownership",
+        "deployment and runtime constraints",
+        "product requirement notes"
+      ],
+      "conditions": [
+        "llm_app",
+        "postgres",
+        "react",
+        "technology_evaluation"
+      ],
       "template": "templates/engineering/architect.md"
     },
     {
@@ -233,6 +278,18 @@
       "verification": [
         "api-contract-verification"
       ],
+      "retrieval_hints": [
+        "existing automation scripts",
+        "schedule and cron definitions",
+        "connected service config",
+        "state or dedup store",
+        "prior run logs",
+        "recipient and record lists"
+      ],
+      "conditions": [
+        "github_actions",
+        "webhook_trigger"
+      ],
       "template": "templates/knowledge-business/automation-operations.md"
     },
     {
@@ -271,6 +328,15 @@
       },
       "recipes": [],
       "verification": [],
+      "retrieval_hints": [
+        "existing copy and drafts",
+        "brand voice guide",
+        "product feature descriptions",
+        "approved claims and proof points"
+      ],
+      "conditions": [
+        "ui_copy"
+      ],
       "template": "templates/knowledge-business/content-copywriter.md"
     },
     {
@@ -312,6 +378,16 @@
       },
       "recipes": [],
       "verification": [],
+      "retrieval_hints": [
+        "raw data files",
+        "schema and table definitions",
+        "existing queries and notebooks",
+        "metric definition docs",
+        "prior analysis reports"
+      ],
+      "conditions": [
+        "postgres"
+      ],
       "template": "templates/knowledge-business/data-analyst.md"
     },
     {
@@ -357,6 +433,17 @@
         "ship-feature"
       ],
       "verification": [],
+      "retrieval_hints": [
+        "pipeline job definitions",
+        "transform scripts",
+        "upstream source datasets",
+        "destination tables",
+        "downstream reports and consumers",
+        "notebooks promoted to jobs"
+      ],
+      "conditions": [
+        "postgres"
+      ],
       "template": "templates/engineering/data-engineer.md"
     },
     {
@@ -408,6 +495,17 @@
       ],
       "verification": [
         "database-migration-verification"
+      ],
+      "retrieval_hints": [
+        "schema definitions",
+        "migration history",
+        "data access and query code",
+        "constraints and access rules",
+        "fixtures and seed data"
+      ],
+      "conditions": [
+        "postgres",
+        "slow_query"
       ],
       "template": "templates/engineering/database-engineer.md"
     },
@@ -465,6 +563,19 @@
         "browser-verification",
         "api-contract-verification"
       ],
+      "retrieval_hints": [
+        "failing module",
+        "its tests",
+        "recent changes to it",
+        "error and log sites",
+        "reproduction scripts",
+        "related state or persistence"
+      ],
+      "conditions": [
+        "browser_available",
+        "llm_app",
+        "postgres"
+      ],
       "template": "templates/engineering/debugger.md"
     },
     {
@@ -521,6 +632,20 @@
       "verification": [
         "release-verification"
       ],
+      "retrieval_hints": [
+        "ci workflow files",
+        "build and packaging config",
+        "deployment manifests",
+        "environment config and secret refs",
+        "release and rollback scripts",
+        "health check definitions"
+      ],
+      "conditions": [
+        "docker",
+        "github_actions",
+        "schema_migration",
+        "vercel"
+      ],
       "template": "templates/engineering/devops-release.md"
     },
     {
@@ -561,6 +686,17 @@
         "ship-feature"
       ],
       "verification": [],
+      "retrieval_hints": [
+        "role catalog and profiles",
+        "role template files",
+        "evidence to hand a worker",
+        "files each job owns",
+        "worktree or branch state",
+        "returned subagent artifacts"
+      ],
+      "conditions": [
+        "untrusted_content"
+      ],
       "template": "templates/core/dispatcher.md"
     },
     {
@@ -604,6 +740,18 @@
       "verification": [
         "documentation-verification"
       ],
+      "retrieval_hints": [
+        "existing docs pages",
+        "readme and changelog",
+        "source code being documented",
+        "config and env samples",
+        "cli and api entry points",
+        "docs navigation index"
+      ],
+      "conditions": [
+        "coauthoring_with_user",
+        "public_docs_site"
+      ],
       "template": "templates/knowledge-business/documentation-writer.md"
     },
     {
@@ -646,6 +794,17 @@
       ],
       "verification": [
         "documentation-verification"
+      ],
+      "retrieval_hints": [
+        "repository guidance files",
+        "entry points and main modules",
+        "user visible strings",
+        "config and build files",
+        "existing tests for the area",
+        "directory structure listings"
+      ],
+      "conditions": [
+        "postgres"
       ],
       "template": "templates/engineering/explorer.md"
     },
@@ -709,6 +868,18 @@
         "browser-verification",
         "documentation-verification"
       ],
+      "retrieval_hints": [
+        "files the request names",
+        "readily available context",
+        "sources or commands to verify"
+      ],
+      "conditions": [
+        "data_question",
+        "research_question",
+        "security_sensitive",
+        "ui_task",
+        "writing_task"
+      ],
       "template": "templates/core/generalist.md"
     },
     {
@@ -751,6 +922,17 @@
       },
       "recipes": [],
       "verification": [],
+      "retrieval_hints": [
+        "current positioning copy",
+        "landing pages and site content",
+        "past campaign briefs",
+        "analytics and funnel data",
+        "competitor notes",
+        "product capability docs"
+      ],
+      "conditions": [
+        "market_research"
+      ],
       "template": "templates/knowledge-business/growth-marketing-strategist.md"
     },
     {
@@ -836,6 +1018,27 @@
         "api-contract-verification",
         "browser-verification"
       ],
+      "retrieval_hints": [
+        "target source files",
+        "project conventions and config",
+        "existing tests for it",
+        "current uncommitted diff",
+        "similar existing patterns",
+        "build and check commands"
+      ],
+      "conditions": [
+        "async_workload",
+        "cache_layer",
+        "data_model",
+        "design_handoff",
+        "frontend_stack",
+        "nextjs",
+        "react",
+        "security_sensitive",
+        "shadcn",
+        "tailwind",
+        "ui_task"
+      ],
       "template": "templates/core/implementer.md"
     },
     {
@@ -862,7 +1065,7 @@
           "background-jobs"
         ],
         "conditional": {
-          "recent_migration": [
+          "recent_schema_change": [
             "migrations",
             "database-migration-verification"
           ],
@@ -888,6 +1091,18 @@
       ],
       "verification": [
         "release-verification"
+      ],
+      "retrieval_hints": [
+        "recent deploy records",
+        "feature flag config",
+        "alerting and monitoring config",
+        "runbooks and rollback procedures",
+        "incident log files",
+        "dependency version bumps"
+      ],
+      "conditions": [
+        "recent_schema_change",
+        "security_incident"
       ],
       "template": "templates/engineering/incident-responder.md"
     },
@@ -942,6 +1157,19 @@
         "debug-application"
       ],
       "verification": [],
+      "retrieval_hints": [
+        "benchmark and load scripts",
+        "profiling output",
+        "hot path code",
+        "query and index definitions",
+        "caching layers",
+        "performance budgets"
+      ],
+      "conditions": [
+        "frontend",
+        "postgres",
+        "recent_schema_change"
+      ],
       "template": "templates/engineering/performance-engineer.md"
     },
     {
@@ -987,6 +1215,19 @@
         "database-migration"
       ],
       "verification": [],
+      "retrieval_hints": [
+        "relevant source modules",
+        "existing docs and examples",
+        "project conventions",
+        "interface and data contracts",
+        "migrations and permissions",
+        "prior plans or specs"
+      ],
+      "conditions": [
+        "api_change",
+        "schema_change",
+        "security_sensitive"
+      ],
       "template": "templates/core/planner.md"
     },
     {
@@ -1032,6 +1273,17 @@
       },
       "recipes": [],
       "verification": [],
+      "retrieval_hints": [
+        "existing product briefs",
+        "requirements and acceptance criteria",
+        "user research notes",
+        "roadmap and issue tracker",
+        "current feature behavior",
+        "usage metrics or analytics"
+      ],
+      "conditions": [
+        "ui_task"
+      ],
       "template": "templates/product-design/product-manager.md"
     },
     {
@@ -1085,6 +1337,18 @@
         "api-contract-verification",
         "database-migration-verification"
       ],
+      "retrieval_hints": [
+        "old and new api surfaces",
+        "call sites and consumers",
+        "dependency manifests",
+        "characterization tests",
+        "compatibility shims",
+        "generated artifacts"
+      ],
+      "conditions": [
+        "frontend_stack",
+        "schema_migration"
+      ],
       "template": "templates/engineering/refactoring-migration-specialist.md"
     },
     {
@@ -1126,6 +1390,16 @@
         "research-technical-decision"
       ],
       "verification": [],
+      "retrieval_hints": [
+        "workspace files with local facts",
+        "primary source documents",
+        "current version and changelog",
+        "authorized connected records",
+        "prior research notes"
+      ],
+      "conditions": [
+        "claude_api"
+      ],
       "template": "templates/core/researcher.md"
     },
     {
@@ -1191,6 +1465,20 @@
         "browser-verification",
         "documentation-verification"
       ],
+      "retrieval_hints": [
+        "the changed diff",
+        "acceptance criteria",
+        "dependencies of changed code",
+        "existing verification evidence",
+        "ci or test output"
+      ],
+      "conditions": [
+        "ai_system",
+        "api_change",
+        "schema_change",
+        "security_sensitive",
+        "ui_task"
+      ],
       "template": "templates/core/reviewer.md"
     },
     {
@@ -1242,6 +1530,19 @@
         "review-pull-request"
       ],
       "verification": [],
+      "retrieval_hints": [
+        "authentication and authorization code",
+        "input handling boundaries",
+        "secret and credential config",
+        "dependency manifests",
+        "external entry points",
+        "tool permission definitions"
+      ],
+      "conditions": [
+        "agent_system",
+        "architecture_review",
+        "official_security_skill_installed"
+      ],
       "template": "templates/engineering/security-auditor.md"
     },
     {
@@ -1300,6 +1601,19 @@
       "verification": [
         "browser-verification",
         "api-contract-verification"
+      ],
+      "retrieval_hints": [
+        "requirements and acceptance criteria",
+        "changed behavior code",
+        "existing test suites",
+        "fixtures and test data",
+        "baseline failure logs",
+        "test environment config"
+      ],
+      "conditions": [
+        "ai_system",
+        "browser_available",
+        "ui_task"
       ],
       "template": "templates/core/tester.md"
     },
@@ -1376,6 +1690,24 @@
         "visual-verification",
         "accessibility-verification"
       ],
+      "retrieval_hints": [
+        "screen and page components",
+        "existing component library",
+        "design tokens and stylesheets",
+        "empty loading and error states",
+        "keyboard and focus handling",
+        "screenshots of the interface"
+      ],
+      "conditions": [
+        "browser_available",
+        "existing_ui",
+        "implementing_ui",
+        "official_design_skill_unavailable",
+        "react",
+        "shadcn",
+        "tailwind",
+        "ui_copy"
+      ],
       "template": "templates/product-design/ui-ux-designer.md"
     },
     {
@@ -1415,6 +1747,16 @@
       },
       "recipes": [],
       "verification": [],
+      "retrieval_hints": [
+        "git log and reflog",
+        "working tree status",
+        "stash and dangling objects",
+        "remote tracking refs",
+        "branch and tag refs"
+      ],
+      "conditions": [
+        "github_actions"
+      ],
       "template": "templates/engineering/version-control.md"
     }
   ]

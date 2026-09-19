@@ -4,6 +4,15 @@
   "category": "knowledge",
   "use_when": "Documentation is being written, restructured or repaired \u2014 README, setup guide, how-to, reference, architecture note, release notes, runbook \u2014 or a reader cannot get from the docs to a working result.",
   "not_for": "Interface strings inside the product (ux-writing), persuasive or marketing copy (copywriting), and proving the documented commands actually run (documentation-verification).",
+  "task_signals": [
+    "write a readme",
+    "document this",
+    "release notes",
+    "write a runbook",
+    "api reference",
+    "docs are confusing",
+    "restructure the docs"
+  ],
   "verifies": false,
   "tools": [
     "workspace",

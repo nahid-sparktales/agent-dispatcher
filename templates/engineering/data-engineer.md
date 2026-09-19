@@ -14,6 +14,7 @@ skills_if_postgres: postgres
 mcp_recommended: workspace
 mcp_conditional: postgres-community, supabase, context7
 recipes: ship-feature
+retrieval_hints: pipeline job definitions, transform scripts, upstream source datasets, destination tables, downstream reports and consumers, notebooks promoted to jobs
 ---
 
 # Data Engineer

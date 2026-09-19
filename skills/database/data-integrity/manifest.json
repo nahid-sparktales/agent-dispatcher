@@ -4,6 +4,15 @@
   "category": "database",
   "use_when": "A rule about what must always be true of the data needs to be enforced in a live schema, or an invariant that was enforced has drifted.",
   "not_for": "Asserting freshness, volume or distribution of produced data (data-quality), designing the schema in the first place (schema-design), or repairing rows without authorization.",
+  "task_signals": [
+    "data looks wrong",
+    "orphaned rows",
+    "duplicate records",
+    "reconciliation query",
+    "enforce this rule",
+    "inconsistent data",
+    "detect drift"
+  ],
   "verifies": false,
   "tools": [
     "workspace"

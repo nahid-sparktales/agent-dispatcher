@@ -4,6 +4,14 @@
   "category": "backend",
   "use_when": "A rule of the form 'only X may do Y to Z' is added, changed or doubted \u2014 roles, permissions, per-owner or per-tenant scoping, admin paths.",
   "not_for": "Establishing who the caller is (authentication), UI affordances that merely hide controls, or infrastructure-level network and IAM policy, or investigating a live report that one caller reached another's data (auth-security).",
+  "task_signals": [
+    "roles and permissions",
+    "admin only",
+    "rbac",
+    "per tenant scoping",
+    "restrict access",
+    "permission check"
+  ],
   "verifies": false,
   "tools": [
     "workspace"

@@ -4,6 +4,15 @@
   "category": "quality",
   "use_when": "Something is broken, the cause is not yet known, and someone is about to start editing code to find out.",
   "not_for": "An outage still in progress (investigate-incident \u2014 mitigate before explaining), a cause already diagnosed that only needs implementing, or writing the regression test itself (regression-testing).",
+  "task_signals": [
+    "bug",
+    "crash",
+    "why is this failing",
+    "intermittent failure",
+    "unexpected behaviour",
+    "still broken",
+    "root cause"
+  ],
   "verifies": false,
   "tools": [
     "workspace",

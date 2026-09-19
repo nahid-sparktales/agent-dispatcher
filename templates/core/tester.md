@@ -18,6 +18,7 @@ mcp_recommended: workspace, github
 mcp_conditional: playwright, chrome-devtools, axe-devtools
 recipes: ship-feature, debug-application
 verification: browser-verification, api-contract-verification
+retrieval_hints: requirements and acceptance criteria, changed behavior code, existing test suites, fixtures and test data, baseline failure logs, test environment config
 ---
 
 # Tester

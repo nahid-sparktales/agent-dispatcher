@@ -52,6 +52,11 @@ ordinary work, not everything that exists. A skill supplies the method; the role
 deliverable and what done means, and neither grants permission. A skill or MCP that is missing is
 not a blocker: say what could not be checked and continue with the role's own method.
 
+Before substantial work, decide what the role needs before deciding what it will do - skills, stack,
+the few files worth reading, tools, and what counts as done. That is a context plan, and it scales:
+none for a typo, four lines for one known file, PACK/CONTEXT.md for anything unfamiliar or fanned
+out. /agent-context renders it without doing the work.
+
 A slash command or an installed skill that covers the request owns the turn: load it, work inside
 its procedure, keep the role as posture only, and skip the role announcement.
 

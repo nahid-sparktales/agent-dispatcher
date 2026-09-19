@@ -4,6 +4,14 @@
   "category": "ai",
   "use_when": "A prompt is being written or patched, its output is inconsistent or the wrong shape, a model version changed, or someone has declared a prompt improved.",
   "not_for": "Scoping an agent's job, tools and prohibitions (agent-design), choosing what material to load into the window (context-engineering), and model selection or fine-tuning.",
+  "task_signals": [
+    "write a prompt",
+    "improve this prompt",
+    "system prompt",
+    "model ignores instructions",
+    "inconsistent output",
+    "few shot examples"
+  ],
   "verifies": false,
   "tools": [
     "workspace",

@@ -25,7 +25,7 @@ if [ "$1" = "--uninstall" ]; then
   uninstall_previous
   for f in commands/agent-*.md; do
     t="$D/commands/$(basename "$f")"
-    [ -f "$t" ] && grep -q "agent-dispatcher skill's" "$t" 2>/dev/null && rm -f "$t"
+    [ -f "$t" ] && grep -q "agent-dispatcher skill" "$t" 2>/dev/null && rm -f "$t"
   done
   rm -rf "$D/skills/agent-dispatcher"
   rm -f "$D/hooks/agent-dispatcher-activate.sh"

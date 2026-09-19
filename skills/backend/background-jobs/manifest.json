@@ -4,6 +4,15 @@
   "category": "backend",
   "use_when": "Work is being moved off a request path onto a queue or scheduler, or a job ran twice, never ran, ran out of order, or is stuck retrying.",
   "not_for": "Concurrency inside a single request, streaming topology design, or CI/cron pipeline configuration in the delivery system.",
+  "task_signals": [
+    "background job",
+    "queue worker",
+    "cron job",
+    "job ran twice",
+    "stuck in retry",
+    "move off request path",
+    "dead letter queue"
+  ],
   "verifies": false,
   "tools": [
     "workspace",

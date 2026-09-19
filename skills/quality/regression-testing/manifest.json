@@ -4,6 +4,14 @@
   "category": "quality",
   "use_when": "A bug has just been fixed, or keeps coming back, and the fix needs a test that is proven to fail without it.",
   "not_for": "Designing a test strategy or a new feature's suite, coverage for code with no known defect, or diagnosing the bug in the first place (systematic-debugging).",
+  "task_signals": [
+    "regression test",
+    "test for the fix",
+    "bug came back",
+    "keeps regressing",
+    "stays fixed",
+    "cover this defect"
+  ],
   "verifies": false,
   "tools": [
     "workspace"

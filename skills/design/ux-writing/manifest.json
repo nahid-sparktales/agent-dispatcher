@@ -4,6 +4,14 @@
   "category": "design",
   "use_when": "Interface strings are being written, reviewed or repaired \u2014 labels, errors, empty states, confirmations, form hints \u2014 or a control's wording is causing hesitation.",
   "not_for": "Marketing and landing-page copy, documentation and release notes, or deciding layout and visual treatment (ui-design).",
+  "task_signals": [
+    "error message",
+    "button label",
+    "empty state copy",
+    "microcopy",
+    "confirmation wording",
+    "tooltip text"
+  ],
   "verifies": false,
   "tools": [
     "workspace"

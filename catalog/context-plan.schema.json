@@ -1,0 +1,477 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/nahid-sparktales/agent-dispatcher/catalog/context-plan.schema.json",
+  "schema_version": "2.1.0",
+  "title": "Context plan",
+  "description": "What one agent needs in order to perform one task correctly. NOT an execution plan: it holds no steps, no ordering and no implementation decisions. The context engine owns this document; the specialist owns the steps. Most fields are optional on purpose \u2014 a trivial task's plan is three lines, and inventing the rest is the failure mode this schema exists to prevent.",
+  "type": "object",
+  "required": [
+    "task",
+    "agent"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "task": {
+      "type": "object",
+      "title": "What was asked for, how big, and what kind of work it is",
+      "description": "What was asked for, restated in one line.",
+      "required": [
+        "summary",
+        "size"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "summary": {
+          "type": "string",
+          "description": "One line, in the user's terms, not the agent's."
+        },
+        "type": {
+          "type": "string",
+          "description": "The kind of work. Drives retrieval ranking and the verification contract.",
+          "enum": [
+            "debugging",
+            "implementation",
+            "design",
+            "review",
+            "testing",
+            "research",
+            "planning",
+            "analysis",
+            "migration",
+            "security",
+            "performance",
+            "operations",
+            "documentation",
+            "writing",
+            "exploration",
+            "orchestration"
+          ]
+        },
+        "size": {
+          "type": "string",
+          "description": "Sets the context budget and how much of this plan is worth filling in. `trivial` means no plan is warranted \u2014 record the size and stop.",
+          "enum": [
+            "trivial",
+            "small",
+            "standard",
+            "complex"
+          ]
+        }
+      }
+    },
+    "agent": {
+      "type": "object",
+      "title": "Which single role owns it, why, and the near-miss it beat",
+      "description": "Who owns the work. One role. A chain is one plan per hop, not one plan with several owners.",
+      "required": [
+        "id",
+        "reason"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "A role id from catalog/loadouts.json."
+        },
+        "reason": {
+          "type": "string",
+          "description": "Why this role, in one line, tied to the deliverable the request asks for."
+        },
+        "considered": {
+          "type": "array",
+          "description": "Near-miss roles and the line that excluded them. Usually the role's own `not_for`. Fill this only when the call was close.",
+          "items": {
+            "type": "object",
+            "required": [
+              "id",
+              "rejected_because"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "rejected_because": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "forced": {
+          "type": "boolean",
+          "description": "True when the user named the role (/agent-<slug>). Routing did not happen and must not be second-guessed."
+        }
+      }
+    },
+    "capabilities": {
+      "type": "array",
+      "title": "The capability ids the work needs \u2014 asked for before any skill id",
+      "description": "Capability ids this task needs, from catalog/skills.json. This is the bridge between the task and the skills: ask for a capability, then see which installed skill provides it.",
+      "items": {
+        "type": "string"
+      }
+    },
+    "skills": {
+      "type": "array",
+      "title": "The one to five skills selected, each with the reason and whether it is actually installed",
+      "description": "The skills actually selected \u2014 one to five for ordinary work. A skill is here because a capability required it, never because it is installed.",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "reason",
+          "status"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string",
+            "description": "What this task needs that this skill supplies."
+          },
+          "tier": {
+            "type": "string",
+            "description": "Where the role's loadout puts it.",
+            "enum": [
+              "core",
+              "preferred",
+              "optional",
+              "conditional",
+              "verification"
+            ]
+          },
+          "condition": {
+            "type": "string",
+            "description": "For a conditional skill: the signal id from catalog/signals.json that admitted it."
+          },
+          "status": {
+            "type": "string",
+            "description": "`selected` \u2014 loaded. `substituted` \u2014 the first choice was absent and this one covers the capability. `unavailable` \u2014 named by the loadout but not installed; the role's own method carries the work.",
+            "enum": [
+              "selected",
+              "substituted",
+              "unavailable"
+            ]
+          },
+          "substitutes_for": {
+            "type": "string",
+            "description": "The unavailable skill id this one stands in for."
+          }
+        }
+      }
+    },
+    "stack": {
+      "type": "object",
+      "title": "What the project is, with the file behind each claim, and which conditions that settles",
+      "description": "What the project actually is, and which conditional buckets that opens. Detection activates guidance. It never grants authorization.",
+      "additionalProperties": false,
+      "properties": {
+        "detected": {
+          "type": "array",
+          "description": "Each claim with the file it came from. A claim with no evidence path is a guess with formatting.",
+          "items": {
+            "type": "object",
+            "required": [
+              "name",
+              "evidence"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Next.js, Tailwind, Postgres, Terraform."
+              },
+              "evidence": {
+                "type": "string",
+                "description": "The path, and the substring if a content check decided it."
+              }
+            }
+          }
+        },
+        "conditions": {
+          "type": "object",
+          "description": "signal id -> outcome. `unknown` is a real and common answer; the signal's own `when_unknown` says what follows from it.",
+          "additionalProperties": {
+            "enum": [
+              "true",
+              "false",
+              "unknown"
+            ]
+          }
+        },
+        "undetermined": {
+          "type": "array",
+          "description": "What detection could not establish. Part of the result, not an omission.",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "retrieval": {
+      "type": "array",
+      "title": "What to go and find in the workspace, and the question each search answers",
+      "description": "What to go and find in the workspace, and why. Queries, not results.",
+      "items": {
+        "type": "object",
+        "required": [
+          "query",
+          "reason"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "Identifiers, paths or phrases to search for."
+          },
+          "reason": {
+            "type": "string",
+            "description": "The question this search answers."
+          }
+        }
+      }
+    },
+    "context": {
+      "type": "array",
+      "title": "What retrieval returned \u2014 ranked, deduplicated, capped, each with its provenance",
+      "description": "What retrieval returned, ranked, deduplicated and capped. Every entry carries its provenance \u2014 why it is here, and how it matched.",
+      "items": {
+        "type": "object",
+        "required": [
+          "path",
+          "reason",
+          "match"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "source",
+              "test",
+              "config",
+              "schema",
+              "migration",
+              "manifest",
+              "doc",
+              "workflow",
+              "other"
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "description": "Which retrieval query brought it in, and what it is expected to answer."
+          },
+          "match": {
+            "type": "string",
+            "description": "How it matched. `expansion` means a strong result imported or referenced it \u2014 bounded, and the strong result is named in `via`.",
+            "enum": [
+              "identifier",
+              "filename",
+              "path",
+              "content",
+              "symbol",
+              "expansion",
+              "structure"
+            ]
+          },
+          "via": {
+            "type": "string",
+            "description": "For `expansion`: the path that led here."
+          },
+          "rank": {
+            "type": "integer",
+            "description": "1 = most relevant. Ordinal only. It is not a probability and must not be reported as one."
+          },
+          "symbols": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "lines": {
+            "type": "string",
+            "description": "The range actually read, e.g. \"120-180\". Absent means the whole file."
+          }
+        }
+      }
+    },
+    "excluded": {
+      "type": "array",
+      "title": "What was retrieved and then dropped, and why, so a wrong cut is visible",
+      "description": "Retrieved and then dropped \u2014 by the cap, by deduplication, or as noise. Recorded so a wrong cut is visible rather than silent.",
+      "items": {
+        "type": "object",
+        "required": [
+          "path",
+          "reason"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "tools": {
+      "type": "array",
+      "title": "Which servers are present, absent or unestablished \u2014 availability, never authorization",
+      "description": "MCP servers and host tools that materially help. Availability is a fact about the environment; it is never authorization.",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "status",
+          "reason"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "An id from catalog/mcp.json."
+          },
+          "status": {
+            "type": "string",
+            "description": "`available` \u2014 its tools are present in this session. `absent` \u2014 named by the loadout, not present; the registry's `fallback` applies. `unknown` \u2014 not established.",
+            "enum": [
+              "available",
+              "absent",
+              "unknown"
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "description": "What it would be used for. An `absent` entry says instead which check cannot be performed."
+          }
+        }
+      }
+    },
+    "permissions": {
+      "type": "object",
+      "title": "What authorization the work needs, and how each status is actually known",
+      "description": "Authorization the work needs. The runtime owns permission and exposes almost none of it for inspection, so every entry carries how it is known. Never assert a permission from a role file, a skill or a detected stack \u2014 none of them grant anything.",
+      "additionalProperties": false,
+      "properties": {
+        "required": {
+          "$ref": "#/$defs/permissionList"
+        },
+        "optional": {
+          "$ref": "#/$defs/permissionList"
+        }
+      }
+    },
+    "verification": {
+      "type": "array",
+      "title": "The evidence required before this is done, fixed before the work rather than after",
+      "description": "The evidence that must exist before this work is called done. Written before the work starts, so it cannot be lowered to match what happened to be produced.",
+      "items": {
+        "type": "object",
+        "required": [
+          "check",
+          "status"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "check": {
+            "type": "string",
+            "description": "The concrete check, e.g. \"the original reproduction re-run after the fix\"."
+          },
+          "skill": {
+            "type": "string",
+            "description": "The verification skill that defines it, when one does."
+          },
+          "status": {
+            "type": "string",
+            "description": "Set at planning time to `required` or `blocked`. `blocked` names, in `basis`, the tooling that is missing \u2014 and the report then says the check was not performed rather than downgrading the claim.",
+            "enum": [
+              "required",
+              "blocked"
+            ]
+          },
+          "basis": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "budget": {
+      "type": "object",
+      "title": "Roughly how much context this should spend, and on what",
+      "description": "Roughly how much context this task should spend, and on what. Approximate by design \u2014 the point is to prefer relevant context over a full window, not to count tokens precisely.",
+      "additionalProperties": false,
+      "properties": {
+        "target_tokens": {
+          "type": "integer"
+        },
+        "estimated_tokens": {
+          "type": "integer"
+        },
+        "by_source": {
+          "type": "object",
+          "description": "source -> approximate tokens.",
+          "additionalProperties": {
+            "type": "integer"
+          }
+        }
+      }
+    },
+    "diagnostics": {
+      "type": "array",
+      "title": "What this plan could not establish, and what was degraded",
+      "description": "What this plan could not establish, and what was degraded: a recommended skill that is not installed, a server that is absent, a retrieval that found nothing, a condition left unknown. An empty list is a claim; do not make it falsely.",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "$defs": {
+    "permissionList": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "status"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "workspace-read, workspace-edit, command-execution, network-fetch, browser, external-write, deployment.",
+            "enum": [
+              "workspace-read",
+              "workspace-edit",
+              "command-execution",
+              "network-fetch",
+              "browser",
+              "external-write",
+              "deployment"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "description": "`known` \u2014 established, and `basis` says how. `unavailable` \u2014 established as withheld: plan mode gating writes, a call already refused. `unknown` \u2014 the runtime does not expose it, which is the honest default for most entries.",
+            "enum": [
+              "known",
+              "unknown",
+              "unavailable"
+            ]
+          },
+          "basis": {
+            "type": "string",
+            "description": "The observation behind the status: \"the user asked for the edit\", \"plan mode is active\", \"a Bash call was denied this session\". Required whenever status is not `unknown`."
+          }
+        }
+      }
+    }
+  }
+}

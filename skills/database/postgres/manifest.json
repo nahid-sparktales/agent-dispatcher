@@ -4,6 +4,15 @@
   "category": "database",
   "use_when": "The project runs on Postgres and the decision depends on engine behaviour \u2014 a column type, an index kind, a plan to read, an isolation level, DDL lock behaviour, or a row-level security policy.",
   "not_for": "Engine-neutral modelling decisions (schema-design), the measure-fix-measure loop on one slow statement (query-optimization), or another database engine.",
+  "task_signals": [
+    "postgres",
+    "row level security",
+    "rls policy",
+    "isolation level",
+    "jsonb",
+    "which index type",
+    "supabase database"
+  ],
   "verifies": false,
   "tools": [
     "workspace",

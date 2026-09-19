@@ -4,6 +4,14 @@
   "category": "design",
   "use_when": "A layout has to hold across viewport widths \u2014 building it, repairing an overflow or collapse at some size, or filling in the sizes a single-width design never specified.",
   "not_for": "Proving the rendered result (browser-verification), semantics and assistive-technology behaviour (accessibility), or visual style direction.",
+  "task_signals": [
+    "mobile layout",
+    "breakpoint",
+    "overflows on mobile",
+    "responsive",
+    "media query",
+    "doesnt fit on phone"
+  ],
   "verifies": false,
   "tools": [
     "playwright",

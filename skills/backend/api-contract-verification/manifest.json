@@ -4,6 +4,14 @@
   "category": "backend",
   "use_when": "An endpoint, API client or third-party integration is about to be reported as working, or someone asks whether an integration is actually verified.",
   "not_for": "Load and performance testing, rendered UI verification (browser-verification), and authoring a project's general test strategy.",
+  "task_signals": [
+    "verify the integration",
+    "does this endpoint work",
+    "contract test",
+    "hit the real api",
+    "confirm it actually works",
+    "check someone elses integration"
+  ],
   "verifies": true,
   "tools": [
     "workspace",

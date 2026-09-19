@@ -4,6 +4,15 @@
   "category": "quality",
   "use_when": "An automated end-to-end suite is being created, extended, triaged for flake, or pruned, or a case has to be placed at or below this level.",
   "not_for": "Manually confirming one change renders and works (browser-verification), unit and integration coverage (test-design), choosing overall coverage levels (test-strategy), and load or performance testing.",
+  "task_signals": [
+    "e2e tests",
+    "playwright suite",
+    "cypress",
+    "flaky specs",
+    "end to end",
+    "intermittently red",
+    "user journey test"
+  ],
   "verifies": false,
   "tools": [
     "playwright",

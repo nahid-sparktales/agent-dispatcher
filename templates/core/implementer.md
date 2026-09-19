@@ -25,6 +25,7 @@ mcp_recommended: workspace, github, context7
 mcp_conditional: playwright, supabase, vercel, figma
 recipes: ship-feature, debug-application, build-production-ui
 verification: api-contract-verification, browser-verification
+retrieval_hints: target source files, project conventions and config, existing tests for it, current uncommitted diff, similar existing patterns, build and check commands
 ---
 
 # Implementer

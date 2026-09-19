@@ -4,6 +4,14 @@
   "category": "design",
   "use_when": "Someone is about to claim a screen or flow is accessible, keyboard-operable, screen-reader usable or WCAG-conformant, or an accessibility fix needs re-checking.",
   "not_for": "Making the fixes (accessibility), general rendered-UI checks (browser-verification), or authoring a conformance statement \u2014 which is a separate, authorized act.",
+  "task_signals": [
+    "is this accessible",
+    "verify accessibility",
+    "wcag compliant",
+    "accessibility audit",
+    "axe scan",
+    "accessibility sign off"
+  ],
   "verifies": true,
   "tools": [
     "playwright",

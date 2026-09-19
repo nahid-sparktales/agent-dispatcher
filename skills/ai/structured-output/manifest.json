@@ -4,6 +4,14 @@
   "category": "ai",
   "use_when": "A model's output feeds code rather than a human \u2014 extraction, classification, routing, scoring \u2014 or parsing keeps failing, fields arrive invented, or a schema is being designed for a model to fill.",
   "not_for": "Designing the tools an agent calls (tool-design), building the server that hosts them (mcp-design), or the quality of prose a human will read.",
+  "task_signals": [
+    "json output",
+    "invalid json",
+    "parsing fails",
+    "json schema",
+    "extract fields",
+    "classify into categories"
+  ],
   "verifies": false,
   "tools": [
     "workspace",

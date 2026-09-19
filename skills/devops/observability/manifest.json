@@ -4,6 +4,15 @@
   "category": "devops",
   "use_when": "A service or a new critical path is going to production, an incident ended with a question the data could not answer, or a dependency, queue or job is being added whose failure would otherwise be silent.",
   "not_for": "Stabilizing a failure that is happening right now (incident-response), measuring a known-slow path you can already reproduce (performance-profiling), and tracing agent or LLM runs (llm-observability).",
+  "task_signals": [
+    "add monitoring",
+    "metrics and alerts",
+    "no visibility",
+    "we had no data",
+    "structured logging",
+    "tracing setup",
+    "alert on errors"
+  ],
   "verifies": false,
   "tools": [
     "workspace",

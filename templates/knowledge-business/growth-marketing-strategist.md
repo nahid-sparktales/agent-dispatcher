@@ -14,6 +14,7 @@ skills_preferred: copywriting, product-analytics
 skills_if_market_research: deep-research, source-evaluation
 mcp_recommended: workspace
 mcp_conditional: notion, google-workspace
+retrieval_hints: current positioning copy, landing pages and site content, past campaign briefs, analytics and funnel data, competitor notes, product capability docs
 ---
 
 # Growth & Marketing Strategist

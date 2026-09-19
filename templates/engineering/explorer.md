@@ -15,6 +15,7 @@ mcp_recommended: workspace, github
 mcp_conditional: context7
 recipes: ship-feature
 verification: documentation-verification
+retrieval_hints: repository guidance files, entry points and main modules, user visible strings, config and build files, existing tests for the area, directory structure listings
 ---
 
 # Explorer

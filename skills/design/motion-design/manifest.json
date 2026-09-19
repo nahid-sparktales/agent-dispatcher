@@ -4,6 +4,14 @@
   "category": "design",
   "use_when": "Transitions, animated state changes, gesture movement or loading indicators are being added, tuned or reviewed, or an interface reads as janky or sluggish.",
   "not_for": "Static visual design and layout, general performance profiling of non-animated code, or proving a screen works at all (browser-verification).",
+  "task_signals": [
+    "animation",
+    "transition",
+    "feels janky",
+    "hover effect",
+    "loading spinner",
+    "reduced motion"
+  ],
   "verifies": false,
   "tools": [
     "workspace",

@@ -4,6 +4,15 @@
   "category": "database",
   "use_when": "A schema or data migration is being written, reviewed or sequenced against a database that holds real data and has live readers.",
   "not_for": "Greenfield schema design, query tuning with no DDL, or proving after the fact that a migration did what it claimed (database-migration-verification).",
+  "task_signals": [
+    "write a migration",
+    "zero downtime migration",
+    "add a column safely",
+    "drop a column",
+    "rename column",
+    "rollback plan",
+    "alter table lock"
+  ],
   "verifies": false,
   "tools": [
     "workspace",

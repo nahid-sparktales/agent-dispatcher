@@ -4,6 +4,15 @@
   "category": "devops",
   "use_when": "A GitHub Actions workflow is being added, changed or reviewed, or CI is slow, flaky, or reporting green when it should be red.",
   "not_for": "Provider-neutral pipeline and gate design (ci-cd), container image authoring (docker), writing the tests a workflow runs (test-design, e2e-testing), or authorizing a deployment.",
+  "task_signals": [
+    "github actions",
+    "workflow yaml",
+    "flaky ci",
+    "ci takes forever",
+    "actions secrets",
+    "ci passed but broken",
+    "cache in ci"
+  ],
   "verifies": false,
   "tools": [
     "workspace",

@@ -21,6 +21,7 @@ skills_if_anthropic_api: anthropic-claude-api
 mcp_recommended: workspace, context7
 recipes: ship-feature, debug-application
 verification: agent-evals
+retrieval_hints: agent prompt templates, tool schema definitions, model routing config, evaluation cases and fixtures, memory and context stores, runtime permission config
 ---
 
 # AI & Agent Engineer

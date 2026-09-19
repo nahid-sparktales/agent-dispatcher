@@ -4,6 +4,15 @@
   "category": "database",
   "use_when": "Checks on a dataset are being written or reviewed, a wrong value reached a consumer with nothing catching it, or an existing check is noisy enough to be ignored.",
   "not_for": "Proving one migration did what it claimed (database-migration-verification), building or repairing the pipeline that produces the data (data-pipelines), enforcing an invariant in the schema's own design (schema-design), or interpreting what the numbers mean, or enforcing an invariant inside a live schema (data-integrity).",
+  "task_signals": [
+    "data quality checks",
+    "stale data",
+    "freshness check",
+    "wrong number shipped",
+    "noisy alerts",
+    "row count dropped",
+    "dbt tests"
+  ],
   "verifies": false,
   "tools": [
     "workspace",

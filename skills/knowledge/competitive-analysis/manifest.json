@@ -4,6 +4,15 @@
   "category": "knowledge",
   "use_when": "A choice between real alternatives \u2014 library, service, vendor, build versus buy \u2014 has to be defended, or someone arrives with a comparison table and a conclusion.",
   "not_for": "General investigation method (deep-research), judging an individual source (source-evaluation), or writing positioning and marketing copy.",
+  "task_signals": [
+    "build vs buy",
+    "compare these tools",
+    "which library",
+    "vendor evaluation",
+    "alternatives to",
+    "comparison table",
+    "stacks up against"
+  ],
   "verifies": false,
   "tools": [
     "workspace",

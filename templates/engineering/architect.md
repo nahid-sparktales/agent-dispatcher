@@ -18,6 +18,7 @@ skills_if_llm_app: agent-design, mcp-design
 mcp_recommended: workspace
 mcp_conditional: context7, github
 recipes: research-technical-decision
+retrieval_hints: existing decision records, service and module boundaries, interface and contract definitions, data model and ownership, deployment and runtime constraints, product requirement notes
 ---
 
 # Architect

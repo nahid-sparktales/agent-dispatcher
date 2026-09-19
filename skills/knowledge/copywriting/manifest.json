@@ -4,6 +4,15 @@
   "category": "knowledge",
   "use_when": "Copy aimed at an audience outside the product is being written or rewritten \u2014 landing page, product messaging, email, ad, announcement \u2014 or an existing draft's claims need auditing before it ships.",
   "not_for": "Interface strings inside the product (ux-writing), documentation (technical-writing), and publishing or sending anything, which stays with the user.",
+  "task_signals": [
+    "landing page copy",
+    "marketing email",
+    "ad copy",
+    "launch announcement",
+    "rewrite this headline",
+    "punchier copy",
+    "sales page"
+  ],
   "verifies": false,
   "tools": [
     "workspace"
