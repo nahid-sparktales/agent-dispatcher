@@ -104,6 +104,11 @@ The installer builds and validates the pack, copies its skills into
 registers a `SessionStart` hook. It backs up an existing `settings.json` before adding the hook
 and skips command files it does not own. `CLAUDE_CONFIG_DIR` overrides the default config directory.
 
+Updates are staged before live files are replaced. If a replacement fails, the installer
+restores the previous pack, commands, hook, settings, and manifest. A failed staging check
+leaves the installed version untouched. See [manual installer recovery](adapters/claude-code/README.md#installing)
+for the recovery limits.
+
 Start a new Claude Code session and use the shorter command names:
 
 ```text
@@ -151,6 +156,7 @@ context plan. While active, the dispatcher re-routes when the kind of work chang
 | `/agent-debugger` | Work as the Debugger. |
 | `/agent-reviewer` | Work as the Reviewer. |
 | `/agent-inventory` | List skills, tools, and MCPs with usability and setup status. |
+| `/agent-doctor` | Check installation health, list every capability, and recommend relevant setup. |
 | `/agent-context` | Show the current context plan. |
 | `/agent-context explain` | Explain the role, skills, and tools selected. |
 | `/agent-context verbose` | Include candidates, dropped files, and the context budget. |
@@ -230,6 +236,44 @@ links, and fallbacks; compact still lists every entry in the requested scope. Th
 inspects availability without loading every skill, probing accounts, or installing anything.
 It reports discovery limits rather than treating an unseen integration as missing. Usability
 is separate from permission to perform a particular action.
+
+### Check health and get setup recommendations
+
+In Codex:
+
+```text
+$agent-dispatcher doctor
+$agent-dispatcher doctor all reviewer
+$agent-dispatcher doctor mcps
+$agent-dispatcher doctor setup
+```
+
+In Claude Code, use `/agent-doctor` with the same arguments, or
+`/agent-dispatcher:agent-doctor` for a plugin install. `/agent-dispatcher doctor` also works.
+
+The default checks the installation and goes through **all bundled guides, referenced external
+skills, catalog MCPs, and additional skills/tools exposed in the current session**. Each entry
+states what is usable, what connection has been verified, what needs setup, or what remains
+unknown. It also checks activation and hook registration; a registered hook does not prove trust.
+The full inventory is followed by a ranked shortlist of useful missing capabilities, with a
+reason, source link, next step, and existing fallback. A role argument focuses recommendations
+without hiding other inventory entries or changing your active role.
+
+Doctor checks availability without loading every guide or calling every integration. It never
+connects accounts, enables services, uses stored credentials, or changes permissions. A configured
+server is not automatically connected; incomplete host discovery is reported as unknown.
+Disabled and retired integrations are not recommended for activation.
+
+For an offline local check from the source checkout:
+
+```bash
+python3 -B doctor.py --project /path/to/project --role reviewer
+python3 -B doctor.py mcps --project /path/to/project --json
+```
+
+The standalone command cannot see a running agent's connections by itself. In-session commands
+supply a sanitized observation snapshot using `--evidence`; see
+[doctor procedure and evidence format](DOCTOR.template.md). JSON output is available for tooling.
 
 ### Activate automatically in future sessions
 
@@ -503,6 +547,7 @@ Edit source files, then run from the repository root:
 python3 build.py
 python3 test_build.py
 python3 test_decision.py
+python3 test_doctor.py
 ```
 
 These checks run offline without provider credentials. They validate generated-file agreement,

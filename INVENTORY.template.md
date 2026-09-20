@@ -7,6 +7,10 @@ That file is a generated catalog of candidates, never evidence of installation o
 
 ## Controls
 
+For installation health and prioritized recommendations as well as this inventory, use
+`doctor` and follow DOCTOR.md beside this reference. `inventory` remains a lightweight
+inspection; neither command installs or connects anything.
+
 - `inventory` or `inventory all`: all bundled guides, referenced external skills, other skills
   exposed by the host, visible native tools, and registered or host-exposed MCPs.
 - `inventory skills`, `inventory tools`, `inventory mcps`: restrict the report to that category.

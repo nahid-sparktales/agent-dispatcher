@@ -1,7 +1,7 @@
 ---
 name: agent-dispatcher
 description: Turns the session into a role-routing dispatcher. Reads each request, picks the best-fit specialist role from 27 profiles (UI/UX designer, reviewer, tester, debugger, architect, researcher, PM, security auditor, data analyst, copywriter and more), loads that role's working method, and works as that specialist — chaining roles within a turn when the work needs it. Use when the user types /agent-dispatcher, names a role like "/agent-uidesigner" or "/agent-reviewer", asks you to act as a specialist agent, switch agent modes, route work by expertise, or turn perpetual dispatcher mode on or off.
-argument-hint: "[role-id | on | off | status | output compact|verbose]"
+argument-hint: "[role-id | doctor | inventory | on | off | status | output compact|verbose]"
 ---
 
 # Agent Dispatcher
@@ -59,9 +59,13 @@ Route each request to one specialist role, load that role, work as it. 27 roles.
 
 ## Inventory
 
-`inventory [all|skills|tools|mcps|setup] [verbose]` lists catalog and host-exposed capabilities
-with usability and setup status. Read INVENTORY.md beside this skill; do not route or execute
-work. `/agent-inventory` is the same inspection. It never installs or connects anything.
+`inventory [all|skills|tools|mcps|setup] [verbose]` or `/agent-inventory`: read INVENTORY.md
+beside this skill for read-only usability and setup inspection. Do not route, install, or connect.
+
+## Doctor
+
+`doctor [all|skills|tools|mcps|setup] [role-id]` or `/agent-doctor`: read DOCTOR.md beside this
+skill for health, full inventory, and recommendations. Read-only; preserve the role.
 
 ## Activity output
 

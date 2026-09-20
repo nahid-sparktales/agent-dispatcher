@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- Stage Claude manual installations before replacing live files, with rollback for failed
+  replacements and handled interruptions. Preserve recovery backups and a path mapping if
+  rollback cannot finish; report post-commit cleanup failures accurately.
+- Add `doctor` / `/agent-doctor` for read-only package health, full skill/tool/MCP inventory,
+  session-evidence reconciliation, and role/project-based setup recommendations. Keep unknown,
+  configured, exposed, connected, disabled, and retired capabilities distinct. Bundle the
+  offline helper in both host packages and add recovery/doctor regression coverage.
+
 - Add a Codex adapter with one discoverable dispatcher skill, all shared roles and supporting
   guides, native role/context/decision controls, a self-contained plugin export, and an owned
   install/update/uninstall path. Add opt-in Codex session activation with separate user-owned

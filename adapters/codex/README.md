@@ -23,6 +23,8 @@ $agent-dispatcher output verbose
 $agent-dispatcher output compact
 $agent-dispatcher inventory
 $agent-dispatcher inventory setup verbose
+$agent-dispatcher doctor
+$agent-dispatcher doctor all reviewer
 $agent-dispatcher context explain
 $agent-dispatcher decision
 $agent-dispatcher status
@@ -45,6 +47,13 @@ append `verbose` for evidence and setup details. Each row distinguishes usable, 
 blocked, unknown, and not recommended. Tool exposure is not proof of a working connection or
 permission for every action. Missing discovery produces an explicit unknown, not an invented
 installation result. The command makes no account probes or setup changes.
+
+`$agent-dispatcher doctor` adds package integrity, activation/hook checks, and ranked setup
+recommendations to the complete inventory. Append `all reviewer` to focus recommendations,
+or `skills`, `tools`, `mcps`, or `setup` to filter the inventory. The helper lives at
+`scripts/doctor.py`; its shared procedure is `references/DOCTOR.md`. Session evidence distinguishes
+callable tools from connections that have successfully been used. The offline CLI reports unknown
+when it has no session evidence. Neither form connects accounts or changes configuration.
 
 ## Activity output
 

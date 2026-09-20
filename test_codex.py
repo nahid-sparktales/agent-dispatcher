@@ -94,6 +94,53 @@ class CodexPackageTests(unittest.TestCase):
         self.assertEqual(json.loads(result.stdout)["agent"]["id"], "reviewer")
         self.assertFalse(list(self.pack.rglob(".agent-dispatcher-decision.json")))
 
+    def test_doctor_is_bundled_with_shared_procedure_and_inventory(self):
+        self.assertEqual((self.pack / "scripts/doctor.py").read_bytes(),
+                         (ROOT / "doctor.py").read_bytes())
+        self.assertEqual((self.pack / "references/DOCTOR.md").read_bytes(),
+                         (ROOT / "DOCTOR.template.md").read_bytes())
+        self.assertEqual((ROOT / "skills/agent-dispatcher/doctor.py").read_bytes(),
+                         (ROOT / "doctor.py").read_bytes())
+        self.assertIn("references/DOCTOR.md", (self.pack / "SKILL.md").read_text())
+        self.assertIn("DOCTOR.md", (ROOT / "commands/agent-doctor.md").read_text())
+
+    def test_doctor_cli_reconciles_session_evidence_outside_package(self):
+        project = self.root / "doctor-project"
+        config = self.root / "doctor-config"
+        project.mkdir(exist_ok=True)
+        config.mkdir(exist_ok=True)
+        evidence = {"schema_version": 1,
+                    "mcps": [{"id": "github-session", "catalog_id": "github", "status": "verified"}],
+                    "tools": [{"id": "mcp__github__list_issues", "server": "github-session", "status": "verified"},
+                              {"id": "native_read_file", "status": "exposed"}],
+                    "skills": [{"id": "extra-host-guide", "status": "exposed"}],
+                    "disabled": ["slack"]}
+        before = {str(p.relative_to(self.pack)): p.read_bytes()
+                  for p in self.pack.rglob("*") if p.is_file()}
+        result = subprocess.run([sys.executable, "-B", str(self.pack / "scripts/doctor.py"),
+                                 "all", "--project", str(project), "--config-dir", str(config),
+                                 "--role", "reviewer", "--evidence", "-", "--json"],
+                                cwd=project, input=json.dumps(evidence),
+                                capture_output=True, text=True, timeout=15)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        report = json.loads(result.stdout)
+        self.assertTrue(report["read_only"])
+        self.assertEqual(report["host"], "codex")
+        self.assertEqual(report["role"], "reviewer")
+        entries = {(row["category"], row["id"]): row for row in report["entries"]}
+        self.assertEqual(sum(kind == "bundled_skill" for kind, _ in entries), len(self.data["skills"]))
+        self.assertEqual(entries["mcp_server", "github"]["status"], "usable")
+        self.assertEqual(entries["mcp_server", "github"]["evidence"], "verified")
+        self.assertEqual(entries["mcp_server", "slack"]["status"], "blocked")
+        self.assertEqual(entries["mcp_tool", "mcp__github__list_issues"]["status"], "usable")
+        self.assertIn(("host_skill", "extra-host-guide"), entries)
+        self.assertIn(("native_tool", "native_read_file"), entries)
+        self.assertNotIn("github", [row["id"] for row in report["recommendations"]])
+        self.assertEqual(list(project.iterdir()), [])
+        self.assertEqual(list(config.iterdir()), [])
+        self.assertEqual(before, {str(p.relative_to(self.pack)): p.read_bytes()
+                                  for p in self.pack.rglob("*") if p.is_file()})
+
     def test_plugin_manifest_and_hook_use_codex_contract(self):
         manifest = json.loads((self.plugin / ".codex-plugin/plugin.json").read_text())
         source = json.loads((ROOT / ".claude-plugin/plugin.json").read_text())

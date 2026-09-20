@@ -62,7 +62,7 @@ def export_package(destination, data):
             raise ValueError(f"unadapted Claude mode control in {rid}")
         write(refs / "roles" / f"{rid}.md", text)
     write(refs / "ROLES.md", "\n".join(roles))
-    for name in ("CONTEXT.md", "SIGNALS.md", "INDEX.md", "ACTIVITY.md", "INVENTORY.md"):
+    for name in ("CONTEXT.md", "SIGNALS.md", "INDEX.md", "ACTIVITY.md", "INVENTORY.md", "DOCTOR.md"):
         text = adapt((build.ADAPTER / name).read_text())
         for skill_meta in data["skills"]:
             original = skill_meta["path"]
@@ -110,6 +110,7 @@ def export_package(destination, data):
     shutil.copytree(ROOT / "catalog", runtime / "catalog")
     for name in ("activate.py", "decide.py"):
         shutil.copyfile(SOURCE / name, scripts / name)
+    shutil.copyfile(ROOT / "doctor.py", scripts / "doctor.py")
     manifest = json.loads((ROOT / ".claude-plugin" / "plugin.json").read_text())
     manifest["skills"] = "./skills/"
     manifest["interface"] = {

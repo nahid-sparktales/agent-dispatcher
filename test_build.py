@@ -29,7 +29,7 @@ def check(name, cond, detail=""):
         print(f"  FAIL {name} — {detail}")
 
 
-GENERATED = ["skills/agent-dispatcher/INVENTORY.md", "skills/agent-dispatcher/INVENTORY.json", "skills/agent-dispatcher/ACTIVITY.md", "skills/agent-dispatcher/SKILL.md", "skills/agent-dispatcher/INDEX.md",
+GENERATED = ["skills/agent-dispatcher/DOCTOR.md", "skills/agent-dispatcher/doctor.py", "skills/agent-dispatcher/INVENTORY.md", "skills/agent-dispatcher/INVENTORY.json", "skills/agent-dispatcher/ACTIVITY.md", "skills/agent-dispatcher/SKILL.md", "skills/agent-dispatcher/INDEX.md",
              "skills/agent-dispatcher/CONTEXT.md", "skills/agent-dispatcher/SIGNALS.md",
              "catalog/skills.json", "catalog/loadouts.json", "README.md",
              "docs/skills.md", "docs/mcps.md", "docs/recipes.md",
@@ -234,96 +234,43 @@ def hook_behaviour(roles):
               "did not carry" in out, repr(out[-400:]))
 
 
-def install_heredocs():
-    """The two Python blocks in install.sh, executed rather than parsed.
-
-    Parsing them only catches a syntax error. The worse failure is the one that parses: a
-    filter that stops matching, or a lookup that stops writing through to `s`, leaves
-    install.sh exiting 0 having registered nothing — or, on uninstall, having left
-    settings.json pointing at the hook script the same run already deleted, so every later
-    session start errors. Nothing static sees that, because nothing changed. Only running the
-    blocks against a real settings.json and reading it back does.
-    """
-    blocks = re.findall(r"<<'PY'\n(.*?)\nPY\n", (ROOT / "install.sh").read_text(), re.S)
-    check("install.sh's two Python heredocs are still found", len(blocks) == 2,
-          f"{len(blocks)} found — the extraction, not install.sh, is probably what broke")
-    if len(blocks) != 2:
-        return
-    uninstall, install = blocks
+def install_settings():
+    """Exercise the installer's settings transformation against common host layouts."""
+    import install_claude as installer
     script = (build.HOOKS / "agent-dispatcher-activate.sh").name
-
-    def run(block, d):
-        return subprocess.run([sys.executable, "-c", block, str(d)],
-                              capture_output=True, text=True)
-
-    def entries(d):
-        """settings.json as it stands, and the entries in it that belong to this pack."""
-        s = json.loads((d / "settings.json").read_text())
-        return s, [e for e in s.get("hooks", {}).get("SessionStart", [])
-                   if any(script[:-3] in h.get("command", "") for h in e.get("hooks", []))]
-
     theirs = {"matcher": "startup", "hooks": [{"type": "command", "command": "echo theirs"}]}
-    # The three states a real machine presents. They matter separately: only the last one has
-    # `hooks` already in place, so a read that stops writing through to `s` still appends to a
-    # live list there and no-ops on the first two — which are the ordinary case.
-    seeds = {"no settings.json": None,
+    seeds = {"no settings.json": {},
              "settings.json without hooks": {"model": "opus"},
              "settings.json with another hook": {"model": "opus",
                                                  "hooks": {"SessionStart": [theirs]}}}
     for label, seed in seeds.items():
         with tempfile.TemporaryDirectory() as tmp:
             d = pathlib.Path(tmp)
-            if seed is not None:
-                (d / "settings.json").write_text(json.dumps(seed) + "\n")
-
-            r = run(install, d)
-            s, ours = entries(d)
-            check(f"install.sh's block registers the SessionStart hook — {label}",
-                  r.returncode == 0 and len(ours) == 1,
-                  f"rc={r.returncode} {(r.stderr or r.stdout).strip()[:160]} — "
-                  f"{len(ours)} registered, so the installer reported success and armed nothing")
-            # The path it registers has to be the path the `cp` above it writes to, or the hook
-            # is registered under a name that does not exist the first time it is called.
-            check(f"and registers the path install.sh copies the script to — {label}",
+            installed = installer.hook_settings(seed, d)
+            ours = [e for e in installed["hooks"]["SessionStart"]
+                    if any(script[:-3] in h.get("command", "") for h in e.get("hooks", []))]
+            check(f"installer registers the SessionStart hook — {label}",
+                  len(ours) == 1, f"{len(ours)} registered")
+            check(f"and registers the path the installer copies the script to — {label}",
                   bool(ours) and shlex.split(ours[0]["hooks"][0].get("command", ""))
-                  == ["bash", str(d / "hooks" / script)],
-                  repr(ours[0]["hooks"][0].get("command", "") if ours else None))
-
-            r = run(install, d)
-            _, ours = entries(d)
+                  == ["bash", str(d / "hooks" / script)], repr(ours))
             check(f"a second install registers it once, not twice — {label}",
-                  r.returncode == 0 and len(ours) == 1,
-                  f"rc={r.returncode} — {len(ours)} registered")
-
-            r = run(uninstall, d)
-            s, ours = entries(d)
-            # The one that matters: this block runs *after* `rm -f` has deleted the script.
-            check(f"install.sh's uninstall block removes it again — {label}",
-                  r.returncode == 0 and not ours,
-                  f"rc={r.returncode} {(r.stderr or r.stdout).strip()[:160]} — {len(ours)} left "
-                  "registered against a script --uninstall has already deleted")
-            if seed:
-                check(f"and leaves the rest of settings.json alone — {label}",
-                      s.get("model") == "opus"
-                      and ("hooks" not in seed or theirs in s["hooks"]["SessionStart"]),
-                      str(s)[:200])
-                check(f"having backed it up first — {label}",
-                      (d / "settings.json.bak-agent-dispatcher").exists())
-    return install
+                  installer.hook_settings(installed, d) == installed)
+            removed = installer.hook_settings(installed, d, remove=True)
+            check(f"uninstall removes its hook again — {label}",
+                  not any(script[:-3] in h.get("command", "")
+                          for e in removed.get("hooks", {}).get("SessionStart", [])
+                          for h in e.get("hooks", [])))
+            check(f"and leaves the rest of settings.json alone — {label}",
+                  all(removed.get(k) == value for k, value in seed.items()), str(removed)[:200])
+    return installer
 
 
-def install_script(install_block):
-    """`./install.sh --uninstall` itself, run — not only the Python inside it.
+def install_script(installer):
+    """Run the real uninstall entry point against isolated settings and ownership fixtures.
 
-    The blocks alone cannot show the order the shell runs them in, and the order is the sharp
-    edge: the settings.json rewrite sits in the same branch as the `rm -f` that deletes the hook
-    script, so with the rewrite second, anything stopping it — a hand-edited settings.json is
-    enough — leaves every session start pointing at a file the same run has already deleted.
-    Running `--uninstall` here is safe: that branch exits long before install.sh reaches this
-    suite, so there is no recursion.
+    This branch skips installation validation, so calling it from this suite cannot recurse.
     """
-    if not install_block:
-        return
     script_name = (build.HOOKS / "agent-dispatcher-activate.sh").name
     theirs = {"type": "command", "command": "bash /theirs.sh"}
     with tempfile.TemporaryDirectory() as tmp:
@@ -336,7 +283,7 @@ def install_script(install_block):
             script.write_text("#!/bin/bash\n")
             (d / ".agent-dispatcher-installed").touch()
             (d / "settings.json").write_text(json.dumps(settings) + "\n")
-            subprocess.run([sys.executable, "-c", install_block, str(d)], capture_output=True)
+            (d / "settings.json").write_text(json.dumps(installer.hook_settings(settings, d)) + "\n")
             return json.loads((d / "settings.json").read_text())
 
         def uninstall():
@@ -408,7 +355,7 @@ def main():
           set(re.findall(r"^### `([a-z0-9-]+)`", router, re.M)) == ids)
     cmds = sorted(build.CMDS.glob("agent-*.md"))
     # Inspection and configuration commands do not force a specialist role.
-    NON_ROLE_CMDS = ("agent-context.md", "agent-decision.md", "agent-inventory.md")
+    NON_ROLE_CMDS = ("agent-context.md", "agent-decision.md", "agent-inventory.md", "agent-doctor.md")
     role_cmds = [c for c in cmds if c.name not in NON_ROLE_CMDS]
     check("one command per role, plus inspection and configuration commands",
           len(role_cmds) == len(roles)
@@ -643,10 +590,8 @@ def main():
           (fm["name"], fm["not_for"]) == (r["name"], r["not_for"]),
           f"{fm['name']!r} / {fm['not_for']!r}")
 
-    # Same class, one layer out: install.sh's two Python blocks are Python inside a quoted bash
-    # heredoc, and `bash -n` only ever sees the shell. Compiling them would catch a syntax error
-    # and nothing else, so they get run against a throwaway settings.json instead.
-    install_script(install_heredocs())
+    # Verify registration behavior and the real uninstaller against throwaway settings.
+    install_script(install_settings())
 
     print("\nhygiene")
     tracked = [p for p in ROOT.rglob("*")

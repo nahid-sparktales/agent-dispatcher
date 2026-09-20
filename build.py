@@ -645,6 +645,8 @@ def write_index(d):
 def write_inventory(d):
     """Ship setup metadata with the pack; session availability is never generated."""
     (ADAPTER / "INVENTORY.md").write_text((ROOT / "INVENTORY.template.md").read_text())
+    (ADAPTER / "DOCTOR.md").write_text((ROOT / "DOCTOR.template.md").read_text())
+    (ADAPTER / "doctor.py").write_bytes((ROOT / "doctor.py").read_bytes())
     data = {
         "local_skills": [{
             "id": item["id"], "purpose": item.get("summary") or item["description"],
@@ -654,11 +656,13 @@ def write_inventory(d):
         } for item in d["skills"]],
         "external_skills": [{key: item.get(key) for key in (
             "id", "name", "purpose", "repository", "path", "required_tools", "fallback",
-            "license", "verified", "scripts_included", "network_usage")}
+            "license", "verified", "scripts_included", "network_usage", "trust",
+            "requirement", "activation", "capability", "notes")}
             for item in sorted(d["external"].values(), key=lambda item: item["id"])],
         "tools_and_mcps": [{key: item.get(key) for key in (
             "id", "name", "purpose", "source", "transport", "auth", "risk", "writes",
-            "read_only_option", "fallback", "notes")}
+            "read_only_option", "fallback", "notes", "recommended_for", "conditional_for",
+            "activation", "official")}
             for item in sorted(d["mcp"].values(), key=lambda item: item["id"])],
     }
     (ADAPTER / "INVENTORY.json").write_text(json.dumps(data, indent=2) + "\n")
@@ -839,6 +843,13 @@ def write_commands(d):
         f'(`{SKILL_DIR}/INVENTORY.md` for a manual install, or inside the plugin). '
         'Follow its inspection procedure for `inventory $ARGUMENTS`. Do not route work, '
         'install anything, or connect accounts.\n')
+    (CMDS / "agent-doctor.md").write_text(
+        '---\ndescription: "Check dispatcher health and every skill, tool, and MCP; recommend relevant setup."\n'
+        'argument-hint: "[all | skills | tools | mcps | setup] [role-id]"\n---\n\n'
+        'Read DOCTOR.md in the agent-dispatcher skill directory beside SKILL.md '
+        f'(`{SKILL_DIR}/DOCTOR.md` for a manual install, or inside the plugin). '
+        'Follow its read-only procedure for `doctor $ARGUMENTS`, including current-session '
+        'evidence and ranked recommendations. Do not install, connect accounts, or enable anything.\n')
     # Also not a role: configuration for the optional decision engine.
     (CMDS / "agent-decision.md").write_text(sub(DECISION_CMD, "{{SKILL_DIR}}", SKILL_DIR))
 

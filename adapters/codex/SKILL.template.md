@@ -22,6 +22,7 @@ These are arguments to one skill, not separate slash commands:
 | --- | --- |
 | `context`, `context explain`, `context verbose` | Inspect the current context plan using [CONTEXT.md](references/CONTEXT.md); do not execute the task. If no task exists, say so. |
 | `inventory`, optionally `all`, `skills`, `tools`, `mcps`, or `setup`, then `verbose` | Follow [INVENTORY.md](references/INVENTORY.md) to list usability, evidence, and setup needs; do not install or connect anything. |
+| `doctor`, optionally `all`, `skills`, `tools`, `mcps`, or `setup`, and a role id/alias | Follow [DOCTOR.md](references/DOCTOR.md) for package health, full capability inventory, current-session usability, and ranked setup recommendations. This is read-only; keep the active role unchanged. |
 | `decision` | Run `python3 PACK/scripts/decide.py --project PROJECT status`. |
 | `decision off`, `decision auto`, `decision required` | Run `python3 PACK/scripts/decide.py --project PROJECT mode MODE`. Scopes still ship disabled. See [Jev](references/jev.md) only when configuring that integration. |
 | `output`, `output compact`, `output verbose` | Inspect or change the conversation's activity output style as described below. |

@@ -40,6 +40,23 @@ If either path already exists without that manifest, installation and uninstall 
 it. Move conflicting files aside before installing, or restore the original manifest for a prior
 manual installation. Without a manifest and without either file, uninstall leaves settings alone.
 
+`install.sh` delegates to `install_claude.py`. It builds and validates the source, prepares the
+whole replacement in staging, and only then replaces live paths. Backups are kept until the
+transaction succeeds. On a failed replacement or a handled interruption, it restores the prior
+pack, owned commands, hook, settings, and manifest. This is rollback for an interrupted process,
+not a guarantee against power loss or an uncatchable process termination. If restoring a backup
+also fails, keep the recovery directory reported by the installer and recover those files before
+retrying. Unrelated commands and settings are preserved.
+
+## Doctor
+
+`/agent-doctor` or `/agent-dispatcher doctor` checks package health and the entire capability
+inventory, then recommends relevant missing integrations. Use `all reviewer` to focus those
+recommendations, or `skills`, `tools`, `mcps`, or `setup` for a category. Plugin users add the
+`agent-dispatcher:` prefix. The shared procedure is `DOCTOR.md` in the installed skill and the
+read-only helper is `doctor.py`. Session observations establish tool exposure and successful
+connections; catalog entries and config files alone cannot. No setup actions are performed.
+
 ## Adding another runtime
 
 Write a renderer beside this one. The canonical `templates/`, `skills/`, `recipes/` and `catalog/`

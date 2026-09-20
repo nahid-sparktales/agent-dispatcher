@@ -265,6 +265,16 @@ class InstallerTests(unittest.TestCase):
                                     env=self.env, capture_output=True, text=True, timeout=10)
             self.assertEqual(status.returncode, 0, status.stderr)
             self.assertIn("No decision scope is enabled", status.stdout)
+            doctor = subprocess.run([sys.executable, str(pack / "doctor.py"), "all", "--host", "claude",
+                                     "--config-dir", str(self.config), "--project", str(self.root),
+                                     "--role", "reviewer", "--json"], cwd=self.root, env=self.env,
+                                    capture_output=True, text=True, timeout=10)
+            self.assertEqual(doctor.returncode, 0, doctor.stderr)
+            report = json.loads(doctor.stdout)
+            self.assertEqual(report["host"], "claude")
+            self.assertEqual(report["role"], "reviewer")
+            self.assertTrue(report["read_only"])
+            self.assertTrue(report["entries"])
             if iteration == 0:
                 # Emulate a previous release's registration before exercising the update.
                 ours[0]["command"] = f'bash "{self.config}/hooks/agent-dispatcher-activate.sh"'
@@ -278,6 +288,220 @@ class InstallerTests(unittest.TestCase):
         self.assertFalse((self.config / "skills" / "agent-dispatcher").exists())
         self.assertFalse((self.config / ".agent-dispatcher-installed").exists())
         self.assertTrue((self.config / ".agent-dispatcher-active").exists())
+
+
+class RecoverableInstallerTests(unittest.TestCase):
+    """Real filesystem transactions with deterministic failures; no host config is touched."""
+    def setUp(self):
+        import install_claude
+        self.installer = install_claude
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.root = Path(self.tmp.name)
+        self.repo = self.root / "source"
+        self.config = self.root / "config"
+        self.config.mkdir()
+        sources = {
+            "skills/agent-dispatcher/SKILL.md": "dispatcher v1",
+            "skills/agent-dispatcher/INDEX.md": "index",
+            "skills/agent-dispatcher/CONTEXT.md": "context",
+            "skills/agent-dispatcher/roles/implementer.md": "implementer",
+            "skills/testing/check/SKILL.md": "guide",
+            "recipes/check.md": "recipe",
+            "decision/__main__.py": "# inert engine\n",
+            "catalog/loadouts.json": "{}",
+            "doctor.py": "# read-only doctor\n",
+            "hooks/agent-dispatcher-activate.sh": "#!/bin/bash\n",
+            "commands/agent-reviewer.md": "review v1",
+            "commands/agent-implementer.md": "implement v1",
+        }
+        for relative, value in sources.items():
+            target = self.repo / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(value)
+        (self.config / "settings.json").write_text('{"model": "preserve", "hooks": {}}')
+        (self.config / "settings.json").chmod(0o600)
+        self.build = patch("install_claude.build_and_validate")
+        self.build.start()
+        self.addCleanup(self.build.stop)
+        self.quiet = contextlib.redirect_stdout(io.StringIO())
+        self.quiet.__enter__()
+        self.addCleanup(self.quiet.__exit__, None, None, None)
+        self.installer.install(self.config, self.repo)
+        # Legacy registration and an obsolete owned command both need updating. The original
+        # user backup also remains exactly as it was, even if the current settings differ.
+        settings = json.loads((self.config / "settings.json").read_text())
+        settings["hooks"]["SessionStart"][0]["hooks"][0]["command"] = (
+            f'bash "{self.config}/hooks/agent-dispatcher-activate.sh"')
+        (self.config / "settings.json").write_text(json.dumps(settings, separators=(",", ":")))
+        obsolete = self.config / "commands/agent-obsolete.md"
+        obsolete.write_text("owned old command")
+        with (self.config / self.installer.MANIFEST).open("a") as manifest:
+            manifest.write(str(obsolete) + "\n")
+        (self.repo / "skills/agent-dispatcher/SKILL.md").write_text("dispatcher v2")
+        (self.repo / "commands/agent-reviewer.md").write_text("review v2")
+        user = self.config / "commands/agent-user.md"
+        user.write_text("unrelated command")
+        (self.config / ".agent-dispatcher-active").touch()
+        self.before = self.snapshot()
+
+    def snapshot(self):
+        return {str(p.relative_to(self.config)): (
+            p.lstat().st_mode, os.readlink(p) if p.is_symlink() else p.read_bytes() if p.is_file() else None)
+            for p in self.config.rglob("*")}
+
+    def assert_restored(self):
+        self.assertEqual(self.snapshot(), self.before, "failed update must restore all prior bytes and modes")
+
+    def test_successful_update_replaces_pack_commands_and_removes_only_obsolete_owned_files(self):
+        self.installer.install(self.config, self.repo)
+        self.assertEqual((self.config / "skills/agent-dispatcher/SKILL.md").read_text(), "dispatcher v2")
+        self.assertTrue((self.config / "skills/agent-dispatcher/doctor.py").is_file())
+        self.assertEqual((self.config / "commands/agent-reviewer.md").read_text(), "review v2")
+        self.assertFalse((self.config / "commands/agent-obsolete.md").exists())
+        self.assertEqual((self.config / "commands/agent-user.md").read_text(), "unrelated command")
+        self.assertEqual((self.config / "settings.json").stat().st_mode & 0o777, 0o600)
+        self.assertFalse(list(self.config.glob(".agent-dispatcher-stage-*")))
+
+    def test_staging_copy_failure_preserves_previous_installation(self):
+        original = self.installer.copy_file
+        def failing_copy(source, target):
+            if source == self.repo / "doctor.py":
+                raise OSError("simulated full disk while staging doctor")
+            return original(source, target)
+        with patch("install_claude.copy_file", side_effect=failing_copy), self.assertRaises(OSError):
+            self.installer.install(self.config, self.repo)
+        self.assert_restored()
+
+    def test_incomplete_staged_pack_is_rejected_before_commit(self):
+        (self.repo / "skills/agent-dispatcher/CONTEXT.md").unlink()
+        with self.assertRaisesRegex(ValueError, "incomplete"):
+            self.installer.install(self.config, self.repo)
+        self.assert_restored()
+
+    def test_build_failure_does_not_touch_the_live_installation(self):
+        with patch("install_claude.build_and_validate", side_effect=subprocess.CalledProcessError(1, "build")), \
+                self.assertRaises(subprocess.CalledProcessError):
+            self.installer.install(self.config, self.repo)
+        self.assert_restored()
+
+    def test_failed_replacements_restore_pack_settings_manifest_and_commands(self):
+        original = os.replace
+        for relative in ("commands/agent-reviewer.md", "settings.json", ".agent-dispatcher-installed"):
+            for phase in ("backup", "replacement"):
+                with self.subTest(target=relative, phase=phase):
+                    failed = False
+                    target = self.config / relative
+                    def failing_replace(source, destination):
+                        nonlocal failed
+                        selected = source == target if phase == "backup" else destination == target
+                        if not failed and selected:
+                            failed = True
+                            raise OSError("simulated rename failure")
+                        return original(source, destination)
+                    with patch("install_claude.os.replace", side_effect=failing_replace), \
+                            self.assertRaises(OSError):
+                        self.installer.install(self.config, self.repo)
+                    self.assertTrue(failed)
+                    self.assert_restored()
+
+    def test_interrupt_after_a_completed_rename_restores_previous_installation(self):
+        import signal
+        original = os.replace
+        interrupted = False
+        def interrupt_after_replace(source, destination):
+            nonlocal interrupted
+            result = original(source, destination)
+            if destination == self.config / "settings.json" and not interrupted:
+                interrupted = True
+                signal.raise_signal(signal.SIGTERM)
+            return result
+        with self.installer.interruptible(), \
+                patch("install_claude.os.replace", side_effect=interrupt_after_replace), \
+                self.assertRaises(KeyboardInterrupt):
+            self.installer.install(self.config, self.repo)
+        self.assertTrue(interrupted)
+        self.assert_restored()
+
+    def test_failed_fresh_install_removes_new_files_backup_and_directories(self):
+        self.config = self.root / "fresh-config"
+        self.config.mkdir()
+        (self.config / "settings.json").write_text('{"model": "untouched"}')
+        self.before = self.snapshot()
+        original = os.replace
+        failed = False
+        def failing_replace(source, destination):
+            nonlocal failed
+            if destination == self.config / "settings.json" and not failed:
+                failed = True
+                raise OSError("simulated settings failure")
+            return original(source, destination)
+        with patch("install_claude.os.replace", side_effect=failing_replace), self.assertRaises(OSError):
+            self.installer.install(self.config, self.repo)
+        self.assertTrue(failed)
+        self.assert_restored()
+
+    def test_failure_during_uninstall_restores_registration_and_owned_files(self):
+        original = os.replace
+        failed = False
+        def failing_replace(source, destination):
+            nonlocal failed
+            if source == self.config / "skills/agent-dispatcher" and not failed:
+                failed = True
+                raise OSError("simulated pack removal failure")
+            return original(source, destination)
+        with patch("install_claude.os.replace", side_effect=failing_replace), self.assertRaises(OSError):
+            self.installer.install(self.config, self.repo, uninstall=True)
+        self.assertTrue(failed)
+        self.assert_restored()
+
+    def test_user_settings_edit_during_staging_is_not_overwritten(self):
+        original = self.installer.stage_pack
+        updated = b'{"model": "user changed during staging"}'
+        def stage_and_edit(repo, destination):
+            original(repo, destination)
+            (self.config / "settings.json").write_bytes(updated)
+        with patch("install_claude.stage_pack", side_effect=stage_and_edit), \
+                self.assertRaisesRegex(ValueError, "changed during staging"):
+            self.installer.install(self.config, self.repo)
+        self.before["settings.json"] = (self.before["settings.json"][0], updated)
+        self.assert_restored()
+
+    def test_cleanup_failure_reports_committed_installation(self):
+        original = shutil.rmtree
+        errors = io.StringIO()
+        def failing_cleanup(path, *args, **kwargs):
+            if Path(path).name.startswith(".agent-dispatcher-stage-"):
+                raise OSError("simulated cleanup permissions failure")
+            return original(path, *args, **kwargs)
+        with patch("install_claude.shutil.rmtree", side_effect=failing_cleanup), \
+                contextlib.redirect_stderr(errors):
+            self.installer.install(self.config, self.repo)
+        self.assertEqual((self.config / "skills/agent-dispatcher/SKILL.md").read_text(), "dispatcher v2")
+        self.assertIn("Installation committed", errors.getvalue())
+        self.assertNotIn("previous installation", errors.getvalue().lower())
+        self.assertEqual(len(list(self.config.glob(".agent-dispatcher-stage-*"))), 1)
+
+    def test_rollback_failure_keeps_recovery_files(self):
+        original = os.replace
+        failed = False
+        def failing_replace(source, destination):
+            nonlocal failed
+            if destination == self.config / "settings.json":
+                failed = True
+                raise OSError("simulated persistent settings failure")
+            return original(source, destination)
+        with patch("install_claude.os.replace", side_effect=failing_replace), \
+                self.assertRaisesRegex(RuntimeError, "recovery files preserved"):
+            self.installer.install(self.config, self.repo)
+        self.assertTrue(failed)
+        workspaces = list(self.config.glob(".agent-dispatcher-stage-*"))
+        self.assertEqual(len(workspaces), 1)
+        recovery = json.loads((workspaces[0] / "recovery.json").read_text())
+        self.assertIn(str(self.config / "settings.json"), [e["target"] for e in recovery["entries"]])
+        old_settings = self.before["settings.json"][1]
+        self.assertTrue(any(p.is_file() and p.read_bytes() == old_settings
+                            for p in workspaces[0].glob("previous-*")))
 
 
 class GeneratedArtifactTests(unittest.TestCase):

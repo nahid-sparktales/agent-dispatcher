@@ -950,7 +950,12 @@
       "license": "proprietary \u2014 anthropics/claude-code is under Anthropic's Commercial Terms",
       "verified": "2026-09-19",
       "scripts_included": false,
-      "network_usage": false
+      "network_usage": false,
+      "trust": "official",
+      "requirement": "optional",
+      "activation": "Designing or revising an agent/subagent definition.",
+      "capability": "ai.agent-design",
+      "notes": "Reference only. Do not vendor: that repository has no open-source licence."
     },
     {
       "id": "anthropic-brand-guidelines",
@@ -963,7 +968,12 @@
       "license": "Apache-2.0",
       "verified": "2026-09-19",
       "scripts_included": false,
-      "network_usage": false
+      "network_usage": false,
+      "trust": "official",
+      "requirement": "optional",
+      "activation": "Copy or design that must match an established brand.",
+      "capability": "knowledge.brand-voice",
+      "notes": ""
     },
     {
       "id": "anthropic-claude-api",
@@ -976,7 +986,12 @@
       "license": "Apache-2.0",
       "verified": "2026-09-19",
       "scripts_included": false,
-      "network_usage": false
+      "network_usage": false,
+      "trust": "official",
+      "requirement": "recommended",
+      "activation": "Writing code against the Claude API or choosing a model.",
+      "capability": "ai.provider-api",
+      "notes": "Ships with Claude Code already."
     },
     {
       "id": "anthropic-claude-security",
@@ -989,7 +1004,12 @@
       "license": "Apache-2.0",
       "verified": "2026-09-19",
       "scripts_included": false,
-      "network_usage": false
+      "network_usage": false,
+      "trust": "official",
+      "requirement": "optional",
+      "activation": "Security review of application code.",
+      "capability": "security.review",
+      "notes": ""
     },
     {
       "id": "anthropic-doc-coauthoring",
@@ -1002,7 +1022,12 @@
       "license": "Apache-2.0",
       "verified": "2026-09-19",
       "scripts_included": false,
-      "network_usage": false
+      "network_usage": false,
+      "trust": "official",
+      "requirement": "optional",
+      "activation": "Long-form document work with a user reviewing as it goes.",
+      "capability": "knowledge.writing",
+      "notes": ""
     },
     {
       "id": "anthropic-frontend-design",
@@ -1015,7 +1040,12 @@
       "license": "Apache-2.0 (per-skill LICENSE.txt in anthropics/skills)",
       "verified": "2026-09-19",
       "scripts_included": false,
-      "network_usage": false
+      "network_usage": false,
+      "trust": "official",
+      "requirement": "recommended",
+      "activation": "Creating or reshaping UI where visual direction matters.",
+      "capability": "design.ui.direction",
+      "notes": "The byte-identical copy in anthropics/claude-code is under Anthropic's proprietary Commercial Terms \u2014 cite and install from anthropics/skills, which carries Apache-2.0 per skill. Already ships with Claude Code as the `frontend-design` skill."
     },
     {
       "id": "anthropic-mcp-builder",
@@ -1028,7 +1058,12 @@
       "license": "Apache-2.0",
       "verified": "2026-09-19",
       "scripts_included": false,
-      "network_usage": false
+      "network_usage": false,
+      "trust": "official",
+      "requirement": "optional",
+      "activation": "Designing or implementing an MCP server.",
+      "capability": "ai.mcp-design",
+      "notes": ""
     },
     {
       "id": "anthropic-mcp-integration",
@@ -1041,7 +1076,12 @@
       "license": "proprietary \u2014 see above",
       "verified": "2026-09-19",
       "scripts_included": false,
-      "network_usage": false
+      "network_usage": false,
+      "trust": "official",
+      "requirement": "optional",
+      "activation": "Adding an MCP server to a plugin.",
+      "capability": "ai.mcp-design",
+      "notes": "Reference only, not vendorable."
     },
     {
       "id": "anthropic-plugin-structure",
@@ -1054,7 +1094,12 @@
       "license": "proprietary \u2014 see above",
       "verified": "2026-09-19",
       "scripts_included": false,
-      "network_usage": false
+      "network_usage": false,
+      "trust": "official",
+      "requirement": "optional",
+      "activation": "Changing how this pack is packaged or installed.",
+      "capability": "ai.plugin-packaging",
+      "notes": "Reference only, not vendorable."
     },
     {
       "id": "anthropic-skill-creator",
@@ -1067,7 +1112,12 @@
       "license": "Apache-2.0",
       "verified": "2026-09-19",
       "scripts_included": false,
-      "network_usage": false
+      "network_usage": false,
+      "trust": "official",
+      "requirement": "optional",
+      "activation": "Writing or reviewing a skill for this pack or another.",
+      "capability": "ai.skill-authoring",
+      "notes": ""
     },
     {
       "id": "anthropic-skill-development",
@@ -1080,7 +1130,12 @@
       "license": "proprietary \u2014 see above",
       "verified": "2026-09-19",
       "scripts_included": false,
-      "network_usage": false
+      "network_usage": false,
+      "trust": "official",
+      "requirement": "optional",
+      "activation": "Authoring a skill for a Claude Code plugin.",
+      "capability": "ai.skill-authoring",
+      "notes": "Reference only, not vendorable."
     },
     {
       "id": "anthropic-webapp-testing",
@@ -1093,7 +1148,12 @@
       "license": "Apache-2.0",
       "verified": "2026-09-19",
       "scripts_included": false,
-      "network_usage": false
+      "network_usage": false,
+      "trust": "official",
+      "requirement": "recommended",
+      "activation": "Verifying a web app's behaviour end to end.",
+      "capability": "verification.browser",
+      "notes": ""
     },
     {
       "id": "community-frontend-ui-ux",
@@ -1106,7 +1166,12 @@
       "license": "MIT",
       "verified": "2026-09-19",
       "scripts_included": false,
-      "network_usage": false
+      "network_usage": false,
+      "trust": "community",
+      "requirement": "optional",
+      "activation": "Only when a second opinion on UX heuristics is wanted and the user has installed it.",
+      "capability": "design.ux.heuristics",
+      "notes": "Single maintainer, exactly one commit ever, 2 stars, 0 forks, no releases or tags. Content looked sound but nothing about the repository signals ongoing maintenance or review. Never required; never vendored."
     },
     {
       "id": "community-playwright-skill",
@@ -1121,7 +1186,12 @@
       "license": "MIT",
       "verified": "2026-09-19",
       "scripts_included": true,
-      "network_usage": false
+      "network_usage": false,
+      "trust": "community",
+      "requirement": "optional",
+      "activation": "Not recommended \u2014 Microsoft ships official Playwright skills and an official MCP.",
+      "capability": "verification.browser",
+      "notes": "3.1k stars and real release history, but an official alternative exists, so this is recorded as an alternative provider rather than a recommendation. Declares allowed-tools Bash(node:*), Bash(npm:*), Read, Write."
     },
     {
       "id": "microsoft-playwright-cli",
@@ -1136,7 +1206,12 @@
       "license": "Apache-2.0",
       "verified": "2026-09-19",
       "scripts_included": true,
-      "network_usage": false
+      "network_usage": false,
+      "trust": "official",
+      "requirement": "optional",
+      "activation": "The project uses Playwright and the work involves running or debugging it.",
+      "capability": "verification.browser",
+      "notes": "Installed by Playwright's own tooling: `playwright-cli install --skills`. Declares allowed-tools Bash(playwright-cli:*), Bash(npx:*), Bash(npm:*) \u2014 it runs commands, so review before enabling."
     },
     {
       "id": "microsoft-playwright-component-testing",
@@ -1151,7 +1226,12 @@
       "license": "Apache-2.0",
       "verified": "2026-09-19",
       "scripts_included": true,
-      "network_usage": false
+      "network_usage": false,
+      "trust": "official",
+      "requirement": "optional",
+      "activation": "The project uses Playwright and the work involves running or debugging it.",
+      "capability": "verification.browser",
+      "notes": "Installed by Playwright's own tooling: `playwright-cli install --skills`. Declares allowed-tools Bash(playwright-cli:*), Bash(npx:*), Bash(npm:*) \u2014 it runs commands, so review before enabling."
     },
     {
       "id": "microsoft-playwright-trace",
@@ -1166,7 +1246,12 @@
       "license": "Apache-2.0",
       "verified": "2026-09-19",
       "scripts_included": true,
-      "network_usage": false
+      "network_usage": false,
+      "trust": "official",
+      "requirement": "optional",
+      "activation": "The project uses Playwright and the work involves running or debugging it.",
+      "capability": "verification.browser",
+      "notes": "Installed by Playwright's own tooling: `playwright-cli install --skills`. Declares allowed-tools Bash(playwright-cli:*), Bash(npx:*), Bash(npm:*) \u2014 it runs commands, so review before enabling."
     },
     {
       "id": "nextjs-next-cache-components-adoption",
@@ -1179,7 +1264,12 @@
       "license": "MIT",
       "verified": "2026-09-19",
       "scripts_included": false,
-      "network_usage": false
+      "network_usage": false,
+      "trust": "official",
+      "requirement": "optional",
+      "activation": "The project uses Next.js and the specific feature this skill covers.",
+      "capability": "frontend.nextjs",
+      "notes": "Only the five skills under skills/ are published for users. The 20 under .agents/skills/ are maintainer-internal (metadata.internal: true) and are deliberately excluded from this catalog."
     },
     {
       "id": "nextjs-next-cache-components-optimizer",
@@ -1192,7 +1282,12 @@
       "license": "MIT",
       "verified": "2026-09-19",
       "scripts_included": false,
-      "network_usage": false
+      "network_usage": false,
+      "trust": "official",
+      "requirement": "optional",
+      "activation": "The project uses Next.js and the specific feature this skill covers.",
+      "capability": "frontend.nextjs",
+      "notes": "Only the five skills under skills/ are published for users. The 20 under .agents/skills/ are maintainer-internal (metadata.internal: true) and are deliberately excluded from this catalog."
     },
     {
       "id": "nextjs-next-dev-loop",
@@ -1205,7 +1300,12 @@
       "license": "MIT",
       "verified": "2026-09-19",
       "scripts_included": false,
-      "network_usage": false
+      "network_usage": false,
+      "trust": "official",
+      "requirement": "optional",
+      "activation": "The project uses Next.js and the specific feature this skill covers.",
+      "capability": "frontend.nextjs",
+      "notes": "Only the five skills under skills/ are published for users. The 20 under .agents/skills/ are maintainer-internal (metadata.internal: true) and are deliberately excluded from this catalog."
     },
     {
       "id": "nextjs-next-partial-prefetching-adoption",
@@ -1218,7 +1318,12 @@
       "license": "MIT",
       "verified": "2026-09-19",
       "scripts_included": false,
-      "network_usage": false
+      "network_usage": false,
+      "trust": "official",
+      "requirement": "optional",
+      "activation": "The project uses Next.js and the specific feature this skill covers.",
+      "capability": "frontend.nextjs",
+      "notes": "Only the five skills under skills/ are published for users. The 20 under .agents/skills/ are maintainer-internal (metadata.internal: true) and are deliberately excluded from this catalog."
     },
     {
       "id": "nextjs-next-partial-prefetching-optimizer",
@@ -1231,7 +1336,12 @@
       "license": "MIT",
       "verified": "2026-09-19",
       "scripts_included": false,
-      "network_usage": false
+      "network_usage": false,
+      "trust": "official",
+      "requirement": "optional",
+      "activation": "The project uses Next.js and the specific feature this skill covers.",
+      "capability": "frontend.nextjs",
+      "notes": "Only the five skills under skills/ are published for users. The 20 under .agents/skills/ are maintainer-internal (metadata.internal: true) and are deliberately excluded from this catalog."
     },
     {
       "id": "vercel-composition-patterns",
@@ -1244,7 +1354,12 @@
       "license": "MIT claimed per-skill; no LICENSE file at the repository root and the GitHub API reports no license",
       "verified": "2026-09-19",
       "scripts_included": false,
-      "network_usage": false
+      "network_usage": false,
+      "trust": "verified",
+      "requirement": "optional",
+      "activation": "Structuring components in a React codebase.",
+      "capability": "frontend.architecture",
+      "notes": "vercel-labs is Vercel's own labs org. Repo-wide licence grant is unconfirmed \u2014 treat as reference, not vendorable."
     },
     {
       "id": "vercel-deploy-to-vercel",
@@ -1257,7 +1372,12 @@
       "license": "MIT claimed per-skill; no LICENSE file at the repository root and the GitHub API reports no license",
       "verified": "2026-09-19",
       "scripts_included": false,
-      "network_usage": false
+      "network_usage": false,
+      "trust": "verified",
+      "requirement": "optional",
+      "activation": "Deploying to Vercel \u2014 knowledge only, not permission.",
+      "capability": "devops.deployment",
+      "notes": "vercel-labs is Vercel's own labs org. Repo-wide licence grant is unconfirmed \u2014 treat as reference, not vendorable."
     },
     {
       "id": "vercel-react-best-practices",
@@ -1270,7 +1390,12 @@
       "license": "MIT claimed per-skill; no LICENSE file at the repository root and the GitHub API reports no license",
       "verified": "2026-09-19",
       "scripts_included": false,
-      "network_usage": false
+      "network_usage": false,
+      "trust": "verified",
+      "requirement": "optional",
+      "activation": "The project uses React.",
+      "capability": "frontend.react",
+      "notes": "vercel-labs is Vercel's own labs org. Repo-wide licence grant is unconfirmed \u2014 treat as reference, not vendorable."
     },
     {
       "id": "vercel-react-native-skills",
@@ -1283,7 +1408,12 @@
       "license": "MIT claimed per-skill; no LICENSE file at the repository root and the GitHub API reports no license",
       "verified": "2026-09-19",
       "scripts_included": false,
-      "network_usage": false
+      "network_usage": false,
+      "trust": "verified",
+      "requirement": "optional",
+      "activation": "The project is React Native.",
+      "capability": "frontend.react-native",
+      "notes": "vercel-labs is Vercel's own labs org. Repo-wide licence grant is unconfirmed \u2014 treat as reference, not vendorable."
     },
     {
       "id": "vercel-react-view-transitions",
@@ -1296,7 +1426,12 @@
       "license": "MIT claimed per-skill; no LICENSE file at the repository root and the GitHub API reports no license",
       "verified": "2026-09-19",
       "scripts_included": false,
-      "network_usage": false
+      "network_usage": false,
+      "trust": "verified",
+      "requirement": "optional",
+      "activation": "Implementing view transitions in React.",
+      "capability": "frontend.animation",
+      "notes": "vercel-labs is Vercel's own labs org. Repo-wide licence grant is unconfirmed \u2014 treat as reference, not vendorable."
     },
     {
       "id": "vercel-vercel-cli-with-tokens",
@@ -1309,7 +1444,12 @@
       "license": "MIT claimed per-skill; no LICENSE file at the repository root and the GitHub API reports no license",
       "verified": "2026-09-19",
       "scripts_included": false,
-      "network_usage": false
+      "network_usage": false,
+      "trust": "verified",
+      "requirement": "optional",
+      "activation": "Automating Vercel CLI use.",
+      "capability": "devops.deployment",
+      "notes": "vercel-labs is Vercel's own labs org. Repo-wide licence grant is unconfirmed \u2014 treat as reference, not vendorable."
     },
     {
       "id": "vercel-vercel-optimize",
@@ -1322,7 +1462,12 @@
       "license": "MIT claimed per-skill; no LICENSE file at the repository root and the GitHub API reports no license",
       "verified": "2026-09-19",
       "scripts_included": false,
-      "network_usage": false
+      "network_usage": false,
+      "trust": "verified",
+      "requirement": "optional",
+      "activation": "The project deploys to Vercel and cost or performance is the question.",
+      "capability": "devops.cost-performance",
+      "notes": "vercel-labs is Vercel's own labs org. Repo-wide licence grant is unconfirmed \u2014 treat as reference, not vendorable."
     },
     {
       "id": "vercel-web-design-guidelines",
@@ -1335,7 +1480,12 @@
       "license": "MIT claimed per-skill; no LICENSE file at the repository root and the GitHub API reports no license",
       "verified": "2026-09-19",
       "scripts_included": false,
-      "network_usage": false
+      "network_usage": false,
+      "trust": "verified",
+      "requirement": "optional",
+      "activation": "Designing or reviewing a web interface.",
+      "capability": "design.ui.direction",
+      "notes": "vercel-labs is Vercel's own labs org. Repo-wide licence grant is unconfirmed \u2014 treat as reference, not vendorable."
     },
     {
       "id": "vercel-writing-guidelines",
@@ -1348,7 +1498,12 @@
       "license": "MIT claimed per-skill; no LICENSE file at the repository root and the GitHub API reports no license",
       "verified": "2026-09-19",
       "scripts_included": false,
-      "network_usage": false
+      "network_usage": false,
+      "trust": "verified",
+      "requirement": "optional",
+      "activation": "Writing product or documentation copy.",
+      "capability": "knowledge.writing",
+      "notes": "vercel-labs is Vercel's own labs org. Repo-wide licence grant is unconfirmed \u2014 treat as reference, not vendorable."
     }
   ],
   "tools_and_mcps": [
@@ -1363,7 +1518,15 @@
       "writes": true,
       "read_only_option": "Use its scan tools without acting on the remediate tool's edits automatically.",
       "fallback": "axe-core via the browser or @axe-core/playwright, plus the manual keyboard and screen-reader checks a scanner cannot make.",
-      "notes": "Official Deque server. Its remediate tool produces code changes \u2014 review them, do not apply blind. An automated scan catches roughly a third of WCAG issues: it never proves accessibility on its own."
+      "notes": "Official Deque server. Its remediate tool produces code changes \u2014 review them, do not apply blind. An automated scan catches roughly a third of WCAG issues: it never proves accessibility on its own.",
+      "recommended_for": [],
+      "conditional_for": [
+        "ui-ux-designer",
+        "tester",
+        "reviewer"
+      ],
+      "activation": "Accessibility must be checked and the organization has axe DevTools.",
+      "official": true
     },
     {
       "id": "chrome-devtools",
@@ -1376,7 +1539,16 @@
       "writes": true,
       "read_only_option": "None. It clicks, fills, uploads and evaluates scripts.",
       "fallback": "The playwright MCP or the host's own browser tools.",
-      "notes": "Official Google/Chrome. Strongest choice for performance profiling of a real page; overlaps playwright for plain interaction."
+      "notes": "Official Google/Chrome. Strongest choice for performance profiling of a real page; overlaps playwright for plain interaction.",
+      "recommended_for": [],
+      "conditional_for": [
+        "performance-engineer",
+        "debugger",
+        "ui-ux-designer",
+        "tester"
+      ],
+      "activation": "The question needs DevTools-grade evidence \u2014 a performance trace, detailed network timing \u2014 beyond what plain browser control gives.",
+      "official": true
     },
     {
       "id": "cloudflare",
@@ -1389,7 +1561,16 @@
       "writes": true,
       "read_only_option": "No flag. Contain it by granting narrow permissions at the OAuth screen or minting a read-only API token.",
       "fallback": "Read wrangler.toml and CI config from the repository; treat live edge state as unknown.",
-      "notes": "The main API server is read AND write over 2,500+ endpoints including DNS, Workers and Zero Trust. The docs and observability endpoints are the safe ones. Container and Browser Run endpoints spend billable resources."
+      "notes": "The main API server is read AND write over 2,500+ endpoints including DNS, Workers and Zero Trust. The docs and observability endpoints are the safe ones. Container and Browser Run endpoints spend billable resources.",
+      "recommended_for": [],
+      "conditional_for": [
+        "devops-release",
+        "api-integration-engineer",
+        "security-auditor",
+        "debugger"
+      ],
+      "activation": "The project runs on Cloudflare \u2014 wrangler.toml, Workers, Cloudflare DNS \u2014 and the server is configured.",
+      "official": true
     },
     {
       "id": "context7",
@@ -1402,7 +1583,23 @@
       "writes": false,
       "read_only_option": "read-only by nature \u2014 its tools are resolve-library-id and query-docs",
       "fallback": "Official documentation via the browser; cite what was read.",
-      "notes": "Do not reach for it to answer questions the repository already answers. Library entries are community-contributed, so treat a returned snippet as evidence to check, not as authority."
+      "notes": "Do not reach for it to answer questions the repository already answers. Library entries are community-contributed, so treat a returned snippet as evidence to check, not as authority.",
+      "recommended_for": [
+        "implementer",
+        "researcher",
+        "api-integration-engineer",
+        "ai-agent-engineer"
+      ],
+      "conditional_for": [
+        "planner",
+        "architect",
+        "database-engineer",
+        "devops-release",
+        "documentation-writer",
+        "data-engineer"
+      ],
+      "activation": "A framework or library API matters and its current behaviour is not knowable from the repository.",
+      "official": true
     },
     {
       "id": "datadog",
@@ -1415,7 +1612,17 @@
       "writes": true,
       "read_only_option": "Permission-scoped: Datadog checks the matching permission (e.g. monitors_write) on each tool call, so a read-only key yields a read-only server.",
       "fallback": "Whatever telemetry is reachable locally; say what could not be observed.",
-      "notes": "Datadog does publish an official managed MCP server, contrary to a common assumption. The public repo under datadog-labs holds docs and examples, not the server."
+      "notes": "Datadog does publish an official managed MCP server, contrary to a common assumption. The public repo under datadog-labs holds docs and examples, not the server.",
+      "recommended_for": [],
+      "conditional_for": [
+        "debugger",
+        "incident-responder",
+        "devops-release",
+        "performance-engineer",
+        "security-auditor"
+      ],
+      "activation": "The project's telemetry is in Datadog and the question needs production evidence.",
+      "official": true
     },
     {
       "id": "figma",
@@ -1428,7 +1635,15 @@
       "writes": true,
       "read_only_option": "Use only the read tools (get_design_context, get_metadata, get_screenshot, get_variable_defs and the rest); the write and Weave tool groups change or generate canvas content.",
       "fallback": "Work from the repository's own design tokens, existing components and screenshots. Never invent what a design says.",
-      "notes": "Three tool groups: read, write, and Weave (which runs tools and uploads assets). Figma for Government supports only the desktop server \u2014 the remote one is not available there, and MCP is outside Figma's FedRAMP audit scope."
+      "notes": "Three tool groups: read, write, and Weave (which runs tools and uploads assets). Figma for Government supports only the desktop server \u2014 the remote one is not available there, and MCP is outside Figma's FedRAMP audit scope.",
+      "recommended_for": [],
+      "conditional_for": [
+        "ui-ux-designer",
+        "product-manager",
+        "implementer"
+      ],
+      "activation": "The task references a Figma file or a design system held in Figma, and the server is configured.",
+      "official": true
     },
     {
       "id": "github",
@@ -1441,7 +1656,31 @@
       "writes": true,
       "read_only_option": "--read-only flag; GITHUB_TOOLSETS scopes which of the 22 toolsets are exposed at all",
       "fallback": "git and the gh CLI against the local checkout; say which repository facts could not be confirmed.",
-      "notes": "Prefer --read-only for review and audit roles. Writing an issue, a PR or a comment is an outward-facing action and needs its own confirmation."
+      "notes": "Prefer --read-only for review and audit roles. Writing an issue, a PR or a comment is an outward-facing action and needs its own confirmation.",
+      "recommended_for": [
+        "explorer",
+        "implementer",
+        "reviewer",
+        "tester",
+        "security-auditor",
+        "devops-release",
+        "api-integration-engineer",
+        "ai-agent-engineer",
+        "documentation-writer",
+        "version-control",
+        "dispatcher"
+      ],
+      "conditional_for": [
+        "planner",
+        "researcher",
+        "architect",
+        "debugger",
+        "performance-engineer",
+        "refactoring-migration-specialist",
+        "product-manager"
+      ],
+      "activation": "The task needs repository state that is not on local disk \u2014 issues, PRs, CI runs, another repo.",
+      "official": true
     },
     {
       "id": "google-workspace",
@@ -1454,7 +1693,15 @@
       "writes": true,
       "read_only_option": "Scope-based: request read-only OAuth scopes.",
       "fallback": "Ask the user for the content; never guess at the contents of a mailbox or calendar.",
-      "notes": "Google now publishes first-party Workspace MCP servers (Developer Preview) \u2014 community servers are no longer the only option and should not be used in preference. Google's own docs warn that these clients have powerful access and should be treated accordingly. Sending mail or creating events is outward-facing: confirm each one."
+      "notes": "Google now publishes first-party Workspace MCP servers (Developer Preview) \u2014 community servers are no longer the only option and should not be used in preference. Google's own docs warn that these clients have powerful access and should be treated accordingly. Sending mail or creating events is outward-facing: confirm each one.",
+      "recommended_for": [],
+      "conditional_for": [
+        "automation-operations",
+        "product-manager",
+        "growth-marketing-strategist"
+      ],
+      "activation": "The user has connected the specific product and the task needs it.",
+      "official": true
     },
     {
       "id": "grafana",
@@ -1467,7 +1714,16 @@
       "writes": true,
       "read_only_option": "Disable the write-capable tool groups; 29+ tools are enabled by default.",
       "fallback": "Logs and metrics reachable from the workspace; state what was not observed.",
-      "notes": "Default tool set can create and update dashboards, alert rules, annotations and incidents \u2014 that is production observability config, not just reads."
+      "notes": "Default tool set can create and update dashboards, alert rules, annotations and incidents \u2014 that is production observability config, not just reads.",
+      "recommended_for": [],
+      "conditional_for": [
+        "debugger",
+        "incident-responder",
+        "devops-release",
+        "performance-engineer"
+      ],
+      "activation": "The project's observability lives in Grafana and a question needs real telemetry.",
+      "official": true
     },
     {
       "id": "linear",
@@ -1480,7 +1736,16 @@
       "writes": true,
       "read_only_option": "A purpose-built read-only endpoint: https://mcp.linear.app/mcp/readonly \u2014 use it unless the task genuinely requires filing or editing issues.",
       "fallback": "Work from what the user pasted or from the repository's own issue references.",
-      "notes": "The only server in this catalog shipping a dedicated read-only endpoint. Creating or updating an issue is outward-facing and needs confirmation."
+      "notes": "The only server in this catalog shipping a dedicated read-only endpoint. Creating or updating an issue is outward-facing and needs confirmation.",
+      "recommended_for": [],
+      "conditional_for": [
+        "product-manager",
+        "automation-operations",
+        "dispatcher",
+        "planner"
+      ],
+      "activation": "The team tracks work in Linear and the task needs issue context.",
+      "official": true
     },
     {
       "id": "notion",
@@ -1493,7 +1758,16 @@
       "writes": true,
       "read_only_option": "None. Restrict by sharing only the pages the integration needs.",
       "fallback": "Ask for the content, or work from the repository's own docs.",
-      "notes": "Write tools create, update, move and duplicate pages and databases \u2014 shared workspace content. Some tools are plan-gated. Self-hosted v2.0.0 was a breaking change: database tools became data-source tools."
+      "notes": "Write tools create, update, move and duplicate pages and databases \u2014 shared workspace content. Some tools are plan-gated. Self-hosted v2.0.0 was a breaking change: database tools became data-source tools.",
+      "recommended_for": [],
+      "conditional_for": [
+        "product-manager",
+        "documentation-writer",
+        "automation-operations",
+        "growth-marketing-strategist"
+      ],
+      "activation": "The team's docs or specs live in Notion and the task needs them.",
+      "official": true
     },
     {
       "id": "playwright",
@@ -1506,7 +1780,19 @@
       "writes": true,
       "read_only_option": "None. --isolated gives an in-memory profile and is the real containment control.",
       "fallback": "The host's own browser tools, or a local Playwright script. With neither, report that rendered verification was unavailable and never describe the UI as verified.",
-      "notes": "Its README states plainly: \"Playwright MCP is not a security boundary.\" --allowed-origins is NOT a security control either \u2014 the README says it \"does not serve as a security boundary and does not affect redirects\". A non-isolated profile can act as the logged-in user on any site."
+      "notes": "Its README states plainly: \"Playwright MCP is not a security boundary.\" --allowed-origins is NOT a security control either \u2014 the README says it \"does not serve as a security boundary and does not affect redirects\". A non-isolated profile can act as the logged-in user on any site.",
+      "recommended_for": [
+        "ui-ux-designer",
+        "tester"
+      ],
+      "conditional_for": [
+        "implementer",
+        "debugger",
+        "performance-engineer",
+        "reviewer"
+      ],
+      "activation": "Rendered behaviour has to be observed rather than inferred \u2014 UI work, a browser-only bug, Core Web Vitals.",
+      "official": true
     },
     {
       "id": "postgres-community",
@@ -1519,7 +1805,17 @@
       "writes": true,
       "read_only_option": "--access-mode=restricted. The default is not unrestricted, but confirm the mode before pointing it anywhere real.",
       "fallback": "psql through the workspace against a local database, and the repository's migrations as the schema source of truth.",
-      "notes": "NOT official \u2014 published by Crystal DBA, an independent company. It is the most-cited successor to the archived reference server, but it is a third party holding a database connection string. Never point it at production. For Neon, Neon publishes its own official server (https://neon.com/docs/ai/neon-mcp-server), which its own docs warn grants broad database management."
+      "notes": "NOT official \u2014 published by Crystal DBA, an independent company. It is the most-cited successor to the archived reference server, but it is a third party holding a database connection string. Never point it at production. For Neon, Neon publishes its own official server (https://neon.com/docs/ai/neon-mcp-server), which its own docs warn grants broad database management.",
+      "recommended_for": [],
+      "conditional_for": [
+        "database-engineer",
+        "data-engineer",
+        "data-analyst",
+        "debugger",
+        "performance-engineer"
+      ],
+      "activation": "Only with the user's explicit say-so, against a local or throwaway database.",
+      "official": false
     },
     {
       "id": "postgres-reference",
@@ -1532,7 +1828,11 @@
       "writes": false,
       "read_only_option": "n/a",
       "fallback": "For Supabase projects use the supabase entry. Otherwise use psql and the project's own migration tooling through the workspace, and keep production credentials out of the agent's reach.",
-      "notes": "It was removed from modelcontextprotocol/servers and moved to servers-archived. Any guide still recommending it is stale."
+      "notes": "It was removed from modelcontextprotocol/servers and moved to servers-archived. Any guide still recommending it is stale.",
+      "recommended_for": [],
+      "conditional_for": [],
+      "activation": "never",
+      "official": true
     },
     {
       "id": "sentry",
@@ -1545,7 +1845,16 @@
       "writes": true,
       "read_only_option": "None published. Scope the endpoint to one org/project and keep to inspection tools.",
       "fallback": "Application logs through the workspace; say that production error data was not available.",
-      "notes": "Sentry describes it as \"primarily designed for human-in-the-loop coding agents\". docs.sentry.io/product/sentry-mcp/ now redirects to mcp.sentry.dev."
+      "notes": "Sentry describes it as \"primarily designed for human-in-the-loop coding agents\". docs.sentry.io/product/sentry-mcp/ now redirects to mcp.sentry.dev.",
+      "recommended_for": [],
+      "conditional_for": [
+        "debugger",
+        "incident-responder",
+        "devops-release",
+        "performance-engineer"
+      ],
+      "activation": "The project uses Sentry and an error or regression needs real production evidence.",
+      "official": true
     },
     {
       "id": "slack",
@@ -1558,7 +1867,15 @@
       "writes": true,
       "read_only_option": "None. Keep to search and read tools.",
       "fallback": "Ask the user to paste the thread.",
-      "notes": "The highest-consequence server here: it sends messages to real people, creates canvases and uploads files. Every send is an outward-facing action requiring explicit per-message confirmation \u2014 drafting is not sending."
+      "notes": "The highest-consequence server here: it sends messages to real people, creates canvases and uploads files. Every send is an outward-facing action requiring explicit per-message confirmation \u2014 drafting is not sending.",
+      "recommended_for": [],
+      "conditional_for": [
+        "automation-operations",
+        "incident-responder",
+        "product-manager"
+      ],
+      "activation": "The task genuinely needs Slack content, and the workspace admin has approved the integration.",
+      "official": true
     },
     {
       "id": "supabase",
@@ -1571,7 +1888,19 @@
       "writes": true,
       "read_only_option": "Point it at a local or branch project rather than production, and prefer its read-only mode where the deployment offers one.",
       "fallback": "Read migrations and schema files from the repository; state that live database state was not inspected.",
-      "notes": "The repository was renamed from supabase-community/supabase-mcp to supabase/mcp; the old URL still redirects. Never assume production access \u2014 apply migrations to a branch or local project first."
+      "notes": "The repository was renamed from supabase-community/supabase-mcp to supabase/mcp; the old URL still redirects. Never assume production access \u2014 apply migrations to a branch or local project first.",
+      "recommended_for": [],
+      "conditional_for": [
+        "database-engineer",
+        "api-integration-engineer",
+        "implementer",
+        "architect",
+        "debugger",
+        "data-analyst",
+        "data-engineer"
+      ],
+      "activation": "The project actually uses Supabase \u2014 supabase/ directory, a Supabase client dependency, or the user says so.",
+      "official": true
     },
     {
       "id": "vercel",
@@ -1584,7 +1913,16 @@
       "writes": true,
       "read_only_option": "none published \u2014 scope by using only the inspection tools",
       "fallback": "Read vercel.json and CI configuration from the repository; treat deployment state as unknown.",
-      "notes": "Vercel's own documentation says connecting \"grants the AI system you're using the same access as your Vercel user account\", and its purchase tools \"execute real, non-refundable charges\". Deployment and purchase are separately authorized actions \u2014 preparing a deployment is not permission to run one."
+      "notes": "Vercel's own documentation says connecting \"grants the AI system you're using the same access as your Vercel user account\", and its purchase tools \"execute real, non-refundable charges\". Deployment and purchase are separately authorized actions \u2014 preparing a deployment is not permission to run one.",
+      "recommended_for": [],
+      "conditional_for": [
+        "devops-release",
+        "implementer",
+        "debugger",
+        "performance-engineer"
+      ],
+      "activation": "The project deploys to Vercel \u2014 vercel.json, a linked project, or the user says so.",
+      "official": true
     },
     {
       "id": "workspace",
@@ -1597,7 +1935,22 @@
       "writes": true,
       "read_only_option": "The runtime's permission mode; a read-only role simply does not call the mutating tools.",
       "fallback": "none needed",
-      "notes": "Listed so loadouts can name it explicitly. It is the baseline every other entry is measured against."
+      "notes": "Listed so loadouts can name it explicitly. It is the baseline every other entry is measured against.",
+      "recommended_for": [
+        "dispatcher",
+        "explorer",
+        "implementer",
+        "tester",
+        "reviewer",
+        "debugger",
+        "refactoring-migration-specialist",
+        "version-control",
+        "documentation-writer",
+        "data-engineer"
+      ],
+      "conditional_for": [],
+      "activation": "always available",
+      "official": true
     }
   ]
 }
