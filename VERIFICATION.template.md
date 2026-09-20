@@ -10,6 +10,9 @@ or automatic runner is enabled. PACK is the package; PROJECT the workspace. Quot
 ```text
 {{VERIFICATION_COMMAND}} run --project PROJECT --kind tests -- python3 -B -m unittest discover
 {{VERIFICATION_COMMAND}} run --project PROJECT --kind check -- CHECK ARGUMENTS
+{{VERIFICATION_COMMAND}} run --project PROJECT --kind check --stdin -- python3 -B - <<'PY'
+assert 1 + 1 == 2
+PY
 {{VERIFICATION_COMMAND}} show --project PROJECT --receipt RECEIPT --cleanup --json
 ```
 
@@ -23,8 +26,9 @@ files. Forced termination can leave state; this cleanup excludes files a command
 
 Run only authorized commands; no shell or permission bypass. Never retry a denial via this
 wrapper. `--timeout` bounds execution, `--label` names checks, `--json` exposes evidence.
-`--stdin` before `-- python3 -B -` supplies quoted inline input (64 KiB); otherwise Python `-`
-is refused. Stored command details omit inline code/sensitive arguments; raw output is discarded.
+`--stdin` reads a pipe or quoted heredoc (64 KiB maximum); the flag takes no argument. Place
+it before `-- python3 -B -`; Python `-` without explicit stdin is refused. Stored command
+details omit inline code/sensitive arguments; raw output is discarded.
 
 Unittest/pytest counts are runner reports, not coverage proof. Unsupported summaries have
 unknown counts; zero tests is not a pass. Generic success proves only a successful command exit.
