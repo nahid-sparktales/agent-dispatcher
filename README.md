@@ -1,9 +1,5 @@
 # agent-dispatcher
 
-<p align="center">
-  <img src="docs/assets/dispatchtony.png" alt="Tony Tony Chopper at an Agent Dispatcher desk with Claude and GitHub on the monitors." width="960">
-</p>
-
 [![CI](https://github.com/nahid-sparktales/agent-dispatcher/actions/workflows/ci.yml/badge.svg)](https://github.com/nahid-sparktales/agent-dispatcher/actions/workflows/ci.yml)
 [![Security](https://github.com/nahid-sparktales/agent-dispatcher/actions/workflows/security.yml/badge.svg)](https://github.com/nahid-sparktales/agent-dispatcher/actions/workflows/security.yml)
 
