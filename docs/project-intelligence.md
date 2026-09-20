@@ -9,8 +9,11 @@ flowchart TD
   P -->|Simple, safe, known scope| D[Direct work and required native checks]
   P -->|Substantial| S[Select role and scan allowed sources]
   S --> F[Fingerprint and redact source evidence]
-  F --> M[Maintain local fact and structural indexes]
+  F --> W{Cache writes within task scope?}
+  W -->|Yes| M[Maintain local fact and structural indexes]
+  W -->|No| V[Derive read-only evidence; preserve caches]
   M --> R[Rank by task, role and relevant changes]
+  V --> R
   R --> C[Related symbols, dependencies and test candidates]
   C --> B[Budget guidance, evidence and metadata together]
   B --> E[Agent works and verifies]
@@ -42,6 +45,15 @@ Substantial tasks automatically maintain `.agent-dispatcher/project-map.json` an
 optional `.agent-dispatcher/project-graph.json`. Keeping the graph separate preserves the
 existing fact-map format. Both consume the same bounded, redacted scan. The host requests
 maintenance during preparation; no background watcher or observer is installed.
+
+Automatic maintenance is subordinate to task scope. Both cache writers enforce a read-only
+preview, a literal `--writable-path` list when supplied, and a conservative guard for restricted
+edits, file preservation, and read-only requests. A scope veto occurs before directory creation
+or replacement and still returns fresh task evidence. Preview wins over maintenance; exclusions
+and write scope are independent. Only explicit caller paths provide an exact file boundary;
+the language guard is supplementary and can conservatively defer harmless optional writes.
+These checks constrain the two cache writers, not unrelated host tools or external reuse state.
+The decision and whether anything was actually persisted remain visible in packet metadata.
 
 The fact map preserves source-backed feature locations, dependencies, declared test commands
 and decisions. The structural index supports a task/role view instead of sending the whole

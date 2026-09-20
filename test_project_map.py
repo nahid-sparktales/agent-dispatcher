@@ -325,8 +325,9 @@ class ProjectMapTests(unittest.TestCase):
 
     def test_preview_reuses_selector_snapshot_without_scan_or_write(self):
         self.basic()
-        def enrich(project, task, pack, snapshot, preview=False, maintain=False):
-            return project_map.context_entries(project, task, pack=pack, snapshot=snapshot, preview=preview, maintain=maintain)
+        def enrich(project, task, pack, snapshot, preview=False, maintain=False, writable_paths=None):
+            return project_map.context_entries(project, task, pack=pack, snapshot=snapshot, preview=preview,
+                                               maintain=maintain, writable_paths=writable_paths)
         with mock.patch.object(context, "_project_map", side_effect=enrich), \
                 mock.patch.object(context, "_enumerate", wraps=context._enumerate) as listing, \
                 mock.patch.object(context, "_read", wraps=context._read) as reading, \

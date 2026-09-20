@@ -667,7 +667,7 @@ def build_map(project, pack=None, refresh=False):
     return report
 
 
-def maintain_map(project, pack=None, snapshot=None):
+def maintain_map(project, pack=None, snapshot=None, *, task=None, preview=False, writable_paths=None):
     """Maintain only an owned cache from one complete, unfiltered safe scan.
 
     Partial scans still yield current evidence, but never replace global state.
@@ -679,6 +679,9 @@ def maintain_map(project, pack=None, snapshot=None):
         root = _root(project)
         helper = _context()
         scrub = helper._scrubber(helper.find_pack(pack))
+        scope = helper._cache_write_scope(task, STATE_DIR + "/" + STATE_FILE, preview=preview,
+                                          writable_paths=writable_paths, snapshot=snapshot)
+        maintenance["write_scope"] = scope
         # Refuse foreign, malformed, or unsafe state before any scan or write.
         existing = _load(root)
         snapshot = snapshot if snapshot is not None else _scan(root, helper, scrub)
@@ -694,7 +697,10 @@ def maintain_map(project, pack=None, snapshot=None):
         partial = (not snapshot["complete"] or bool(snapshot.get("exclude_paths"))
                    or bool(snapshot.get("task_excluded_paths")))
         diagnostic = None
-        if partial:
+        if not scope["allowed"]:
+            maintenance["action"] = "deferred"
+            diagnostic = "Project-map maintenance deferred by the cache write scope; current evidence is read-only and no cache was saved."
+        elif partial:
             maintenance["action"] = "deferred"
             diagnostic = "Project-map maintenance deferred: the current scan is partial or task-filtered; no global cache was saved."
         elif data == existing:
@@ -715,7 +721,7 @@ def maintain_map(project, pack=None, snapshot=None):
                       read_only=not maintenance["persisted"],
                       evidence_origin="stored" if maintenance["action"] in {"built", "refreshed", "unchanged"}
                       else "current_scan")
-        report["refresh_recommended"] = maintenance["action"] in {"deferred", "unavailable"}
+        report["refresh_recommended"] = scope["allowed"] and maintenance["action"] in {"deferred", "unavailable"}
         report["counts"]["withheld"] = prior["counts"]["withheld"] if prior else 0
         report["counts"]["task_excluded"] = prior["counts"].get("task_excluded", 0) if prior else 0
         if diagnostic:
@@ -730,7 +736,7 @@ def maintain_map(project, pack=None, snapshot=None):
                 "diagnostics": ["Project map is invalid or unsafe; no cached facts used and existing state left untouched."]}
 
 
-def context_entries(project, task, pack=None, snapshot=None, *, preview=False, maintain=False):
+def context_entries(project, task, pack=None, snapshot=None, *, preview=False, maintain=False, writable_paths=None):
     """Bounded enrichment; persistence is enabled only by the explicit maintain flag."""
     preview_state = {"requested": preview, "used": False, "persisted": False}
     maintenance_state = {"requested": maintain, "action": "unavailable" if maintain else "not_requested",
@@ -744,8 +750,11 @@ def context_entries(project, task, pack=None, snapshot=None, *, preview=False, m
         if task is not None and (not isinstance(task, str) or len(task) > helper.MAX_TASK_CHARS):
             raise ProjectMapError("Task filter exceeds the supported size or has an invalid type; contents withheld.")
         if maintain:
-            report = maintain_map(root, pack=pack, snapshot=snapshot)
+            report = maintain_map(root, pack=pack, snapshot=snapshot, task=task,
+                                  preview=preview, writable_paths=writable_paths)
             maintenance_state = report["maintenance"]
+            if preview:
+                preview_state["used"] = report["evidence_origin"] == "current_scan"
             report["entries"] = _matching(report["entries"], scrub(task) if task else None, helper, root)
             return _context_report(report, report["cache_status"], report["evidence_origin"],
                                    report["coverage"], preview_state, maintenance_state,

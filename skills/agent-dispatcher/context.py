@@ -63,6 +63,72 @@ class ContextArgumentParser(argparse.ArgumentParser):
         self.exit(2, "context.py: invalid arguments; use --help for supported options. Input values withheld.\n")
 
 
+def _cache_write_scope(task, target, *, preview=False, writable_paths=None, snapshot=None):
+    """Only narrow optional cache writes; task text can veto, never grant permission.
+
+    Literal caller paths are the exact boundary. The conservative language guard
+    is supplementary, not a general natural-language authorization interpreter.
+    Shared snapshot decisions can only tighten a later helper's own decision.
+    """
+    targets = {".agent-dispatcher/project-map.json", ".agent-dispatcher/project-graph.json"}
+    if target not in targets or type(preview) is not bool:
+        raise ContextError("Invalid cache write scope; input values withheld.")
+    if task is not None and (not isinstance(task, str) or len(task) > MAX_TASK_CHARS):
+        raise ContextError("Invalid cache task scope; input values withheld.")
+    if writable_paths is not None:
+        if not isinstance(writable_paths, (list, tuple)) or len(writable_paths) > MAX_EXCLUDE_PATHS:
+            raise ContextError("Writable paths must be a bounded list of literal project-relative paths.")
+        for value in writable_paths:
+            if not isinstance(value, str) or not 0 < len(value) <= 512:
+                raise ContextError("Invalid writable path; input values withheld.")
+            path = value[:-1] if value.endswith("/") else value
+            if (not path or path in {".", ".."} or path.startswith("~")
+                    or PurePosixPath(path).is_absolute() or ".." in PurePosixPath(path).parts
+                    or PurePosixPath(path).as_posix() != path
+                    or any(c in value for c in "\\:*?[]")
+                    or any(ord(c) < 32 or ord(c) == 127 for c in value)):
+                raise ContextError("Invalid writable path; use literal relative files or directories ending in /.")
+    decision = {"allowed": True, "reason": "automatic_maintenance", "target": target}
+    if preview:
+        decision.update(allowed=False, reason="read_only_preview")
+    else:
+        request = re.sub(r"\s+", " ", task or "").casefold().replace("\u2019", "'")
+        write = r"(?:modif(?:y|ying|ied|ications?)|edit(?:s|ed|ing)?|chang(?:e(?:s|d)?|ing)|writ(?:e|es|ing|ten)|updat(?:e(?:s|d)?|ing)|touch(?:ed|ing)?|replac(?:e(?:d)?|ing)|patch(?:ed|ing)?|creat(?:e(?:d)?|ing)|generat(?:e(?:d)?|ing)|save(?:d)?|persist(?:ed)?)"
+        restrictions = (
+            r"\bread[ -]?only\b",
+            rf"\b(?:do not|don't|never|must not|cannot|can't|no|without|avoid)\s+(?:\w+\s+){{0,4}}{write}\b",
+            rf"\b(?:only|just|solely|exclusively)\s+(?:\w+\s+){{0,2}}{write}\b",
+            rf"\b(?:only|solely|exclusively)\b.{{0,100}}?\b(?:may|can|should|must)\s+be\s+{write}\b",
+            rf"\b{write}\b.{{0,120}}?\b(?:only|solely|exclusively|nothing else|alone)\b",
+            rf"\b{write}\s+(?:no|zero)\s+files?\b",
+            r"\b(?:limit|restrict|confine)\w*\b.{0,80}?\b(?:changes|edits|writes|modifications|scope)\b",
+            r"\b(?:changes|edits|writes|modifications|scope)\b.{0,80}?\b(?:limited|restricted|confined)\b",
+            r"\b(?:preserve|keep|leave)\b.{0,160}?\b(?:unchanged|untouched|unmodified|intact|as[ -]is|alone)\b",
+            r"\b(?:preserve|keep|leave)\s+(?:everything|anything)(?:\s+else)?\b",
+            r"\b(?:preserve|keep|leave)\s+[`\"']?\.?agent-dispatcher(?:/|\b)",
+            r"\b(?:preserve|keep|leave)\s+(?:(?:all|every|any|the|other|existing|remaining|unrelated)\s+){0,5}(?:files?|sources?|code|caches?|snapshots?|metadata|state)\b",
+            r"\b(?:files?|caches?|snapshots?|metadata)\b.{0,80}?\b(?:must|should)\s+(?:remain|stay|be left)\s+(?:unchanged|untouched|unmodified|intact)\b",
+            r"\b(?:files?|caches?|snapshots?|metadata)\b.{0,100}?\boff[ -]limits\b",
+        )
+        if any(re.search(pattern, request) for pattern in restrictions):
+            decision.update(allowed=False, reason="task_scope_restricted")
+        elif writable_paths is not None:
+            allowed = any(target == path or (path.endswith("/") and target.startswith(path))
+                          for path in writable_paths)
+            decision.update(allowed=allowed, reason="explicit_writable_paths" if allowed else "outside_writable_paths")
+    if snapshot is not None and "cache_write_scope" in snapshot:
+        scope = snapshot["cache_write_scope"]
+        inherited = scope.get(target) if isinstance(scope, dict) else None
+        if (not isinstance(inherited, dict) or type(inherited.get("allowed")) is not bool
+                or inherited.get("target") != target):
+            decision.update(allowed=False, reason="invalid_snapshot_scope")
+        elif not inherited["allowed"] and decision["allowed"]:
+            reasons = {"read_only_preview", "task_scope_restricted", "outside_writable_paths", "invalid_snapshot_scope"}
+            reason = inherited.get("reason")
+            decision.update(allowed=False, reason=reason if reason in reasons else "invalid_snapshot_scope")
+    return decision
+
+
 def find_pack(requested=None):
     origin = Path(requested).expanduser().resolve() if requested else Path(__file__).resolve().parent
     if not origin.is_dir():
@@ -607,7 +673,7 @@ def _ranges(candidate, radius=8):
     return [(start + 1, end, "\n".join(lines[start:end])) for start, end in windows]
 
 
-def _project_map(project, task, pack, snapshot, preview=False, maintain=False):
+def _project_map(project, task, pack, snapshot, preview=False, maintain=False, writable_paths=None):
     missing = {"status": "missing", "entries": [], "estimated_tokens": 0,
                "cache_status": "missing", "evidence_origin": "none",
                "coverage": {"scan_complete": bool(snapshot["complete"]),
@@ -625,7 +691,7 @@ def _project_map(project, task, pack, snapshot, preview=False, maintain=False):
         namespace = {"__name__": "_dispatcher_project_map", "__file__": str(helper_path)}
         exec(compile(helper_path.read_text(encoding="utf-8"), str(helper_path), "exec"), namespace)
         return namespace["context_entries"](project, task, pack=pack, snapshot=snapshot,
-                                            preview=preview, maintain=maintain)
+                                            preview=preview, maintain=maintain, writable_paths=writable_paths)
     except (OSError, UnicodeError, SyntaxError, ValueError, TypeError, KeyError):
         return dict(missing, status="unavailable", cache_status="unavailable",
                     diagnostics=["Project map helper unavailable or map unsafe; no cached facts used."])
@@ -718,7 +784,7 @@ def _finish_packet(result, pack, packet_tokens, guide_ids, reuse_state, reuse_sc
 def select_context(project, task, role=None, size="standard", max_tokens=None, pack=None,
                    *, exclude_paths=(), map_preview=False, auto_exclude=True,
                    compact=False, packet_tokens=None, guide_ids=(), map_maintain=False,
-                   reuse_state=None, reuse_scope=None, _delivery=None):
+                   reuse_state=None, reuse_scope=None, writable_paths=None, _delivery=None):
     """Select evidence; opt-in maintenance/reuse writes only bounded owned state."""
     if not isinstance(task, str) or not task.strip() or len(task) > MAX_TASK_CHARS:
         raise ContextError("Task must contain 1–16000 characters; task contents withheld.")
@@ -736,6 +802,10 @@ def select_context(project, task, role=None, size="standard", max_tokens=None, p
         raise ContextError("Packet budget must be an integer between 256 and 100000.")
     if not compact and (packet_tokens is not None or guide_ids or reuse_state is not None or reuse_scope is not None):
         raise ContextError("Packet budgets, supplied guides and evidence reuse require --compact.")
+    # Decide on the original request before redaction and before any source scan.
+    # Only these decisions, never task text or caller path lists, enter the snapshot.
+    cache_scope = {target: _cache_write_scope(task, target, preview=map_preview, writable_paths=writable_paths)
+                   for target in (".agent-dispatcher/project-map.json", ".agent-dispatcher/project-graph.json")}
     root = Path(project).expanduser().resolve()
     if not root.is_dir():
         raise ContextError("Project must be an existing readable directory.")
@@ -806,12 +876,14 @@ def select_context(project, task, role=None, size="standard", max_tokens=None, p
                 "inventory_paths": [p for p in paths if not _skip(p)], "exclude_paths": excluded_paths,
                 "task_excluded_paths": [p for p in task_excluded if not _skip(p)], "texts": texts,
                 "hashes": hashes, "bytes": scanned, "complete": scan_complete, "changed_paths": changed,
+                "cache_write_scope": cache_scope,
                 "diagnostics": [d for d in diagnostics if "partial" in d or "enumeration unavailable" in d]}
     graph_evidence = None
     if map_preview or map_maintain:
         try:
             graph_evidence = _sibling("project_graph")["query_graph"](
-                root, task, role=role_id, pack=base, snapshot=snapshot, maintain=map_maintain)
+                root, task, role=role_id, pack=base, snapshot=snapshot, maintain=map_maintain,
+                preview=map_preview, writable_paths=writable_paths)
             for path, priority in list(graph_evidence.get("source_priorities", {}).items())[:8]:
                 if path not in texts:
                     continue
@@ -919,7 +991,8 @@ def select_context(project, task, role=None, size="standard", max_tokens=None, p
                          "by_reason": dict(sorted(Counter(item["reason"] for item in excluded).items()))}
     if len(excluded) > MAX_EXCLUDED:
         diagnostics.append("Excluded file details limited to the first 100 paths; counts include all exclusions.")
-    map_evidence = _project_map(root, task, base, snapshot, preview=map_preview, maintain=map_maintain)
+    map_evidence = _project_map(root, task, base, snapshot, preview=map_preview, maintain=map_maintain,
+                                writable_paths=writable_paths)
     wrote_project = any(e and e.get("maintenance", {}).get("persisted") for e in (map_evidence, graph_evidence))
     result = {"schema_version": 1, "read_only": not wrote_project, "project": scrub(str(root)), "role": role_id, "size": size,
             "project_map": map_evidence, "resources": _resources(base, role_id),
@@ -1015,6 +1088,7 @@ def main(argv=None):
     parser.add_argument("--no-auto-exclude", action="store_true", help="Disable conservative task-derived evidence exclusions for inspection")
     parser.add_argument("--map-preview", action="store_true", help="Derive a read-only map preview when the cache is missing or stale; use for substantial source/map work")
     parser.add_argument("--map-maintain", action="store_true", help="Maintain local project indexes from the same safe scan; partial scans defer writes")
+    parser.add_argument("--writable-path", action="append", help="Limit optional cache writes to literal relative files/subtrees (directory ends in /); repeatable, never overrides task restrictions")
     parser.add_argument("--compact", action="store_true", help="Supply role guidance and budget the entire context packet")
     parser.add_argument("--packet-tokens", type=int, help="Compact packet limit, estimated at four characters per token")
     parser.add_argument("--guide", action="append", default=[], help="Include a selected eligible guide's full body; repeatable, compact only")
@@ -1036,7 +1110,7 @@ def main(argv=None):
                                 auto_exclude=not args.no_auto_exclude, compact=args.compact,
                                 packet_tokens=args.packet_tokens, guide_ids=args.guide,
                                 map_maintain=args.map_maintain, reuse_state=args.reuse_state, reuse_scope=args.reuse_scope,
-                                _delivery=delivery)
+                                writable_paths=args.writable_path, _delivery=delivery)
     except (ContextError, OSError, UnicodeError) as exc:
         print(str(exc) if isinstance(exc, ContextError) else "Context input could not be read; contents withheld.", file=sys.stderr)
         return 2

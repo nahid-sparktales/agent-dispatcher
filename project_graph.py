@@ -489,7 +489,8 @@ def _prune(view, sources):
     view["source_priorities"] = {path: value for path, value in view["source_priorities"].items() if path in paths}
 
 
-def query_graph(project, task, role=None, pack=None, snapshot=None, *, maintain=False):
+def query_graph(project, task, role=None, pack=None, snapshot=None, *, maintain=False,
+                preview=False, writable_paths=None):
     """Return a small task view and source-priority hints; never enumerate/read sources."""
     maintenance = {"requested": maintain, "action": "not_requested", "persisted": False}
     base = {"schema_version": SCHEMA_VERSION, "status": "unavailable", "cache_status": "unavailable",
@@ -507,6 +508,10 @@ def query_graph(project, task, role=None, pack=None, snapshot=None, *, maintain=
         scrub = context._scrubber(context.find_pack(pack))
         if (snapshot is None or not isinstance(task, str) or len(task) > context.MAX_TASK_CHARS or type(maintain) is not bool):
             raise GraphError("Graph queries require a safe context snapshot and a bounded task.")
+        scope = context._cache_write_scope(task, helper.STATE_DIR + "/" + STATE_FILE,
+                                           preview=preview, writable_paths=writable_paths, snapshot=snapshot)
+        if maintain:
+            maintenance["write_scope"] = scope
         existing, safe_state = None, True
         try:
             existing = helper._load(root, state_file=STATE_FILE, validator=_valid_graph, max_bytes=MAX_BYTES)
@@ -523,7 +528,10 @@ def query_graph(project, task, role=None, pack=None, snapshot=None, *, maintain=
             old = {s["path"]: s["sha256"] for s in existing["sources"]}
             changed |= {s["path"] for s in data["sources"] if old.get(s["path"]) != s["sha256"]}
         if maintain:
-            if not safe_state:
+            if not scope["allowed"]:
+                maintenance["action"] = "deferred"
+                base["diagnostics"].append("Graph persistence deferred by the cache write scope; current evidence is read-only and no cache was saved.")
+            elif not safe_state:
                 maintenance["action"] = "unavailable"
             elif partial:
                 maintenance["action"] = "deferred"

@@ -43,11 +43,25 @@ global cache. It never labels that subset as verified whole-project freshness. U
 foreign, or malformed state is left untouched; write failures report that saving failed.
 Use current permitted evidence and targeted investigation when maintenance cannot finish.
 
-Use --map-preview instead when writes are disallowed. It derives fresh evidence when the
-cache is absent or stale without saving anything. With neither flag, context selection
+Use --map-preview for read-only work, protected caches, and limited file-edit scopes. It derives
+fresh evidence when the cache is absent or stale without saving anything. With neither flag, context selection
 only reads and verifies an existing cache; a missing map leaves ordinary context selection
 available. The standalone `show` command always stays read-only, and explicit `build` and
-`refresh` remain available. If both flags reach the helper, maintenance takes precedence.
+`refresh` remain available for authorized cache operations, never to bypass task restrictions.
+If both flags reach the helper, preview takes precedence and maintenance is deferred.
+
+Both automatic cache writers check scope before creating a directory or changing a file.
+The conservative request guard treats read-only, limited edits, and file-preservation language
+as a veto; request text never grants additional write access. Repeat --writable-path with the
+actual permitted relative files or subtrees (trailing /) for a literal boundary. Each cache is
+checked separately; task restrictions still win. This option does not constrain source reads,
+external reuse state, or arbitrary host tools. It is not a general permission sandbox.
+Unknown natural-language phrasing needs the explicit path boundary or preview.
+
+Scope deferral returns fresh evidence with `maintenance.action: deferred`, `persisted: false`,
+and `maintenance.write_scope` naming the target and reason. `project_read_only` reports whether
+context preparation changed project state. Do not confuse successful evidence preparation with
+a saved cache, or recommend an out-of-scope refresh to remove the diagnostic.
 
 Saved-cache status and evidence origin are reported separately; eight facts and 1,000
 estimated tokens bound the evidence. Intentional task exclusions are not stale sources.

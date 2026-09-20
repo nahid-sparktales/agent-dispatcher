@@ -175,8 +175,11 @@ proof of completeness.
 
 During substantial source work, `--map-maintain` uses the same scan to maintain the source-linked
 project map and structural graph when safe writes are permitted. Excluded or incomplete scans defer persistence;
-unsafe destinations leave a read-only result with diagnostics. Use `--map-preview` when writes
-are disallowed. Map facts are evidence, never authorization to run their declared commands.
+unsafe destinations leave a read-only result with diagnostics. Use `--map-preview` for read-only
+work, protected caches, or limited edits; preview always wins over maintenance. Both writers also
+veto recognized task restrictions. Repeat `--writable-path` to enforce literal permitted files or
+subtrees (trailing `/`), independently of source-reading exclusions. Deferred maintenance still
+returns fresh evidence and explains its write decision. Map facts never authorize execution.
 
 Repeated preparation may opt into `--reuse-state ABS --reuse-scope ID`, using an authorized
 absolute state path outside the project. Reuse references only within the same context that

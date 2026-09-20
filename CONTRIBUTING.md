@@ -52,6 +52,7 @@ python3 test_doctor.py    # health checks, full inventory, evidence, and recomme
 python3 test_context.py   # bounded local retrieval, excerpts, ranking, and exclusions
 python3 test_context_packet.py # serialized budget, supplied guidance, and evidence trimming
 python3 test_context_reuse.py # retained evidence fingerprints, invalidation, and safe state
+python3 test_cache_scope.py # task edit boundaries, read-only precedence, and cache-write regression fixtures
 python3 test_project_map.py # source-backed maps, staleness, safe writes, and context integration
 python3 test_project_graph.py # structural extraction, bounded ranking, and cache safety
 python3 test_e2e.py       # native-client evaluation runner, offline fixtures only
