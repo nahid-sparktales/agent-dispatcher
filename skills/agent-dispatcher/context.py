@@ -784,7 +784,39 @@ def _finish_packet(result, pack, packet_tokens, guide_ids, reuse_state, reuse_sc
 def select_context(project, task, role=None, size="standard", max_tokens=None, pack=None,
                    *, exclude_paths=(), map_preview=False, auto_exclude=True,
                    compact=False, packet_tokens=None, guide_ids=(), map_maintain=False,
-                   reuse_state=None, reuse_scope=None, writable_paths=None, _delivery=None):
+                   reuse_state=None, reuse_scope=None, writable_paths=None, audit=False, _delivery=None):
+    """Prepare context; an explicit audit captures helper writes before they happen."""
+    if type(audit) is not bool:
+        raise ContextError("Task audit must be a boolean.")
+    pending = [] if audit else None
+    try:
+        return _select_context(project, task, role, size, max_tokens, pack,
+                               exclude_paths=exclude_paths, map_preview=map_preview, auto_exclude=auto_exclude,
+                               compact=compact, packet_tokens=packet_tokens, guide_ids=guide_ids,
+                               map_maintain=map_maintain, reuse_state=reuse_state, reuse_scope=reuse_scope,
+                               writable_paths=writable_paths, _delivery=_delivery, _audit_pending=pending)
+    except BaseException:
+        if pending:
+            cleanup = _discard_audit(pending[0])
+            if cleanup.get("status") != "removed":
+                raise ContextError("Context preparation failed; audit cleanup is unresolved at "
+                                   + str(cleanup.get("leftover_path", pending[0]["state"]))) from None
+        raise
+
+
+def _discard_audit(handle):
+    """Clean an undelivered baseline; never sweep unrelated temporary state."""
+    try:
+        return _sibling("change_audit")["cleanup_audit"](
+            handle["project"], handle["state"], pack=handle["pack"])
+    except (OSError, ValueError, TypeError, KeyError):
+        return {"status": "refused", "leftover_path": handle["state"]}
+
+
+def _select_context(project, task, role=None, size="standard", max_tokens=None, pack=None,
+                    *, exclude_paths=(), map_preview=False, auto_exclude=True,
+                    compact=False, packet_tokens=None, guide_ids=(), map_maintain=False,
+                    reuse_state=None, reuse_scope=None, writable_paths=None, _delivery=None, _audit_pending=None):
     """Select evidence; opt-in maintenance/reuse writes only bounded owned state."""
     if not isinstance(task, str) or not task.strip() or len(task) > MAX_TASK_CHARS:
         raise ContextError("Task must contain 1–16000 characters; task contents withheld.")
@@ -878,6 +910,16 @@ def select_context(project, task, role=None, size="standard", max_tokens=None, p
                 "hashes": hashes, "bytes": scanned, "complete": scan_complete, "changed_paths": changed,
                 "cache_write_scope": cache_scope,
                 "diagnostics": [d for d in diagnostics if "partial" in d or "enumeration unavailable" in d]}
+    audit_report = None
+    if _audit_pending is not None:
+        try:
+            audit_report = _sibling("change_audit")["start_audit"](root, exclude_paths=excluded_paths, pack=base)
+            _audit_pending.append({"project": str(root), "pack": str(base), "state": audit_report["state"]})
+        except (OSError, ValueError, TypeError, KeyError) as exc:
+            # Helper diagnostics are authored and scrubbed by the trusted
+            # helper, including paths of owned state that could not be removed.
+            detail = " " + str(exc) if exc.__class__.__name__ in {"AuditError", "VerificationError"} else ""
+            raise ContextError("Task change audit could not start; no cache maintenance was attempted." + detail) from None
     graph_evidence = None
     if map_preview or map_maintain:
         try:
@@ -1010,6 +1052,10 @@ def select_context(project, task, role=None, size="standard", max_tokens=None, p
                        "No model, network or project execution was used. Map persistence is reported in maintenance fields."]}
     if graph_evidence is not None:
         result["project_graph"] = graph_evidence
+    if audit_report is not None:
+        result["change_audit"] = audit_report
+        result["project_read_only"] = not wrote_project
+        result["read_only"] = False
     if compact:
         result["project_read_only"] = not wrote_project
         result["change_focus"] = {"source": "git_uncommitted", "paths": [scrub(p) for p in changed[:12]],
@@ -1027,6 +1073,12 @@ def render(result):
     if preferences:
         lines.append(f"Output: {preferences['output']}; requested effort: {preferences['requested_effort']}; active host effort: unknown.")
         lines.extend("Diagnostic: " + message for message in preferences.get("diagnostics", []))
+    audit = result.get("change_audit")
+    if audit:
+        lines += ["", "Change audit state: " + audit["state"],
+                  "Finish this audit before preservation claims; finishing also cleans its owned temporary state."]
+        if not audit["coverage"]["complete"]:
+            lines.append("Audit coverage is incomplete; blanket file-preservation claims are unavailable.")
     resources = result.get("resources", {})
     if resources.get("role") or resources.get("guides"):
         lines += ["", "Package resources — candidate locations only; guides have not been selected or loaded."]
@@ -1094,6 +1146,7 @@ def main(argv=None):
     parser.add_argument("--guide", action="append", default=[], help="Include a selected eligible guide's full body; repeatable, compact only")
     parser.add_argument("--reuse-state", help="Explicit private evidence ledger outside the project; compact only")
     parser.add_argument("--reuse-scope", help="Identity of context that still retains earlier evidence; compact only")
+    parser.add_argument("--audit", action="store_true", help="Start a task change audit in owned temporary state before cache writes; finish it before claiming file preservation")
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args(argv)
     delivery = []
@@ -1110,7 +1163,7 @@ def main(argv=None):
                                 auto_exclude=not args.no_auto_exclude, compact=args.compact,
                                 packet_tokens=args.packet_tokens, guide_ids=args.guide,
                                 map_maintain=args.map_maintain, reuse_state=args.reuse_state, reuse_scope=args.reuse_scope,
-                                writable_paths=args.writable_path, _delivery=delivery)
+                                writable_paths=args.writable_path, audit=args.audit, _delivery=delivery)
     except (ContextError, OSError, UnicodeError) as exc:
         print(str(exc) if isinstance(exc, ContextError) else "Context input could not be read; contents withheld.", file=sys.stderr)
         return 2
@@ -1122,6 +1175,11 @@ def main(argv=None):
         sys.stdout.flush()
     except (OSError, UnicodeError):
         print("Context output could not be delivered; reuse ledger was not updated.", file=sys.stderr)
+        if result.get("change_audit"):
+            cleanup = _discard_audit({"project": str(Path(args.project).expanduser().resolve()),
+                                      "pack": str(find_pack(args.pack)), "state": result["change_audit"]["state"]})
+            if cleanup.get("status") != "removed":
+                print("Audit cleanup is unresolved at " + str(cleanup["leftover_path"]), file=sys.stderr)
         return 1
     for commit, packet, pending in delivery:
         committed = commit(packet, pending)

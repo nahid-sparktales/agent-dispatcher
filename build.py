@@ -63,6 +63,7 @@ def reference_text(name, d, host="claude"):
         "{{MAP_COMMAND}}": "python3 -B PACK/" + ("scripts/" if codex else "") + "project_map.py",
         "{{MAP_INSPECT_COMMAND}}": "$agent-dispatcher map" if codex else "/agent-map",
         "{{VERIFICATION_COMMAND}}": "python3 -B PACK/" + ("scripts/" if codex else "") + "verification.py",
+        "{{AUDIT_COMMAND}}": "python3 -B PACK/" + ("scripts/" if codex else "") + "change_audit.py",
         "{{PREFERENCES_COMMAND}}": "python3 -B PACK/" + ("scripts/" if codex else "") + "preferences.py",
         "{{VERIFY_CONTROL}}": "$agent-dispatcher verify" if codex else "/agent-verify",
         "{{PREFERENCES_CONTROL}}": "$agent-dispatcher preferences" if codex else "/agent-preferences",
@@ -546,7 +547,7 @@ def write_context(d):
     for name in TEMPLATED_REFERENCES:
         (ADAPTER / name).write_text(reference_text(name, d))
     for name in ("context.py", "context_packet.py", "context_reuse.py", "project_map.py", "project_graph.py",
-                 "resources.py", "verification.py", "preferences.py"):
+                 "resources.py", "verification.py", "preferences.py", "change_audit.py"):
         (ADAPTER / name).write_bytes((ROOT / name).read_bytes())
     (ADAPTER / "jev.md").write_text(decision_guide())
 

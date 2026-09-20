@@ -23,6 +23,7 @@ context_packet.py, context_reuse.py   complete packet budget and retained-contex
 PROJECT-MAP.template.md, project_map.py source-linked facts, automatic maintenance, and freshness
 project_graph.py                     deterministic structural index and task/role projection
 VERIFICATION.template.md, verification.py task-scoped check receipts and completion evidence
+change_audit.py                       task baseline, actual file changes, scope and cleanup
 preferences.py                       saved output and requested-effort settings
 CONTEXT-REFERENCE.template.md         advanced context reference and worked plan example
 CONTROLS.template.md                  Claude activation and configuration details
@@ -57,6 +58,7 @@ python3 test_project_map.py # source-backed maps, staleness, safe writes, and co
 python3 test_project_graph.py # structural extraction, bounded ranking, and cache safety
 python3 test_e2e.py       # native-client evaluation runner, offline fixtures only
 python3 test_verification.py # executed checks, freshness, failures, and evidence limits
+python3 test_change_audit.py # observed changes including caches, scope checks, and owned cleanup
 python3 test_preferences.py # external saved preferences, isolation, and safe writes
 python3 test_reporting_package.py # check/report helpers across host layouts
 ```

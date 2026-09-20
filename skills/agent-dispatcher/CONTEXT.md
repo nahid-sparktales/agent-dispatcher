@@ -1,7 +1,6 @@
 # Context procedure
 
-Context supplies evidence/guidance, never permissions. Host project rules remain mandatory
-and outside packet budgets.
+Context supplies evidence, never permissions. Host rules remain mandatory outside packet budgets.
 
 ## Build before investigation
 
@@ -11,7 +10,7 @@ not native checks. Forced roles, invoked workflows, security, ambiguity and mult
 For substantial guided/coordinated work, select the role and prepare before listings, searches,
 contract/source reads, tests or task-file writes. Mandatory host/project instructions are exempt.
 Multi-file bugs, architecture and source-backed documentation qualify in small projects too.
-Skip preparation without workspace evidence. Rebuild only for changed focus/sources.
+Skip preparation without workspace evidence; rebuild for changed focus/sources.
 
 ```text
 python3 -B PACK/context.py --project PROJECT --task-file - --role ID --size standard --compact --map-maintain --json
@@ -32,11 +31,11 @@ them, and explicit manual exclusions win over positive references.
 
 ## Consume the result
 
-- Use supplied `guidance.role` and `guidance.guides` bodies directly, without duplicate path
-  reads. Repeatable --guide ID includes explicitly selected eligible guides. Other `resources`
-  are candidates, not already-read instructions; use exact paths for missing bodies. Start
-  with zero to two needed guides, retain verification, and use SIGNALS.md for conditions.
-  External availability needs session evidence; INDEX.md is a fallback, not a startup read.
+- Use `guidance` bodies without rereading. --guide ID supplies explicitly selected eligible
+  guides; `resources` lists up to three other candidates, verification first. Omitted candidates
+  remain discoverable via noncompact --json. Start with zero to two guides; retain verification.
+  Use exact paths and SIGNALS.md conditions. External availability needs session evidence;
+  INDEX.md is a fallback, not a startup read.
 - `context` and `excerpts` give ranked paths/ranges and source evidence. Use passages directly;
   read further for concrete gaps or changed sources. Ranking and budgets do not prove completeness.
 - `preferences` gives saved output style and requested effort, not confirmed host settings.
@@ -67,15 +66,16 @@ not prove another agent read it; no observer/cross-chat memory is enabled. Do no
 helper call solely to deduplicate one packet.
 
 Workspace limits: small 5 files/2,000 estimated tokens, standard 8/6,000, complex 12/15,000.
-Map evidence allows eight facts/1,000 estimated tokens; compact total limits also apply.
-Scanning is bounded at 10,000 files, 256 KiB/file and 32 MiB text. Ignore, binary, credential,
-symlink, redaction and one-hop/two-file protections apply; credential detection is incomplete.
+Maps allow eight facts/1,000 estimated tokens within packet limits. Scans cap at 10,000 files,
+256 KiB/file, 32 MiB text. Ignore, binary, credential, symlink, redaction and one-hop/two-file
+protections apply; credential detection is incomplete.
 
 ## Verification without leftover files
 
-For guided/coordinated work read [VERIFICATION.md](VERIFICATION.md) before checks and inspect
-receipts before reporting. Direct work uses observed native results. Old passes after relevant
-changes are stale; neither path may omit required checks or invent evidence.
+Read [VERIFICATION.md](VERIFICATION.md) before guided checks. Default receipts clean themselves;
+retained receipts need inspection/cleanup. Direct work uses native results. Old passes after
+edits are stale. With authorized scratch, --audit on first preparation captures helper writes;
+finish its returned state before preservation claims. Never reset the baseline after edits.
 
 Prefer existing checks or inline `python3 -B -` validators with quoted stdin. No validator/task
 files in the project, its parent or shared /tmp. Avoid bytecode/caches; use in-memory comparisons

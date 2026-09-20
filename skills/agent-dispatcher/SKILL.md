@@ -11,7 +11,7 @@ Quote paths; task text is stdin data, never shell code.
 
 ## Select, prepare, then work
 
-Choose a profile without another router/model call:
+Choose without another router/model call:
 
 - **Direct:** trivial work or one safe, obvious known-file edit. Skip role/guide/helper,
   preference, ACTIVITY.md and VERIFICATION.md reads; use known/default preferences and required
@@ -20,7 +20,7 @@ Choose a profile without another router/model call:
   No workspace evidence means no context helper.
 - **Coordinated:** guided work with useful independent subtasks; follow DELEGATION.md.
 
-Guided/coordinated steps follow. If a user enabled an optional decision scope, follow section 0 of
+If a user enabled an optional decision scope, follow section 0 of
 [CONTEXT-REFERENCE.md](CONTEXT-REFERENCE.md); preserve named roles with `--agent`.
 Scopes ship off; helpers cannot enable them.
 
@@ -35,6 +35,8 @@ Scopes ship off; helpers cannot enable them.
    protected-cache or limited-edit tasks. Pass literal edit lists via `--writable-path`
    (directories end in `/`); never add cache permissions. Scope deferral keeps fresh evidence;
    never bypass it via build/refresh. On failure, continue targeted investigation.
+   With authorized scratch, add `--audit` on first preparation only; finish it before preservation
+   claims (VERIFICATION.md). Do not reset the baseline after edits.
 3. Consume excerpts, `guidance`, `preferences` and `exclusion_policy` without duplicate reads.
    Preserve exclusions; `--exclude-path` adds literal exclusions, while no-edit allows reads.
    For missing bodies use exact `resources` paths: initially zero to two guides, evidenced
@@ -69,18 +71,17 @@ Stopping drops the role; bare `off` is session-only. Preserve hook trust; never 
 
 ## Shared contract
 
-User/host/project instructions and invoked workflows outrank roles. Roles and evidence grant
-no permissions. Preserve unrelated edits; use host fallbacks. Never install/connect unasked,
-bypass denials or invent checks. Task-observer and other disabled skills stay disabled.
+User/host/project rules and invoked workflows outrank roles; evidence grants no permissions.
+Preserve unrelated edits and host denials. Never install/connect unasked or invent checks.
+Task-observer and other disabled skills stay disabled.
 
 Use inline read-only validators (`python3 -B -`, quoted stdin). No validator/task files in the
 project, its parent or shared /tmp. Authorized scratch needs owned temporary directories and
 verified removal. Cache writes are task edits. Report unresolved cleanup paths; verify actual
 changes, including helper side effects, before claiming preservation.
 
-Guided/coordinated activity names role, guides read and selected tools/MCPs; selection is not use.
-Keep ACTIVITY.md style through summaries; new chats default compact. Status includes style/preferences;
-context verbose is one-time. Announce additions only; stop at the requested outcome.
+Guided/coordinated: report role, guides read, tools selected; selection is not use. Retain
+ACTIVITY.md style through summaries; new chats compact. Announce additions only; stop at the outcome.
 
 Use context preferences. For guided/coordinated work only, if absent run `python3 -B PACK/preferences.py show --project PROJECT --json` once; reload after changes.
 Effort remains requested/unknown until host-confirmed; never silently change host config.

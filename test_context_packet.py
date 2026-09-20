@@ -48,6 +48,103 @@ class ContextPacketTests(unittest.TestCase):
     def compact(self, result=None, guides=()):
         return packet.compact_packet(result or self.result(), self.pack, guides)
 
+    def many_candidates(self):
+        result = self.result()
+        resources = result["resources"]
+        for index in range(18):
+            ident = f"candidate-{index}"
+            condition = f"condition-{index}"
+            resources["guides"].append({"id": ident, "path": str(self.guide), "status": "bundled",
+                                        "tiers": ["core"] if index < 2 else ["preferred"] if index < 4 else [],
+                                        "conditions": [condition]})
+            resources["conditions"][condition] = f"Use this candidate when its task condition {index} actually applies."
+        resources["guides"][15].update(tiers=["verification"], path=None, status="external_availability_unknown")
+        resources["guides"][17]["tiers"] = ["verification"]
+        return result
+
+    def test_large_budget_still_returns_a_small_truthful_candidate_shortlist(self):
+        original = self.many_candidates()
+        untouched = copy.deepcopy(original)
+        for target in (4000, 18000, 100000):
+            with self.subTest(target=target):
+                out = packet.fit_packet(self.compact(original), target=target)
+                resources = out["resources"]
+                self.assertEqual([guide["id"] for guide in resources["guides"]],
+                                 ["candidate-14", "candidate-16", "test-design"])
+                self.assertEqual(resources["guides"][0]["status"], "external_availability_unknown")
+                self.assertIsNone(resources["guides"][0]["path"])
+                self.assertEqual(set(resources["conditions"]), {"condition-14", "condition-16"})
+                self.assertNotIn("role", resources)
+                self.assertEqual(out["guidance"]["role"]["path"], str(self.role))
+                self.assertEqual(out["guidance"]["guides"], [])
+                self.assertEqual(out["packet_omissions"]["guide_candidates"], 16)
+                self.assertTrue(any("--json without --compact" in line and "--guide ID" in line for line in out["limits"]))
+                # Hold every other field constant to measure metadata savings independently
+                # of excerpt/graph trimming, model behavior, or host token accounting.
+                full_metadata = copy.deepcopy(out)
+                full_metadata["resources"] = original["resources"]
+                packet.account_packet(full_metadata)
+                self.assertLess(len(packet.dumps(out)), len(packet.dumps(full_metadata)) * 0.8)
+                self.assertEqual(out["excerpts"], original["excerpts"])
+                self.assertEqual(out["budget"]["estimated_tokens"], math.ceil(len(packet.dumps(out)) / 4))
+        self.assertEqual(original, untouched)
+
+    def test_explicit_guide_is_resolved_before_shortlisting_and_keeps_its_conditions(self):
+        result = self.many_candidates()
+        default = self.compact(result)
+        self.assertNotIn("candidate-17", [guide["id"] for guide in default["resources"]["guides"]])
+        out = packet.fit_packet(self.compact(result, ["candidate-17"]), target=100000)
+        self.assertEqual([guide["id"] for guide in out["resources"]["guides"]],
+                         ["candidate-14", "candidate-16", "test-design", "candidate-17"])
+        self.assertEqual(out["resources"]["conditions"]["condition-17"],
+                         result["resources"]["conditions"]["condition-17"])
+        self.assertEqual(out["guidance"]["guides"][0]["content"], self.guide.read_text())
+        self.assertEqual(out["packet_omissions"]["guide_candidates"], 15)
+
+    def test_shortlist_stays_bounded_with_many_verification_and_selected_guides(self):
+        result = self.many_candidates()
+        for guide in result["resources"]["guides"]:
+            guide["tiers"] = ["verification"]
+        selected = [f"candidate-{index}" for index in range(5)]
+        out = self.compact(result, selected)
+        self.assertEqual([guide["id"] for guide in out["resources"]["guides"]],
+                         ["test-design", "candidate-5", "candidate-6", *selected])
+        self.assertEqual(len(out["resources"]["guides"]), 8)
+        self.assertEqual([guide["id"] for guide in out["guidance"]["guides"]], selected)
+        self.assertEqual(out["packet_omissions"]["guide_candidates"], 11)
+
+    def test_shortlist_preserves_maintenance_scope_exclusions_and_diagnostics(self):
+        result = self.many_candidates()
+        for key, name in (("project_map", "project-map.json"), ("project_graph", "project-graph.json")):
+            result.setdefault(key, {})["maintenance"] = {
+                "action": "deferred", "persisted": False,
+                "write_scope": {"allowed": False, "reason": "outside_writable_paths",
+                                "target": f".agent-dispatcher/{name}"}}
+        result["resources"]["diagnostics"].append("A package guide is unavailable; use its fallback.")
+        out = packet.fit_packet(self.compact(result), target=100000)
+        for key in ("project_map", "project_graph"):
+            self.assertEqual(out[key]["maintenance"], result[key]["maintenance"])
+        self.assertEqual(out["exclusion_policy"], result["exclusion_policy"])
+        self.assertEqual(out["diagnostics"], result["diagnostics"])
+        self.assertEqual(out["resources"]["diagnostics"], result["resources"]["diagnostics"])
+
+    def test_fit_drops_default_candidates_before_explicit_metadata_and_counts_all_omissions(self):
+        result = self.many_candidates()
+        for guide in result["resources"]["guides"]:
+            if guide["id"] in {"candidate-14", "candidate-16", "test-design"}:
+                guide["path"] = str(self.pack / ("long-candidate-location-" * 200))
+        compact = self.compact(result, ["candidate-17"])
+        minimum = copy.deepcopy(compact)
+        minimum["resources"]["guides"] = [minimum["resources"]["guides"][-1]]
+        minimum["resources"]["conditions"] = {"condition-17": result["resources"]["conditions"]["condition-17"]}
+        packet.account_packet(minimum)
+        out = packet.fit_packet(compact, target=minimum["budget"]["estimated_tokens"] + 2)
+        self.assertEqual([guide["id"] for guide in out["resources"]["guides"]], ["candidate-17"])
+        self.assertEqual(set(out["resources"]["conditions"]), {"condition-17"})
+        self.assertEqual(out["packet_omissions"]["guide_candidates"], 18)
+        self.assertEqual(out["guidance"], compact["guidance"])
+        self.assertEqual(out["excerpts"], compact["excerpts"])
+
     def test_full_packet_estimate_matches_exact_serialization_with_unicode(self):
         result = self.result()
         result["diagnostics"].append("Unicode sources: café 日本語 🍎")
@@ -157,7 +254,7 @@ class ContextPacketTests(unittest.TestCase):
         self.assertEqual(out["budget"]["excerpt_tokens"], sum(math.ceil(len(e["content"]) / 4) for e in out["excerpts"]))
 
     def test_reuse_references_are_counted_and_keep_matching_context(self):
-        result = self.compact()
+        result = self.compact(self.many_candidates())
         excerpt = result["excerpts"].pop()
         reference = {key: excerpt[key] for key in ("id", "path", "lines")}
         result["reuse"] = {"status": "prepared", "references": [reference], "emitted_count": 99, "reused_count": 99}

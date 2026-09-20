@@ -61,6 +61,7 @@ jobs:
       - name: Test verification evidence and saved preferences
         run: |
           python3 test_verification.py
+          python3 test_change_audit.py
           python3 test_preferences.py
           python3 test_reporting_package.py
       - name: Verify regeneration leaves the checkout clean

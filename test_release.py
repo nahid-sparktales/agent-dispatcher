@@ -355,6 +355,7 @@ class RecoverableInstallerTests(unittest.TestCase):
             "project_map.py": "# explicit map builder and read-only inspector\n",
             "resources.py": "# read-only package resource resolver\n",
             "verification.py": "# task-scoped check evidence\n",
+            "change_audit.py": "# task-scoped observed file changes\n",
             "preferences.py": "# saved dispatcher preferences\n",
             "hooks/agent-dispatcher-activate.sh": "#!/bin/bash\n",
             "commands/agent-reviewer.md": "review v1",

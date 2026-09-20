@@ -56,7 +56,7 @@ class DoctorTests(unittest.TestCase):
         write(self.pack / "roles/reviewer.md", "# Reviewer")
         for file in ("INDEX.md", "CONTEXT.md", "CONTEXT-REFERENCE.md", "ROLES.md", "CONTROLS.md",
                      "DELEGATION.md", "PROJECT-MAP.md", "VERIFICATION.md", "jev.md", "DOCTOR.md", "doctor.py", "context.py", "project_map.py", "resources.py", "verification.py", "preferences.py",
-                     "context_packet.py", "context_reuse.py", "project_graph.py"):
+                     "context_packet.py", "context_reuse.py", "project_graph.py", "change_audit.py"):
             write(self.pack / file, "fixture")
 
     def inspect(self, **kwargs):
@@ -211,7 +211,7 @@ class DoctorTests(unittest.TestCase):
         self.assertIn("project_map.py", health["missing_files"])
 
     def test_reporting_helpers_and_guide_are_required_for_package_health(self):
-        missing = {"verification.py", "preferences.py", "VERIFICATION.md"}
+        missing = {"verification.py", "preferences.py", "change_audit.py", "VERIFICATION.md"}
         for name in missing:
             (self.pack / name).unlink()
         health = self.row(self.inspect(), "package-files")

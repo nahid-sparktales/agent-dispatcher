@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
 """Offline observed-result, freshness and receipt-safety regressions."""
 import json
+import contextlib
+import io
 import os
 from pathlib import Path
 import subprocess
 import sys
 import tempfile
+import shutil
 import time
 import unittest
 from unittest import mock
@@ -449,6 +452,351 @@ class VerificationTests(unittest.TestCase):
         self.assertLess(len(rendered.split()), 150)
         self.assertIn("earlier checks", rendered)
         self.assertIn("not verified", rendered)
+
+    def temporary_recorder(self):
+        created = []
+        original = verification._temporary_directory
+        def create(project):
+            path, identity = original(project)
+            created.append(path)
+            self.addCleanup(lambda: shutil.rmtree(path) if path.exists() and not path.is_symlink() else None)
+            self.assertFalse(path.is_relative_to(self.project.parent))
+            self.assertEqual(path.stat().st_mode & 0o777, 0o700)
+            return path, identity
+        return created, mock.patch.object(verification, "_temporary_directory", side_effect=create)
+
+    def test_temporary_success_returns_evidence_then_removes_exact_owned_directory(self):
+        created, recording = self.temporary_recorder()
+        original = verification._inspection
+        def inspect(*args):
+            self.assertEqual((created[-1] / "receipt.json").stat().st_mode & 0o777, 0o600)
+            return original(*args)
+        with recording, mock.patch.object(verification, "_inspection", side_effect=inspect):
+            result = verification.run_temporary_check(self.project, [sys.executable, "-c", "pass"], kind="check")
+        self.assertEqual(self.last(result)["outcome"], "command_succeeded")
+        self.assertEqual(result["cleanup"], {"status": "removed", "receipt_removed": True, "directory_removed": True})
+        self.assertFalse(created[0].exists())
+        self.assertEqual({p.name for p in self.root.iterdir()}, {"project"})
+        self.assertIn("private directory removed", verification.render(result))
+
+    def test_temporary_cleanup_on_failed_timeout_denied_and_unlaunchable_checks(self):
+        denied = self.write("not-executable", "no")
+        cases = [([sys.executable, "-c", "raise SystemExit(3)"], 5, "command_failed"),
+                 ([sys.executable, "-c", "import time; time.sleep(10)"], 0.05, "timeout"),
+                 ([str(denied)], 5, "denied"),
+                 ([str(self.project / "does-not-exist")], 5, "launch_failed")]
+        for command, timeout, outcome in cases:
+            with self.subTest(outcome=outcome):
+                created, recording = self.temporary_recorder()
+                with recording:
+                    result = verification.run_temporary_check(self.project, command, kind="check", timeout=timeout)
+                self.assertEqual(self.last(result)["outcome"], outcome)
+                self.assertEqual(result["cleanup"]["status"], "removed")
+                self.assertFalse(created[0].exists())
+
+    def test_temporary_cleanup_on_exceptions_before_and_after_receipt_write(self):
+        for target in ("_execute", "_inspection"):
+            with self.subTest(target=target):
+                created, recording = self.temporary_recorder()
+                with recording, mock.patch.object(verification, target, side_effect=RuntimeError("private exception payload")):
+                    with self.assertRaises(verification.VerificationError) as caught:
+                        verification.run_temporary_check(self.project, [sys.executable, "-c", "pass"], kind="check")
+                self.assertNotIn("private exception payload", str(caught.exception))
+                self.assertEqual(caught.exception.cleanup["status"], "removed")
+                self.assertFalse(created[0].exists())
+
+    def test_temporary_cleanup_on_keyboard_interrupt_and_invalid_command(self):
+        created, recording = self.temporary_recorder()
+        with recording, mock.patch.object(verification, "_execute", side_effect=KeyboardInterrupt):
+            with self.assertRaises(KeyboardInterrupt) as caught:
+                verification.run_temporary_check(self.project, [sys.executable, "-c", "pass"])
+        self.assertEqual(caught.exception.cleanup["status"], "removed")
+        self.assertFalse(created[0].exists())
+        created, recording = self.temporary_recorder()
+        with recording:
+            with self.assertRaises(verification.VerificationError) as caught:
+                verification.run_temporary_check(self.project, [])
+        self.assertEqual(caught.exception.cleanup["status"], "removed")
+        self.assertFalse(created[0].exists())
+
+    def test_temporary_cleanup_preserves_unexpected_entries(self):
+        created, recording = self.temporary_recorder()
+        original = verification._inspection
+        def inspect(*args):
+            (created[-1] / "unrelated.txt").write_text("keep me")
+            return original(*args)
+        with recording, mock.patch.object(verification, "_inspection", side_effect=inspect):
+            result = verification.run_temporary_check(self.project, [sys.executable, "-c", "pass"], kind="check")
+        self.assertEqual(result["cleanup"]["status"], "refused")
+        self.assertEqual(result["cleanup"]["leftover_path"], str(created[0]))
+        self.assertEqual((created[0] / "unrelated.txt").read_text(), "keep me")
+        self.assertTrue((created[0] / "receipt.json").exists())
+
+    def test_temporary_cleanup_refuses_changed_replaced_symlinked_and_hardlinked_receipts(self):
+        target = self.root / "unrelated-target"
+        target.write_text("keep me")
+        original = verification._inspection
+        for mutation in ("edit", "replace", "symlink", "hardlink"):
+            with self.subTest(mutation=mutation):
+                created, recording = self.temporary_recorder()
+                def inspect(*args):
+                    result = original(*args)
+                    path = created[-1] / "receipt.json"
+                    if mutation == "edit":
+                        path.write_text("different writer")
+                    elif mutation == "replace":
+                        replacement = created[-1] / "replacement"
+                        replacement.write_bytes(path.read_bytes())
+                        replacement.replace(path)
+                    else:
+                        path.unlink()
+                        path.symlink_to(target) if mutation == "symlink" else os.link(target, path)
+                    return result
+                with recording, mock.patch.object(verification, "_inspection", side_effect=inspect):
+                    result = verification.run_temporary_check(self.project, [sys.executable, "-c", "pass"], kind="check")
+                self.assertEqual(result["cleanup"]["status"], "refused")
+                self.assertTrue(os.path.lexists(created[0] / "receipt.json"))
+                self.assertEqual(target.read_text(), "keep me")
+
+    def test_temporary_cleanup_refuses_replaced_directory(self):
+        created, recording = self.temporary_recorder()
+        original = verification._inspection
+        moved = []
+        def inspect(*args):
+            result = original(*args)
+            path = created[-1]
+            destination = path.with_name(path.name + "-moved")
+            path.rename(destination)
+            moved.append(destination)
+            self.addCleanup(shutil.rmtree, destination)
+            path.mkdir(mode=0o700)
+            (path / "receipt.json").write_text("foreign replacement")
+            return result
+        with recording, mock.patch.object(verification, "_inspection", side_effect=inspect):
+            result = verification.run_temporary_check(self.project, [sys.executable, "-c", "pass"], kind="check")
+        self.assertEqual(result["cleanup"]["status"], "refused")
+        self.assertEqual((created[0] / "receipt.json").read_text(), "foreign replacement")
+        self.assertTrue((moved[0] / "receipt.json").exists())
+
+    def test_show_cleanup_inspects_then_removes_receipt_and_preserves_shared_parent(self):
+        self.run_check([sys.executable, "-c", "pass"], kind="check")
+        sentinel = self.root / "keep.txt"
+        sentinel.write_text("unrelated")
+        before = (self.receipt.read_bytes(), self.receipt.stat().st_mtime_ns)
+        verification.inspect_receipt(self.project, self.receipt)
+        self.assertEqual(before, (self.receipt.read_bytes(), self.receipt.stat().st_mtime_ns))
+        result = verification.inspect_receipt(self.project, self.receipt, cleanup=True)
+        self.assertEqual(self.last(result)["freshness"], "current")
+        self.assertEqual(result["cleanup"], {"status": "removed", "receipt_removed": True, "directory_removed": False})
+        self.assertFalse(self.receipt.exists())
+        self.assertEqual(sentinel.read_text(), "unrelated")
+        self.assertTrue(self.root.is_dir())
+
+    def test_show_cleanup_rejects_foreign_or_changed_receipt(self):
+        self.run_check([sys.executable, "-c", "pass"], kind="check")
+        other = self.root / "another-project"
+        other.mkdir()
+        with self.assertRaises(verification.VerificationError):
+            verification.inspect_receipt(other, self.receipt, cleanup=True)
+        self.assertTrue(self.receipt.exists())
+        original = verification._inspection
+        def inspect(*args):
+            self.receipt.write_text("new evidence from another writer")
+            return original(*args)
+        with mock.patch.object(verification, "_inspection", side_effect=inspect):
+            result = verification.inspect_receipt(self.project, self.receipt, cleanup=True)
+        self.assertEqual(result["cleanup"]["status"], "refused")
+        self.assertEqual(self.receipt.read_text(), "new evidence from another writer")
+
+    def test_cli_default_temporary_receipts_and_explicit_cleanup(self):
+        base = [sys.executable, "-B", str(ROOT / "verification.py")]
+        for payload, status in (("pass", 0), ("raise SystemExit(9)", 1)):
+            proc = subprocess.run([*base, "run", "--project", str(self.project), "--kind", "check", "--json", "--", sys.executable, "-c", payload],
+                                  cwd=self.root, text=True, capture_output=True)
+            self.assertEqual(proc.returncode, status, proc.stderr)
+            self.assertEqual(json.loads(proc.stdout)["cleanup"]["status"], "removed")
+            self.assertEqual({p.name for p in self.root.iterdir()}, {"project"})
+        self.run_check([sys.executable, "-c", "pass"], kind="check")
+        proc = subprocess.run([*base, "show", "--project", str(self.project), "--receipt", str(self.receipt), "--cleanup", "--json"],
+                              cwd=self.root, text=True, capture_output=True)
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertEqual(json.loads(proc.stdout)["cleanup"]["status"], "removed")
+        self.assertFalse(self.receipt.exists())
+
+    def test_cli_cleanup_refusal_is_nonzero_even_when_check_succeeds(self):
+        created, recording = self.temporary_recorder()
+        original = verification._inspection
+        def inspect(*args):
+            (created[-1] / "unexpected").write_text("keep")
+            return original(*args)
+        output = io.StringIO()
+        with recording, mock.patch.object(verification, "_inspection", side_effect=inspect), contextlib.redirect_stdout(output):
+            status = verification.main(["run", "--project", str(self.project), "--kind", "check", "--json", "--", sys.executable, "-c", "pass"])
+        self.assertEqual(status, 2)
+        self.assertEqual(self.last(json.loads(output.getvalue()))["outcome"], "command_succeeded")
+        self.assertEqual(json.loads(output.getvalue())["cleanup"]["status"], "refused")
+
+    def test_cli_exception_reports_cleanup_without_leaking_exception_payload(self):
+        created, recording = self.temporary_recorder()
+        error_output = io.StringIO()
+        with recording, mock.patch.object(verification, "_execute", side_effect=RuntimeError("secret exception data")), contextlib.redirect_stderr(error_output):
+            status = verification.main(["run", "--project", str(self.project), "--json", "--", sys.executable, "-c", "pass"])
+        self.assertEqual(status, 2)
+        self.assertNotIn("secret exception data", error_output.getvalue())
+        self.assertEqual(json.loads(error_output.getvalue().splitlines()[-1])["cleanup"]["status"], "removed")
+        self.assertFalse(created[0].exists())
+
+    def test_unsafe_temp_roots_refused_without_starting_check(self):
+        # There cannot be a temporary location outside the parent of filesystem root.
+        with mock.patch.object(verification, "_execute") as execute:
+            with self.assertRaises(verification.VerificationError):
+                verification.run_temporary_check(Path("/"), [sys.executable, "-c", "pass"])
+        execute.assert_not_called()
+
+    def test_cleanup_failure_retains_receipt_and_reports_non_success(self):
+        self.run_check([sys.executable, "-c", "pass"], kind="check")
+        original = self.receipt.read_bytes()
+        with mock.patch.object(verification.os, "unlink", side_effect=PermissionError):
+            result = verification.inspect_receipt(self.project, self.receipt, cleanup=True)
+        self.assertEqual(result["cleanup"]["status"], "refused")
+        self.assertFalse(result["cleanup"]["receipt_removed"])
+        self.assertEqual(self.receipt.read_bytes(), original)
+
+    def test_cleanup_detects_same_inode_edit_during_final_fingerprint(self):
+        self.run_check([sys.executable, "-c", "pass"], kind="check")
+        original = verification._receipt_fingerprint
+        def fingerprint(*args, **kwargs):
+            result = original(*args, **kwargs)
+            self.receipt.write_text("concurrent evidence")
+            return result
+        with mock.patch.object(verification, "_receipt_fingerprint", side_effect=fingerprint):
+            result = verification.inspect_receipt(self.project, self.receipt, cleanup=True)
+        self.assertEqual(result["cleanup"]["status"], "refused")
+        self.assertEqual(self.receipt.read_text(), "concurrent evidence")
+
+    def test_project_local_temp_environment_falls_back_outside_project_parent(self):
+        with mock.patch.object(verification.tempfile, "gettempdir", return_value=str(self.project)):
+            path, identity = verification._temporary_directory(self.project)
+        self.addCleanup(lambda: path.rmdir() if path.exists() else None)
+        self.assertFalse(path.is_relative_to(self.project.parent))
+        self.assertEqual(identity, (path.stat().st_dev, path.stat().st_ino))
+        self.assertEqual(path.stat().st_mode & 0o777, 0o700)
+
+    def test_fresh_temporary_receipt_save_never_overwrites_a_competing_entry(self):
+        created, recording = self.temporary_recorder()
+        original = verification.os.fsync
+        def competing_write(fd):
+            (created[-1] / "receipt.json").write_text("competing user data")
+            return original(fd)
+        with recording, mock.patch.object(verification.os, "fsync", side_effect=competing_write):
+            with self.assertRaises(verification.VerificationError) as caught:
+                verification.run_temporary_check(self.project, [sys.executable, "-c", "pass"], kind="check")
+        self.assertEqual((created[0] / "receipt.json").read_text(), "competing user data")
+        self.assertEqual(caught.exception.cleanup["status"], "refused")
+        self.assertFalse(caught.exception.cleanup["receipt_removed"])
+        self.assertEqual({p.name for p in created[0].iterdir()}, {"receipt.json"})
+
+    def test_existing_receipt_save_rechecks_content_after_preparing_new_file(self):
+        self.run_check([sys.executable, "-c", "pass"], kind="check")
+        original = verification.os.fsync
+        def competing_write(fd):
+            self.receipt.write_text("new evidence from another writer")
+            return original(fd)
+        with mock.patch.object(verification.os, "fsync", side_effect=competing_write):
+            with self.assertRaises(verification.VerificationError):
+                self.run_check([sys.executable, "-c", "pass"], kind="check")
+        self.assertEqual(self.receipt.read_text(), "new evidence from another writer")
+        self.assertFalse(list(self.root.glob(".dispatcher-receipt-*")))
+
+    def test_show_cleanup_requires_an_actual_boolean(self):
+        self.run_check([sys.executable, "-c", "pass"], kind="check")
+        original = self.receipt.read_bytes()
+        for invalid in ("false", "true", 1, 0, None, [], {}):
+            with self.subTest(cleanup=invalid):
+                with self.assertRaises(verification.VerificationError):
+                    verification.inspect_receipt(self.project, self.receipt, cleanup=invalid)
+                self.assertEqual(self.receipt.read_bytes(), original)
+                self.assertTrue(self.root.is_dir())
+
+    def setup_directory_recorder(self):
+        created = []
+        original = verification.tempfile.mkdtemp
+        def create(*args, **kwargs):
+            path = Path(original(*args, **kwargs))
+            created.append(path)
+            self.addCleanup(lambda: shutil.rmtree(path) if path.exists() and not path.is_symlink() else None)
+            return str(path)
+        return created, mock.patch.object(verification.tempfile, "mkdtemp", side_effect=create)
+
+    def test_temporary_directory_permission_setup_failure_cleans_and_stops(self):
+        created, recording = self.setup_directory_recorder()
+        with recording, mock.patch.object(verification.os, "fchmod", side_effect=PermissionError("secret diagnostic")):
+            with self.assertRaises(verification.VerificationError) as caught:
+                verification._temporary_directory(self.project)
+        self.assertEqual(len(created), 1)
+        self.assertFalse(created[0].exists())
+        self.assertEqual(caught.exception.cleanup["status"], "removed")
+        self.assertNotIn("secret diagnostic", str(caught.exception))
+
+    def test_temporary_directory_stat_failure_requires_known_identity_to_cleanup(self):
+        original = Path.lstat
+        for fail_on, expected in ((1, "refused"), (2, "removed")):
+            with self.subTest(fail_on=fail_on):
+                created, recording = self.setup_directory_recorder()
+                calls = 0
+                def limited(path, *args, **kwargs):
+                    nonlocal calls
+                    if created and path == created[-1]:
+                        calls += 1
+                        if calls == fail_on:
+                            raise OSError("private diagnostic")
+                    return original(path, *args, **kwargs)
+                with recording, mock.patch.object(Path, "lstat", limited):
+                    with self.assertRaises(verification.VerificationError) as caught:
+                        verification._temporary_directory(self.project)
+                self.assertEqual(len(created), 1)
+                self.assertEqual(caught.exception.cleanup["status"], expected)
+                self.assertEqual(created[0].exists(), expected == "refused")
+                self.assertNotIn("private diagnostic", str(caught.exception))
+                if expected == "refused":
+                    self.assertIn(str(created[0]), str(caught.exception))
+
+    def test_temporary_directory_setup_failure_preserves_extra_files_and_replacements(self):
+        for mutation in ("extra", "replacement"):
+            with self.subTest(mutation=mutation):
+                created, recording = self.setup_directory_recorder()
+                def fail(fd, mode):
+                    path = created[-1]
+                    if mutation == "replacement":
+                        moved = path.with_name(path.name + "-moved")
+                        path.rename(moved)
+                        self.addCleanup(shutil.rmtree, moved)
+                        path.mkdir(mode=0o700)
+                    (path / "unrelated.txt").write_text("preserve me")
+                    raise PermissionError()
+                with recording, mock.patch.object(verification.os, "fchmod", side_effect=fail):
+                    with self.assertRaises(verification.VerificationError) as caught:
+                        verification._temporary_directory(self.project)
+                self.assertEqual(len(created), 1)
+                self.assertEqual(caught.exception.cleanup["status"], "refused")
+                self.assertEqual((created[0] / "unrelated.txt").read_text(), "preserve me")
+                self.assertIn(str(created[0]), str(caught.exception))
+
+    def test_temporary_directory_setup_failure_redacts_retained_location(self):
+        secret = "ghp_" + "F" * 30
+        with tempfile.TemporaryDirectory(prefix=secret + "-") as outside:
+            created, recording = self.setup_directory_recorder()
+            def fail(fd, mode):
+                (created[-1] / "unrelated").write_text("preserve")
+                raise PermissionError(secret)
+            with recording, mock.patch.object(verification.tempfile, "gettempdir", return_value=outside), \
+                    mock.patch.object(verification.os, "fchmod", side_effect=fail):
+                with self.assertRaises(verification.VerificationError) as caught:
+                    verification._temporary_directory(self.project)
+            self.assertEqual(caught.exception.cleanup["status"], "refused")
+            self.assertNotIn(secret, str(caught.exception))
+            self.assertNotIn(secret, json.dumps(caught.exception.cleanup))
+            self.assertIn("[redacted]", caught.exception.cleanup["leftover_path"])
 
 
 if __name__ == "__main__":

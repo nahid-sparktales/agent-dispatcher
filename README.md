@@ -164,8 +164,9 @@ win. Profiles do not switch the host's model, effort or permissions.
 
 Substantial work uses a compact context packet containing source excerpts, the selected role's
 instructions, and resource locations. Supplied guidance is consumed directly instead of read
-again from its file. Guides remain selective: repeatable `--guide ID` can include eligible guide
-bodies, while unselected resources remain candidates.
+again from its file. Repeatable `--guide ID` supplies eligible guide bodies. Compact packets keep
+up to three other guide candidates, prioritizing verification, and omit duplicate role metadata.
+Explicit guides resolve against the full eligible catalog even when absent from the shortlist.
 
 `--packet-tokens N` bounds the estimated size of the whole compact packet, including guidance,
 metadata, diagnostics, map facts, graph views and excerpts. This is not a measurement of the host's full
@@ -273,11 +274,13 @@ Low effort is a **saved request**, not proof the host changed its active setting
 never edits Claude or Codex model configuration. Default effort is `host` until changed.
 Activity `output compact|verbose` remains separate.
 
-The verification helper wraps authorized commands, records their outcomes and fingerprints
-workspace files. Inspecting the receipt after an edit marks earlier results stale. Failed
-checks, zero tests, unknown counts and checks not run remain distinct. It does not infer
-behavioral coverage, validate external services, or bypass permission denials. Receipts are
-explicit task-owned files outside the workspace, not a background observer. See the
+The verification helper wraps authorized commands and fingerprints workspace files. Default
+receipts are temporary: evidence is returned and owned files are removed with a cleanup result.
+Explicit retained receipts can be inspected after edits and removed with `show --cleanup`.
+Failed checks, zero tests, unknown counts and checks not run remain distinct. Optional preparation
+with `--audit` captures a task baseline before helper writes; finishing the audit reports actual
+file changes, including untracked/ignored caches, then cleans its state. Partial scans cannot
+prove preservation. No observer, behavioral-coverage claim or permission bypass is enabled. See the
 [verification guide](skills/agent-dispatcher/VERIFICATION.md) for commands and coverage limits.
 
 ### List what is usable and what needs setup

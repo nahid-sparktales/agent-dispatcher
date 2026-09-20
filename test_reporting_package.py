@@ -122,7 +122,7 @@ class ReportingPackageTests(unittest.TestCase):
         reports = []
         for layout, (helpers, _refs, _pack) in self.layouts.items():
             with self.subTest(layout=layout):
-                for name in ("preferences.py", "verification.py"):
+                for name in ("preferences.py", "verification.py", "change_audit.py"):
                     self.assertEqual((helpers / name).read_bytes(), (ROOT / name).read_bytes())
                 shown = self.invoke(layout, "preferences.py", "show", "--json")
                 self.assertEqual(shown["output"], "eli5-succinct")
@@ -206,6 +206,38 @@ class ReportingPackageTests(unittest.TestCase):
                                 "--receipt", receipts / "source.json", "--json")
             self.assertEqual(shown["observations"][-1]["freshness"], "stale")
         self.assertEqual(self.protected_state(), changed)
+
+    def test_temporary_receipts_and_task_audits_work_across_packages(self):
+        for layout in self.layouts:
+            with self.subTest(layout=layout):
+                result = self.invoke(layout, "verification.py", "run", "--project", self.project,
+                                     "--kind", "tests", "--json", "--", sys.executable,
+                                     "-B", "-m", "unittest", "discover")
+                self.assertEqual(result["observations"][-1]["outcome"], "tests_passed")
+                self.assertEqual(result["cleanup"]["status"], "removed")
+                self.assertTrue(result["cleanup"]["directory_removed"])
+                project = self.case / (layout + "-audit-project")
+                project.mkdir()
+                subprocess.run(["git", "init", "-q", str(project)], check=True, capture_output=True)
+                source = project / "auth.py"
+                source.write_text("def login_enabled():\n    return True\n")
+                (project / ".gitignore").write_text(".agent-dispatcher/\n")
+                packet = self.invoke(layout, "context.py", "--project", project, "--task",
+                                     "Inspect login_enabled and its dependencies", "--role", "implementer",
+                                     "--compact", "--map-maintain", "--audit", "--json")
+                state = Path(packet["change_audit"]["state"])
+                self.assertTrue(state.is_file())
+                source.write_text("def login_enabled():\n    return False\n")
+                (project / "untracked.txt").write_text("New task output\n")
+                audit = self.invoke(layout, "change_audit.py", "finish", "--project", project,
+                                    "--state", state, "--writable-path", "auth.py", "--json", expected=1)
+                self.assertTrue(audit["complete"])
+                self.assertEqual(audit["changes"]["modified"], ["auth.py"])
+                self.assertEqual(audit["out_of_scope"], [".agent-dispatcher/project-graph.json",
+                                                       ".agent-dispatcher/project-map.json", "untracked.txt"])
+                self.assertEqual(audit["scope_status"], "out_of_scope")
+                self.assertEqual(audit["cleanup"]["status"], "removed")
+                self.assertFalse(state.parent.exists())
 
     def test_host_commands_links_and_single_codex_skill(self):
         for layout, (_helpers, refs, pack) in self.layouts.items():

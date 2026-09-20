@@ -177,7 +177,7 @@ def _validate_observation(entry, snapshots):
             raise ValueError()
 
 
-def _read_receipt(path, project, *, missing=False):
+def _read_receipt(path, project, *, missing=False, _identity=None):
     if not path.exists():
         if missing:
             return {"format_version": FORMAT_VERSION, "owner": OWNER, "owner_uid": os.getuid(),
@@ -207,12 +207,14 @@ def _read_receipt(path, project, *, missing=False):
                 raise ValueError()
         for entry in receipt["observations"]:
             _validate_observation(entry, receipt["snapshots"])
+        if _identity is not None:
+            _identity.update(identity=(info.st_dev, info.st_ino), sha256=_digest(raw))
         return receipt, _digest(raw)
     except (OSError, ValueError, TypeError, KeyError, RecursionError):
         raise VerificationError("Receipt is malformed, belongs to another project, or is not an owned Dispatcher receipt; it was not overwritten.") from None
 
 
-def _write_receipt(path, receipt, expected, project):
+def _write_receipt(path, receipt, expected, project, *, _owned_state=None):
     raw = json.dumps(receipt, sort_keys=True, indent=2).encode("utf-8") + b"\n"
     if len(raw) > MAX_RECEIPT_BYTES:
         raise VerificationError("Receipt reached its size limit; use a fresh explicitly authorized receipt path.")
@@ -222,12 +224,20 @@ def _write_receipt(path, receipt, expected, project):
     fd, temp_name = tempfile.mkstemp(prefix=".dispatcher-receipt-", dir=path.parent)
     try:
         with os.fdopen(fd, "wb") as handle:
+            os.fchmod(handle.fileno(), 0o600)
             handle.write(raw)
             handle.flush()
             os.fsync(handle.fileno())
-        # The parent is an explicitly chosen owned directory. Recheck the destination
-        # before replacement; no arbitrary existing file can be adopted as a receipt.
-        if path.exists():
+            info = os.fstat(handle.fileno())
+        if _owned_state is not None:
+            # Pin the file we created, not whatever may appear at the path later.
+            _owned_state.update(identity=(info.st_dev, info.st_ino), sha256=_digest(raw))
+        # Fresh destinations remain exclusive even if another writer creates an
+        # entry while we prepare the temporary file. Existing receipts must still
+        # match the content read before execution immediately before replacement.
+        if expected is not None:
+            if _existing_digest(path) != expected:
+                raise VerificationError("Receipt changed during the check; no replacement was performed.")
             info = path.lstat()
             if not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid() or info.st_nlink != 1:
                 raise VerificationError("Receipt destination changed; no replacement was performed.")
@@ -254,6 +264,153 @@ def _existing_digest(path):
             return _digest(handle.read(MAX_RECEIPT_BYTES + 1))
     except (OSError, ValueError):
         raise VerificationError("Receipt changed or could not be read safely.") from None
+
+
+def _temporary_directory(project):
+    """Create a private directory outside both the project and its parent."""
+    candidates = dict.fromkeys((tempfile.gettempdir(), "/tmp", "/var/tmp"))
+    for candidate in candidates:
+        try:
+            parent = Path(candidate).resolve(strict=True)
+            if not parent.is_dir() or parent.is_relative_to(project.parent):
+                continue
+            path = Path(tempfile.mkdtemp(prefix="agent-dispatcher-verification-", dir=parent))
+        except OSError:
+            continue
+        # Once creation succeeds, this path must be accounted for even if its
+        # setup fails. Pin its identity before changing permissions; operate on
+        # the descriptor so a replacement cannot redirect that change.
+        identity, fd = None, None
+        try:
+            info = path.lstat()
+            if not stat.S_ISDIR(info.st_mode) or info.st_uid != os.getuid():
+                raise ValueError()
+            identity = (info.st_dev, info.st_ino)
+            if stat.S_IMODE(info.st_mode) & 0o077:
+                raise ValueError()
+            fd = os.open(path, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0))
+            opened = os.fstat(fd)
+            if (opened.st_dev, opened.st_ino) != identity:
+                raise ValueError()
+            os.fchmod(fd, 0o700)
+            current = path.lstat()
+            if ((current.st_dev, current.st_ino) != identity or not stat.S_ISDIR(current.st_mode)
+                    or current.st_uid != os.getuid() or stat.S_IMODE(current.st_mode) != 0o700):
+                raise ValueError()
+            return path, identity
+        except BaseException as cause:
+            try:
+                _, scrub = _runtime()
+            except (VerificationError, OSError):
+                scrub = lambda value: "[temporary location withheld: redaction unavailable]"
+            cleaned = _cleanup_owned_file(path / "receipt.json", None, directory_identity=identity,
+                                          remove_directory=True, scrub=scrub)
+            if isinstance(cause, (KeyboardInterrupt, SystemExit)):
+                cause.cleanup = cleaned
+                raise
+            message = "Temporary directory setup failed; the check was not started."
+            if cleaned["status"] == "removed":
+                message += " The owned temporary directory was removed and absence verified."
+            else:
+                message += " Cleanup refused; retained state: " + cleaned["leftover_path"]
+            error = VerificationError(message)
+            error.cleanup = cleaned
+            raise error from None
+        finally:
+            if fd is not None:
+                os.close(fd)
+    raise VerificationError("No safe temporary directory is available outside the project and its parent; the check was not started.")
+
+
+def _receipt_fingerprint(path, dir_fd=None):
+    """Fingerprint an owned regular file without following the final symlink."""
+    flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0)
+    fd = os.open(path, flags, dir_fd=dir_fd)
+    with os.fdopen(fd, "rb") as handle:
+        info = os.fstat(handle.fileno())
+        if (not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid()
+                or info.st_nlink != 1 or info.st_size > MAX_RECEIPT_BYTES):
+            raise VerificationError("Owned temporary evidence changed; cleanup was refused.")
+        raw = handle.read(MAX_RECEIPT_BYTES + 1)
+        if len(raw) > MAX_RECEIPT_BYTES:
+            raise VerificationError("Owned temporary evidence exceeded its limit; cleanup was refused.")
+        return {"identity": (info.st_dev, info.st_ino), "sha256": _digest(raw)}
+
+
+def _cleanup_owned_file(path, expected, *, directory_identity=None, remove_directory=False, scrub=lambda value: value):
+    """Remove only the pinned unchanged file; never adopt entries or sweep a parent.
+
+    The caller must validate the file's schema and project before calling this.
+    A directory may be removed only when its original identity is supplied and it
+    is private and contains no other entries. Descriptor-relative operations keep
+    an ancestor replacement from redirecting receipt deletion.
+    """
+    path = Path(path)
+    result = {"status": "refused", "receipt_removed": False, "directory_removed": False}
+    fd = None
+    try:
+        for parent in (path.parent, *path.parent.parents):
+            if parent.is_symlink():
+                raise ValueError()
+        flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0)
+        fd = os.open(path.parent, flags)
+        directory = os.fstat(fd)
+        identity = (directory.st_dev, directory.st_ino)
+        if (not stat.S_ISDIR(directory.st_mode) or directory.st_uid != os.getuid()
+                or directory_identity is not None and identity != tuple(directory_identity)
+                or remove_directory and (directory_identity is None or stat.S_IMODE(directory.st_mode) != 0o700)):
+            raise ValueError()
+
+        def check_directory():
+            if any(parent.is_symlink() for parent in (path.parent, *path.parent.parents)):
+                raise ValueError()
+            current = path.parent.lstat()
+            if (not stat.S_ISDIR(current.st_mode) or (current.st_dev, current.st_ino) != identity
+                    or current.st_uid != os.getuid()
+                    or remove_directory and (stat.S_IMODE(current.st_mode) != 0o700
+                                             or set(os.listdir(fd)) - {path.name})):
+                raise ValueError()
+
+        check_directory()
+        try:
+            entry = os.stat(path.name, dir_fd=fd, follow_symlinks=False)
+        except FileNotFoundError:
+            entry = None
+        if entry is not None:
+            actual = _receipt_fingerprint(path.name, dir_fd=fd)
+            if (not isinstance(expected, dict) or not expected or actual["identity"] != tuple(expected.get("identity", ()))
+                    or actual["sha256"] != expected.get("sha256")
+                    or (entry.st_dev, entry.st_ino) != actual["identity"]):
+                raise ValueError()
+            check_directory()
+            latest = os.stat(path.name, dir_fd=fd, follow_symlinks=False)
+            attributes = ("st_dev", "st_ino", "st_uid", "st_mode", "st_nlink", "st_size", "st_mtime_ns", "st_ctime_ns")
+            if any(getattr(latest, key) != getattr(entry, key) for key in attributes) or not stat.S_ISREG(latest.st_mode):
+                raise ValueError()
+            os.unlink(path.name, dir_fd=fd)
+        try:
+            os.stat(path.name, dir_fd=fd, follow_symlinks=False)
+        except FileNotFoundError:
+            result["receipt_removed"] = True
+        else:
+            raise ValueError()
+        check_directory()
+        if os.path.lexists(path):
+            raise ValueError()
+        if remove_directory:
+            os.rmdir(path.parent)
+            if os.path.lexists(path.parent):
+                raise ValueError()
+            result["directory_removed"] = True
+        result["status"] = "removed"
+        return result
+    except (OSError, ValueError, VerificationError, TypeError):
+        result["reason"] = "Cleanup refused because owned evidence or its directory changed, contained other entries, or could not be removed safely."
+        result["leftover_path"] = _safe_text(str(path.parent if remove_directory else path), scrub, 4096)
+        return result
+    finally:
+        if fd is not None:
+            os.close(fd)
 
 
 def _snapshot(project, runtime):
@@ -570,7 +727,7 @@ def _inspection(receipt, current, scrub):
                             "Receipts are editable local records, not tamper-proof attestations."]}
 
 
-def run_check(project, receipt, command, *, kind="tests", label="", timeout=120, pack=None, stdin_data=None):
+def run_check(project, receipt, command, *, kind="tests", label="", timeout=120, pack=None, stdin_data=None, _owned_state=None):
     """Run one explicitly authorized argv and append its observed result to a receipt."""
     runtime, scrub = _runtime(pack)
     project = _project(project)
@@ -600,16 +757,48 @@ def run_check(project, receipt, command, *, kind="tests", label="", timeout=120,
                                    "execution": execution, "before_complete": before["complete"],
                                    "changed_during_check": _difference(before, after), "snapshot": snapshot_id,
                                    "recorded_at_unix": int(time.time())})
-    _write_receipt(path, record, expected, project)
+    _write_receipt(path, record, expected, project, _owned_state=_owned_state)
     return _inspection(record, after, scrub)
 
 
-def inspect_receipt(project, receipt, *, pack=None):
-    """Read a receipt and compare it to today's bounded local source inventory."""
+def run_temporary_check(project, command, *, kind="tests", label="", timeout=120, pack=None, stdin_data=None):
+    """Run with a private short-lived receipt and return evidence after cleanup."""
+    _, scrub = _runtime(pack)
+    project = _project(project)
+    directory, identity = _temporary_directory(project)
+    path = directory / "receipt.json"
+    owned = {}
+    failure = None
+    try:
+        result = run_check(project, path, command, kind=kind, label=label, timeout=timeout, pack=pack,
+                           stdin_data=stdin_data, _owned_state=owned)
+    except BaseException as error:
+        failure = error
+    finally:
+        cleanup = _cleanup_owned_file(path, owned, directory_identity=identity, remove_directory=True, scrub=scrub)
+    if failure is not None:
+        if not isinstance(failure, (VerificationError, KeyboardInterrupt, SystemExit)):
+            failure = VerificationError("Verification could not finish; local input, execution or receipt I/O failed.")
+        failure.cleanup = cleanup
+        raise failure from None
+    result["cleanup"] = cleanup
+    return result
+
+
+def inspect_receipt(project, receipt, *, pack=None, cleanup=False):
+    """Inspect current evidence; optionally delete only this unchanged receipt."""
+    if type(cleanup) is not bool:
+        raise VerificationError("Cleanup must be a boolean.")
     runtime, scrub = _runtime(pack)
     project = _project(project)
-    record, _ = _read_receipt(_receipt_path(project, receipt), project)
-    return _inspection(record, _snapshot(project, runtime), scrub)
+    path = _receipt_path(project, receipt)
+    owned = {}
+    directory = path.parent.lstat()
+    record, _ = _read_receipt(path, project, _identity=owned)
+    result = _inspection(record, _snapshot(project, runtime), scrub)
+    if cleanup:
+        result["cleanup"] = _cleanup_owned_file(path, owned, directory_identity=(directory.st_dev, directory.st_ino), scrub=scrub)
+    return result
 
 
 def record_unrun(project, receipt, *, status, reason, label="", pack=None):
@@ -656,6 +845,12 @@ def render(result):
         lines.append(f"- {label}: {text}.")
     if len(entries) > 4:
         lines.append(f"{len(entries) - 4} earlier checks are in JSON output.")
+    cleanup = result.get("cleanup")
+    if cleanup:
+        if cleanup["status"] == "removed":
+            lines.append("Temporary receipt and its private directory removed." if cleanup["directory_removed"] else "Requested receipt removed; its parent directory was kept.")
+        else:
+            lines.append("Cleanup refused; retained evidence needs attention: " + cleanup["leftover_path"])
     lines.append("This checks only the recorded commands and visible local files. Browser, production, ignored files and outside changes are not verified.")
     return "\n".join(lines)
 
@@ -692,7 +887,7 @@ def main(argv=None):
     for name in ("run", "show", "note"):
         command = sub.add_parser(name)
         command.add_argument("--project", required=True)
-        command.add_argument("--receipt", required=True)
+        command.add_argument("--receipt", required=name != "run", help="Explicit persistent receipt path; run defaults to a private temporary receipt that is cleaned up.")
         command.add_argument("--json", action="store_true")
         command.add_argument("--pack")
         if name != "show":
@@ -705,26 +900,34 @@ def main(argv=None):
         if name == "note":
             command.add_argument("--status", choices=("not_run", "denied"), required=True)
             command.add_argument("--reason", required=True)
+        if name == "show":
+            command.add_argument("--cleanup", action="store_true", help="After inspection, remove only the unchanged owned receipt; keep its parent directory.")
     args = parser.parse_args(argv)
     try:
         if args.action == "run":
             command = args.command[1:] if args.command[:1] == ["--"] else args.command
-            result = run_check(args.project, args.receipt, command, kind=args.kind, label=args.label, timeout=args.timeout, pack=args.pack,
-                               stdin_data=_read_stdin() if args.stdin else None)
+            runner = run_check if args.receipt else run_temporary_check
+            arguments = (args.project, args.receipt, command) if args.receipt else (args.project, command)
+            result = runner(*arguments, kind=args.kind, label=args.label, timeout=args.timeout, pack=args.pack,
+                            stdin_data=_read_stdin() if args.stdin else None)
         elif args.action == "show":
-            result = inspect_receipt(args.project, args.receipt, pack=args.pack)
+            result = inspect_receipt(args.project, args.receipt, pack=args.pack, cleanup=args.cleanup)
         else:
             result = record_unrun(args.project, args.receipt, status=args.status, reason=args.reason, label=args.label, pack=args.pack)
         print(json.dumps(result, indent=2, sort_keys=True) if args.json else render(result))
+        if result.get("cleanup", {}).get("status") == "refused":
+            return 2
         if args.action == "run" and result["observations"][-1]["outcome"] in {"tests_failed", "command_failed", "timeout", "denied", "launch_failed", "zero_tests"}:
             return 1
         return 0
-    except (VerificationError, OSError):
+    except (VerificationError, OSError, KeyboardInterrupt):
         # Generic OSError handling avoids printing credential-shaped arguments or
         # subprocess exception reprs. Deliberately authored errors are safe text.
         error = sys.exc_info()[1]
         print(str(error) if isinstance(error, VerificationError) else "Verification could not finish; local input or receipt I/O failed.", file=sys.stderr)
-        return 2
+        if hasattr(error, "cleanup"):
+            print(json.dumps({"cleanup": error.cleanup}, sort_keys=True), file=sys.stderr)
+        return 130 if isinstance(error, KeyboardInterrupt) else 2
 
 
 if __name__ == "__main__":

@@ -637,7 +637,7 @@ def inspect(pack=None, project=None, host=None, config_dir=None, role=None, evid
     required += [ref_base / "roles" / (name + ".md") for name in roles]
     required += [pack / "scripts" / name if ref_base != pack else pack / name
                  for name in ("doctor.py", "context.py", "context_packet.py", "context_reuse.py", "project_map.py", "project_graph.py",
-                              "resources.py", "verification.py", "preferences.py")]
+                              "resources.py", "verification.py", "preferences.py", "change_audit.py")]
     runtime = catalog.parent if catalog else (pack / "scripts/runtime" if ref_base != pack else pack)
     required += [runtime / "catalog/loadouts.json", runtime / "catalog/resource-paths.json", runtime / "decision/redact.py"]
     missing_files = [path for path in required if not safe_file(path)]
