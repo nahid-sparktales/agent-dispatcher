@@ -105,3 +105,36 @@ def fixture_after_warmup(fixture, initial_dir):
         if check["kind"] == "unchanged":
             check["paths"] = list(dict.fromkeys([*check["paths"], *INDEX_PATHS]))
     return result
+
+
+def grade_warm_fixture(fixture, initial_dir, final_dir, final_answer):
+    """Keep private evaluators' relative source lookups on the warm baseline.
+
+    Evaluators are copied verbatim into an owned temporary fixture, with the
+    captured initial files as its source tree. No assertions or task edits change.
+    """
+    import tempfile
+    from .grading import grade
+    source = Path(fixture["source_dir"])
+    fixture_root = source.parent
+    original = rt.tree_files(source, {"__pycache__"})
+    initial = rt.tree_files(initial_dir, {"__pycache__"})
+    if any(original.get(path) != initial.get(path)
+           for path in set(original) | set(initial) if path not in INDEX_PATHS):
+        raise ValueError("Warm grading baseline changed original source files outside the project indexes.")
+    with tempfile.TemporaryDirectory(prefix="dispatcher-warm-grade-") as temporary:
+        staged = Path(temporary).resolve() / "fixture"
+        private = {path: data for path, data in rt.tree_files(fixture_root, {"__pycache__"}).items()
+                   if not path.startswith(source.name + "/")}
+        rt.copy_files(private, staged)
+        rt.copy_files(initial, staged / source.name)
+        adjusted = fixture_after_warmup(fixture, staged / source.name)
+        for check in adjusted["checks"]:
+            if check["kind"] != "python":
+                continue
+            original_script = Path(check["script"])
+            copied_script = staged / original_script.relative_to(fixture_root)
+            if original_script.read_bytes() != copied_script.read_bytes():
+                raise ValueError("Private evaluator bytes changed during warm grading setup.")
+            check["script"] = str(copied_script)
+        return grade(adjusted, final_dir, final_answer)

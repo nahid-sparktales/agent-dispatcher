@@ -360,9 +360,8 @@ def run_trial(config, batch, row, fixture):
     result["activity"] = activity.empty()
     try:
         with workspace_for(config, client, condition, fixture) as (workspace, skill):
-            graded_fixture = fixture
             if config.get("warm_project_index", False):
-                from evals.end_to_end.warmup import warm_project_indexes, fixture_after_warmup
+                from evals.end_to_end.warmup import warm_project_indexes
                 result["index_setup"] = warm_project_indexes(config, client, workspace)
                 rt.write_json(artifacts / "index-setup.json", result["index_setup"])
                 if not result["index_setup"]["ok"]:
@@ -372,7 +371,6 @@ def run_trial(config, batch, row, fixture):
             if config.get("warm_project_index", False):
                 validate_final_artifacts(initial, {})
                 rt.copy_files(initial, artifacts / "initial")
-                graded_fixture = fixture_after_warmup(fixture, artifacts / "initial")
             result["starting_files_digest"] = rt.digest_files(initial)
             check = adapters.doctor(client, spec, workspace, skill)
             result["cli_version"] = check.get("version")
@@ -431,7 +429,12 @@ def run_trial(config, batch, row, fixture):
                 elif execution["output_overflow"] or execution.get("cleanup_warning") or execution["returncode"] != 0 or parsed["status"] != "completed":
                     result["status"] = "infrastructure_error"
                 else:
-                    result["auto_grade"] = grade(graded_fixture, artifacts / "final", result["final_answer"])
+                    if config.get("warm_project_index", False):
+                        from evals.end_to_end.warmup import grade_warm_fixture
+                        result["auto_grade"] = grade_warm_fixture(
+                            fixture, artifacts / "initial", artifacts / "final", result["final_answer"])
+                    else:
+                        result["auto_grade"] = grade(fixture, artifacts / "final", result["final_answer"])
                     passed = result["auto_grade"]["passed"]
                     if condition == "dispatcher" and not result["treatment_invoked"]:
                         passed = False
