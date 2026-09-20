@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Offline end-to-end harness tests; no model or authenticated service is invoked."""
 import json
+import copy
 import os
 from pathlib import Path
 import signal
@@ -116,6 +117,35 @@ class SchedulingTests(unittest.TestCase):
         self.assertEqual(len(runner.schedule(self.fixtures, "smoke", 4)), 8)
         self.assertEqual(len(runner.schedule(self.fixtures, "pilot", 4)), 120)
 
+    def test_single_client_counts_and_conditions(self):
+        for client in runner.CLIENTS:
+            with self.subTest(client=client):
+                smoke = runner.schedule(self.fixtures, "smoke", 4, clients=[client])
+                pilot = runner.schedule(self.fixtures, "pilot", 4, clients=[client])
+                self.assertEqual(len(smoke), 4)
+                self.assertEqual(len(pilot), 60)
+                self.assertEqual({row['client'] for row in smoke + pilot}, {client})
+                for first, second in zip(pilot[::2], pilot[1::2]):
+                    self.assertEqual(first['fixture_id'], second['fixture_id'])
+                    self.assertEqual(first['repetition'], second['repetition'])
+                    self.assertEqual({first['condition'], second['condition']}, set(runner.CONDITIONS))
+
+    def test_client_selection_rejects_empty_duplicate_unknown_and_scalar_inputs(self):
+        for clients in ([], {}, ['claude', 'claude'], ['unknown'], 'claude', None):
+            with self.subTest(clients=clients), self.assertRaises(ValueError):
+                runner.selected_clients(clients)
+        self.assertEqual(runner.selected_clients(['claude', 'codex']), runner.CLIENTS)
+
+    def test_single_client_smoke_readiness_rejects_partial_or_wrong_client_evidence(self):
+        batch = {'config': {'clients': {'claude': {}}}, 'schedule': [None] * 4}
+        trial = {'client': 'claude', 'startup_valid': True, 'usage_observed': True,
+                 'status': 'completed', 'condition': 'dispatcher', 'treatment_invoked': True}
+        results = {'trials': [dict(trial) for _ in range(4)]}
+        self.assertTrue(runner.smoke_ready(batch, results))
+        self.assertFalse(runner.smoke_ready(batch, {'trials': results['trials'][:3]}))
+        results['trials'][0]['client'] = 'codex'
+        self.assertFalse(runner.smoke_ready(batch, results))
+
     def test_current_suite_keeps_two_smoke_tasks_and_pairs_every_pilot_task(self):
         from evals.end_to_end.grading import load_suite
         fixtures = load_suite()
@@ -150,6 +180,23 @@ class SchedulingTests(unittest.TestCase):
         runner.validate_config(config)
         with self.assertRaisesRegex(ValueError, "explicit model"):
             runner.validate_config(config, live=True)
+
+    def test_single_client_config_and_fingerprint_preserve_selected_scope(self):
+        spec = {'auth': 'subscription', 'executable': 'claude', 'model': 'fixed-model',
+                'effort': 'medium', 'profile_dir': '/tmp/eval-claude-only'}
+        config = {'schema_version': 1, 'seed': 1, 'timeout_seconds': 600,
+                  'clients': {'claude': spec}}
+        runner.validate_config(config, live=True)
+        both = copy.deepcopy(config)
+        both['clients']['codex'] = {**spec, 'executable': 'codex', 'profile_dir': '/tmp/eval-codex-other'}
+        runner.validate_config(both, live=True)
+        self.assertNotEqual(runner.fingerprint(config), runner.fingerprint(both))
+        both['clients']['codex']['profile_dir'] = spec['profile_dir'] + '/nested'
+        with self.assertRaisesRegex(ValueError, 'separate evaluation profiles'):
+            runner.validate_config(both, live=True)
+        for clients in ({}, {'unknown': spec}, []):
+            with self.subTest(clients=clients), self.assertRaises(ValueError):
+                runner.validate_config({**config, 'clients': clients})
 
     def test_paired_catalog_drift_invalidates_both_sides(self):
         base = {"client": "claude", "fixture_id": "edit", "repetition": 1,

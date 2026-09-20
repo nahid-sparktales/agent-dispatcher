@@ -381,7 +381,7 @@
     {
       "id": "auth_config_boundary",
       "category": "context_retrieval",
-      "prompt": "Unauthenticated /profile still succeeds when APP_ALLOW_GUEST=false. Trace the live\nrequest/settings/auth flow and fix the settings parser to meet CONTRACT.md, including\nits false/true aliases, missing default, and invalid-value behavior. Preserve router\nand identity behavior. The archive and generated snapshot are distractors, not runtime\nentrypoints. Modify only the live settings parser and add tests/test_auth_config.py; leave\nall existing tests, configuration, documentation, and other code unchanged. Add focused\nregression tests, run the local tests if possible, and report only actual verification.",
+      "prompt": "Unauthenticated /profile still succeeds when APP_ALLOW_GUEST=false. Fix the live\nbehavior to meet CONTRACT.md, including its false/true aliases, missing default,\nand invalid-value behavior. Preserve router and identity behavior. The archive and\ngenerated snapshot are distractors, not runtime entrypoints. Modify only the live\nconfiguration-loading code and add tests/test_auth_config.py; leave all existing\ntests, configuration, documentation, and other code unchanged. Add focused regression\ntests, run the local tests if possible, and report only actual verification.",
       "source_dir": "auth_config_boundary/source",
       "timeout_seconds": 600,
       "smoke": false,
@@ -479,13 +479,13 @@
     {
       "id": "architecture_evidence",
       "category": "architecture_discovery",
-      "prompt": "Inspect this small project and replace architecture.json with the source-backed\nreport specified in REPORT_CONTRACT.md. Establish the live public entrypoint, both\n/tasks features, the four direct route-to-service-to-store calls, declared project\ndependencies, the Makefile test command, and the accepted storage decision. Follow\ncurrent imports and callsites rather than the retired prototype or future proposal.\nInclude exact supporting path/line/quote/SHA-256 citations. This is documentation\nonly: preserve every other file, use no network, and do not install dependencies.\nSummarize your findings without claiming execution you did not perform.",
+      "prompt": "Inspect this small project and replace architecture.json with the source-backed\nreport specified in REPORT_CONTRACT.md. Establish the live public entrypoint, the\nsupported /tasks features, their direct route-to-service-to-store calls, declared\nproject dependencies, the Makefile test command, and the accepted storage decision.\nFollow current imports and callsites rather than the retired prototype or future\nproposal. Include exact supporting path/line/quote/SHA-256 citations. This is\ndocumentation only: preserve every other file, use no network, and do not install\ndependencies. Summarize your findings without claiming execution you did not perform.",
       "source_dir": "architecture_evidence/source",
       "timeout_seconds": 600,
       "smoke": false,
       "human_required": false,
       "acceptance": [
-        "The report maps the current entrypoint, supported route branches, and exactly the four live service/store call edges.",
+        "The report maps the current entrypoint, supported route branches, and exactly the live service/store call edges; unused implementations are excluded.",
         "Declared dependency and test-command facts distinguish configuration from assumed usage; the storage decision comes from the accepted ADR, not the proposal.",
         "Every fact has an exact current supporting citation; only the report scaffold changes."
       ],
@@ -513,6 +513,7 @@
             "docs/proposals/sqlite.md",
             "flowdesk/__init__.py",
             "flowdesk/api.py",
+            "flowdesk/batch_service.py",
             "flowdesk/service.py",
             "flowdesk/storage.py",
             "prototype/sqlite_api.py",

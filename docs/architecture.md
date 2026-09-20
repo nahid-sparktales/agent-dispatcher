@@ -128,7 +128,7 @@ lives in the sidecar `manifest.json`.
 
 An install puts the whole pack under one directory — `skills/agent-dispatcher/`, with skill
 categories under its `lib/`. The pack never claims a top-level name like `security` or `design` in
-someone's skills directory, and a local skill id is resolved by globbing `**/skills/*/<id>/SKILL.md`
+someone's skills directory, and a local skill id is resolved through the generated resource-path manifest
 rather than by reading the index, which exists for external ids and glob misses.
 
 ## Precedence

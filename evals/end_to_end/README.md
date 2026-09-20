@@ -30,8 +30,21 @@ copies the fixture suite, and writes `dist/evals/local/config.json`. It does not
 rebuild tracked files, change installed skills/hooks, or call a model. The output
 directory must be new. `dist/` is already ignored by Git.
 
+To evaluate only one client, select it during preparation:
+
+```sh
+python3 evals/end_to_end/run.py prepare --output dist/evals/claude-only --clients claude --claude-model MODEL_ID --claude-effort EFFORT
+```
+
+Replace `MODEL_ID` and `EFFORT` with explicit values supported by that client. The default
+is `--clients codex claude`; `--clients codex` is also supported. Selection is stored in
+the configuration's `clients` mapping. Only selected packages and dedicated profiles are
+created, and doctor/run inspect or launch only those clients. A Claude-only experiment
+does not need Codex installed or authenticated. Keep the selection fixed during a run;
+changing it invalidates prior smoke evidence along with other configuration changes.
+
 Edit the generated configuration to set **explicit model identifiers and effort
-settings** for both clients. Keep each fixed throughout an experiment. Set each
+settings** for each selected client. Keep each fixed throughout an experiment. Set each
 client's `auth` to `subscription` or `api`; mixed authentication modes across
 clients are supported, but a client uses the same mode in both conditions.
 `prepare` also accepts `--codex-model`, `--codex-effort`, `--codex-auth` and the
@@ -99,6 +112,10 @@ event capture using the same configuration and CLI versions. A fixture failure
 can be a legitimate smoke result; missing dispatcher invocation cannot establish
 a working treatment setup. Smoke outcomes are not pooled with pilot results.
 
+With one selected client, smoke performs **4 runs** and pilot performs **60 runs**.
+Both stock and dispatcher conditions remain paired; only the unused client's runs
+are omitted. Reports contain the selected clients and keep their outcomes separate.
+
 Runs are sequential. Each task/repetition pair gets a seeded random condition
 order, a fresh session, and a fresh Git working directory outside this repository.
 The fixture files and user request are identical except for the treatment prefix.
@@ -106,7 +123,15 @@ Subprocess time and output are bounded; timeout/cancellation terminates its proc
 group. There are no automatic retries. Setup/auth/runtime errors stop the batch;
 already attempted trials remain visible, and remaining trials are not run.
 
-A scored treatment run that ignores the skill counts as a compliance failure.
+A scored treatment run without observed dispatcher invocation counts as a
+compliance failure. Evidence includes successful skill/role access or native
+skill expansion. For Claude, an `isReplay: true` user event containing the entire
+exact `/agent-dispatcher` command envelope also establishes invocation: the
+client injects the expanded skill body internally and omits that body from
+replay output. Raw slash requests, unmarked envelopes, assistant claims, and
+quoted or partial envelopes do not establish invocation. Trivial tasks may
+legitimately finish without a subsequent role read.
+
 Paired starting-file hashes, CLI versions and available native startup catalogs
 are compared. Unexpected differences invalidate both sides rather than giving
 one side an unfair advantage.
@@ -126,6 +151,38 @@ results as private project data. Authentication profiles are never in these
 artifacts. The runner creates no external reports or uploads.
 
 ## Blind human review
+
+### Review in a local web app
+
+For a guided review, open a completed batch in Review room:
+
+```sh
+python3 -m evals.end_to_end.review_app --batch dist/evals/local/batches/BATCH_ID
+```
+
+Open the local address printed by the command (normally `http://127.0.0.1:8765`).
+The app shows the responses needing human review, grouped by task, with a checklist,
+readable answer, saved files, and recorded checks. Five plain-language questions use
+**Yes**, **No**, or **Not sure**, with no preselected answers. Missing command evidence
+is described as unavailable, not as a failed test. Model-generated content is rendered
+as inert text; routing announcements are hidden for display without changing evidence.
+
+Choices and optional notes save automatically in the batch's `review-ui-state.json`.
+You can leave and resume later. **Apply reviews** updates `review-ratings.json` and
+regenerates the evaluation report; partial or uncertain reviews stay pending. Changing
+an applied review to **Not sure** and applying again returns it to pending. **Download
+ratings** exports compatible JSON. Positive answers to the two negatively named rating
+fields below are converted automatically. The comparison is revealed only after every
+required review is complete and applied.
+
+The server runs only on this computer and uses Python's standard library; it makes no
+model calls or uploads. Stop it with Ctrl+C and rerun the same command to resume. Use
+`--port NUMBER` if the default port is occupied. Existing packet mappings and evidence
+digests are validated before saving; stale tabs or changed source evidence cannot
+silently overwrite reviews. For optional review of automatically graded tasks, use the
+packet export workflow below.
+
+### Packet export and rating format
 
 Automated checks run against a disposable copy of the final files after the agent
 exits. Private evaluators and reference answers are not put in the task workspace.
@@ -167,6 +224,49 @@ the combined task outcome. They never pool clients or select the best repetition
 timeouts, task failures, unattempted schedule entries and pending reviews have
 distinct counts. Unknown usage/cost is unavailable, never zero. Monetary fields
 are provider-reported estimates where available, not subscription invoices.
+
+## Helper coverage and task scope
+
+New batches save private, versioned `activity.json` per trial. Native tool call/results
+establish helper attempts and outcomes, map enrichment, successful role/guide reads, returned
+character counts, repeated reads, failed paths and denials. Paths must resolve into the staged
+package; echoed commands and unrelated same-name scripts do not prove use. Missing or partial
+traces remain unknown. Character counts estimate visible instruction loading, not the host's
+full context window or exact model tokens. Route agreement across repetitions is diagnostic,
+not a correctness score. Helper, routing and loading measurements stay outside anonymous
+review packets. Literal working-directory prefixes and task-text pipelines are recognized;
+ambiguous shell forms remain unknown. Retrospective attribution belongs in separate analysis
+artifacts with trace, frozen-package and parser fingerprints, never rewritten trial results.
+
+Private preparation measurements compare matched helper completion with native workspace actions,
+including listings, searches, task-contract reads and writes. Role and detailed guide reads before
+preparation are counted separately. Mandatory project instructions and package entrypoint discovery
+are exempt. First-attempt timing and outcome distinguish an early failed attempt from skipped
+preparation. Interleaved investigation before helper completion is late; unsupported or incomplete
+prefixes cannot establish clean ordering. Unknown events after established preparation do not erase
+that earlier evidence. Exclusion measurements use validated policy metadata returned by the helper,
+not assistant claims. Both measurements cover eligible tasks and remain separate from task quality
+and blinded human review.
+
+A bounded audit captures the harness-owned directory surrounding `project/` before cleanup,
+including failure and timeout paths. It records relative paths, types and sizes without following
+symlinks or collecting arbitrary outside contents. A leftover outside project scope fails the
+scope outcome even if artifact checks pass. Incomplete auditing cannot establish clean scope.
+Recorded writes that were subsequently removed are distinguished from remaining files. Neutral
+scope evidence appears in new review packets and the review interface; helper identity and
+condition remain private. Successful writes beyond the audited directory are flagged for
+inspection with unknown remaining state, without automatically changing task grades. Captured
+residue is shown separately, with bounded relative paths, types and sizes. Cleanup claims alone
+do not prove removal, and a clean owned-directory audit does not resolve outside writes.
+The audit does not inspect personal profiles or establish whole-machine confinement.
+
+For a focused follow-up, copy `greeting`, `merge_intervals`, `auth_config_boundary`,
+`stale_project_map`, and `architecture_evidence` into a new temporary suite directory with a
+filtered `manifest.json`. Keep its two smoke flags. Prepare that directory with `--fixtures`
+and `--clients claude`: it produces four smoke trials followed by twenty pilot trials. Freeze
+model, effort, fixtures and package first; retain all results, including missed helper-use
+acceptance criteria. Do not alter old evidence or ratings. A helper invocation proves coverage,
+not a causal improvement in task quality.
 
 ## Extend and verify
 

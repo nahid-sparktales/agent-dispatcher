@@ -109,7 +109,7 @@ subagent handoff.
 
 ## 0 · The decision engine
 
-Three steps below are **bounded choices**: one role out of 27, one to five skills out of a
+Three steps below are **bounded choices**: one role out of 27, a few relevant skills out of a
 declared loadout, a few relevant servers out of 19. A decision engine answers those, and there
 are two of them.
 
@@ -154,35 +154,36 @@ Ask for a **capability**, then see which installed skill provides it. Never the 
 selected because it is installed is the failure this layer exists to prevent.
 
 ```text
-task  →  capabilities needed  →  the role's loadout  →  1–5 skills
+task  →  capabilities needed  →  the role's loadout  →  only the guides needed next
 ```
 
 The role's frontmatter is the candidate set, already narrowed by whoever wrote the role:
 
-- **`skills_core`** — load before starting. These are the role's method.
+- **`skills_core`** — strong method candidates; load only what this task needs next.
 - **`skills_preferred`** — load when the task touches what they cover.
 - **`skills_optional`** — only when the task names the thing they are about.
 - **`skills_if_<signal>`** — only when that signal is established true. Section 3.
 - **`verification`** — selected by what must be proven, not by what the work was.
 
-One to five for ordinary work. Five is not a hard ceiling — a genuinely broad task may need more —
+Normally zero to two initially; add guidance for concrete needs. Five is not a hard ceiling — a genuinely broad task may need more —
 but a sixth skill needs a reason in the plan, and `skills_core` plus `skills_preferred` is already
-capped at five and 30KB by the build so the always-on set cannot creep.
+capped at five and 30KB by the build so the candidate bundle cannot creep; it is not an always-on set.
 
 **Two skills for the same capability never both load.** Pick one and say why.
 
 **A decision engine ranks only ids this loadout already names** — candidate generation stays with
-the registry. Keep the one-to-five discipline anyway, and record each skill's `selected_by`. A
+the registry. Keep selection selective anyway, and record each skill's `selected_by`. A
 ranking is a reason to look closer, never a reason to skip asking whether the task turns on it.
 
-**How to tell whether a skill is available.** A local id resolves through
-`{{SKILL_GLOB}}`. Host-provided skills may live outside this pack; use the session's
+**How to tell whether a skill is available.** A local id resolves through the helper's trusted
+`resources` metadata. Missing metadata uses INDEX.md as a fallback. Host-provided skills
+may live outside this pack; use the session's
 skill listing or supported discovery metadata. Exposure is not proof its body was read.
 An incomplete listing leaves availability unknown, not absent. A disabled skill stays
 disabled even when its files exist. Catalog membership alone proves neither availability
 nor permission to activate a skill.
 
-**When a skill is unavailable** — the glob finds nothing and the session's listing does not name
+**When a skill is unavailable** — the trusted resource path is unavailable and the session's listing does not name
 it, and discovery is complete enough to establish the absence:
 
 1. Continue with the role's base method. The role, not the skill, owns the outcome.
@@ -200,7 +201,7 @@ not apply to it — it would invert, leaving neither the preferred skill nor its
 it here instead: use the preferred skill when the session has it, the declared substitute when it
 does not, and say which one you used.
 
-**Conditional skills compete for the same one-to-five slots.** They are not a second allowance on
+**Conditional skills compete for the same task-specific slots.** They are not a second allowance on
 top of core and preferred. `implementer` declares eleven conditional buckets; if four of them fire
 at once, that is a sign the request is really several tasks, not permission to load fourteen
 skills. Pick the ones the work actually turns on.

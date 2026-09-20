@@ -487,6 +487,28 @@ def _read_evidence(name: str, inputs: Any, output: Any = None) -> bool:
     return False
 
 
+def _native_claude_dispatcher_replay(event: dict) -> bool:
+    """Recognize the native command envelope, never an unmarked invocation claim.
+
+    Claude 2.1.150 expands a slash skill before querying the model, but marks its
+    body isMeta and omits it from replay output. The native user replay contains
+    this exact envelope even when trivial work legitimately needs no role read.
+    """
+    if event.get("type") != "user" or event.get("isReplay") is not True:
+        return False
+    message = event.get("message")
+    if not isinstance(message, dict) or message.get("role") != "user":
+        return False
+    content = message.get("content")
+    if not isinstance(content, str):
+        return False
+    return re.fullmatch(
+        r"<command-message>agent-dispatcher</command-message>\n"
+        r"<command-name>/agent-dispatcher</command-name>"
+        r"(?:\n<command-args>[\s\S]*</command-args>)?", content,
+    ) is not None
+
+
 def _shell_instruction_read(command: str, depth: int = 0) -> bool:
     """Conservatively identify read commands; echoed command text is not a read."""
     if depth > 2:
@@ -583,6 +605,7 @@ def parse_events(client: str, stdout: str) -> dict:
                 result["startup"] = {key: event[key] for key in keys if key in event}
                 result["startup"]["init_received"] = True
             elif kind in ("assistant", "user"):
+                result["treatment_invoked"] |= _native_claude_dispatcher_replay(event)
                 message = event.get("message", {})
                 blocks = message.get("content", []) if isinstance(message, dict) else []
                 if isinstance(blocks, str):
@@ -598,8 +621,8 @@ def parse_events(client: str, stdout: str) -> dict:
                             result["treatment_invoked"] |= _read_evidence(*call, block.get("content"))
                     elif kind == "user" and block.get("type") == "text":
                         text = block.get("text", "")
-                        # Replay of the slash command alone is not proof. Native
-                        # skill expansion supplies its base directory + content.
+                        # Some clients also emit the full native skill expansion.
+                        # Raw slash text or an unmarked command envelope is not proof.
                         if ("Base directory for this skill:" in text and
                             re.search(r"agent-dispatcher(?:[/\\]|\s|$)", text) and
                             ("# Agent Dispatcher" in text or "Route each request" in text)):

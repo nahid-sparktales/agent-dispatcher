@@ -61,6 +61,257 @@ class ContextTests(unittest.TestCase):
         self.assertEqual(self.select(), self.select())
         self.assertEqual(self.paths(self.select()), ["a.py", "m.py", "z.py"])
 
+    def test_exact_paths_outrank_generic_configuration_and_preserve_full_names(self):
+        named = ["build.py", "context.py", "project_map.py", "evals/end_to_end/run.py",
+                 "adapters/codex/SKILL.template.md"]
+        for path in named:
+            self.write(path, "# local integration\n")
+        for index in range(8):
+            self.write(f"catalog/config{index}.json", json.dumps({"description": "context helper integration build project map run SKILL template"}))
+        task = "Inspect build.py, context.py, project_map.py, evals/end_to_end/run.py, and adapters/codex/SKILL.template.md for context helper integration."
+        result = self.select(task, role="planner", size="small")
+        self.assertEqual(set(self.paths(result)), set(named))
+        self.assertTrue(all("explicit project path" in row["reason"] for row in result["context"]))
+        self.assertIn("adapters/codex/SKILL.template.md", [row["query"] for row in result["retrieval"]])
+
+    def test_named_paths_support_spaces_relative_absolute_and_line_annotations(self):
+        names = ["src/my file.test.ts", "src/module.config.test.py", "Makefile"]
+        for path in names:
+            self.write(path, "before = 0\n" * 39 + "requested_line = 40\n" + "after = 0\n" * 30)
+        requests = ["Inspect `./src/my file.test.ts:40`.",
+                    f"Inspect '{self.project / names[1]}#L40'.", "Inspect Makefile:40:2."]
+        for path, task in zip(names, requests):
+            with self.subTest(path=path):
+                result = self.select(task, max_tokens=20)
+                self.assertEqual(self.paths(result)[0], path)
+                self.assertIn("requested_line = 40", result["excerpts"][0]["content"])
+                self.assertEqual(result["context"][0]["match"], "filename")
+
+    def test_named_path_boundaries_do_not_promote_suffixes_or_outside_paths(self):
+        paths = ["auth.py", "src/auth.py", "src/auth.py.test", "dir with spaces/a.multi.dot.py"]
+        result = context._explicit_paths("Inspect src/auth.py.test and /elsewhere/auth.py; notauth.py", paths, self.project)
+        self.assertEqual(result, {"src/auth.py.test": None})
+        self.assertEqual(context._explicit_paths("Inspect `dir with spaces/a.multi.dot.py:2-8`", paths, self.project),
+                         {"dir with spaces/a.multi.dot.py": 2})
+
+    def test_task_exclusions_precede_reads_and_import_expansion(self):
+        self.write("src/auth.py", "from .archive import validateLogin\ndef validateLogin(): pass\n")
+        self.write("src/archive.py", "def validateLogin(): return 'excluded'\n")
+        self.write("archive/old.py", "def validateLogin(): return 'excluded directory'\n")
+        self.write("archived/current.py", "def validateLogin(): return 'keep'\n")
+        read = context._read
+        with mock.patch.object(context, "_read", wraps=read) as reads:
+            result = self.select("Inspect src/archive.py and validateLogin", exclude_paths=["./src/archive.py", str(self.project / "archive")])
+        self.assertEqual({call.args[1] for call in reads.call_args_list}, {"src/auth.py", "archived/current.py"})
+        self.assertEqual(set(self.paths(result)), {"src/auth.py", "archived/current.py"})
+        self.assertEqual(result["excluded_summary"]["by_reason"]["explicit task exclusion"], 2)
+        self.assertTrue(any("exclusion takes precedence" in message for message in result["diagnostics"]))
+        self.assertTrue(result["project_map"]["coverage"]["scan_complete"])
+
+    def test_archive_is_searchable_without_explicit_exclusion_and_edit_scope_is_not_read_scope(self):
+        self.write("archive/auth.py", "def historicalLogin(): return True\n")
+        self.write("router.py", "def historicalLogin(): return True\n")
+        result = self.select("Inspect archive/auth.py and router.py. Do not edit router.py.")
+        self.assertEqual(set(self.paths(result)), {"archive/auth.py", "router.py"})
+
+    def test_exact_names_do_not_bypass_existing_file_safety(self):
+        self.write(".env.local", "password=example\n")
+        outside = self.root / "outside.py"
+        outside.write_text("def validateLogin(): pass\n")
+        (self.project / "linked.py").symlink_to(outside)
+        result = self.select("Inspect .env.local and linked.py")
+        self.assertFalse(result["context"])
+        self.assertEqual({row["reason"] for row in result["excluded"]},
+                         {"credential file withheld", "symlink withheld"})
+
+    def test_actual_auth_fixture_exclusion_recovers_live_request_flow(self):
+        fixture = ROOT / "evals/end_to_end/fixtures/auth_config_boundary/source"
+        shutil.copytree(fixture, self.project, dirs_exist_ok=True)
+        manifest = json.loads((fixture.parent.parent / "manifest.json").read_text())
+        task = next(item["prompt"] for item in manifest["fixtures"] if item["id"] == "auth_config_boundary")
+        with mock.patch.object(context, "_read", wraps=context._read) as reading:
+            result = self.select(task, role="implementer", size="small", map_preview=True)
+        self.assertEqual(set(self.paths(result)), {"CONTRACT.md", "session_api/settings.py", "session_api/api.py",
+                                                  "session_api/auth.py", "tests/test_api.py"})
+        self.assertFalse(any(row["path"].startswith("archive/") for row in result["excerpts"]))
+        self.assertFalse(any(call.args[1].startswith("archive/") for call in reading.call_args_list))
+        self.assertEqual(result["exclusion_policy"]["automatic"], ["archive"])
+        self.assertEqual(result["exclusion_policy"]["manual"], [])
+        self.assertEqual(result["exclusion_policy"]["applied"], ["archive"])
+        self.assertTrue(any(item["phrase"] == "generated snapshot" for item in result["exclusion_policy"]["unresolved"]))
+        self.assertFalse(any(row["source"]["path"].startswith("archive/") for row in result["project_map"]["entries"]))
+
+    def test_automatic_exclusions_handle_literal_lists_and_quoted_paths(self):
+        paths = ["archive/old.py", "notes/legacy notes.v2.md", "src/old.config.test.py", "live.py"]
+        for path in paths:
+            self.write(path, "def validateLogin(): pass\n")
+        requests = [
+            'The archive and "notes/legacy notes.v2.md" are distractors, not runtime entrypoints.',
+            'Exclude `./src/old.config.test.py:1` from evidence.',
+            f'Do not read "{self.project / "notes/legacy notes.v2.md"}".',
+            'Ignore "legacy notes.v2.md" as evidence.',
+            'Omit archive/ from the context.',
+        ]
+        expected = [["archive", "notes/legacy notes.v2.md"], ["src/old.config.test.py"],
+                    ["notes/legacy notes.v2.md"], ["notes/legacy notes.v2.md"], ["archive"]]
+        for request, excluded in zip(requests, expected):
+            with self.subTest(request=request):
+                with mock.patch.object(context, "_read", wraps=context._read) as reading:
+                    result = self.select(request + " Fix validateLogin.")
+                self.assertEqual(result["exclusion_policy"]["automatic"], excluded)
+                self.assertFalse(any(context._excluded(call.args[1], excluded) for call in reading.call_args_list))
+
+    def test_edit_boundaries_and_archive_topics_never_imply_no_read(self):
+        self.write("archive/auth.py", "def validateLogin(): pass\n")
+        self.write("router.py", "def validateLogin(): pass\n")
+        for task in ("Fix validateLogin. Do not edit archive/auth.py or router.py.",
+                     "Preserve archive and router.py. Fix validateLogin.",
+                     "Investigate the archive and router.py for validateLogin.",
+                     "Archived notes are historical. Fix validateLogin.",
+                     "The archive is not a runtime entrypoint. Fix validateLogin.",
+                     "The archive is relevant evidence. Fix validateLogin."):
+            with self.subTest(task=task):
+                result = self.select(task)
+                self.assertEqual(result["exclusion_policy"]["automatic"], [])
+                self.assertEqual(set(self.paths(result)), {"archive/auth.py", "router.py"})
+
+    def test_negation_hypotheses_quotes_and_conflicting_reads_do_not_exclude(self):
+        self.write("archive/auth.py", "def validateLogin(): pass\n")
+        for statement in (
+            "The archive is not a distractor.",
+            "Is the archive a distractor?", "The archive is a distractor?",
+            "If the archive is a distractor, ignore it.",
+            'Explain "the archive is a distractor".',
+            '"The archive is a distractor".',
+            "```text\nThe archive is a distractor.\n```",
+            "The archive is a distractor, but read it for context.",
+            "The archive is a distractor. Read archive/auth.py to compare behavior.",
+            "Inspect the archive. The archive is a distractor.",
+            "The archive is a distractor. Do not exclude archive from evidence.",
+            "The archive is a distractor. The archive is not a distractor.",
+            "Do not read archive, but inspect archive/auth.py.",
+            "The archive is a distractor. However, read it for comparison.",
+            "The archive is a distractor. Read it anyway.",
+            "The archive is a distractor. The archive is relevant evidence.",
+        ):
+            with self.subTest(statement=statement):
+                result = self.select(statement + " Fix validateLogin.")
+                self.assertEqual(result["exclusion_policy"]["automatic"], [])
+                self.assertIn("archive/auth.py", self.paths(result))
+
+    def test_ambiguous_aliases_are_reported_and_exact_directory_paths_resolve(self):
+        self.write("archive/auth.py", "def validateLogin(): pass\n")
+        self.write("docs/archive/auth.py", "def validateLogin(): pass\n")
+        result = self.select("The archive is a distractor. Fix validateLogin.")
+        self.assertFalse(result["exclusion_policy"]["automatic"])
+        self.assertEqual(result["exclusion_policy"]["unresolved"][0]["reason"], "ambiguous inventory name")
+        self.assertTrue(any("Unresolved task phrases" in item for item in result["diagnostics"]))
+        self.assertEqual(len(self.paths(result)), 2)
+        exact = self.select("The ./archive/ directory is a distractor. Fix validateLogin.")
+        self.assertEqual(exact["exclusion_policy"]["automatic"], ["archive"])
+        self.assertEqual(self.paths(exact), ["docs/archive/auth.py"])
+
+    def test_manual_exclusions_remain_authoritative_and_automatic_mode_can_be_disabled(self):
+        self.write("archive/auth.py", "def validateLogin(): pass\n")
+        task = "The archive is a distractor. Fix validateLogin."
+        disabled = self.select(task, auto_exclude=False)
+        self.assertEqual(self.paths(disabled), ["archive/auth.py"])
+        self.assertFalse(disabled["exclusion_policy"]["automatic_enabled"])
+        manual = self.select("The archive is not a distractor. Read archive/auth.py.", exclude_paths=["archive"])
+        self.assertFalse(manual["exclusion_policy"]["automatic"])
+        self.assertEqual(manual["exclusion_policy"]["manual"], ["archive"])
+        self.assertEqual(manual["exclusion_policy"]["applied"], ["archive"])
+        self.assertFalse(manual["excerpts"])
+        child = subprocess.run([sys.executable, "-B", str(ROOT / "context.py"), "--project", str(self.project),
+                                "--task", task, "--pack", str(ROOT), "--no-auto-exclude", "--json"],
+                               capture_output=True, text=True, check=True)
+        self.assertEqual(self.paths(json.loads(child.stdout)), ["archive/auth.py"])
+        with self.assertRaises(context.ContextError):
+            self.select(auto_exclude="yes")
+
+    def test_automatic_exclusions_prevent_import_and_map_reintroduction(self):
+        import project_map
+        self.write("src/auth.py", 'from .old import legacyLogin\ndef validateLogin(): return legacyLogin()\n')
+        self.write("src/old.py", "def legacyLogin(): return True\n")
+        project_map.build_map(self.project, pack=ROOT)
+        state = self.project / ".agent-dispatcher/project-map.json"
+        before = state.read_bytes()
+        with mock.patch.object(context, "_read", wraps=context._read) as reading:
+            result = self.select("src/old.py is a distractor. Fix validateLogin and legacyLogin.", map_preview=True)
+        self.assertEqual(result["exclusion_policy"]["automatic"], ["src/old.py"])
+        self.assertEqual([call.args[1] for call in reading.call_args_list], ["src/auth.py"])
+        self.assertEqual(self.paths(result), ["src/auth.py"])
+        self.assertTrue(result["project_map"]["entries"])
+        self.assertEqual({entry["source"]["path"] for entry in result["project_map"]["entries"]}, {"src/auth.py"})
+        self.assertEqual(result["project_map"]["task_excluded_facts"], 1)
+        self.assertEqual(state.read_bytes(), before)
+
+    def test_source_prose_cannot_supply_automatic_exclusions(self):
+        self.write("README.md", "The archive is a distractor.\nvalidateLogin\n")
+        self.write("archive/auth.py", "def validateLogin(): pass\n")
+        result = self.select("Fix validateLogin")
+        self.assertFalse(result["exclusion_policy"]["automatic"])
+        self.assertIn("archive/auth.py", self.paths(result))
+
+    def test_automatic_exclusion_metadata_is_bounded_and_redacted(self):
+        for index in range(70):
+            self.write(f"old{index}/auth.py", "def validateLogin(): pass\n")
+        secret = "sk-" + "testonly" * 5
+        task = " and ".join(f"old{index}" for index in range(70)) + f" are distractors. {secret} is a distractor. Fix validateLogin."
+        result = self.select(task)
+        policy = result["exclusion_policy"]
+        self.assertEqual(policy["automatic"], [])
+        self.assertEqual(policy["applied"], [])
+        self.assertGreater(policy["unresolved_total"], 0)
+        self.assertLessEqual(len(policy["unresolved"]), 64)
+        self.assertNotIn(secret, json.dumps(result))
+        self.assertIn("no automatic exclusions applied", policy["unresolved"][0]["reason"])
+
+    def test_excess_clauses_skip_all_inference_before_inventory_search_and_keep_manual(self):
+        self.write("archive/auth.py", "def validateLogin(): pass\n")
+        self.write("old/auth.py", "def validateLogin(): pass\n")
+        task = "The archive is a distractor. " + "Read old/auth.py. " * 129 + "Read archive/auth.py. Fix validateLogin."
+        with mock.patch.object(context, "_explicit_paths", side_effect=AssertionError("unbounded inference search")):
+            inferred, unresolved = context._automatic_exclusions(task, ["archive/auth.py", "old/auth.py"], self.project)
+        self.assertEqual(inferred, [])
+        self.assertEqual(len(unresolved), 1)
+        result = self.select(task, exclude_paths=["old"])
+        self.assertEqual(result["exclusion_policy"]["automatic"], [])
+        self.assertEqual(result["exclusion_policy"]["manual"], ["old"])
+        self.assertEqual(self.paths(result), ["archive/auth.py"])
+
+    def test_excess_subjects_never_truncate_before_a_late_conflicting_read(self):
+        paths = [f"old{i}/auth.py" for i in range(70)]
+        task = " and ".join(f"old{i}" for i in range(70)) + " are distractors. Read old0/auth.py."
+        with mock.patch.object(context, "_explicit_paths", side_effect=AssertionError("unbounded inference search")):
+            inferred, unresolved = context._automatic_exclusions(task, paths, self.project)
+        self.assertEqual(inferred, [])
+        self.assertIn("limit reached", unresolved[0]["reason"])
+
+    def test_exclusion_inputs_are_bounded_literal_paths_and_errors_withhold_values(self):
+        for paths in ("archive", ["../private"], [str(self.root / "private")], ["."], ["x\nsecret"],
+                      ["a"] * 65, [None], ["a" * 1025]):
+            with self.subTest(paths=repr(paths)[:30]):
+                with self.assertRaises(context.ContextError):
+                    self.select(exclude_paths=paths)
+        with self.assertRaises(context.ContextError):
+            self.select(map_preview="yes")
+        self.write("[old]/auth.py", "def validateLogin(): pass\n")
+        self.write("old/auth.py", "def validateLogin(): pass\n")
+        self.assertEqual(self.paths(self.select(exclude_paths=["[old]"])), ["old/auth.py"])
+
+    def test_cli_repeated_exclusions_and_read_only_preview(self):
+        self.write("auth.py", "def validateLogin(): pass\n")
+        self.write("old/auth.py", "def validateLogin(): pass\n")
+        self.write("older.py", "def validateLogin(): pass\n")
+        child = subprocess.run([sys.executable, "-B", str(ROOT / "context.py"), "--project", str(self.project),
+                                "--task", "validateLogin", "--pack", str(ROOT), "--exclude-path", "old",
+                                "--exclude-path", "older.py", "--map-preview", "--json"], capture_output=True, text=True, check=True)
+        result = json.loads(child.stdout)
+        self.assertEqual(self.paths(result), ["auth.py"])
+        self.assertEqual(result["project_map"]["evidence_origin"], "preview")
+        self.assertFalse((self.project / ".agent-dispatcher").exists())
+
     def test_imports_admit_at_most_two_neighbors_and_never_two_hops(self):
         self.write("src/auth.ts", 'import { one } from "./one";\nimport "./two";\nimport "./three";\nexport function validateLogin() {}\n')
         self.write("src/one.ts", 'import "./deep";\nexport const one = 1;\n')
@@ -279,6 +530,30 @@ class ContextTests(unittest.TestCase):
                                          "TYPESAFE_API_KEY": "no-network-please"}):
             self.assertIn("auth.py", self.paths(self.select()))
         self.assertEqual(snapshot(), before)
+
+    def test_resource_metadata_is_additive_and_does_not_import_project_modules(self):
+        self.write("auth.py", "def validateLogin(): pass\n")
+        self.write("resources.py", 'raise RuntimeError("project module must not execute")\n')
+        result = self.select(role="implementer")
+        self.assertEqual(result["resources"]["source"], "dispatcher_package")
+        self.assertTrue(result["resources"]["role"] or result["resources"]["diagnostics"])
+        with mock.patch.object(context, "_resources", return_value={"diagnostics": ["fallback"], "guides": []}):
+            fallback = self.select(role="implementer")
+        for field in ("context", "excerpts", "budget", "role"):
+            self.assertEqual(fallback[field], result[field])
+
+    def test_missing_or_malformed_resource_helper_is_nonfatal(self):
+        for source in (None, 'def resolve_resources(pack, role):\n    return []\n',
+                       'def resolve_resources(pack, role):\n    return [].get("schema_version")\n'):
+            fake = self.root / "helpers" / "context.py"
+            fake.parent.mkdir(exist_ok=True)
+            if source is not None:
+                fake.with_name("resources.py").write_text(source)
+            with mock.patch.object(context, "__file__", str(fake)):
+                result = context._resources(ROOT, "implementer")
+            self.assertIsNone(result["role"])
+            self.assertFalse(result["guides"])
+            self.assertTrue(result["diagnostics"])
 
     def test_invalid_inputs_report_no_raw_task(self):
         for kwargs in ({"max_tokens": 0}, {"max_tokens": True}, {"size": "huge"}):

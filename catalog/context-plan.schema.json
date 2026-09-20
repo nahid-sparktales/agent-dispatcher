@@ -129,7 +129,7 @@
     },
     "skills": {
       "type": "array",
-      "title": "The one to five skills selected, each with the reason and whether it is actually installed",
+      "title": "The task-relevant skills selected, each with the reason and whether it is actually installed",
       "description": "The skills actually selected \u2014 one to five for ordinary work. A skill is here because a capability required it, never because it is installed.",
       "items": {
         "type": "object",

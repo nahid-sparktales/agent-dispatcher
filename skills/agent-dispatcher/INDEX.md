@@ -7,7 +7,7 @@ are repo-relative, and an install puts the same tree under the pack's `lib/`.
 Two uses, and only two. **Resolve** an id a loadout named. **Match** a request against
 the `signals` line when you need a capability your loadout does not already name, or
 when the skill it named is not installed — the capability map at the end says which
-ids are interchangeable. Not for browsing: one to five skills is a normal task, and a
+ids are interchangeable. Not for browsing: normally zero to two guides load initially, and a
 skill selected because it appeared in this list is the failure the whole layer exists
 to prevent.
 

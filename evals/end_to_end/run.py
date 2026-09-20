@@ -36,17 +36,31 @@ def fingerprint(config):
     return hashlib.sha256(json.dumps(value, sort_keys=True).encode()).hexdigest()
 
 
+def selected_clients(clients=CLIENTS):
+    """Use one validated, canonical client order for staging, probing and scheduling."""
+    if isinstance(clients, str) or not isinstance(clients, (dict, list, tuple)):
+        raise ValueError("clients must be a nonempty selection of codex and/or claude")
+    names = list(clients)
+    if (not names or any(not isinstance(name, str) or name not in CLIENTS for name in names)
+            or len(set(names)) != len(names)):
+        raise ValueError("clients must be a nonempty, unique selection of codex and/or claude")
+    return tuple(client for client in CLIENTS if client in names)
+
+
 def validate_config(config, live=False):
     if config.get("schema_version") != 1:
         raise ValueError("unsupported evaluation configuration version")
-    if set(config.get("clients", {})) != set(CLIENTS):
-        raise ValueError("configuration must name both codex and claude")
+    if not isinstance(config.get("clients"), dict):
+        raise ValueError("configuration clients must be an object")
+    selected_clients(config["clients"])
     if type(config.get("seed")) is not int:
         raise ValueError("seed must be an integer")
     if type(config.get("timeout_seconds")) is not int or not 1 <= config["timeout_seconds"] <= 3600:
         raise ValueError("timeout_seconds must be an integer between 1 and 3600")
     profiles = []
     for client, spec in config["clients"].items():
+        if not isinstance(spec, dict):
+            raise ValueError(f"{client}: client settings must be an object")
         if spec.get("auth") not in ("subscription", "api"):
             raise ValueError(f"{client}: auth must be subscription or api")
         if not isinstance(spec.get("executable"), str) or not spec["executable"]:
@@ -60,7 +74,8 @@ def validate_config(config, live=False):
         if profile.is_symlink():
             raise ValueError("evaluation profiles cannot be symlinks")
         profiles.append(profile.resolve())
-    if profiles[0] == profiles[1] or any(a in b.parents for a, b in (profiles, profiles[::-1])):
+    if any(a == b or a in b.parents or b in a.parents
+           for index, a in enumerate(profiles) for b in profiles[index + 1:]):
         raise ValueError("clients must have separate evaluation profiles")
 
 
@@ -80,29 +95,38 @@ def source_snapshot(destination):
     return rt.digest_files(files)
 
 
-def stage_packages(destination):
+def stage_packages(destination, clients=CLIENTS):
+    clients = selected_clients(clients)
     with tempfile.TemporaryDirectory(prefix="dispatcher-eval-build-") as temporary:
         snapshot = Path(temporary) / "source"
         digest = source_snapshot(snapshot)
         output = Path(temporary) / "codex-package"
-        build = subprocess.run([sys.executable, str(snapshot / "build_codex.py"), "--output", str(output)],
+        command = ([sys.executable, str(snapshot / "build_codex.py"), "--output", str(output)]
+                   if "codex" in clients else [sys.executable, str(snapshot / "build.py")])
+        build = subprocess.run(command,
                                cwd=snapshot, capture_output=True, text=True, timeout=120)
         if build.returncode:
             raise ValueError("dispatcher package build failed in isolated snapshot: " + rt.scrub_text(build.stderr[-1500:]))
-        rt.copy_files(rt.tree_files(output / "skills/agent-dispatcher"), destination / "codex")
-        claude = destination / "claude"
-        rt.copy_files(rt.tree_files(snapshot / "skills/agent-dispatcher"), claude)
-        for folder in sorted((snapshot / "skills").iterdir()):
-            if folder.is_dir() and folder.name != "agent-dispatcher":
-                rt.copy_files(rt.tree_files(folder), claude / "lib" / folder.name)
-        for name in ("recipes", "decision", "catalog"):
-            rt.copy_files(rt.tree_files(snapshot / name, {"__pycache__"}), claude / name)
+        if "codex" in clients:
+            rt.copy_files(rt.tree_files(output / "skills/agent-dispatcher"), destination / "codex")
+        if "claude" in clients:
+            claude = destination / "claude"
+            # Reuse the installer's pure staging function from this frozen
+            # snapshot, including layout-specific resource path remapping.
+            staging = subprocess.run(
+                [sys.executable, "-B", "-c",
+                 "from pathlib import Path; import sys; from install_claude import stage_pack; "
+                 "stage_pack(Path(sys.argv[1]), Path(sys.argv[2]))", str(snapshot), str(claude)],
+                cwd=snapshot, capture_output=True, text=True, timeout=120)
+            if staging.returncode:
+                raise ValueError("Claude package staging failed in isolated snapshot: " + rt.scrub_text(staging.stderr[-1500:]))
         return {"source_digest": digest,
-                "package_digests": {c: rt.digest_tree(destination / c) for c in CLIENTS}}
+                "package_digests": {c: rt.digest_tree(destination / c) for c in clients}}
 
 
-def prepare(output, suite_path=None, models=None, efforts=None, auth=None, seed=20260919):
+def prepare(output, suite_path=None, models=None, efforts=None, auth=None, seed=20260919, clients=CLIENTS):
     from evals.end_to_end.grading import load_suite
+    clients = selected_clients(clients)
     output = Path(output).absolute()
     if output.exists():
         raise ValueError("prepare requires a new output directory; existing results are never overwritten")
@@ -117,7 +141,7 @@ def prepare(output, suite_path=None, models=None, efforts=None, auth=None, seed=
     if output == profile_root or output in profile_root.parents:
         raise ValueError("authentication profiles must be outside artifacts")
     output.mkdir(parents=True)
-    provenance = stage_packages(output / "packages")
+    provenance = stage_packages(output / "packages", clients)
     staged_fixtures = rt.tree_files(suite_source, {"__pycache__"})
     if suite_path and Path(suite_path).is_file() and Path(suite_path).name != "manifest.json":
         content = staged_fixtures[Path(suite_path).name]
@@ -132,7 +156,7 @@ def prepare(output, suite_path=None, models=None, efforts=None, auth=None, seed=
     provenance["runner_digest"] = rt.digest_tree(Path(__file__).parent, {"fixtures", "__pycache__"})
     config = {"schema_version": 1, "created_at": now(), "seed": seed, "timeout_seconds": 600,
               "output_dir": str(output), "provenance": provenance, "clients": {}}
-    for client in CLIENTS:
+    for client in clients:
         profile = profile_root / client
         profile.mkdir(parents=True, mode=0o700)
         (profile / ".dispatcher-eval-profile").write_text("v1\n")
@@ -160,7 +184,7 @@ def load_config(path, live=False):
         if marker.is_symlink() or not marker.is_file() or marker.read_text() != "v1\n":
             raise ValueError(f"{client}: not an owned evaluation profile; prepare a new evaluation")
     provenance = config["provenance"]
-    for client in CLIENTS:
+    for client in selected_clients(config["clients"]):
         if rt.digest_tree(output / "packages" / client) != provenance["package_digests"][client]:
             raise ValueError("staged dispatcher package changed; prepare a new evaluation")
     if rt.digest_tree(output / "fixtures") != provenance["fixtures_digest"]:
@@ -227,8 +251,9 @@ def workspace_for(config, client, condition, fixture=None):
 
 def doctor(config):
     from evals.end_to_end import adapters
+    validate_config(config, live=True)
     checks = {}
-    for client in CLIENTS:
+    for client in selected_clients(config["clients"]):
         for condition in CONDITIONS:
             key = client + "/" + condition
             try:
@@ -241,13 +266,14 @@ def doctor(config):
             "fingerprint": fingerprint(config), "checks": checks}
 
 
-def schedule(fixtures, suite, seed):
+def schedule(fixtures, suite, seed, clients=CLIENTS):
+    clients = selected_clients(clients)
     rng = random.Random(seed)
     selected = [f for f in fixtures if f.get("smoke")] if suite == "smoke" else fixtures
     if suite == "smoke" and len(selected) != 2:
         raise ValueError("smoke suite must select exactly two fixtures")
     rows = []
-    for client in CLIENTS:
+    for client in clients:
         for fixture in selected:
             for repetition in range(1, (1 if suite == "smoke" else 2) + 1):
                 conditions = list(CONDITIONS)
@@ -273,8 +299,37 @@ def diff_files(before, after):
     return "".join(lines)
 
 
+@contextmanager
+def capture_scope(workspace, result, artifacts, env):
+    """Record sibling residue while the owned temporary directory still exists."""
+    try:
+        yield
+    finally:
+        audit = rt.audit_trial_parent(workspace)
+        result["scope_audit"] = rt.sanitize(audit, env)
+        passed = audit["clean"]
+        reason = ("No files or directories remained outside the project in the owned trial directory."
+                  if passed is True else "Files or directories remained outside the permitted project."
+                  if passed is False else "The owned trial directory could not be completely inspected.")
+        result["scope_check"] = {"passed": passed, "reason": reason}
+        if passed is not True:
+            result["diagnostics"].append(reason)
+            if result["status"] in {"completed", "task_failure"}:
+                if passed is False:
+                    result.update(status="task_failure", task_success=False)
+                elif result["status"] == "completed":
+                    result.update(status="infrastructure_error", task_success=None)
+        try:
+            rt.write_json(artifacts / "scope-audit.json", result["scope_audit"])
+        except OSError:
+            if result["status"] == "completed":
+                result.update(status="infrastructure_error", task_success=None)
+            result["diagnostics"].append("Scope evidence could not be saved.")
+            raise
+
+
 def run_trial(config, batch, row, fixture):
-    from evals.end_to_end import adapters
+    from evals.end_to_end import adapters, activity
     from evals.end_to_end.grading import grade
     client, condition = row["client"], row["condition"]
     spec = config["clients"][client]
@@ -290,6 +345,7 @@ def run_trial(config, batch, row, fixture):
               "rubric": fixture["rubric"], "diagnostics": [], "startup_valid": False}
     started = False
     launch_env = {}
+    result["activity"] = activity.empty()
     try:
         with workspace_for(config, client, condition, fixture) as (workspace, skill):
             initial = rt.tree_files(workspace, rt.EXCLUDED)
@@ -307,51 +363,57 @@ def run_trial(config, batch, row, fixture):
             prompt = launch["stdin_prefix"] + fixture["prompt"]
             if launch["effective"].get("input_format") == "stream-json":
                 prompt = json.dumps({"type": "user", "message": {"role": "user", "content": prompt}}) + "\n"
-            execution = rt.execute(launch["argv"], cwd=workspace, env=launch["env"],
-                                   prompt=prompt,
-                                   timeout=min(config["timeout_seconds"], fixture["timeout_seconds"]))
-            started = True
-            result["elapsed_seconds"] = execution["elapsed_seconds"]
-            result["cancelled"] = execution.get("cancelled", False)
-            result["exit_status"] = execution["returncode"]
-            (artifacts / "events.jsonl").write_text(rt.sanitize_stream(execution["stdout"], launch["env"]))
-            (artifacts / "stderr.txt").write_text(rt.scrub_text(execution["stderr"], launch["env"]))
-            parsed = adapters.parse_events(client, execution["stdout"])
-            result["usage"] = parsed["usage"]
-            result["usage_observed"] = parsed.get("usage_observed", False)
-            result["startup"] = parsed.get("startup", {})
-            result["final_answer"] = rt.scrub_text(parsed["final_answer"], launch["env"])
-            result["treatment_invoked"] = parsed["treatment_invoked"] if condition == "dispatcher" else None
-            result["diagnostics"] = parsed.get("diagnostics", []) + parsed.get("errors", [])
-            if execution.get("cleanup_warning"):
-                result["diagnostics"].append(execution["cleanup_warning"])
-            (artifacts / "answer.md").write_text(result["final_answer"])
-            startup_errors = adapters.validate_startup(client, spec, parsed, condition)
-            result["startup_valid"] = not startup_errors
-            result["diagnostics"].extend(startup_errors)
-            final = rt.tree_files(workspace, rt.EXCLUDED)
-            validate_final_artifacts(final, launch["env"])
-            rt.copy_files(final, artifacts / "final")
-            (artifacts / "changes.diff").write_text(rt.scrub_text(diff_files(initial, final), launch["env"]))
-            result["final_files_digest"] = rt.digest_files(final)
-            if parsed["status"] == "authentication_failure":
-                result["status"] = "authentication_failure"
-            elif execution["timed_out"] or execution.get("cancelled"):
-                result.update(status="timeout", task_success=False)
-                if execution.get("cancelled"):
-                    result["diagnostics"].append("Run interrupted; partial evidence retained.")
-            elif startup_errors:
-                result["status"] = "invalid_configuration"
-            elif execution["output_overflow"] or execution.get("cleanup_warning") or execution["returncode"] != 0 or parsed["status"] != "completed":
-                result["status"] = "infrastructure_error"
-            else:
-                result["auto_grade"] = grade(fixture, artifacts / "final", result["final_answer"])
-                passed = result["auto_grade"]["passed"]
-                if condition == "dispatcher" and not result["treatment_invoked"]:
-                    passed = False
-                    result["diagnostics"].append("Dispatcher invocation not observed; treatment-compliance failure.")
-                result["status"] = "completed" if passed else "task_failure"
-                result["task_success"] = (None if result["auto_grade"]["human_required"] else True) if passed else False
+            activity_binding = activity.bind(workspace, skill)
+            with capture_scope(workspace, result, artifacts, launch["env"]):
+                execution = rt.execute(launch["argv"], cwd=workspace, env=launch["env"],
+                                       prompt=prompt,
+                                       timeout=min(config["timeout_seconds"], fixture["timeout_seconds"]))
+                started = True
+                result["elapsed_seconds"] = execution["elapsed_seconds"]
+                result["cancelled"] = execution.get("cancelled", False)
+                result["exit_status"] = execution["returncode"]
+                (artifacts / "events.jsonl").write_text(rt.sanitize_stream(execution["stdout"], launch["env"]))
+                (artifacts / "stderr.txt").write_text(rt.scrub_text(execution["stderr"], launch["env"]))
+                result["activity"] = activity.analyze(client, execution["stdout"], activity_binding,
+                                                      interrupted=bool(execution["timed_out"] or execution.get("cancelled") or execution["output_overflow"]))
+                result["activity"] = rt.sanitize(result["activity"], launch["env"])
+                rt.write_json(artifacts / "activity.json", result["activity"])
+                parsed = adapters.parse_events(client, execution["stdout"])
+                result["usage"] = parsed["usage"]
+                result["usage_observed"] = parsed.get("usage_observed", False)
+                result["startup"] = parsed.get("startup", {})
+                result["final_answer"] = rt.scrub_text(parsed["final_answer"], launch["env"])
+                result["treatment_invoked"] = parsed["treatment_invoked"] if condition == "dispatcher" else None
+                result["diagnostics"] = parsed.get("diagnostics", []) + parsed.get("errors", [])
+                if execution.get("cleanup_warning"):
+                    result["diagnostics"].append(execution["cleanup_warning"])
+                (artifacts / "answer.md").write_text(result["final_answer"])
+                startup_errors = adapters.validate_startup(client, spec, parsed, condition)
+                result["startup_valid"] = not startup_errors
+                result["diagnostics"].extend(startup_errors)
+                final = rt.tree_files(workspace, rt.EXCLUDED)
+                validate_final_artifacts(final, launch["env"])
+                rt.copy_files(final, artifacts / "final")
+                (artifacts / "changes.diff").write_text(rt.scrub_text(diff_files(initial, final), launch["env"]))
+                result["final_files_digest"] = rt.digest_files(final)
+                if parsed["status"] == "authentication_failure":
+                    result["status"] = "authentication_failure"
+                elif execution["timed_out"] or execution.get("cancelled"):
+                    result.update(status="timeout", task_success=False)
+                    if execution.get("cancelled"):
+                        result["diagnostics"].append("Run interrupted; partial evidence retained.")
+                elif startup_errors:
+                    result["status"] = "invalid_configuration"
+                elif execution["output_overflow"] or execution.get("cleanup_warning") or execution["returncode"] != 0 or parsed["status"] != "completed":
+                    result["status"] = "infrastructure_error"
+                else:
+                    result["auto_grade"] = grade(fixture, artifacts / "final", result["final_answer"])
+                    passed = result["auto_grade"]["passed"]
+                    if condition == "dispatcher" and not result["treatment_invoked"]:
+                        passed = False
+                        result["diagnostics"].append("Dispatcher invocation not observed; treatment-compliance failure.")
+                    result["status"] = "completed" if passed else "task_failure"
+                    result["task_success"] = (None if result["auto_grade"]["human_required"] else True) if passed else False
     except ValueError as exc:
         result.update(status="task_failure" if started else "invalid_configuration",
                       task_success=False if started else None)
@@ -381,8 +443,10 @@ def validate_final_artifacts(files, env):
 
 def smoke_ready(batch, results):
     trials = results["trials"]
-    return (len(trials) == len(batch["schedule"]) == 8
+    clients = selected_clients(batch.get("config", {}).get("clients", CLIENTS))
+    return (len(trials) == len(batch["schedule"]) == 2 * len(CONDITIONS) * len(clients)
             and all(t["startup_valid"] and t.get("usage_observed") and t["status"] in ("completed", "task_failure")
+                    and t.get("client", clients[0]) in clients
                     and (t["condition"] == "baseline" or t["treatment_invoked"])
                     for t in trials))
 
@@ -444,7 +508,7 @@ def run(config, suite):
     batch_dir.mkdir(parents=True)
     batch = {"schema_version": 1, "created_at": now(), "suite": suite, "seed": config["seed"],
              "config": config, "provenance": config["provenance"], "fingerprint": fingerprint(config),
-             "schedule": schedule(fixtures, suite, config["seed"]), "doctor": preflight}
+             "schedule": schedule(fixtures, suite, config["seed"], selected_clients(config["clients"])), "doctor": preflight}
     rt.write_json(batch_dir / "batch.json", batch)
     results = {"schema_version": 1, "trials": []}
     rt.write_json(batch_dir / "results.json", results)
@@ -474,6 +538,8 @@ def main(argv=None):
     p.add_argument("--output", type=Path, required=True)
     p.add_argument("--fixtures", type=Path)
     p.add_argument("--seed", type=int, default=20260919)
+    p.add_argument("--clients", nargs="+", choices=CLIENTS, default=list(CLIENTS),
+                   help="clients to evaluate (default: codex claude); selection persists in config")
     for client in CLIENTS:
         p.add_argument(f"--{client}-model")
         p.add_argument(f"--{client}-effort")
@@ -494,7 +560,7 @@ def main(argv=None):
             config_path = prepare(args.output, args.fixtures,
                                   {c: getattr(args, c + "_model") for c in CLIENTS},
                                   {c: getattr(args, c + "_effort") for c in CLIENTS},
-                                  {c: getattr(args, c + "_auth") for c in CLIENTS}, args.seed)
+                                  {c: getattr(args, c + "_auth") for c in CLIENTS}, args.seed, clients=args.clients)
             print(f"Prepared {config_path}; no model runs started.")
             print("Use native login with the dedicated profile directories in this configuration, or provider API environment variables.")
         elif args.command in ("doctor", "run"):

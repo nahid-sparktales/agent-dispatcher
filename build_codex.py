@@ -96,9 +96,14 @@ def export_package(destination, data):
     shutil.copytree(ROOT / "decision", runtime / "decision",
                     ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
     shutil.copytree(ROOT / "catalog", runtime / "catalog")
+    write(runtime / "catalog/resource-paths.json", json.dumps({
+        "schema_version": 1, "layout": "codex",
+        "roles": {r["id"]: f"references/roles/{r['id']}.md" for r in data["roles"]},
+        "guides": {s["id"]: "references/" + s["path"].replace("/SKILL.md", "/GUIDE.md") for s in data["skills"]},
+    }, indent=2) + "\n")
     for name in ("activate.py", "decide.py"):
         shutil.copyfile(SOURCE / name, scripts / name)
-    for name in ("doctor.py", "context.py", "project_map.py"):
+    for name in ("doctor.py", "context.py", "project_map.py", "resources.py"):
         shutil.copyfile(ROOT / name, scripts / name)
     manifest = json.loads((ROOT / ".claude-plugin" / "plugin.json").read_text())
     manifest["skills"] = "./skills/"

@@ -16,6 +16,10 @@
       "sha256": "073d60331d30e9ee45a26e61131d2ad1046bb4be84f68721186c0599306da1a5"
     },
     {
+      "path": "service/errors.py",
+      "sha256": "6f97edf1d89965d055820a83f032d72339de8ce5ff7c2fc4ca7b03eefe0ae128"
+    },
+    {
       "path": "service/old_errors.py",
       "sha256": "32d468e98992570120389e8ede26ce66e3358927529c9566d74c621e49903275"
     },
@@ -67,6 +71,17 @@
         "path": "worker.py",
         "line": 1,
         "sha256": "3dcde98e834220ea596f7bff675138d4ff82e2b1bc7e458ba24fdf19f6ffb4cb"
+      }
+    },
+    {
+      "kind": "feature",
+      "label": "TemporaryFailure",
+      "detail": "Candidate feature location; definition: class TemporaryFailure(Exception):",
+      "basis": "heuristic",
+      "source": {
+        "path": "service/errors.py",
+        "sha256": "6f97edf1d89965d055820a83f032d72339de8ce5ff7c2fc4ca7b03eefe0ae128",
+        "line": 1
       }
     }
   ]

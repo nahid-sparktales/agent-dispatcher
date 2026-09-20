@@ -11,6 +11,7 @@ import os
 import pathlib
 import re
 import shlex
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -37,6 +38,7 @@ GENERATED = ["skills/agent-dispatcher/DOCTOR.md", "skills/agent-dispatcher/docto
 GENERATED += ["skills/agent-dispatcher/" + name for name in build.REFERENCE_FILES]
 GENERATED.append("skills/agent-dispatcher/context.py")
 GENERATED.append("skills/agent-dispatcher/project_map.py")
+GENERATED.extend(["skills/agent-dispatcher/resources.py", "catalog/resource-paths.json"])
 
 
 def drift():
@@ -56,6 +58,25 @@ def drift():
 
 
 SKIP = {"node_modules", ".git", "dist", "build", "__pycache__", ".venv", "vendor"}
+
+
+def hygiene_files(root):
+    """Check repository content, including new source, without scanning ignored local output."""
+    env = {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
+    env["GIT_OPTIONAL_LOCKS"] = "0"
+    try:
+        result = subprocess.run(
+            ["git", "-c", "core.fsmonitor=false", "-C", str(root), "ls-files",
+             "--cached", "--others", "--exclude-standard", "-z", "--", "."],
+            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, env=env, timeout=10)
+        if result.returncode == 0:
+            paths = {root / os.fsdecode(name) for name in result.stdout.split(b"\0") if name}
+            return sorted(path for path in paths if path.is_file())
+    except (OSError, subprocess.TimeoutExpired):
+        pass
+    # Source archives have no Git metadata; retain the established generated-tree exclusions.
+    return sorted(path for path in root.rglob("*")
+                  if path.is_file() and not SKIP.intersection(path.relative_to(root).parts))
 
 
 def detect(signal, root):
@@ -404,6 +425,8 @@ def main():
               "the skill path was substituted into nothing")
     hook = (build.HOOKS / "agent-dispatcher-activate.sh").read_text()
     check("hook index == templates", set(re.findall(r"^- `([a-z0-9-]+)`", hook, re.M)) == ids)
+    check("activation invokes the non-executable helper through Python",
+          "python3 -B PACK/context.py --project PROJECT --task-file - --role ID" in hook)
     rendered = sorted((build.ADAPTER / "roles").glob("*.md"))
     check("one rendered role per template", len(rendered) == len(roles))
 
@@ -623,8 +646,25 @@ def main():
     install_script(install_settings())
 
     print("\nhygiene")
-    tracked = [p for p in ROOT.rglob("*")
-               if p.is_file() and ".git/" not in str(p) and "__pycache__" not in str(p)]
+    with tempfile.TemporaryDirectory() as temp:
+        sample = pathlib.Path(temp)
+        (sample / "dist").mkdir()
+        for name in ("tracked.md", "new.py", "dist/fixture.json", "dist/local.json", "ignored.md"):
+            (sample / name).write_text("fixture")
+        (sample / ".gitignore").write_text("dist/\nignored.md\n")
+        check("archive hygiene excludes generated trees while retaining source",
+              {str(path.relative_to(sample)) for path in hygiene_files(sample)}
+              == {".gitignore", "tracked.md", "new.py", "ignored.md"})
+        if shutil.which("git"):
+            sample_env = {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
+            subprocess.run(["git", "init", "--quiet", str(sample)], check=True,
+                           capture_output=True, env=sample_env)
+            subprocess.run(["git", "-C", str(sample), "add", "--force", "--", ".gitignore", "tracked.md",
+                            "dist/fixture.json"], check=True, capture_output=True, env=sample_env)
+            check("repository hygiene retains tracked ignored files and new source, excluding local output",
+                  {str(path.relative_to(sample)) for path in hygiene_files(sample)}
+                  == {".gitignore", "tracked.md", "new.py", "dist/fixture.json"})
+    tracked = hygiene_files(ROOT)
     secret = re.compile(r"(gh[pousr]_[A-Za-z0-9]{20,}|sk-[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|"
                         r"-----BEGIN [A-Z ]*PRIVATE KEY-----)")
     hits = [str(p.relative_to(ROOT)) for p in tracked if p.suffix in (".md", ".json", ".sh", ".py")

@@ -339,9 +339,15 @@ class RecoverableInstallerTests(unittest.TestCase):
             "decision/__main__.py": "# inert engine\n",
             "decision/redact.py": "# fixture\n",
             "catalog/loadouts.json": "{}",
+            "catalog/resource-paths.json": json.dumps({
+                "schema_version": 1, "layout": "source",
+                "roles": {"implementer": "skills/agent-dispatcher/roles/implementer.md"},
+                "guides": {"check": "skills/testing/check/SKILL.md"},
+            }),
             "doctor.py": "# read-only doctor\n",
             "context.py": "# read-only selector\n",
             "project_map.py": "# explicit map builder and read-only inspector\n",
+            "resources.py": "# read-only package resource resolver\n",
             "hooks/agent-dispatcher-activate.sh": "#!/bin/bash\n",
             "commands/agent-reviewer.md": "review v1",
             "commands/agent-implementer.md": "implement v1",
@@ -388,6 +394,13 @@ class RecoverableInstallerTests(unittest.TestCase):
         self.installer.install(self.config, self.repo)
         self.assertEqual((self.config / "skills/agent-dispatcher/SKILL.md").read_text(), "dispatcher v2")
         self.assertTrue((self.config / "skills/agent-dispatcher/doctor.py").is_file())
+        pack = self.config / "skills/agent-dispatcher"
+        self.assertEqual((pack / "resources.py").read_bytes(), (self.repo / "resources.py").read_bytes())
+        self.assertEqual(json.loads((pack / "catalog/resource-paths.json").read_text()), {
+            "schema_version": 1, "layout": "claude_manual",
+            "roles": {"implementer": "roles/implementer.md"},
+            "guides": {"check": "lib/testing/check/SKILL.md"},
+        })
         self.assertEqual((self.config / "commands/agent-reviewer.md").read_text(), "review v2")
         self.assertFalse((self.config / "commands/agent-obsolete.md").exists())
         self.assertEqual((self.config / "commands/agent-user.md").read_text(), "unrelated command")

@@ -376,6 +376,213 @@ class ReportingTests(unittest.TestCase):
         self.assertIn("unavailable", text)
         self.assertEqual({"digest": "fixture"}, result["provenance"])
 
+    def activity(self, availability="complete", role="explorer", count=2):
+        return {"schema_version": 1, "availability": availability,
+                "summary": {"helper_attempts": count, "helper_successes": count,
+                            "guidance_returned_chars": 30, "roles_read": [role]},
+                "route": {"role": role, "basis": "role_read", "consistent": True},
+                "actions": [{"target": "private-profile/skills/secret-guide", "helper": "context"}]}
+
+    def test_activity_complete_partial_and_missing_have_separate_denominators(self):
+        self.add_trial(fixture="complete", activity=self.activity(count=3))
+        self.add_trial(fixture="partial", activity=self.activity("partial", count=2))
+        self.add_trial(fixture="old")
+        metric = self.group(report(self.root))["activity"]["metrics"]["helper_successes"]
+        self.assertEqual(metric, {"observed": 1, "missing": 2, "total": 3, "median": 3,
+                                  "partial_observed_total": 2, "partial_attempts": 1})
+        self.assertIn("partial lower bound", (self.root / "report.md").read_text())
+
+    def test_helper_coverage_uses_eligible_treatment_tasks_and_retains_unknowns(self):
+        def observed(availability="complete", origin=None, count=0):
+            record = self.activity(availability)
+            record["actions"] = [{"kind": "helper", "helper": "context", "outcome": "succeeded"}]
+            if origin:
+                record["actions"][0].update(map_evidence_origin=origin, map_entries=count)
+            return record
+        self.add_trial(fixture="auth", condition="dispatcher", category="context_retrieval", activity=observed())
+        self.add_trial(fixture="stale", condition="dispatcher", category="context_freshness", activity=observed("partial", "preview", 2))
+        self.add_trial(fixture="architecture", condition="dispatcher", category="architecture_discovery", activity=observed("complete", "stored", 0))
+        self.add_trial(fixture="missing", condition="dispatcher", category="context_retrieval", activity=self.activity())
+        self.add_trial(fixture="partial", condition="dispatcher", category="context_freshness", activity=self.activity("partial"))
+        self.add_trial(fixture="trivial", condition="dispatcher", category="edit", activity=observed())
+        self.add_trial(fixture="baseline", category="context_retrieval", activity=observed())
+        result = report(self.root)
+        coverage = result["clients"]["codex"]["helper_coverage"]
+        self.assertEqual(coverage["baseline_not_applicable"], 1)
+        self.assertEqual({key: coverage["context"][key] for key in ("eligible", "observed_success", "not_observed", "unknown")},
+                         {"eligible": 5, "observed_success": 3, "not_observed": 1, "unknown": 1})
+        self.assertIsNone(coverage["context"]["complete_rate"])
+        self.assertEqual(coverage["context"]["observed_rate"], 0.75)
+        self.assertEqual({key: coverage["map"][key] for key in ("eligible", "observed_success", "unknown", "nonempty_facts", "empty_facts")},
+                         {"eligible": 3, "observed_success": 2, "unknown": 1, "nonempty_facts": 1, "empty_facts": 1})
+        self.assertEqual(self.group(result, "dispatcher")["successful"], 6)
+        self.assertIn("Helper adoption on eligible tasks", (self.root / "report.md").read_text())
+
+    def test_route_variation_is_diagnostic_without_changing_success(self):
+        self.add_trial(repetition=1, activity=self.activity(role="explorer"))
+        self.add_trial(repetition=2, activity=self.activity(role="implementer"))
+        result = report(self.root)
+        self.assertEqual(self.group(result)["successful"], 2)
+        agreement = result["clients"]["codex"]["route_agreement"]
+        self.assertEqual(agreement["groups_varied"], 1)
+        self.assertEqual(agreement["groups_agreed"], 0)
+
+    def test_preparation_and_exclusions_are_private_quality_independent_diagnostics(self):
+        def observed(status, availability="complete", attempt="early", outcome="succeeded"):
+            record = self.activity("partial")
+            record["preparation"] = {"schema_version": 1, "status": status, "availability": availability,
+                                     "attempt_timing": attempt, "first_context_attempt_outcome": outcome}
+            record["actions"] = [{"kind": "helper", "helper": "context", "outcome": "succeeded",
+                                  "context_exclusions": {"availability": "complete", "automatic_enabled": True,
+                                  "automatic_count": 2, "manual_count": 0, "applied_count": 2, "unresolved_count": 0, "unresolved_total": 0}}]
+            return record
+        self.add_trial(fixture="first", condition="dispatcher", category="context_retrieval", activity=observed("before_investigation"))
+        self.add_trial(fixture="late", condition="dispatcher", category="context_freshness", activity=observed("after_investigation", "partial", "early", "denied"))
+        self.add_trial(fixture="uncertain", condition="dispatcher", category="architecture_discovery", activity=observed("before_investigation", "partial", "unknown"))
+        self.add_trial(fixture="old", condition="dispatcher", category="context_retrieval", activity=self.activity())
+        self.add_trial(fixture="trivial", condition="dispatcher", category="edit", activity=observed("before_investigation"))
+        self.add_trial(fixture="baseline", category="context_retrieval", activity=observed("before_investigation"))
+        output = report(self.root)
+        coverage = output["clients"]["codex"]["helper_coverage"]
+        prep = coverage["preparation"]
+        self.assertEqual({key: prep[key] for key in ("eligible", "before_investigation", "after_investigation", "not_observed", "unknown")},
+                         {"eligible": 4, "before_investigation": 1, "after_investigation": 1, "not_observed": 0, "unknown": 2})
+        self.assertEqual(prep["first_attempt"], {"early": 2, "late": 0, "not_observed": 0, "unknown": 2, "early_failed_or_denied": 1})
+        exclusions = coverage["exclusions"]
+        self.assertEqual(exclusions["successful_context_calls"], 3)
+        self.assertEqual(exclusions["counts"]["automatic_count"], {"observed_calls": 3, "total": 6})
+        self.assertEqual(self.group(output, "dispatcher")["successful"], 5)
+        self.assertIn("First context attempt:", (self.root / "report.md").read_text())
+        create_review(self.root)
+        self.assertNotIn("preparation", json.dumps(self.packets()))
+        self.assertNotIn("automatic_count", json.dumps(self.packets()))
+
+    def test_missing_exclusion_counts_are_unknown_not_zero(self):
+        record = self.activity()
+        record["actions"] = [{"kind": "helper", "helper": "context", "outcome": "succeeded"},
+                             {"kind": "helper", "helper": "context", "outcome": "succeeded", "context_exclusions": {
+                                 "availability": "partial", "applied_count": 1, "manual_count": True}}]
+        self.add_trial(condition="dispatcher", category="context_retrieval", activity=record)
+        exclusions = report(self.root)["clients"]["codex"]["helper_coverage"]["exclusions"]
+        self.assertEqual((exclusions["unknown_metadata"], exclusions["partial_metadata"]), (1, 1))
+        self.assertEqual(exclusions["counts"]["applied_count"], {"observed_calls": 1, "total": 1})
+        self.assertEqual(exclusions["counts"]["manual_count"], {"observed_calls": 0, "total": 0})
+
+    def test_matching_cleanup_observations_never_establish_absence_or_change_grade(self):
+        record = self.activity()
+        record["actions"] = [{"kind": "write", "target": "trial/check.py", "outcome": "succeeded"},
+                             {"kind": "cleanup_attempt", "target": "trial/check.py", "outcome": "succeeded", "matched_prior_write": True},
+                             {"kind": "cleanup_attempt", "target": "trial/check.py", "outcome": "failed", "matched_prior_write": True},
+                             {"kind": "cleanup_attempt", "target": "outside-owned-trial", "outcome": "succeeded", "matched_prior_write": True}]
+        self.add_trial(activity=record, scope_audit={"schema_version": 1, "availability": "complete", "entry_count": 0}, scope_check={"passed": True})
+        create_review(self.root)
+        scope = self.packets()[0]["scope_evidence"]
+        write = scope["outside_project_writes"][0]
+        self.assertEqual(write["observed_matched_cleanup_successes"], 1)
+        self.assertEqual(scope["outside_project_write_count"], 1)
+        self.assertTrue(scope["requires_human_inspection"])
+        self.assertEqual(scope["outside_audit_remaining_state"], "unknown")
+        self.assertIn("do not independently verify file absence", write["cleanup_limit"])
+        self.assertEqual(self.group(report(self.root))["successful"], 1)
+
+    def test_scope_evidence_is_neutral_and_private_activity_is_never_blinded_packet_data(self):
+        self.add_trial(activity=self.activity(), scope_audit={"schema_version": 1, "availability": "complete",
+                       "entry_count": 1, "entries": [{"path": "/Users/private-profile/model-secret"}]},
+                       scope_check={"passed": False, "reason": "/private/leak"}, task_success=False,
+                       auto_grade={"passed": True, "checks": [{"name": "code", "passed": True}], "human_required": False})
+        create_review(self.root)
+        packet = self.packets()[0]
+        self.assertFalse(packet["scope_evidence"]["passed"])
+        self.assertEqual(packet["scope_evidence"]["residue_entries"], 1)
+        for text in ("private-profile", "secret-guide", "model-secret", "explorer", "helper_successes", "/private/leak"):
+            self.assertNotIn(text, json.dumps(packet))
+        grouped = self.group(report(self.root))
+        self.assertEqual(grouped["artifact_acceptance"]["numerator"], 1)
+        self.assertEqual(grouped["successful"], 0)
+        self.assertEqual(grouped["scope_acceptance"]["numerator"], 0)
+        self.assertIn("Scope evidence", (self.root / "review/packets.md").read_text())
+
+    def test_successful_writes_beyond_owned_audit_require_inspection_without_changing_grade(self):
+        activity = self.activity("partial")
+        activity["actions"] = [
+            {"kind": "write", "target": "outside-owned-trial", "outcome": "succeeded"},
+            {"kind": "write", "target": "trial/check_map.py", "outcome": "succeeded"},
+            {"kind": "write", "target": "outside-owned-trial", "outcome": "denied"},
+            {"kind": "write", "target": "outside-owned-trial", "outcome": "failed"},
+            {"kind": "write", "target": "project/source.py", "outcome": "succeeded"},
+            {"kind": "guidance_read", "target": "package/roles/explorer.md", "outcome": "succeeded"},
+        ]
+        self.add_trial(activity=activity, scope_audit={"schema_version": 1, "availability": "complete",
+                       "entry_count": 0, "entries": [], "clean": True}, scope_check={"passed": True})
+        create_review(self.root)
+        scope = self.packets()[0]["scope_evidence"]
+        self.assertTrue(scope["passed"])
+        self.assertEqual(scope["residue_entries"], 0)
+        self.assertTrue(scope["requires_human_inspection"])
+        self.assertEqual(scope["outside_project_write_count"], 2)
+        self.assertEqual(scope["write_observation_availability"], "partial")
+        self.assertEqual(scope["outside_audit_remaining_state"], "unknown")
+        self.assertEqual(scope["outside_project_writes"], [
+            {"target": "outside-owned-trial", "observed_successful_writes": 1, "remaining_state": "unknown"},
+            {"target": "trial/check_map.py", "observed_successful_writes": 1, "remaining_state": "see_owned_directory_audit"}])
+        self.assertEqual(self.group(report(self.root))["successful"], 1)
+        self.assertIn("human inspection required: True", (self.root / "review/packets.md").read_text())
+        self.assertNotIn("explorer", json.dumps(scope))
+
+    def test_outside_write_flag_is_conservative_even_with_later_cleanup_evidence(self):
+        activity = self.activity()
+        activity["actions"] = [{"kind": "write", "target": "outside-owned-trial", "outcome": "succeeded"}]
+        trial = self.add_trial(activity=activity, scope_audit={"schema_version": 1, "availability": "complete", "entry_count": 0}, scope_check={"passed": True})
+        self.trace(trial, [{"type": "item.completed", "item": {"type": "command_execution", "command": "rm -rf /tmp/cleanup && echo removed", "exit_code": 0, "aggregated_output": "removed"}}])
+        create_review(self.root)
+        self.assertTrue(self.packets()[0]["scope_evidence"]["requires_human_inspection"])
+        self.assertEqual(self.packets()[0]["scope_evidence"]["outside_audit_remaining_state"], "unknown")
+        self.assertTrue(trial["task_success"])
+
+    def test_outside_write_paths_cannot_leak_identity_routing_or_escape(self):
+        activity = self.activity()
+        activity["actions"] = [{"kind": "write", "target": target, "outcome": "succeeded"} for target in (
+            "trial/explorer/report.md", "trial/claude-baseline/secret.md", "trial/../outside", "trial/evil\nHeading")]
+        self.add_trial(activity=activity, scope_audit={"schema_version": 1, "availability": "complete", "entry_count": 0}, scope_check={"passed": True})
+        create_review(self.root)
+        scope = self.packets()[0]["scope_evidence"]
+        self.assertEqual(scope["outside_project_writes"], [{"target": "trial/[path withheld]", "observed_successful_writes": 4, "remaining_state": "see_owned_directory_audit"}])
+        for secret in ("explorer", "claude", "baseline", "secret.md", "Heading", "../"):
+            self.assertNotIn(secret, json.dumps(scope))
+
+    def test_scope_residue_is_bounded_neutral_metadata_and_incomplete_audit_requires_inspection(self):
+        entries = [{"path": "check_map.py", "kind": "file", "size": 123},
+                   {"path": "/Users/private/trial", "kind": "file", "size": 5},
+                   {"path": "../escape", "kind": "symlink", "size": 19},
+                   {"path": "explorer/notes.md", "kind": "directory", "size": 7},
+                   {"path": "scratch.tmp", "kind": "untrusted arbitrary kind", "size": True}]
+        entries += [{"path": f"scratch-{index}.py", "kind": "file", "size": 0} for index in range(50)]
+        self.add_trial(activity=self.activity(), scope_audit={"schema_version": 1, "availability": "partial",
+                       "entry_count": len(entries), "entries": entries}, scope_check={"passed": None})
+        create_review(self.root)
+        scope = self.packets()[0]["scope_evidence"]
+        self.assertTrue(scope["requires_human_inspection"])
+        self.assertIsNone(scope["passed"])
+        self.assertEqual(len(scope["residue"]), 50)
+        self.assertEqual(scope["residue_omitted"], 5)
+        self.assertEqual(scope["residue"][0], {"path": "check_map.py", "kind": "file", "size": 123})
+        self.assertEqual(scope["residue"][2], {"path": "[path withheld]", "kind": "symlink", "size": None})
+        self.assertEqual(scope["residue"][4], {"path": "scratch.tmp", "kind": "unknown", "size": None})
+        for secret in ("/Users", "../escape", "explorer", "untrusted arbitrary"):
+            self.assertNotIn(secret, json.dumps(scope))
+        self.assertIn('"path": "check_map.py"', (self.root / "review/packets.md").read_text())
+
+    def test_old_packets_do_not_gain_scope_fields_or_change_from_private_metrics(self):
+        trial = self.add_trial()
+        create_review(self.root)
+        old = self.packets()
+        self.assertNotIn("scope_evidence", old[0])
+        trial["activity"] = self.activity()
+        trial["activity"]["actions"] = [{"kind": "write", "target": "outside-owned-trial", "outcome": "succeeded"}]
+        self.save()
+        create_review(self.root)
+        self.assertEqual(self.packets(), old)
+
 
 if __name__ == "__main__":
     unittest.main()

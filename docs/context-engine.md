@@ -10,6 +10,50 @@ where to put a new one.
 
 <!-- counts:start -->50 signals decide the conditional buckets across 27 roles and 79 skills.<!-- counts:end -->
 
+## Reliable startup and bounded evidence
+
+Substantial workspace work follows role selection → context helper → selected role and needed
+guides → work and verification. Multi-file bugs, architecture and source-backed reports qualify
+regardless of repository size. Controls and obvious known-file edits retain the bypass. The helper
+returns trusted `resources` separately from untrusted repository excerpts. Generated resource paths
+cover source/plugin, manual Claude and Codex layouts; no normal guide globs or full indexes are needed.
+Core loadouts are candidates, with zero to two guides normally read initially and further guidance
+loaded for specific needs. Forced roles and the optional decision provider retain their precedence.
+
+For substantial tasks, preparation is the first discretionary workspace action. Pass the full,
+unchanged request on stdin before listing files, searching, or reading task contracts and sources.
+Mandatory host instruction discovery remains exempt. A failed helper attempt permits targeted
+fallback investigation with a diagnostic; it does not authorize bypassing a permission denial.
+
+`select_context(..., exclude_paths=(), map_preview=False, auto_exclude=True)` adds optional keyword-only
+controls. CLI equivalents are repeatable `--exclude-path`, `--map-preview`, and `--no-auto-exclude`.
+Named safe paths outrank inferred
+matches, including multiple-dot filenames, quoted spaces and line suffixes. Explicit evidence
+exclusions apply before reads and during enrichment; a no-edit restriction is not a no-read rule.
+Archives remain retrievable when they are the target. Existing scan, excerpt and import-hop caps apply.
+
+Automatic exclusion recognizes explicit distractor and no-read clauses in the request and resolves
+literal names against the safe inventory. It never derives rules from repository contents or fuzzy
+category matches. Negated, conditional, ambiguous or conflicting requests remain readable with a
+diagnostic. Excessive clause or subject counts disable all automatic inference rather than silently
+dropping a later conflict. Manual exclusions remain authoritative. The separate `exclusion_policy`
+records automatic, manual, applied and unresolved rules; hosts preserve applied exclusions during
+subsequent investigation. Inspection can disable inference without changing manual exclusions.
+
+Read-only map previews reuse the same scan when eligible work has a missing or stale cache. Saved
+cache status stays separate from evidence origin; previews never create or refresh files. The map's
+eight-fact/1,000-estimated-token limit remains separate from excerpts. Task filtering is distinguished
+from incomplete coverage. Explicit map build/refresh commands retain sole responsibility for writes.
+
+The workflow size baseline includes role and guide bodies, not only entrypoints. Tests require at
+least 35% fewer bytes for the representative authentication, map-refresh and architecture workflows.
+This is an instruction-footprint check, not measured model context or proof of better outcomes.
+
+Read-only report and regression checks should run inline, using `python3 -B -` where appropriate.
+Do not save validator scripts in project siblings or shared temporary paths. Necessary, permitted
+scratch work uses an owned temporary-directory context and verifies removal. Unknown cleanup stays
+unresolved even when the project diff contains only the requested deliverable.
+
 ## The split that everything else follows
 
 A **context plan** says what an agent needs. An **execution plan** says what it will do. The
@@ -29,7 +73,7 @@ the description carries.
 | `task` | required | What was asked for, how big, and what kind of work it is. |
 | `agent` | required | Which single role owns it, why, and the near-miss it beat. |
 | `capabilities` | as needed | The capability ids the work needs — asked for before any skill id. |
-| `skills` | as needed | The one to five skills selected, each with the reason and whether it is actually installed. |
+| `skills` | as needed | The task-relevant skills selected, each with the reason and whether it is actually installed. |
 | `stack` | as needed | What the project is, with the file behind each claim, and which conditions that settles. |
 | `retrieval` | as needed | What to go and find in the workspace, and the question each search answers. |
 | `context` | as needed | What retrieval returned — ranked, deduplicated, capped, each with its provenance. |
@@ -490,7 +534,7 @@ migration. The signal has to be in what the user asked for.
 Not visible in the repository. No tool enumerates installed skills, configured servers
 or the permission mode — but a *skill's* presence is still establishable, because every
 loaded skill's name and description is in the session's own listing from the start, and
-a local id resolves by globbing `**/<id>/SKILL.md`. A *server's* presence is establish-
+a local id resolves through trusted context resources metadata. A *server's* presence is establish-
 able the same way: its tools are in the session, or they are not. The permission mode
 is not establishable at all. Never assume — and when a signal is about which of two
 skills to use, `CONTEXT.md` section 2 resolves it, not the unknown-default.

@@ -310,7 +310,7 @@ migration. The signal has to be in what the user asked for.
 Not visible in the repository. No tool enumerates installed skills, configured servers
 or the permission mode — but a *skill's* presence is still establishable, because every
 loaded skill's name and description is in the session's own listing from the start, and
-a local id resolves by globbing `**/<id>/SKILL.md`. A *server's* presence is establish-
+a local id resolves through trusted context resources metadata. A *server's* presence is establish-
 able the same way: its tools are in the session, or they are not. The permission mode
 is not establishable at all. Never assume — and when a signal is about which of two
 skills to use, `CONTEXT.md` section 2 resolves it, not the unknown-default.

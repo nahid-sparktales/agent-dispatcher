@@ -914,7 +914,7 @@
       "name": "documentation-verification",
       "path": "skills/knowledge/documentation-verification/SKILL.md",
       "summary": "Documentation is about to be called correct, current or ready to publish, or a setup guide, quickstart or onboarding path fails at an unidentified step.",
-      "description": "Prove a document works by executing it \u2014 every command run in a clean environment, every code example executed, every link and file path resolved, every flag and env var checked against the code. Use before calling docs correct or up to date, when a README or setup guide is suspected stale, when onboarding fails at an unknown step, or when checking someone else's documentation change. Not for judging whether the writing is clear or well structured, and not a substitute for the project's own test suite."
+      "description": "Verify documentation against its promises: validate source-report citations and schemas, or execute runnable guide commands in the stated environment. Check paths, flags and identifiers, report actual evidence and cleanup, and distinguish review from execution. Not a prose-quality review or a replacement for project tests."
     },
     {
       "id": "e2e-testing",
@@ -1618,7 +1618,7 @@
       "name": "regression-testing",
       "path": "skills/quality/regression-testing/SKILL.md",
       "summary": "A bug has just been fixed, or keeps coming back, and the fix needs a test that is proven to fail without it.",
-      "description": "Turn a fixed bug into a test that fails on the old code and passes on the new one \u2014 pick the cheapest level that can observe the defect, assert the behaviour rather than the patch, and confirm the failure by reverting the fix. Use right after a bug is fixed, when adding coverage for a defect that keeps coming back, or when a test was written for a fix but never seen failing. Not for designing a test strategy or a new feature's suite, and not the right tool for an environmental, cosmetic or one-off failure \u2014 this skill says when to write no test at all."
+      "description": "Turn a fixed bug into a test that fails on the old code and passes on the new one. Assert behavior at the cheapest useful level and compare old behavior without reverting unrelated work or leaving scratch files. Use after a fix or when recurring defects lack coverage; not for a new feature's test strategy or an environmental/cosmetic failure."
     },
     {
       "id": "release-verification",

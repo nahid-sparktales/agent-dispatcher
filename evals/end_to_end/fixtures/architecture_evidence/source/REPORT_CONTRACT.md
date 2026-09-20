@@ -5,7 +5,7 @@ entrypoint, features, edges, dependencies, test_command, and decision.
 - entrypoint: value is the current public HTTP-style callable as module:symbol.
 - features: one object per supported /tasks route, with id (list_tasks or
   create_task), value (METHOD /path), and evidence for its route branch.
-- edges: the four direct route-to-service and service-to-store calls for those
+- edges: all direct route-to-service and service-to-store calls for those
   features. Each object has from, to, evidence. The route symbol is handle_request;
   method symbols use Class.method. Do not add import-only or proposed edges.
 - dependencies: value is the exact ordered array of declared project dependencies.

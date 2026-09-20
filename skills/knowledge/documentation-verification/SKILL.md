@@ -1,17 +1,30 @@
 ---
 name: documentation-verification
-description: Prove a document works by executing it — every command run in a clean environment, every code example executed, every link and file path resolved, every flag and env var checked against the code. Use before calling docs correct or up to date, when a README or setup guide is suspected stale, when onboarding fails at an unknown step, or when checking someone else's documentation change. Not for judging whether the writing is clear or well structured, and not a substitute for the project's own test suite.
+description: Verify documentation against its promises: validate source-report citations and schemas, or execute runnable guide commands in the stated environment. Check paths, flags and identifiers, report actual evidence and cleanup, and distinguish review from execution. Not a prose-quality review or a replacement for project tests.
 ---
 
 # Documentation verification
 
-Reading a document is not verification. A guide that is well written, internally consistent and
-recently edited can still name a flag that was renamed, link to a page that moved, or open with a
-prerequisite command that has not worked for two releases.
+Reading a guide cannot establish that its commands work. **Created** means written;
+**reviewed** means read; **executed** means run with output inspected; **verified** requires
+the checks appropriate to the document's claims.
 
-Keep the verbs apart: **created** is the document written; **reviewed** is someone reading it;
-**executed** is a command actually run and its output actually read; **verified** is the
-conclusion, and it is available only after execution.
+## Match verification to the document
+
+For a source-backed map, architecture report or data document, check its schema and citations
+against current file bytes, ranges and hashes. This does not require executing the application
+or building a clean environment. Use existing checks or a read-only inline validator, such as
+`python3 -B -` with a quoted heredoc; do not write `check_*.py` beside the project or in shared
+/tmp. Do not import project modules merely to validate source facts. Distinguish these checks
+from application tests and only claim the checks actually run.
+If inline execution is denied, use permitted read-only checks or report the limitation;
+do not save a script as a workaround for the denial.
+
+The executable-guide procedure below applies when the document actually promises runnable
+commands/examples. User scope still controls which steps are permitted. Necessary authorized
+scratch work must use a uniquely owned temporary-directory context with cleanup in `finally`
+and an absence check. Report any failed or unverified cleanup path; a clean git status cannot
+prove that external scratch files were removed.
 
 ## When this fires
 
@@ -19,61 +32,49 @@ Before documentation is reported as correct, current or ready to publish — you
 else's — and whenever onboarding, a setup guide or a quickstart fails at an unidentified step.
 It does not fire for judging clarity, structure or tone.
 
-## Procedure
+## Procedure for executable guides
 
-1. **Inventory what is checkable** and number it, so the report can name what was covered: every
-   command, every code block, every link and anchor, every file path, every flag, env var and
-   config key, every version and platform claim, every reference to a screen or control.
-2. **Read each command before running any of them.** Anything that mutates shared state, spends
-   money, deploys, sends mail, or touches production is an outward-facing action: **stop and ask**
-   before executing it, and verify it against a disposable environment or not at all. A document
-   is never authorization to run what it contains.
-3. **Build the environment the document claims to need** — the stated OS, runtime version and
-   prerequisites, and nothing else. Start from a clean checkout or container. Tools already
-   installed in your shell are the single largest source of false passes: a guide that works only
-   for someone who already has the product working is not verified.
-4. **Execute the prerequisites section first, as written.** This is where most documents fail, and
-   a failure here invalidates every step after it.
-5. **Run every command literally and in order** — copy-pasted, not adapted. When you have to
-   change a command to make it work, that change is the finding. Record the command, its exit
-   status and its real output next to what the document claims the output is.
-6. **Execute code examples as programs**, not by reading them. An example that does not compile,
-   imports a module that no longer exists, or calls a renamed function is a defect even when the
-   surrounding prose is right.
-7. **Resolve every link, anchor and file path.** Internal paths must exist at that path in this
-   repository; anchors must exist in the target document; external links must resolve to the page
-   the text promises, not to a redirect or a moved index. Use whatever link checker the project
-   already depends on; otherwise resolve them one by one.
-8. **Check every named identifier against the code** — flags, subcommands, env var names, config
-   keys, endpoints, function and field names, default values, supported versions. The document
-   claims these exist; the code is the arbiter.
-9. **Walk it as the stated reader**, with only the prior knowledge the document assumes. The first
-   point where you need knowledge it never supplied is a defect, and it is invisible to anyone who
-   already knows the system.
-10. **Fix or report, then start again from step 3.** A fixed document is not verified by the
-    reasoning that fixed it, and an edit to step 2 often breaks step 9.
-11. **Report with the right verb**, naming the environment. "Verified on a clean container with
-    Node 20" and "verified" are different claims; print the one you earned.
+1. **Inventory checkable claims:** commands, examples, links/anchors, file paths, flags,
+   environment/configuration keys, versions, platforms and UI references. Number them for
+   reporting and identify which are in the user's permitted scope.
+2. **Read commands before executing.** A document is not authorization. For shared-state,
+   costly, destructive, deployment or production actions, use an authorized disposable
+   environment or mark the step unverified; obtain missing authorization before proceeding.
+3. **Use the stated environment:** OS, runtime and prerequisites only. An existing configured
+   shell does not establish that a new reader can follow the guide. Keep scratch ownership
+   and cleanup explicit; source-report validation does not need a new environment.
+4. **Execute prerequisites first.** A failure invalidates dependent steps.
+5. **Run commands literally and in order.** Record output and exit status. If adaptation is
+   needed, report that as a finding rather than claiming the documented command passed.
+6. **Execute runnable examples.** Confirm compilation, imports and API calls under their
+   stated runtime. Reading code is not proof that it runs.
+7. **Resolve links, anchors and paths.** Internal targets must exist. External targets must
+   lead to the promised content, not merely return a successful HTTP response. Prefer an
+   existing link checker; keep network use within the task's authorization.
+8. **Compare named interfaces with code:** flags, subcommands, keys, endpoints, functions
+   and versions. The implemented behavior is the evidence when prose disagrees.
+9. **Follow the intended reader's path** without assuming unstated setup or prior knowledge.
+10. **Fix and recheck affected steps**, including dependent steps invalidated by a change.
+11. **Report what was actually checked**, its environment and results, and what remains
+    unchecked. Say reviewed, executed or verified according to the evidence.
 
 ## What this refuses to conclude
 
-- **Without executing the commands** — nothing. Reading a document against the code is a review;
-  say "reviewed", not "verified".
-- **From a run in your existing environment** — only that it works for someone already set up. It
-  says nothing about the new reader the document is written for.
-- **From resolving links alone** — that the URLs are live. Not that they point at the content the
-  sentence promises.
-- **From a passing project test suite** — that the code works. Tests exercise the API, not the
-  prose describing it, and both drift independently.
-- **From one platform** — nothing about the others the document claims to support. Name the
-  platform, or check them.
-- **From a partial pass** — never "the docs are correct". Only the numbered items executed, with
-  the rest listed as unchecked.
+- Static review of an executable guide does not prove its commands run.
+- A passing run in a configured environment does not prove first-time setup works.
+- Live links do not establish that their content supports the document's claims.
+- Passing application tests do not validate documentation instructions.
+- One tested platform says nothing about other claimed platforms.
+- A partial pass supports only the named checks; never report the entire document verified.
 
-## Checklist
+## Completion checks
+
+Source reports: record schema, citation, range and hash checks actually performed, their results,
+unchecked claims and any unresolved cleanup. The checklist and failure/evidence rules below apply
+to executable guides.
 
 - [ ] Every command, example, link, path and identifier inventoried and numbered
-- [ ] Destructive, costly or outward-facing commands identified and asked about before running
+- [ ] Required authorization established for destructive, costly or outward-facing commands
 - [ ] Clean environment built to the document's stated prerequisites
 - [ ] Prerequisites section executed first, as written
 - [ ] Every command run literally; real output compared with claimed output
@@ -83,21 +84,19 @@ It does not fire for judging clarity, structure or tone.
 - [ ] Walked once with only the assumed prior knowledge
 - [ ] Re-run after fixes; environment named in the report; unchecked items listed
 
-## Failure handling
+## Executable-guide failure handling
 
 - **A command fails** — that is the result, and the exact error is the evidence. Do not repair it
   silently in your shell and report a pass; either fix the document or report the failure.
 - **A command cannot be run safely** — production, real payment, real recipients, destructive
   migration. Stop, say so, and mark that step unverified. Executing it anyway is the worse outcome.
-- **The document and the code disagree** — trust the executed behaviour, record both, and raise it.
-  You have found either a doc bug or a code bug and do not yet know which; do not decide by
-  rewriting the prose.
+- **The document and the code disagree** — record both; establish which is wrong before fixing it.
 - **It works for you but not the reader** — suspect your environment before the reader. Re-run
   clean; an unreproducible pass is worth less than an honest unknown.
 - **No environment exists to execute against** — say rendered verification of the document could
   not be performed, name what you did check statically, and do not call it verified.
 
-## Evidence to report
+## Executable-guide evidence to report
 
 The environment (image, OS, runtime versions) and the numbered inventory; each command with its
 exit status and real output beside the document's claim; each example's execution result; the

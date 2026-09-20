@@ -30,11 +30,16 @@ claims. Correct their source and refresh the map.
 
 The context selector reads an existing map automatically. It verifies current source
 fingerprints and support for each fact before returning a compact, task-relevant subset.
-Missing maps leave ordinary context selection available. Changed, deleted, ignored, or
+With --map-preview, substantial source investigation can derive fresh source-linked facts
+from the selector's existing scan when the cache is missing or stale. Previews never write.
+Saved-cache status and evidence origin are reported separately; eight facts and 1,000
+estimated tokens bound the evidence. Intentional task exclusions are not stale sources.
+Without preview, missing maps leave ordinary context selection available. Changed, deleted, ignored, or
 unreadable sources cannot supply current facts. Report stale or partial coverage and use
 targeted investigation to fill gaps. A new file can make coverage incomplete even when
 previous facts remain valid. Run `refresh` when the user requests a map update; inspection
-and context selection do not silently write or refresh it.
+and context selection do not silently write or refresh it. A preview is fresh evidence,
+not a persisted refresh; no task-specific filters are saved in the map.
 
 Recheck context when the task focus or relevant source changes. The map is bounded and
 heuristic: a recognized definition suggests a feature location; imports and manifests

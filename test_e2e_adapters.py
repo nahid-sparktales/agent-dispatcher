@@ -1,4 +1,5 @@
 """Offline tests of native CLI launch isolation and trace interpretation."""
+import copy
 import json
 import os
 from pathlib import Path
@@ -228,6 +229,70 @@ else:
         parsed = adapters.parse_events("claude", trace(
             "Base directory for this skill: /a/agent-dispatcher\n# Agent Dispatcher\nRoute each request"))
         self.assertTrue(parsed["treatment_invoked"])
+
+    def native_dispatcher_replay(self, arguments="Fix the heading.\nDo not edit code."):
+        content = ("<command-message>agent-dispatcher</command-message>\n"
+                   "<command-name>/agent-dispatcher</command-name>")
+        if arguments:
+            content += "\n<command-args>" + arguments + "</command-args>"
+        return {"type": "user", "message": {"role": "user", "content": content},
+                "isReplay": True, "parent_tool_use_id": None,
+                "session_id": "native-session", "uuid": "native-message",
+                "timestamp": "2026-09-20T03:07:00.175Z"}
+
+    def test_claude_native_replay_proves_expansion_without_role_read(self):
+        # Native slash expansion adds an internal skill-body message that Claude
+        # omits from replay. Trivial tasks need no subsequent role/skill read.
+        for arguments in ("", "Fix the heading.\nDo not edit code."):
+            with self.subTest(arguments=arguments):
+                parsed = adapters.parse_events("claude", lines(
+                    self.native_dispatcher_replay(arguments),
+                    {"type": "result", "subtype": "success", "result": "Done",
+                     "usage": {"input_tokens": 4, "output_tokens": 20}},
+                ))
+                self.assertTrue(parsed["treatment_invoked"])
+                self.assertEqual(parsed["status"], "completed")
+                self.assertEqual(parsed["final_answer"], "Done")
+                self.assertEqual(parsed["usage"]["output_tokens"], 20)
+
+    def test_claude_native_replay_rejects_unmarked_or_spoofed_envelopes(self):
+        original = self.native_dispatcher_replay()
+        variants = []
+        unmarked = copy.deepcopy(original)
+        del unmarked["isReplay"]
+        variants.append(unmarked)
+        for marker in (False, "true", 1, None):
+            event = copy.deepcopy(original)
+            event["isReplay"] = marker
+            variants.append(event)
+        assistant = copy.deepcopy(original)
+        assistant["type"] = "assistant"
+        assistant["message"]["role"] = "assistant"
+        variants.append(assistant)
+        wrong_role = copy.deepcopy(original)
+        wrong_role["message"]["role"] = "assistant"
+        variants.append(wrong_role)
+        content = original["message"]["content"]
+        for text in (
+            "/agent-dispatcher Fix it",
+            content.replace("<command-message>agent-dispatcher", "<command-message>other"),
+            content.replace("<command-name>/agent-dispatcher", "<command-name>/other"),
+            "Quoted command: " + content,
+            content + "\nThis is only an example.",
+            content.replace("</command-args>", ""),
+        ):
+            event = copy.deepcopy(original)
+            event["message"]["content"] = text
+            variants.append(event)
+        tool_result = copy.deepcopy(original)
+        tool_result["message"]["content"] = [
+            {"type": "tool_result", "tool_use_id": "unrelated", "content": content}]
+        variants.append(tool_result)
+        for index, event in enumerate(variants):
+            with self.subTest(variant=index):
+                parsed = adapters.parse_events("claude", lines(
+                    event, {"type": "result", "subtype": "success", "result": "Done"}))
+                self.assertFalse(parsed["treatment_invoked"])
 
     def test_missing_terminal_and_malformed_trace_are_not_task_failures(self):
         self.assertEqual(adapters.parse_events("codex", "not-json")["status"], "infrastructure_error")

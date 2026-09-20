@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Review room</title>
+  <link rel="stylesheet" href="/styles.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to the response</a>
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="Review room home"><span class="brand-mark" aria-hidden="true">r.</span><span>Review room<small>A little focus. A fair comparison.</small></span></a>
+    <div class="top-actions"><span class="blind-badge"><span aria-hidden="true">◈</span> Anonymous review</span><button id="help-button" class="button quiet">How to review <span aria-hidden="true">↗</span></button></div>
+  </header>
+  <div id="loading" class="loading" role="status">Getting your responses ready…</div>
+  <div id="fatal" class="fatal" hidden role="alert"></div>
+  <div id="app" class="app" hidden>
+    <aside class="sidebar" aria-label="Review progress and responses">
+      <div class="sidebar-heading"><span class="eyebrow">YOUR REVIEW</span><h2 id="progress-label">0 of 24 ready</h2><div class="progress-track"><div id="progress-fill"></div></div><p id="progress-detail" class="muted">Take them one at a time.</p></div>
+      <nav id="scenario-nav" aria-label="Scenarios"></nav>
+      <div class="sidebar-bottom"><p id="apply-description">Your choices stay on this computer.</p><button id="apply-button" class="button primary full" disabled>Apply reviews</button><button id="export-button" class="button quiet full">Download ratings <span aria-hidden="true">↓</span></button></div>
+    </aside>
+    <main id="main" tabindex="-1">
+      <div class="page-heading"><div><div class="eyebrow" id="position-label"></div><h1 id="scenario-title"></h1><p id="scenario-description"></p></div><div class="page-controls"><select id="jump-select" aria-label="Jump to a response"></select><button id="previous-button" class="button icon" aria-label="Previous response">←</button><button id="next-button" class="button icon" aria-label="Next response">→</button></div></div>
+      <button id="assessment-shortcut" class="button quiet" data-assessment-link>Go to my assessment ↓</button>
+      <div class="review-layout">
+        <section class="reading-column" aria-label="Task and response">
+          <section class="brief card"><div class="section-label"><span class="step-number">1</span><h2>What you’re looking for</h2></div><ul id="acceptance-list" class="acceptance-list"></ul><details class="original-request"><summary>Read the original request</summary><div id="request-text" class="prose compact"></div></details></section>
+          <section class="response card"><div class="response-header"><div class="section-label"><span class="step-number">2</span><h2>Read the response</h2></div><span id="reading-time" class="subtle"></span></div><div class="tabs" role="tablist" aria-label="Response and evidence"><button id="tab-answer" role="tab" aria-selected="true" aria-controls="content-panel" data-tab="answer">Answer</button><button id="tab-files" role="tab" aria-selected="false" aria-controls="content-panel" data-tab="files" tabindex="-1">Supporting files <span id="file-count"></span></button><button id="tab-checks" role="tab" aria-selected="false" aria-controls="content-panel" data-tab="checks" tabindex="-1">Recorded checks</button></div><div id="content-panel" class="content-panel" role="tabpanel" aria-labelledby="tab-answer" tabindex="0"></div></section>
+        </section>
+        <aside id="assessment" class="assessment card" aria-label="Your assessment"><div class="assessment-heading"><div class="section-label"><span class="step-number">3</span><h2>Your assessment</h2></div><p>Five checks. Your own judgment.</p></div><form id="rating-form"><div id="questions"></div><div class="notes-group"><label for="notes">Anything worth noting? <span>Optional</span></label><textarea id="notes" rows="3" maxlength="6000" placeholder="A missing detail, a questionable claim, or why you’re unsure…"></textarea></div><div class="rating-footer"><div id="save-status" class="save-status" role="status" aria-live="polite">All changes saved</div><button id="retry-button" type="button" class="button quiet full" hidden>Retry saving</button><button id="save-next" class="button primary full" type="submit">Save & next <span aria-hidden="true">→</span></button><button id="skip-button" class="button quiet full" type="button">Set aside for now</button><p class="footer-note">“Not sure” keeps this review pending.</p></div></form></aside>
+      </div>
+      <div class="bottom-navigation"><span id="bottom-position"></span><button id="assessment-link" class="button quiet" data-assessment-link>Go to my assessment ↑</button></div>
+    </main>
+  </div>
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+  <dialog id="help-dialog"><button class="dialog-close button icon" data-close aria-label="Close help">×</button><span class="eyebrow">A QUICK INTRODUCTION</span><h2>A simple way to<br>judge each answer.</h2><p class="dialog-intro">The answers are already written. You don’t need to run anything or write code.</p><ol class="intro-steps"><li><span>01</span><div><strong>Start with the brief</strong><p>The checklist tells you what a good answer should do.</p></div></li><li><span>02</span><div><strong>Read, then check the evidence</strong><p>Open Supporting files or Recorded checks when you need to verify a claim.</p></div></li><li><span>03</span><div><strong>Make five simple choices</strong><p>Choose Yes, No, or Not sure. No scores are filled in for you. Your progress saves automatically.</p></div></li></ol><div class="intro-note">Both setups are hidden while you review. Apply your finished reviews when you’re ready; uncertain answers stay pending.</div><button id="start-button" class="button primary full">Start reviewing <span aria-hidden="true">→</span></button></dialog>
+  <dialog id="finish-dialog"><button class="dialog-close button icon" data-close aria-label="Close progress summary">×</button><span class="eyebrow">REVIEW PROGRESS</span><h2 id="finish-title">You’ve reached the end.</h2><p id="finish-description"></p><div id="finish-details" class="finish-details"></div><button id="finish-apply" class="button primary full">Apply finished reviews</button><button id="return-pending" class="button quiet full">Return to an unfinished response</button></dialog>
+  <dialog id="results-dialog"><button class="dialog-close button icon" data-close aria-label="Close results">×</button><span class="eyebrow">YOUR REVIEW IS APPLIED</span><h2>Now, the comparison.</h2><div id="results-content"></div><button class="button primary full" data-close>Back to my reviews</button></dialog>
+</body>
+</html>

@@ -148,8 +148,12 @@ def emit_hook(config):
         # No task, repository prose, or tool output enters this preamble.
         message = ("AGENT DISPATCHER ACTIVE for Codex. The user opted into specialist routing. "
                    f"Read the skill at {json.dumps(str(PACK / 'SKILL.md'))} before routing work. "
-                   "Use its role catalog and only the selected role's supporting guides. "
+                   "Select the role from the request. For substantial work, the first discretionary workspace action "
+                   "is its read-only context helper with the full unchanged task, before listings, searches or source/contract reads "
+                   "(mandatory host instructions excepted); preserve its exclusion_policy, "
+                   "then read only that role and needed guides at returned exact resource paths. "
                    "Honor the user's current instructions and host permissions. "
+                   "Use inline read-only validators; verify removal of any necessary owned scratch files. "
                    "Stop routing immediately when the user asks. "
                    f"Current session id: {session or '(unavailable)'}. "
                    "Use $agent-dispatcher off to stop this session, off here for this project, "

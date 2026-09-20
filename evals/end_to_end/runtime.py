@@ -195,3 +195,68 @@ def execute(argv, *, cwd, env, prompt, timeout, output_limit=20 * 1024 * 1024):
             "cancelled": cancelled,
             "cleanup_warning": cleanup_warning,
             "output_overflow": overflow.is_set(), "elapsed_seconds": time.monotonic() - started}
+
+
+def audit_trial_parent(workspace, *, max_entries=10000, max_seconds=5):
+    """Inspect metadata in the owned trial parent before teardown, never contents.
+
+    This does not inspect the host or authentication profile. A before/after
+    project snapshot cannot see siblings, while this bounded audit can preserve
+    their existence without following links or collecting arbitrary file data.
+    """
+    workspace = Path(workspace)
+    root = workspace.parent
+    result = {"schema_version": 1, "scope": "owned trial directory outside project",
+              "availability": "complete", "entries": [], "entry_count": 0, "clean": None,
+              "limits": {"max_entries": max_entries, "max_seconds": max_seconds}, "diagnostics": []}
+    started = time.monotonic()
+    pending = [Path(".")]
+    root_fd = None
+    flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+    try:
+        root_fd = os.open(root, flags)
+        while pending:
+            if time.monotonic() - started >= max_seconds:
+                result["availability"] = "partial"
+                result["diagnostics"].append("Owned trial metadata inspection reached its time limit.")
+                break
+            relative = pending.pop()
+            folder_fd = os.dup(root_fd)
+            try:
+                # Reopen each component relative to an anchored descriptor.
+                # A candidate-created/replaced symlink is never traversed.
+                for component in relative.parts:
+                    child_fd = os.open(component, flags, dir_fd=folder_fd)
+                    os.close(folder_fd)
+                    folder_fd = child_fd
+                with os.scandir(folder_fd) as stream:
+                    for entry in stream:
+                        if relative == Path(".") and entry.name == workspace.name:
+                            continue
+                        if time.monotonic() - started >= max_seconds or result["entry_count"] >= max_entries:
+                            result["availability"] = "partial"
+                            result["diagnostics"].append("Owned trial metadata inspection reached its time or entry limit.")
+                            pending.clear()
+                            break
+                        info = entry.stat(follow_symlinks=False)
+                        mode = info.st_mode
+                        kind = "symlink" if stat.S_ISLNK(mode) else "directory" if stat.S_ISDIR(mode) else "file" if stat.S_ISREG(mode) else "special"
+                        name = relative / entry.name
+                        result["entries"].append({"path": name.as_posix(), "kind": kind,
+                                                  "size": info.st_size if kind == "file" else None})
+                        result["entry_count"] += 1
+                        if kind == "directory":
+                            pending.append(name)
+            finally:
+                os.close(folder_fd)
+            if result["availability"] == "partial" and not pending:
+                break
+    except OSError:
+        result["availability"] = "partial" if result["entries"] else "unavailable"
+        result["diagnostics"].append("Owned trial metadata could not be completely inspected.")
+    finally:
+        if root_fd is not None:
+            os.close(root_fd)
+    result["entries"].sort(key=lambda item: item["path"])
+    result["clean"] = False if result["entries"] else True if result["availability"] == "complete" else None
+    return result

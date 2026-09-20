@@ -302,6 +302,136 @@ class ProjectMapTests(unittest.TestCase):
         self.assertFalse(result["project_map"]["diagnostics"])
         self.assertFalse(self.state.parent.exists())
 
+    def test_missing_map_preview_is_source_linked_read_only_and_keeps_cache_missing(self):
+        self.basic()
+        before = self.snapshot()
+        result = context.select_context(self.project, "validate_login", pack=ROOT, map_preview=True)
+        mapping = result["project_map"]
+        self.assertEqual(mapping["status"], "missing")
+        self.assertEqual(mapping["cache_status"], "missing")
+        self.assertEqual(mapping["evidence_origin"], "preview")
+        self.assertEqual(mapping["preview"], {"requested": True, "used": True, "persisted": False})
+        self.assertTrue(mapping["entries"])
+        self.assertEqual({e["source"]["path"] for e in mapping["entries"]}, {"src/auth.py"})
+        for entry in mapping["entries"]:
+            source = entry["source"]
+            self.assertEqual(source["sha256"], hashlib.sha256((self.project / source["path"]).read_bytes()).hexdigest())
+            self.assertEqual(source["line"], 2)
+        self.assertEqual(mapping["coverage"], {"scan_complete": True, "task_filtered": False, "excluded_files": 0})
+        self.assertIn("read-only preview; cache missing", context.render(result))
+        self.assertEqual(self.snapshot(), before)
+        self.assertFalse(self.state.parent.exists())
+        self.assertEqual(self.show()["status"], "missing")
+
+    def test_preview_reuses_selector_snapshot_without_scan_or_write(self):
+        self.basic()
+        def enrich(project, task, pack, snapshot, preview=False):
+            return project_map.context_entries(project, task, pack=pack, snapshot=snapshot, preview=preview)
+        with mock.patch.object(context, "_project_map", side_effect=enrich), \
+                mock.patch.object(context, "_enumerate", wraps=context._enumerate) as listing, \
+                mock.patch.object(context, "_read", wraps=context._read) as reading, \
+                mock.patch.object(project_map, "_scan", side_effect=AssertionError("second scan")), \
+                mock.patch.object(project_map, "_write", side_effect=AssertionError("preview wrote")):
+            result = context.select_context(self.project, "validate_login", pack=ROOT, map_preview=True)
+        self.assertEqual(listing.call_count, 1)
+        paths = [call.args[1] for call in reading.call_args_list]
+        self.assertEqual(len(paths), len(set(paths)))
+        self.assertEqual(result["project_map"]["evidence_origin"], "preview")
+
+    def test_stale_preview_uses_changed_renamed_and_new_sources_without_replacing_cache(self):
+        self.write("old.py", "def validate_old(): pass\n")
+        self.write("deleted.py", "def validate_deleted(): pass\n")
+        self.write("ignored.py", "def validate_ignored(): pass\n")
+        self.write("changed.py", "def validate_before(): pass\n")
+        self.build()
+        (self.project / "old.py").rename(self.project / "renamed.py")
+        (self.project / "deleted.py").unlink()
+        self.write(".gitignore", "ignored.py\n")
+        self.write("changed.py", "def validate_after(): pass\n")
+        self.write("new.py", "def validate_new(): pass\n")
+        before = self.snapshot()
+        result = context.select_context(self.project, "validate project sources", pack=ROOT, map_preview=True)
+        mapping = result["project_map"]
+        self.assertEqual(mapping["cache_status"], "stale")
+        self.assertTrue(mapping["refresh_recommended"])
+        self.assertEqual(mapping["evidence_origin"], "preview")
+        self.assertEqual({e["source"]["path"] for e in mapping["entries"]}, {"renamed.py", "changed.py", "new.py"})
+        self.assertNotIn("validate_before", json.dumps(mapping["entries"]))
+        self.assertGreater(mapping["withheld_facts"], 0)
+        self.assertEqual(self.snapshot(), before)
+        self.assertEqual(self.show()["status"], "stale")
+
+    def test_fresh_cache_does_not_derive_a_preview(self):
+        self.basic()
+        self.build()
+        helper = project_map._context()
+        snapshot = project_map._scan(self.project, helper, helper._scrubber(ROOT))
+        with mock.patch.object(project_map, "_derive_map", side_effect=AssertionError("fresh cache rebuilt")):
+            result = project_map.context_entries(self.project, "validate_login", pack=ROOT, snapshot=snapshot, preview=True)
+        self.assertEqual(result["cache_status"], "fresh")
+        self.assertEqual(result["evidence_origin"], "stored")
+        self.assertFalse(result["preview"]["used"])
+
+    def test_task_exclusions_withhold_cached_facts_without_false_staleness(self):
+        self.write("auth.py", "def validate_live(): pass\n")
+        self.write("archive/auth.py", "def validate_legacy(): pass\n")
+        self.build()
+        self.write("archive/auth.py", "def validate_new_archive(): pass\n")
+        before = self.snapshot()
+        with mock.patch.object(context, "_read", wraps=context._read) as reading:
+            result = context.select_context(self.project, "validate", pack=ROOT, exclude_paths=["archive"], map_preview=True)
+        mapping = result["project_map"]
+        self.assertEqual([call.args[1] for call in reading.call_args_list], ["auth.py"])
+        self.assertEqual({e["source"]["path"] for e in mapping["entries"]}, {"auth.py"})
+        self.assertEqual(mapping["cache_status"], "partial")
+        self.assertFalse(mapping["refresh_recommended"])
+        self.assertEqual(mapping["task_excluded_facts"], 1)
+        self.assertEqual(mapping["withheld_facts"], 0)
+        self.assertEqual(mapping["evidence_origin"], "stored")
+        self.assertEqual(mapping["coverage"], {"scan_complete": True, "task_filtered": True, "excluded_files": 1})
+        self.assertFalse(mapping["preview"]["used"])
+        self.assertEqual(self.snapshot(), before)
+
+    def test_preview_exclusions_and_incomplete_scan_have_distinct_coverage(self):
+        self.write("auth.py", "def validate_live(): pass\n")
+        self.write("archive/auth.py", "def validate_legacy(): pass\n")
+        filtered = context.select_context(self.project, "validate", pack=ROOT, exclude_paths=["archive"], map_preview=True)["project_map"]
+        self.assertEqual({e["source"]["path"] for e in filtered["entries"]}, {"auth.py"})
+        self.assertEqual(filtered["coverage"], {"scan_complete": True, "task_filtered": True, "excluded_files": 1})
+        with mock.patch.object(context, "MAX_SCAN_BYTES", 2):
+            partial = context.select_context(self.project, "validate", pack=ROOT, map_preview=True)["project_map"]
+        self.assertEqual(partial["coverage"], {"scan_complete": False, "task_filtered": False, "excluded_files": 0})
+        self.assertEqual(partial["cache_status"], "missing")
+        self.assertEqual(partial["evidence_origin"], "preview")
+        self.assertFalse(self.state.parent.exists())
+
+    def test_preview_rejects_unsafe_existing_state_and_preserves_task_ranking(self):
+        self.basic()
+        plain = context.select_context(self.project, "validate_login", pack=ROOT)
+        preview = context.select_context(self.project, "validate_login", pack=ROOT, map_preview=True)
+        for field in ("context", "excerpts", "budget"):
+            self.assertEqual(plain[field], preview[field])
+        self.state.parent.mkdir()
+        self.state.write_text('{"foreign":true}')
+        before = self.snapshot()
+        refused = context.select_context(self.project, "validate_login", pack=ROOT, map_preview=True)["project_map"]
+        self.assertEqual(refused["cache_status"], "unavailable")
+        self.assertFalse(refused["entries"])
+        self.assertFalse(refused["preview"]["used"])
+        self.assertEqual(self.snapshot(), before)
+
+    def test_preview_fact_budget_and_no_provider_or_source_execution(self):
+        self.write("feature.py", "import os\nos.system('touch EXECUTED')\n" +
+                   "\n".join(f"def validate_operation_{i}(): pass" for i in range(60)))
+        self.write(".agent-dispatcher-decision.json", '{"mode":"required","provider":"broken"}')
+        with mock.patch.dict(os.environ, {"AGENT_DISPATCHER_DECISION_MODE": "required"}):
+            result = context.select_context(self.project, "validate", pack=ROOT, map_preview=True)["project_map"]
+        self.assertTrue(result["entries"])
+        self.assertLessEqual(len(result["entries"]), 8)
+        self.assertLessEqual(result["estimated_tokens"], 1000)
+        self.assertFalse((self.project / "EXECUTED").exists())
+        self.assertFalse(self.state.parent.exists())
+
     def test_human_show_links_sources_and_labels_heuristics(self):
         self.write("auth.py", "def validate_login(): pass\n")
         result = self.build()

@@ -636,9 +636,9 @@ def inspect(pack=None, project=None, host=None, config_dir=None, role=None, evid
         "DELEGATION.md", "PROJECT-MAP.md", "jev.md", "DOCTOR.md")]
     required += [ref_base / "roles" / (name + ".md") for name in roles]
     required += [pack / "scripts" / name if ref_base != pack else pack / name
-                 for name in ("doctor.py", "context.py", "project_map.py")]
+                 for name in ("doctor.py", "context.py", "project_map.py", "resources.py")]
     runtime = catalog.parent if catalog else (pack / "scripts/runtime" if ref_base != pack else pack)
-    required += [runtime / "catalog/loadouts.json", runtime / "decision/redact.py"]
+    required += [runtime / "catalog/loadouts.json", runtime / "catalog/resource-paths.json", runtime / "decision/redact.py"]
     missing_files = [path for path in required if not safe_file(path)]
     health = entry("package-files", "setup", "needs_setup" if missing_files else "usable",
                    str(len(missing_files)) + " required package files missing or unreadable; repair or reinstall the dispatcher." if missing_files else "Entrypoint, core references, role files and local helpers are readable.")

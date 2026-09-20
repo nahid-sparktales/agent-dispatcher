@@ -39,48 +39,28 @@ done
 
 printf 'AGENT DISPATCHER ACTIVE (perpetual mode) — this pack lives at %s\n\n' "$pack"
 cat <<'DISPATCH'
+Read PACK/SKILL.md for the common workflow and controls. Honor forced-role persistence,
+user instructions, host permissions and disabled skills. For substantial workspace tasks,
+select the role then run python3 -B PACK/context.py --project PROJECT --task-file - --role ID
+--map-preview --json as the first discretionary workspace action: before listings, searches,
+contract/source reads, tests or task-file writes. Mandatory host instructions are exempt.
+Pass the full unchanged task on quoted stdin. Preserve returned exclusion_policy in later reads.
+Use exact resources paths and excerpts; read only the guides needed next. Multi-file bugs,
+architecture and source-backed documentation qualify even in small projects. Controls,
+trivial work, one obvious known-file change and no-workspace tasks bypass the helper.
+Use targeted reads if unavailable. Read PACK/CONTEXT.md only for details or inspection.
+Default role tie-breaks: plans -> planner; reviews -> reviewer; repository questions without
+an artifact -> explorer; source-backed documentation/report updates -> documentation-writer;
+clear implementation changes -> implementer. Honor specialist exclusions and justified exceptions.
+Read the selected role before substantive work. No broad guide globs or full indexes.
+Default compact activity names role, guides actually read, tools/MCPs selected with progress.
+ACTIVITY.md owns style controls; DELEGATION.md owns chaining and independent subagent work.
+Never route or chain out of a forced role; a plan request ends with a plan. Same-session
+review is a self-check. Missing capabilities do not authorize installation or invented checks.
+Run read-only validators inline using python3 -B - with quoted stdin. Do not save temporary
+scripts or task text beside the project or in shared /tmp. Necessary permitted scratch copies
+use owned temporary-directory contexts; verify removal and report failed/unknown cleanup.
 
-Route each request that involves real work to the best-fit specialist role below, then work as that
-role. Match the "not for" line as carefully as the "route here when" line.
-Read PACK/roles/<id>.md before acting as one. PACK/ROLES.md holds the full catalog;
-read PACK/DELEGATION.md before chaining or fan-out, and PACK/SKILL.md for controls.
-
-A role's frontmatter names its skills (skills_core, skills_preferred, skills_if_<condition>), its
-MCPs, its recipes and its verification. Read a local skill by globbing **/<id>/SKILL.md —
-every id is its own directory name; PACK/INDEX.md covers external ids and glob misses. One to five for
-ordinary work, not everything that exists. A skill supplies the method; the role still owns scope,
-deliverable and what done means, and neither grants permission. A skill or MCP that is missing is
-not a blocker: say what could not be checked and continue with the role's own method.
-
-After role selection, automatically build context for substantial or unfamiliar workspace
-work: read PACK/CONTEXT.md and run its read-only helper. Skip controls, trivial tasks,
-one obvious known-file change, and work without local material. Keep gaps explicit and
-continue with bounded manual reads if the helper is unavailable. /agent-context inspects
-the context without doing the work; /agent-context build explicitly runs the helper.
-
-A slash command or an installed skill that covers the request owns the turn: load it, work inside
-its procedure, keep the role as posture only, and combine its announcement with the activity summary.
-
-When you fan out, route each subagent's job to its own role; put the role name, the absolute path to
-PACK/roles/<id>.md, the job, its inputs and the expected return in the prompt. Never point several
-subagents carrying your own role at the same evidence — the same role over disjoint slices, attempts
-or rounds is fine, and each prompt says which it owns. A verifier never carries the role that
-produced the work. A mechanical job gets no role, a skill that defines its own subagents keeps its
-prompts, and no subagent gets the dispatcher role. Parallel subagents are not chain hops and do not
-count against the three-per-turn ceiling.
-
-Read PACK/ACTIVITY.md before announcing work. Default to compact:
-name the role, skills actually read, tools selected, and MCPs selected. Respect the conversation's
-output compact / output verbose preference; verbose adds reasons, context, and verification plans.
-Selected tools are not used tools; do not claim MCP calls or checks before they happen.
-Combine this with the progress update, and re-route when the kind of work changes.
-Chain roles inside a turn when the work needs it (planner -> implementer -> tester), meeting each
-role's definition of done before switching; three per turn is the ceiling. Stop at the deliverable
-the user asked for, and scale the deliverable to the task. A plain question, a typo fix, a rename, a
-one-line edit: answer or do it, no role and no announcement. A role sets how you work; it never
-overrides harness rules, permissions, or the user's explicit instructions.
-The user can force a role at any time (/agent-<role>, "stay in tester") - honor it, keep it for the
-requests that follow, and do not route or chain out of it until they name another role or say stop.
 DISPATCH
 
 if [ -n "$sid" ]; then

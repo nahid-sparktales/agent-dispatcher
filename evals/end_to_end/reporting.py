@@ -266,12 +266,66 @@ def _verification(batch_dir: Path, trial: dict) -> dict:
     return {"availability": "available", "commands": commands, "note": "Selected task shell commands and their observed results. Other actions and commands combined with skill/configuration reads are omitted. Missing evidence does not establish that a check was not run. Command success alone does not establish task correctness.", "trace_partial": partial or len(order) > MAX_COMMANDS}
 
 
+def _neutral_scope_path(relative, batch_dir: Path, trial: dict) -> str:
+    """Expose only bounded relative filenames that carry no known identity cues."""
+    summary = (trial.get("activity") or {}).get("summary") or {}
+    private_names = [name.lower() for key in ("roles_read", "declared_roles")
+                     for name in summary.get(key, []) if isinstance(name, str) and name]
+    safe = (isinstance(relative, str) and bool(relative) and relative != "." and len(relative) <= 200
+            and re.fullmatch(r"[A-Za-z0-9_./ -]+", relative)
+            and not Path(relative).is_absolute() and ".." not in Path(relative).parts
+            and Path(relative).parts[0] != "project"
+            and _blind(relative, trial, batch_dir) == relative
+            and not re.search(r"dispatcher|claude|codex|baseline|treatment|profile|skill|role|guide|credential|token|secret", relative, re.I)
+            and not any(name in relative.lower() for name in private_names))
+    return relative if safe else "[path withheld]"
+
+
+def _outside_write_evidence(batch_dir: Path, trial: dict) -> dict:
+    """Neutral observations, without asserting whether unaudited files remain."""
+    record = trial.get("activity") or {}
+    availability = record.get("availability") if record.get("schema_version") == 1 else "unavailable"
+    if availability not in {"complete", "partial", "unavailable"}:
+        availability = "unavailable"
+    actions = record.get("actions", []) if record.get("schema_version") == 1 else []
+    if not isinstance(actions, list):
+        actions, availability = [], "unavailable"
+    if len(actions) > 2000:
+        availability = "partial"
+    counts, cleanups = Counter(), Counter()
+    for action in actions[:2000]:
+        if (isinstance(action, dict) and action.get("kind") == "cleanup_attempt" and action.get("outcome") == "succeeded"
+                and action.get("matched_prior_write") is True and isinstance(action.get("target"), str)
+                and action["target"].startswith("trial/")):
+            relative = _neutral_scope_path(action["target"].removeprefix("trial/"), batch_dir, trial)
+            cleanups["trial/" + relative] += 1
+        if not isinstance(action, dict) or action.get("kind") != "write" or action.get("outcome") != "succeeded":
+            continue
+        target = action.get("target")
+        if target == "outside-owned-trial":
+            counts[target] += 1
+        elif isinstance(target, str) and target.startswith("trial/"):
+            relative = _neutral_scope_path(target.removeprefix("trial/"), batch_dir, trial)
+            counts["trial/" + relative] += 1
+    rows = [{"target": target, "observed_successful_writes": count,
+             "remaining_state": "unknown" if target == "outside-owned-trial" else "see_owned_directory_audit"}
+            for target, count in sorted(counts.items())]
+    for row in rows:
+        if cleanups[row["target"]]:
+            row["observed_matched_cleanup_successes"] = cleanups[row["target"]]
+            row["cleanup_limit"] = "Matched command results do not independently verify file absence; use the captured audit for remaining state."
+    return {"outside_project_writes": rows[:50], "outside_project_write_count": sum(counts.values()),
+            "outside_project_write_targets_omitted": max(0, len(rows) - 50),
+            "write_observation_availability": availability,
+            "outside_audit_remaining_state": "unknown"}
+
+
 def _packet(batch_dir: Path, trial: dict) -> dict:
     files, omissions = _artifacts(batch_dir, trial)
     rubric = trial.get("rubric", {})
     # Round-trip sanitization handles both prose and per-dimension rubric structures.
     blinded_rubric = json.loads(_blind(json.dumps(rubric, ensure_ascii=False), trial, batch_dir))
-    return {
+    packet = {
         "prompt": _blind(re.sub(r"^\s*[$/]agent-dispatcher\b\s*", "", str(trial.get("prompt", ""))), trial, batch_dir),
         "acceptance": [_blind(str(item), trial, batch_dir) for item in trial.get("acceptance", [])],
         "rubric": blinded_rubric,
@@ -280,6 +334,35 @@ def _packet(batch_dir: Path, trial: dict) -> dict:
         "omissions": omissions,
         "verification_evidence": _verification(batch_dir, trial),
     }
+    # Leave old packets byte-for-byte structurally unchanged. Activity and route
+    # data are private; only this neutral scope result is fit for blind review.
+    audit = trial.get("scope_audit")
+    if isinstance(audit, dict) and audit.get("schema_version") == 1:
+        availability = audit.get("availability")
+        availability = availability if availability in {"complete", "partial", "unavailable"} else "unavailable"
+        count = audit.get("entry_count")
+        count = count if type(count) is int and 0 <= count <= 10000 else None
+        passed = (trial.get("scope_check") or {}).get("passed")
+        writes = _outside_write_evidence(batch_dir, trial)
+        raw_entries = audit.get("entries", [])
+        raw_entries = raw_entries if isinstance(raw_entries, list) else []
+        residue = []
+        for entry in raw_entries[:50]:
+            if not isinstance(entry, dict):
+                continue
+            kind = entry.get("kind")
+            kind = kind if kind in {"file", "directory", "symlink", "special"} else "unknown"
+            size = entry.get("size")
+            size = size if kind == "file" and type(size) is int and 0 <= size <= 2**63 - 1 else None
+            residue.append({"path": _neutral_scope_path(entry.get("path"), batch_dir, trial),
+                            "kind": kind, "size": size})
+        packet["scope_evidence"] = {
+            "availability": availability, "passed": passed if type(passed) is bool else None,
+            "residue_entries": count, "residue": residue, "residue_omitted": max(0, len(raw_entries) - 50), **writes,
+            "requires_human_inspection": writes["outside_project_write_count"] > 0 or passed is not True or availability != "complete",
+            "note": "Metadata inspection covers only the owned temporary directory outside the project, before cleanup. Successful write observations are separate from residue: files beyond that audit have unknown remaining state. Later cleanup is not verified here. Missing or partial activity evidence is not proof that no writes occurred. The inspection flag does not change the task grade or establish that files still remain.",
+        }
+    return packet
 
 
 def create_review(batch_dir: Path, seed: int = 0) -> Path:
@@ -330,6 +413,19 @@ def create_review(batch_dir: Path, seed: int = 0) -> Path:
             lines.extend(["Outcome: " + command["outcome"] + "; exit code: " + str(command["exit_code"]), "", *["    " + line for line in command["command"].splitlines()], "", *["    " + line for line in command["output_excerpt"].splitlines()], ""])
         if evidence.get("trace_partial"):
             lines.extend(["This trace excerpt is partial.", ""])
+        if "scope_evidence" in packet:
+            scope = packet["scope_evidence"]
+            lines.extend(["### Scope evidence", "", scope["note"], "",
+                          f"Inspection: {scope['availability']}; scope passed: {scope['passed']}; residue entries: {scope['residue_entries']}.",
+                          f"Observed successful writes outside the project: {scope['outside_project_write_count']}; activity evidence: {scope['write_observation_availability']}; human inspection required: {scope['requires_human_inspection']}.", ""])
+            for entry in scope["residue"]:
+                lines.extend(["    " + json.dumps(entry, ensure_ascii=False), ""])
+            if scope["residue_omitted"]:
+                lines.extend(["Additional residue paths were omitted from this bounded summary.", ""])
+            for write in scope["outside_project_writes"]:
+                lines.extend(["    " + json.dumps(write, ensure_ascii=False), ""])
+            if scope["outside_project_write_targets_omitted"]:
+                lines.extend(["Additional outside-project write targets were omitted from this bounded summary.", ""])
         for artifact in packet["artifacts"]:
             # Four-space indentation avoids source text closing a Markdown fence.
             lines.extend(["### Artifact: " + artifact["path"], "", *["    " + line for line in artifact["text"].splitlines()], ""])
@@ -418,6 +514,149 @@ def _outcome(trial: dict, rating: dict | None) -> bool | None:
     return value if type(value) is bool else (True if auto.get("passed") is True else None)
 
 
+ACTIVITY_METRICS = (
+    "helper_attempts", "helper_successes", "guidance_reads", "guidance_unique_paths",
+    "guidance_repeated_reads", "guidance_returned_chars", "failed_paths",
+    "permission_denials", "observed_writes",
+)
+
+
+def _activity(trials: list[dict]) -> dict:
+    """Complete measurements and partial lower bounds have separate denominators."""
+    records = [trial.get("activity") or {} for trial in trials]
+    metrics = {}
+    for key in ACTIVITY_METRICS:
+        complete, partial = [], []
+        for record in records:
+            value = (record.get("summary") or {}).get(key)
+            if type(value) is not int or value < 0 or record.get("schema_version") != 1:
+                continue
+            if record.get("availability") == "complete":
+                complete.append(value)
+            elif record.get("availability") == "partial":
+                partial.append(value)
+        metrics[key] = {"observed": len(complete), "missing": len(trials) - len(complete),
+                        "total": sum(complete) if complete else None,
+                        "median": statistics.median(complete) if complete else None,
+                        "partial_observed_total": sum(partial) if partial else None,
+                        "partial_attempts": len(partial)}
+    return {"schema_version": 1, "metrics": metrics,
+            "note": "Private native-event measurements. Partial totals are lower bounds; missing is not zero. Characters returned by guidance reads are not token counts or hidden startup context."}
+
+
+def _helper_coverage(trials: list[dict]) -> dict:
+    """Observed helper adoption on substantial context tasks, never a task grade."""
+    categories = {"context": {"context_retrieval", "context_freshness", "architecture_discovery"},
+                  "map": {"context_freshness", "architecture_discovery"}}
+    report = {"schema_version": 1,
+              "baseline_not_applicable": sum(trial.get("condition") == "baseline" for trial in trials),
+              "note": "Dispatcher-only adoption diagnostics on declared context-task categories. Stock can solve tasks manually; coverage never changes task correctness. Positive evidence can survive a partial trace; absence is counted only with complete activity evidence."}
+    for kind, eligible_categories in categories.items():
+        eligible = [trial for trial in trials if trial.get("condition") == "dispatcher" and trial.get("category") in eligible_categories]
+        counts = {"eligible": len(eligible), "observed_success": 0, "not_observed": 0, "unknown": 0}
+        facts = {"nonempty_facts": 0, "empty_facts": 0, "facts_unknown": 0}
+        for trial in eligible:
+            record = trial.get("activity") or {}
+            actions = record.get("actions", []) if record.get("schema_version") == 1 else []
+            successes = [row for row in actions if isinstance(row, dict) and row.get("kind") == "helper" and row.get("outcome") == "succeeded"]
+            matched = [row for row in successes if row.get("helper") == "context"] if kind == "context" else [
+                row for row in successes if row.get("helper") in {"context", "project_map"}
+                and row.get("map_evidence_origin") in {"stored", "preview"}]
+            if matched:
+                counts["observed_success"] += 1
+                if kind == "map":
+                    values = [row.get("map_entries") for row in matched]
+                    if any(type(value) is int and value > 0 for value in values):
+                        facts["nonempty_facts"] += 1
+                    elif all(type(value) is int and value == 0 for value in values):
+                        facts["empty_facts"] += 1
+                    else:
+                        facts["facts_unknown"] += 1
+            elif record.get("schema_version") == 1 and record.get("availability") == "complete":
+                counts["not_observed"] += 1
+            else:
+                counts["unknown"] += 1
+        observed = counts["observed_success"] + counts["not_observed"]
+        counts.update(observed_rate=counts["observed_success"] / observed if observed else None,
+                      complete_rate=counts["observed_success"] / len(eligible) if eligible and not counts["unknown"] else None)
+        if kind == "map":
+            counts.update(facts)
+        report[kind] = counts
+    eligible = [trial for trial in trials if trial.get("condition") == "dispatcher" and trial.get("category") in categories["context"]]
+    report["preparation"] = _preparation_coverage(eligible)
+    report["exclusions"] = _exclusion_coverage(eligible)
+    return report
+
+
+def _preparation_coverage(trials: list[dict]) -> dict:
+    counts = {"eligible": len(trials), "before_investigation": 0, "after_investigation": 0,
+              "not_observed": 0, "unknown": 0}
+    attempts = {"early": 0, "late": 0, "not_observed": 0, "unknown": 0, "early_failed_or_denied": 0}
+    for trial in trials:
+        record = trial.get("activity") or {}
+        prep = record.get("preparation") or {} if record.get("schema_version") == 1 else {}
+        status = prep.get("status") if prep.get("schema_version") == 1 else None
+        if status not in {"before_investigation", "after_investigation", "not_observed"}:
+            status = "unknown"
+        elif status != "after_investigation" and prep.get("availability") != "complete":
+            status = "unknown"
+        counts[status] += 1
+        timing = prep.get("attempt_timing", "unknown")
+        if timing not in {"early", "late", "not_observed"}:
+            timing = "unknown"
+        attempts[timing] += 1
+        if timing == "early" and prep.get("first_context_attempt_outcome") in {"failed", "denied"}:
+            attempts["early_failed_or_denied"] += 1
+    counts["first_attempt"] = attempts
+    counts["note"] = "Private ordering diagnostics on eligible treatment tasks. Before requires the successful context result before discretionary project reads, searches, listings, observed writes, or selected role/body guide reads. An early denied/failed attempt is recorded separately. Mandatory instruction and package entrypoint discovery are exempt. Unknown prefixes cannot establish early preparation; observed late preparation survives partial traces. No task grades change."
+    return counts
+
+
+def _exclusion_coverage(trials: list[dict]) -> dict:
+    counts = {"successful_context_calls": 0, "complete_metadata": 0, "partial_metadata": 0, "unknown_metadata": 0,
+              "automatic_enabled_calls": 0}
+    totals = {key: {"observed_calls": 0, "total": 0} for key in ("automatic_count", "manual_count", "applied_count", "unresolved_count", "unresolved_total")}
+    for trial in trials:
+        record = trial.get("activity") or {}
+        actions = record.get("actions", []) if record.get("schema_version") == 1 else []
+        for row in actions if isinstance(actions, list) else []:
+            if not isinstance(row, dict) or row.get("kind") != "helper" or row.get("helper") != "context" or row.get("outcome") != "succeeded":
+                continue
+            counts["successful_context_calls"] += 1
+            exclusions = row.get("context_exclusions") or {}
+            availability = exclusions.get("availability")
+            counts[{"complete": "complete_metadata", "partial": "partial_metadata"}.get(availability, "unknown_metadata")] += 1
+            if exclusions.get("automatic_enabled") is True:
+                counts["automatic_enabled_calls"] += 1
+            for key, total in totals.items():
+                value = exclusions.get(key)
+                if type(value) is int and 0 <= value <= 10000:
+                    total["observed_calls"] += 1
+                    total["total"] += value
+    counts["counts"] = totals
+    counts["note"] = "Validated counts from observed successful context JSON only, without task phrases or rule paths. Missing metadata is unknown, not zero; these are process diagnostics, not exclusion-quality grades."
+    return counts
+
+
+def _route_agreement(trials: list[dict]) -> dict:
+    groups = defaultdict(list)
+    unknown = 0
+    for trial in trials:
+        record = trial.get("activity") or {}
+        route = record.get("route") or {}
+        role = route.get("role")
+        if record.get("schema_version") != 1 or route.get("availability", record.get("availability")) != "complete" or route.get("consistent") is not True or not isinstance(role, str):
+            unknown += 1
+            continue
+        groups[(trial.get("fixture_id"), trial.get("condition"))].append(role)
+    details = [{"fixture_id": fixture, "condition": condition, "observed_repetitions": len(roles),
+                "roles": sorted(set(roles)), "agreement": len(set(roles)) == 1}
+               for (fixture, condition), roles in sorted(groups.items()) if len(roles) >= 2]
+    return {"groups_observed": len(details), "groups_agreed": sum(row["agreement"] for row in details),
+            "groups_varied": sum(not row["agreement"] for row in details), "unknown_trials": unknown,
+            "details": details, "note": "Observed route agreement is diagnostic, not a correctness score; different successful routes may be appropriate."}
+
+
 def _group(trials: list[dict], ratings: dict, scheduled: int) -> dict:
     statuses = Counter(trial["status"] for trial in trials)
     valid = [trial for trial in trials if trial["status"] not in INVALID_STATUSES]
@@ -439,6 +678,8 @@ def _group(trials: list[dict], ratings: dict, scheduled: int) -> dict:
         "unnecessary_intervention": _rate([row.get("unnecessary_intervention") for row in human]),
         "human_dimensions": {name: _rate([row.get(name) for row in human]) for name in DIMENSIONS[:3]},
         "treatment_compliance": _rate([trial.get("treatment_invoked") for trial in trials if trial["condition"] == "dispatcher"]),
+        "activity": _activity(trials),
+        "scope_acceptance": _rate([(trial.get("scope_check") or {}).get("passed") for trial in trials]),
         "elapsed_seconds": _measurement([trial.get("elapsed_seconds") for trial in trials]),
         "usage": {name: _measurement([(trial.get("usage") or {}).get(name) for trial in trials]) for name in ("input_tokens", "output_tokens", "cached_input_tokens", "cost_usd")},
     }
@@ -523,20 +764,45 @@ def report(batch_dir: Path) -> dict:
         pairs = _pairs(subset, ratings, client_schedule)
         fixture_categories = {trial["fixture_id"]: trial.get("category", "unknown") for trial in subset}
         categories = {category: {condition: _group([trial for trial in subset if trial.get("category", "unknown") == category and trial["condition"] == condition], ratings, sum(entry.get("condition") == condition and fixture_categories.get(entry.get("fixture_id")) == category for entry in client_schedule)) for condition in CONDITIONS} for category in sorted(set(fixture_categories.values()))}
-        result["clients"][client] = {"conditions": groups, "pairs": pairs, "categories": categories}
+        result["clients"][client] = {"conditions": groups, "pairs": pairs, "categories": categories, "route_agreement": _route_agreement(subset), "helper_coverage": _helper_coverage(subset)}
         lines.extend(["## " + client, "", "| Metric | Baseline | Dispatcher |", "| --- | ---: | ---: |"])
         rows = [("Scheduled", "scheduled"), ("Attempted", "attempted"), ("Unattempted", "unattempted"), ("Invalid attempts", "invalid"), ("Evaluable attempts", "evaluable_attempts"), ("Graded outcomes", "graded"), ("Successful outcomes", "successful"), ("Pending outcomes", "pending_outcomes"), ("Required reviews pending", "required_reviews_pending"), ("Success rate among graded outcomes", "graded_success_rate"), ("Complete success rate", "complete_success_rate")]
         for title, key in rows:
             lines.append(f"| {title} | {_display(groups['baseline'][key])} | {_display(groups['dispatcher'][key])} |")
         for status in sorted(STATUSES):
             lines.append(f"| Status: {status} | {groups['baseline']['statuses'][status]} | {groups['dispatcher']['statuses'][status]} |")
-        for title, key in (("Automated artifact acceptance", "artifact_acceptance"), ("Claim accuracy", "claim_accuracy"), ("Unnecessary intervention", "unnecessary_intervention"), ("Treatment compliance", "treatment_compliance")):
+        for title, key in (("Automated artifact acceptance", "artifact_acceptance"), ("Claim accuracy", "claim_accuracy"), ("Unnecessary intervention", "unnecessary_intervention"), ("Treatment compliance", "treatment_compliance"), ("Owned-directory scope acceptance", "scope_acceptance")):
             cells = [f"{groups[condition][key]['numerator']}/{groups[condition][key]['denominator']} observed; {groups[condition][key]['missing']} missing" for condition in CONDITIONS]
             lines.append(f"| {title} | {cells[0]} | {cells[1]} |")
         for name in ("elapsed_seconds", "input_tokens", "output_tokens", "cached_input_tokens", "cost_usd"):
             measurements = [groups[condition][name] if name == "elapsed_seconds" else groups[condition]["usage"][name] for condition in CONDITIONS]
             cells = [f"{_display(value['median'])} ({value['observed']} observed; {value['missing']} missing)" for value in measurements]
             lines.append(f"| Median {name} | {cells[0]} | {cells[1]} |")
+        lines.extend(["", "### Private process measurements", "", groups["baseline"]["activity"]["note"], "",
+                      "| Measurement | Baseline | Dispatcher |", "| --- | ---: | ---: |"])
+        for name in ACTIVITY_METRICS:
+            cells = []
+            for condition in CONDITIONS:
+                metric = groups[condition]["activity"]["metrics"][name]
+                cells.append(f"{_display(metric['total'])} total / {metric['observed']} complete; {metric['missing']} missing; {_display(metric['partial_observed_total'])} partial lower bound / {metric['partial_attempts']} attempts")
+            lines.append(f"| {name} | {cells[0]} | {cells[1]} |")
+        coverage = result["clients"][client]["helper_coverage"]
+        lines.extend(["", "### Helper adoption on eligible tasks", "", coverage["note"], "",
+                      "| Helper | Eligible treatment trials | Observed success | Not observed in complete trace | Unknown |", "| --- | ---: | ---: | ---: | ---: |"])
+        for name in ("context", "map"):
+            observed = coverage[name]
+            lines.append(f"| {name} | {observed['eligible']} | {observed['observed_success']} | {observed['not_observed']} | {observed['unknown']} |")
+        facts = coverage["map"]
+        lines.append(f"Map results among observed uses: {facts['nonempty_facts']} nonempty, {facts['empty_facts']} empty, {facts['facts_unknown']} with unknown fact count.")
+        prep = coverage["preparation"]
+        attempts = prep["first_attempt"]
+        lines.extend(["", prep["note"],
+                      f"Successful context preparation: {prep['before_investigation']} before workspace investigation/writes, {prep['after_investigation']} after, {prep['not_observed']} not observed, {prep['unknown']} unknown / {prep['eligible']} eligible.",
+                      f"First context attempt: {attempts['early']} early ({attempts['early_failed_or_denied']} failed/denied), {attempts['late']} late, {attempts['not_observed']} not observed, {attempts['unknown']} unknown.",
+                      "", coverage["exclusions"]["note"],
+                      "Exclusion metadata: " + json.dumps(coverage["exclusions"]["counts"], sort_keys=True)])
+        agreement = result["clients"][client]["route_agreement"]
+        lines.extend(["", f"Route agreement: {agreement['groups_agreed']}/{agreement['groups_observed']} observed fixture/condition groups agreed; {agreement['groups_varied']} varied; {agreement['unknown_trials']} trials unknown.", agreement["note"]])
         lines.extend(["", f"Paired outcomes: {pairs['comparable']}/{pairs['total']} comparable; {pairs['improved']} improved, {pairs['regressed']} regressed, {pairs['both_pass']} both passed, {pairs['both_fail']} both failed. Incomplete: {pairs['missing_attempt']} missing attempts, {pairs['invalid']} invalid pairs, {pairs['pending']} pending.", "", "| Paired metric (dispatcher − baseline) | Median difference | Observed pairs | Missing pairs |", "| --- | ---: | ---: | ---: |"])
         for name, measurement in pairs["deltas_dispatcher_minus_baseline"].items():
             lines.append(f"| {name} | {_display(measurement['median'])} | {measurement['observed_pairs']} | {measurement['missing_pairs']} |")

@@ -4,7 +4,7 @@ import contextlib
 import io
 import json
 import os
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import re
 import shutil
 import subprocess
@@ -14,7 +14,7 @@ import unittest
 from unittest.mock import patch
 
 import build
-from build_codex import export_package
+from build_codex import adapt, export_package
 from install_codex import activation_module, install
 from install_claude import stage_pack
 
@@ -31,6 +31,147 @@ class CodexPackageTests(unittest.TestCase):
             cls.data = build.main()
             cls.plugin = cls.root / "agent-dispatcher"
             cls.pack = export_package(cls.plugin, cls.data)
+
+    def resource_reports(self, helper, pack, roles, cwd=None):
+        code = """import importlib.util, json, sys
+spec = importlib.util.spec_from_file_location('dispatcher_resources', sys.argv[1])
+module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(module)
+print(json.dumps([module.resolve_resources(sys.argv[2], role) for role in json.loads(sys.argv[3])]))
+"""
+        result = subprocess.run([sys.executable, "-I", "-B", "-c", code, str(helper),
+                                 str(pack), json.dumps(roles)], cwd=cwd or self.root,
+                                capture_output=True, text=True, timeout=15)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return json.loads(result.stdout)
+
+    def test_resource_manifests_and_resolution_are_exact_read_only_and_cwd_independent(self):
+        manual = self.root / "manual-resource-pack"
+        stage_pack(ROOT, manual)
+        cwd = self.root / "untrusted-resource-cwd"
+        cwd.mkdir()
+        (cwd / "resources.py").write_text("raise AssertionError('project code must not be imported')\n")
+        layouts = (("source", ROOT, ROOT / "catalog", ROOT / "resources.py"),
+                   ("claude_manual", manual, manual / "catalog", manual / "resources.py"),
+                   ("codex", self.pack, self.pack / "scripts/runtime/catalog", self.pack / "scripts/resources.py"))
+
+        def snapshot(path):
+            paths = [path] if path.is_file() else [p for p in path.rglob("*") if p.is_file()]
+            return {str(p): (p.read_bytes(), p.stat().st_mtime_ns) for p in paths}
+
+        watched = (cwd, manual, self.pack, ROOT / "catalog", ROOT / "skills", ROOT / "resources.py")
+        before = [snapshot(path) for path in watched]
+        source_helper = (ROOT / "resources.py").read_bytes()
+        self.assertEqual(source_helper, (ROOT / "skills/agent-dispatcher/resources.py").read_bytes())
+        for layout, pack, catalog, helper in layouts:
+            with self.subTest(layout=layout):
+                self.assertEqual(helper.read_bytes(), source_helper)
+                manifest = json.loads((catalog / "resource-paths.json").read_text())
+                roles = {r["id"]: (f"skills/agent-dispatcher/roles/{r['id']}.md" if layout == "source"
+                                   else f"roles/{r['id']}.md" if layout == "claude_manual"
+                                   else f"references/roles/{r['id']}.md") for r in self.data["roles"]}
+                guides = {s["id"]: (s["path"] if layout == "source"
+                                    else s["path"].replace("skills/", "lib/", 1) if layout == "claude_manual"
+                                    else "references/" + s["path"].replace("/SKILL.md", "/GUIDE.md"))
+                          for s in self.data["skills"]}
+                self.assertEqual(manifest, {"schema_version": 1, "layout": layout,
+                                            "roles": roles, "guides": guides})
+                for relative in [*roles.values(), *guides.values()]:
+                    self.assertFalse(PurePosixPath(relative).is_absolute())
+                    self.assertNotIn("..", PurePosixPath(relative).parts)
+                    self.assertTrue((pack / relative).resolve().is_relative_to(pack.resolve()))
+                    self.assertTrue((pack / relative).is_file(), relative)
+                for skill in self.data["skills"]:
+                    self.assertEqual((pack / guides[skill["id"]]).read_bytes(),
+                                     (ROOT / skill["path"]).read_bytes())
+                for role in self.data["roles"]:
+                    source = (ROOT / "skills/agent-dispatcher/roles" / (role["id"] + ".md")).read_text()
+                    self.assertEqual((pack / roles[role["id"]]).read_text(),
+                                     adapt(source) if layout == "codex" else source)
+                requested = [r[key] for r in self.data["roles"] for key in ("id", "slug")]
+                reports = self.resource_reports(helper, pack, requested, cwd=cwd)
+                for index, role in enumerate(self.data["roles"]):
+                    report, alias = reports[index * 2:index * 2 + 2]
+                    self.assertEqual(report, alias, role["id"])
+                    self.assertEqual(report["diagnostics"], [])
+                    self.assertEqual(report["role"], {"id": role["id"], "path": str(pack / roles[role["id"]])})
+                    expected_ids = set(role["verification"])
+                    for tier in ("core", "preferred", "optional"):
+                        expected_ids.update(role["skills"][tier])
+                    for ids in role["skills"]["conditional"].values():
+                        expected_ids.update(ids)
+                    self.assertEqual({g["id"] for g in report["guides"]}, expected_ids)
+                    self.assertEqual(report["conditions"], {
+                        key: self.data["signals"][key]["summary"] for key in role["skills"]["conditional"]})
+                    for guide in report["guides"]:
+                        ident = guide["id"]
+                        expected_tiers = [tier for tier in ("core", "preferred", "optional")
+                                          if ident in role["skills"][tier]]
+                        if ident in role["verification"]:
+                            expected_tiers.append("verification")
+                        self.assertEqual(guide["tiers"], expected_tiers)
+                        self.assertEqual(set(guide["conditions"]), {
+                            key for key, ids in role["skills"]["conditional"].items() if ident in ids})
+                        self.assertEqual(guide["path"], str(pack / guides[ident]) if ident in guides else None)
+                        self.assertEqual(guide["status"], "bundled" if ident in guides else "external_availability_unknown")
+                unselected, unknown = self.resource_reports(helper, pack, [None, "no-such-role"], cwd=cwd)
+                self.assertIsNone(unselected["role"])
+                self.assertEqual(unselected["guides"], [])
+                self.assertIsNone(unknown["role"])
+                self.assertEqual(unknown["guides"], [])
+                self.assertTrue(unknown["diagnostics"])
+        self.assertEqual(before, [snapshot(path) for path in watched])
+
+    def test_full_context_workflows_reduce_recorded_bytes_by_at_least_35_percent(self):
+        baseline = json.loads((ROOT / "evals/context/workflow-baseline.json").read_text())
+        self.assertEqual(baseline["schema_version"], 1)
+        # The compact workflow loads guides that fit the deliverable; candidate
+        # metadata is counted too, rather than hiding the discovery cost.
+        workflows = {
+            "authentication": ("implementer", ("regression-testing", "authentication")),
+            "map_refresh": ("documentation-writer", ("documentation-verification",)),
+            "architecture_report": ("documentation-writer", ("technical-writing", "documentation-verification")),
+        }
+        manual = self.root / "manual-budget-pack"
+        stage_pack(ROOT, manual)
+        layouts = (("claude", ROOT, ROOT / "skills/agent-dispatcher", ROOT / "catalog", ROOT / "resources.py"),
+                   ("claude", manual, manual, manual / "catalog", manual / "resources.py"),
+                   ("codex", self.pack, self.pack / "references", self.pack / "scripts/runtime/catalog",
+                    self.pack / "scripts/resources.py"))
+        for host, pack, refs, catalog, helper in layouts:
+            manifest = json.loads((catalog / "resource-paths.json").read_text())
+            entry = (ROOT / "skills/agent-dispatcher/SKILL.md" if pack == ROOT else pack / "SKILL.md")
+            for name, (role, loaded_guides) in workflows.items():
+                with self.subTest(host=host, layout=manifest["layout"], workflow=name):
+                    previous = baseline["hosts"][host][name]
+                    self.assertEqual(previous["total_bytes"], sum(c["bytes"] for c in previous["components"]))
+                    self.assertTrue(set(loaded_guides) <= set(previous["guides"]))
+                    resources = self.resource_reports(helper, pack, [role])[0]
+                    self.assertEqual(resources["diagnostics"], [])
+                    self.assertEqual(resources["role"]["id"], role)
+                    self.assertTrue(set(loaded_guides) <= {g["id"] for g in resources["guides"]})
+                    normalized = json.dumps(resources, ensure_ascii=False, separators=(",", ":")).replace(str(pack), "PACK")
+                    files = [entry, refs / "CONTEXT.md", Path(resources["role"]["path"]),
+                             *(pack / manifest["guides"][ident] for ident in loaded_guides)]
+                    measured = sum(len(path.read_bytes()) for path in files) + len(normalized.encode("utf-8"))
+                    self.assertLessEqual(measured * 100, previous["total_bytes"] * 65,
+                                         {"bytes": measured, "baseline": previous["total_bytes"],
+                                          "loaded_guides": loaded_guides})
+
+    def test_selected_role_methods_omit_shared_modes_and_preserve_boundaries(self):
+        for role in self.data["roles"]:
+            boundary = role["body"].split("ROLE BOUNDARIES\n", 1)[1].split("\n---", 1)[0].strip()
+            self.assertTrue(boundary, role["id"])
+            for host, path in (("claude", ROOT / "skills/agent-dispatcher/roles" / (role["id"] + ".md")),
+                               ("codex", self.pack / "references/roles" / (role["id"] + ".md"))):
+                text = path.read_text()
+                with self.subTest(host=host, role=role["id"]):
+                    self.assertNotIn("## Mode", text)
+                    self.assertNotIn("## Response style", text)
+                    self.assertIn("WORKING METHOD", text)
+                    self.assertIn("DEFINITION OF DONE", text)
+                    self.assertIn("ROLE BOUNDARIES", text)
+                    self.assertIn(adapt(boundary) if host == "codex" else boundary, text)
 
     def test_one_discoverable_skill_with_all_shared_guides(self):
         self.assertEqual(list(self.plugin.rglob("SKILL.md")), [self.pack / "SKILL.md"])
@@ -107,7 +248,7 @@ class CodexPackageTests(unittest.TestCase):
                     for p in folder.rglob("*") if p.is_file()}
         before = [snapshot(folder) for folder in (project, manual, self.pack)]
         outputs = []
-        for script in scripts:
+        for script, pack in zip(scripts, (ROOT, manual, self.pack, ROOT)):
             env = dict(os.environ, AGENT_DISPATCHER_DECISION_MODE="required", PYTHONDONTWRITEBYTECODE="1")
             result = subprocess.run([sys.executable, "-B", str(script), "--project", str(project),
                                      "--task-file", "-", "--role", "debugger", "--size", "small", "--json"],
@@ -117,6 +258,8 @@ class CodexPackageTests(unittest.TestCase):
             report = json.loads(result.stdout)
             self.assertTrue(any(row["path"] == "auth.py" for row in report["context"]))
             self.assertTrue(report["excerpts"])
+            self.assertEqual(report["resources"], self.resource_reports(
+                script.with_name("resources.py"), pack, ["debugger"])[0])
             outputs.append({k: report[k] for k in ("retrieval", "context", "excerpts", "excluded", "budget")})
         self.assertEqual(outputs[0], outputs[1])
         self.assertEqual(outputs[0], outputs[2])

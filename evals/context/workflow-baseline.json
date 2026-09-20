@@ -1,0 +1,259 @@
+{
+  "schema_version": 1,
+  "revision": "c183eff9f263f1b94c0a739370fc9334cc978fb1",
+  "measurement": "UTF-8 bytes of entrypoint, required routing/context/activity references, selected role and applicable guides; not model tokens. Pre-change canonical sources.",
+  "hosts": {
+    "claude": {
+      "authentication": {
+        "role": "implementer",
+        "guides": [
+          "test-design",
+          "regression-testing",
+          "authentication"
+        ],
+        "total_bytes": 56959,
+        "components": [
+          {
+            "name": "SKILL.md",
+            "bytes": 6082
+          },
+          {
+            "name": "ROLES.md",
+            "bytes": 9906
+          },
+          {
+            "name": "ACTIVITY.md",
+            "bytes": 2944
+          },
+          {
+            "name": "CONTEXT.md",
+            "bytes": 6079
+          },
+          {
+            "name": "implementer.md",
+            "bytes": 10323
+          },
+          {
+            "name": "SKILL.md",
+            "bytes": 7682
+          },
+          {
+            "name": "SKILL.md",
+            "bytes": 6827
+          },
+          {
+            "name": "SKILL.md",
+            "bytes": 7116
+          }
+        ]
+      },
+      "map_refresh": {
+        "role": "explorer",
+        "guides": [
+          "stack-detection",
+          "technical-writing",
+          "documentation-verification"
+        ],
+        "total_bytes": 52041,
+        "components": [
+          {
+            "name": "SKILL.md",
+            "bytes": 6082
+          },
+          {
+            "name": "ROLES.md",
+            "bytes": 9906
+          },
+          {
+            "name": "ACTIVITY.md",
+            "bytes": 2944
+          },
+          {
+            "name": "CONTEXT.md",
+            "bytes": 6079
+          },
+          {
+            "name": "explorer.md",
+            "bytes": 7353
+          },
+          {
+            "name": "SKILL.md",
+            "bytes": 6190
+          },
+          {
+            "name": "SKILL.md",
+            "bytes": 6303
+          },
+          {
+            "name": "SKILL.md",
+            "bytes": 7184
+          }
+        ]
+      },
+      "architecture_report": {
+        "role": "documentation-writer",
+        "guides": [
+          "technical-writing",
+          "documentation-verification"
+        ],
+        "total_bytes": 46158,
+        "components": [
+          {
+            "name": "SKILL.md",
+            "bytes": 6082
+          },
+          {
+            "name": "ROLES.md",
+            "bytes": 9906
+          },
+          {
+            "name": "ACTIVITY.md",
+            "bytes": 2944
+          },
+          {
+            "name": "CONTEXT.md",
+            "bytes": 6079
+          },
+          {
+            "name": "documentation-writer.md",
+            "bytes": 7660
+          },
+          {
+            "name": "SKILL.md",
+            "bytes": 6303
+          },
+          {
+            "name": "SKILL.md",
+            "bytes": 7184
+          }
+        ]
+      }
+    },
+    "codex": {
+      "authentication": {
+        "role": "implementer",
+        "guides": [
+          "test-design",
+          "regression-testing",
+          "authentication"
+        ],
+        "total_bytes": 56013,
+        "components": [
+          {
+            "name": "SKILL.md",
+            "bytes": 5034
+          },
+          {
+            "name": "ROLES.md",
+            "bytes": 9906
+          },
+          {
+            "name": "ACTIVITY.md",
+            "bytes": 2944
+          },
+          {
+            "name": "CONTEXT.md",
+            "bytes": 6121
+          },
+          {
+            "name": "implementer.md",
+            "bytes": 10383
+          },
+          {
+            "name": "GUIDE.md",
+            "bytes": 7682
+          },
+          {
+            "name": "GUIDE.md",
+            "bytes": 6827
+          },
+          {
+            "name": "GUIDE.md",
+            "bytes": 7116
+          }
+        ]
+      },
+      "map_refresh": {
+        "role": "explorer",
+        "guides": [
+          "stack-detection",
+          "technical-writing",
+          "documentation-verification"
+        ],
+        "total_bytes": 51108,
+        "components": [
+          {
+            "name": "SKILL.md",
+            "bytes": 5034
+          },
+          {
+            "name": "ROLES.md",
+            "bytes": 9906
+          },
+          {
+            "name": "ACTIVITY.md",
+            "bytes": 2944
+          },
+          {
+            "name": "CONTEXT.md",
+            "bytes": 6121
+          },
+          {
+            "name": "explorer.md",
+            "bytes": 7426
+          },
+          {
+            "name": "GUIDE.md",
+            "bytes": 6190
+          },
+          {
+            "name": "GUIDE.md",
+            "bytes": 6303
+          },
+          {
+            "name": "GUIDE.md",
+            "bytes": 7184
+          }
+        ]
+      },
+      "architecture_report": {
+        "role": "documentation-writer",
+        "guides": [
+          "technical-writing",
+          "documentation-verification"
+        ],
+        "total_bytes": 45212,
+        "components": [
+          {
+            "name": "SKILL.md",
+            "bytes": 5034
+          },
+          {
+            "name": "ROLES.md",
+            "bytes": 9906
+          },
+          {
+            "name": "ACTIVITY.md",
+            "bytes": 2944
+          },
+          {
+            "name": "CONTEXT.md",
+            "bytes": 6121
+          },
+          {
+            "name": "documentation-writer.md",
+            "bytes": 7720
+          },
+          {
+            "name": "GUIDE.md",
+            "bytes": 6303
+          },
+          {
+            "name": "GUIDE.md",
+            "bytes": 7184
+          }
+        ]
+      }
+    }
+  }
+}

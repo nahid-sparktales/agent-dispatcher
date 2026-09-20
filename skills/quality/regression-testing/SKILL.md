@@ -1,6 +1,6 @@
 ---
 name: regression-testing
-description: Turn a fixed bug into a test that fails on the old code and passes on the new one — pick the cheapest level that can observe the defect, assert the behaviour rather than the patch, and confirm the failure by reverting the fix. Use right after a bug is fixed, when adding coverage for a defect that keeps coming back, or when a test was written for a fix but never seen failing. Not for designing a test strategy or a new feature's suite, and not the right tool for an environmental, cosmetic or one-off failure — this skill says when to write no test at all.
+description: Turn a fixed bug into a test that fails on the old code and passes on the new one. Assert behavior at the cheapest useful level and compare old behavior without reverting unrelated work or leaving scratch files. Use after a fix or when recurring defects lack coverage; not for a new feature's test strategy or an environmental/cosmetic failure.
 ---
 
 # Regression testing
@@ -36,8 +36,12 @@ a test pinning a symptom you cannot explain pins the wrong thing.
 5. **Make the assertion specific to this defect.** "Does not raise" passes for a function that
    returns nothing useful. Assert the value, the message, the count, the order — whatever the bug
    got wrong.
-6. **Run it against the old code and watch it fail.** Stash or revert the fix, run the test, read
-   the failure. This is the step that makes it a regression test rather than an assertion. The
+6. **Run it against the old code and watch it fail.** Prefer an isolated in-memory old
+   implementation or inline `python3 -B -` check with quoted stdin. Do not stash/revert the
+   user's working tree merely to demonstrate failure. If a scratch copy is necessary and
+   permitted, use a uniquely owned temporary-directory context with cleanup in `finally`,
+   and verify its absence afterward. Never use a shared fixed /tmp name or a project sibling.
+   Read the failure. This is the step that makes it a regression test rather than an assertion. The
    failure message should name the defect; if it says "expected true, got false", improve it now,
    because the next person to see it will be debugging under time pressure.
 7. **Restore the fix and run it green.** Both observations, in that order, are the deliverable.
@@ -85,8 +89,11 @@ decision; silence looks like an oversight.
   the assertion is on the wrong layer or too loose.
 - **It fails against the old code for the wrong reason** — an import error, a missing fixture. That
   is not a reproduction. Fix the harness and look again.
-- **You cannot revert the fix cleanly** — reconstruct the defect instead: re-introduce the specific
-  condition in a scratch copy, never by editing shared or deployed code to make a test fail.
+- **Old behavior cannot be compared within scope** — report that limitation. Do not expand
+  filesystem scope merely to obtain red/green proof. Reconstruct it in memory or use the
+  permitted owned-directory procedure above; never edit shared/deployed code to force failure.
+- **Cleanup fails or is denied** — report the exact owned path as unresolved. Do not claim
+  only the requested files were changed. A clean project diff does not cover temporary writes.
 - **Reproducing it needs a real outward-facing or destructive action** — a live payment, a real
   email, production data, a shared account. Stop and ask. Use a sandbox, a fixture or a recorded
   interaction; never wire a test to send real messages or mutate real records.

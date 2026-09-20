@@ -1,5 +1,6 @@
 """Offline behavioral checks for every independent E2E fixture and grader."""
 import copy
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -230,12 +231,19 @@ class ContextOutcomeFixtureTests(unittest.TestCase):
             before = tree_digest(project)
             snapshot = json.loads(state.read_text())
             self.assertEqual(snapshot['owner'], 'agent-dispatcher-project-map')
+            fresh_entries = [row for row in snapshot['entries']
+                             if row['source']['path'] == 'service/errors.py']
+            self.assertEqual(len(fresh_entries), 1)
+            self.assertEqual(fresh_entries[0]['source']['sha256'],
+                             hashlib.sha256((project / 'service/errors.py').read_bytes()).hexdigest())
             native_which = shutil.which
             with patch.object(shutil, 'which', side_effect=lambda command:
                               None if command == 'rg' else native_which(command)):
                 report = project_map.inspect_map(project, pack=Path(__file__).parent)
             self.assertEqual(report['status'], 'stale')
-            self.assertGreater(report['counts']['withheld'], 0)
+            self.assertEqual(report['counts']['fresh'], 1)
+            self.assertEqual(report['counts']['withheld'], len(snapshot['entries']) - 1)
+            self.assertEqual(report['entries'], fresh_entries)
             paths = {row['path'] for row in report['stale_sources']}
             self.assertTrue({'Makefile', 'worker.py', 'service/old_errors.py'} <= paths)
             self.assertFalse(any(row['source']['path'] in paths for row in report['entries']))
@@ -267,11 +275,32 @@ class ContextOutcomeFixtureTests(unittest.TestCase):
             with self.subTest(shortcut=name):
                 self.change_report('architecture_evidence', 'architecture.json', mutate)
 
-    def test_structured_outputs_are_graded_without_final_prose_keyword_scoring(self):
-        for task_id in ('stale_project_map', 'architecture_evidence'):
+    def test_architecture_report_rejects_unused_callsites_with_genuine_current_citations(self):
+        source = Path(self.fixtures['architecture_evidence']['source_dir'])
+        path = 'flowdesk/batch_service.py'
+        raw = (source / path).read_bytes()
+        lines = raw.decode().splitlines()
+        for edge_index, line in ((2, 6), (3, 9)):
+            citation = {'path': path, 'start_line': line, 'end_line': line,
+                        'quote': lines[line - 1], 'sha256': hashlib.sha256(raw).hexdigest()}
+            with self.subTest(edge=edge_index):
+                result = self.change_report('architecture_evidence', 'architecture.json',
+                    lambda report: report['edges'][edge_index].update(evidence=citation))
+                self.assertTrue(any(check['name'] == 'direct_route_service_store_edges' and not check['passed']
+                                    for check in result['checks']))
+
+    def test_architecture_report_cannot_edit_the_unused_implementation(self):
+        result = self.rejected_mutation('architecture_evidence',
+            lambda root: (root / 'flowdesk/batch_service.py').write_text('# removed unused code\n'))
+        self.assertTrue(any(check['name'] == 'preserve_out_of_scope_sources' and not check['passed']
+                            for check in result['checks']))
+
+    def test_context_success_does_not_require_helper_invocation_or_final_keywords(self):
+        for task_id in ('auth_config_boundary', 'stale_project_map', 'architecture_evidence'):
             fixture = self.fixtures[task_id]
             good = Path(fixture['references_dir']) / 'passing'
-            self.assertTrue(grade(fixture, good / 'files', 'No artifact facts repeated here.')['passed'])
+            self.assertTrue(grade(fixture, good / 'files',
+                'Solved manually from source files without invoking dispatcher helpers.')['passed'])
 
 
 if __name__ == '__main__':

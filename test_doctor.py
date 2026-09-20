@@ -49,12 +49,13 @@ class DoctorTests(unittest.TestCase):
                                  "verification": []}]}
         write(self.pack / "INVENTORY.json", self.inventory)
         write(self.pack / "catalog/loadouts.json", self.roles)
+        write(self.pack / "catalog/resource-paths.json", {"schema_version": 1})
         write(self.pack / "decision/redact.py", "# fixture")
         write(self.pack / "lib/review-guide/SKILL.md", "# Review")
         write(self.pack / "SKILL.md", "# Dispatcher")
         write(self.pack / "roles/reviewer.md", "# Reviewer")
         for file in ("INDEX.md", "CONTEXT.md", "CONTEXT-REFERENCE.md", "ROLES.md", "CONTROLS.md",
-                     "DELEGATION.md", "PROJECT-MAP.md", "jev.md", "DOCTOR.md", "doctor.py", "context.py", "project_map.py"):
+                     "DELEGATION.md", "PROJECT-MAP.md", "jev.md", "DOCTOR.md", "doctor.py", "context.py", "project_map.py", "resources.py"):
             write(self.pack / file, "fixture")
 
     def inspect(self, **kwargs):
@@ -274,6 +275,7 @@ class DoctorTests(unittest.TestCase):
         (self.pack / "lib/review-guide/SKILL.md").unlink()
         self.roles["roles"][0]["skills"]["core"].append("missing-reference")
         write(self.pack / "catalog/loadouts.json", self.roles)
+        write(self.pack / "catalog/resource-paths.json", {"schema_version": 1})
         report = self.inspect(role="reviewer")
         self.assertEqual(self.row(report, "review-guide")["status"], "needs_setup")
         self.assertIn("review-guide", [r["id"] for r in report["recommendations"]])
