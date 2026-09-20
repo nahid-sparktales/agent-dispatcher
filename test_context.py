@@ -312,6 +312,341 @@ class ContextTests(unittest.TestCase):
         self.assertEqual(result["project_map"]["evidence_origin"], "preview")
         self.assertFalse((self.project / ".agent-dispatcher").exists())
 
+    def test_compact_cli_budgets_exact_json_and_supplies_only_requested_guidance(self):
+        self.write("auth.py", 'def validateLogin():\n    return "naïve 🐙"\n')
+        child = subprocess.run(
+            [sys.executable, "-B", str(ROOT / "context.py"), "--project", str(self.project),
+             "--task-file", "-", "--role", "reviewer", "--pack", str(ROOT), "--compact",
+             "--packet-tokens", "7000", "--guide", "test-strategy", "--json"],
+            input="Review validateLogin in auth.py", capture_output=True, text=True,
+            cwd=self.root, check=True)
+        packet = json.loads(child.stdout)
+        encoded = json.dumps(packet, ensure_ascii=False, separators=(",", ":"))
+        self.assertEqual(child.stdout, encoded + "\n")
+        self.assertEqual(packet["budget"]["estimated_tokens"], (len(encoded) + 3) // 4)
+        self.assertLessEqual(packet["budget"]["estimated_tokens"], 7000)
+        self.assertEqual(packet["budget"]["scope"], "serialized_context_packet")
+        self.assertGreater(packet["budget"]["by_source"]["guidance"], 0)
+        role = packet["guidance"]["role"]
+        self.assertEqual(role["id"], "reviewer")
+        self.assertEqual(role["content"], Path(role["path"]).read_text())
+        self.assertEqual(role["sha256"], hashlib.sha256(role["content"].encode()).hexdigest())
+        self.assertEqual([guide["id"] for guide in packet["guidance"]["guides"]], ["test-strategy"])
+        self.assertEqual(self.paths(packet), ["auth.py"])
+        self.assertIn("naïve 🐙", packet["excerpts"][0]["content"])
+        self.assertTrue(packet["read_only"])
+        self.assertFalse((self.project / ".agent-dispatcher").exists())
+
+    def test_compact_cli_rejects_unavailable_guidance_and_impossible_budget_without_source_leak(self):
+        marker = "private-task-fragment-4913"
+        self.write("auth.py", "def validateLogin(): pass\n")
+        cases = (["--compact", "--packet-tokens", "256"],
+                 ["--compact", "--guide", "not-a-registered-guide"],
+                 ["--packet-tokens", "7000"], ["--guide", "test-strategy"])
+        for extra in cases:
+            with self.subTest(arguments=extra):
+                child = subprocess.run(
+                    [sys.executable, "-B", str(ROOT / "context.py"), "--project", str(self.project),
+                     "--task-file", "-", "--role", "reviewer", "--pack", str(ROOT), *extra],
+                    input=marker, capture_output=True, text=True, cwd=self.root)
+                self.assertEqual(child.returncode, 2)
+                self.assertEqual(child.stdout, "")
+                self.assertNotIn(marker, child.stderr)
+        self.assertFalse((self.project / ".agent-dispatcher").exists())
+
+    def test_compact_budget_trimming_preserves_full_guidance_and_all_exclusion_constraints(self):
+        for index in range(12):
+            self.write(f"archive{index}/auth.py", "def validateLogin(): return 'excluded'\n")
+            self.write(f"current{index}.py", "def validateLogin():\n" + "    value = 'authentication evidence'\n" * 40)
+        excluded = [f"archive{index}" for index in range(12)]
+        packet = self.select(role="reviewer", compact=True, packet_tokens=4000,
+                             exclude_paths=excluded, size="complex")
+        encoded = json.dumps(packet, ensure_ascii=False, separators=(",", ":"))
+        self.assertLessEqual(len(encoded), 4000 * 4)
+        self.assertEqual(packet["exclusion_policy"]["manual"], excluded)
+        self.assertEqual(set(packet["exclusion_policy"]["applied"]), set(excluded))
+        self.assertEqual(packet["guidance"]["role"]["content"],
+                         Path(packet["guidance"]["role"]["path"]).read_text())
+        self.assertGreater(sum(packet["packet_omissions"].values()), 0)
+        self.assertEqual(set(self.paths(packet)), {excerpt["path"] for excerpt in packet["excerpts"]})
+        self.assertTrue(all(not path.startswith("archive") for path in self.paths(packet)))
+
+    def test_context_map_maintenance_builds_reuses_and_refreshes_from_one_source_scan(self):
+        source = self.write("auth.py", "def validateLogin():\n    return True\n")
+        config = self.write("package.json", '{"scripts":{"test":"python3 -B -m unittest"}}\n')
+        with mock.patch("os.open", wraps=os.open) as opening:
+            built = self.select(compact=True, map_maintain=True)
+        for path in (source, config):
+            opened = [call for call in opening.call_args_list if call.args[0] == path]
+            self.assertEqual(len(opened), 1, f"source scanned more than once: {path.name}")
+        cache = self.project / ".agent-dispatcher/project-map.json"
+        self.assertEqual(built["project_map"]["maintenance"]["action"], "built")
+        self.assertTrue(built["project_map"]["maintenance"]["persisted"])
+        self.assertFalse(built["read_only"])
+        before, stamp = cache.read_bytes(), cache.stat().st_mtime_ns
+        unchanged = self.select(compact=True, map_maintain=True)
+        self.assertEqual(unchanged["project_map"]["maintenance"]["action"], "unchanged")
+        self.assertFalse(unchanged["project_map"]["maintenance"]["persisted"])
+        self.assertEqual((cache.read_bytes(), cache.stat().st_mtime_ns), (before, stamp))
+        source.write_text("def validateLogin():\n    return False\ndef refreshLogin():\n    return True\n")
+        refreshed = self.select(compact=True, map_maintain=True)
+        self.assertEqual(refreshed["project_map"]["maintenance"]["action"], "refreshed")
+        self.assertEqual(refreshed["project_map"]["cache_status"], "fresh")
+        self.assertNotEqual(cache.read_bytes(), before)
+        self.assertIn("return False", "\n".join(item["content"] for item in refreshed["excerpts"]))
+
+    def test_context_map_filtered_scan_preserves_existing_global_cache_and_avoids_excluded_reads(self):
+        self.write("auth.py", "def validateLogin():\n    return True\n")
+        archive = self.write("archive/old.py", "def obsoleteLogin(): return False\n")
+        self.select(compact=True, map_maintain=True)
+        cache = self.project / ".agent-dispatcher/project-map.json"
+        before = cache.read_bytes()
+        with mock.patch("os.open", wraps=os.open) as opening:
+            filtered = self.select(compact=True, map_maintain=True, exclude_paths=["archive"])
+        self.assertEqual(filtered["project_map"]["maintenance"]["action"], "deferred")
+        self.assertFalse(filtered["project_map"]["maintenance"]["persisted"])
+        self.assertTrue(filtered["project_map"]["coverage"]["task_filtered"])
+        self.assertEqual(cache.read_bytes(), before)
+        self.assertFalse(any(call.args[0] == archive for call in opening.call_args_list))
+        self.assertTrue(filtered["excerpts"])
+        self.assertTrue(all(not path.startswith("archive/") for path in self.paths(filtered)))
+
+    def graph_fixture(self):
+        self.write("auth.py", "from storage import fetch\n\ndef validateLogin():\n    return fetch()\n")
+        self.write("storage.py", "def fetch():\n    return 1\n")
+        self.write("gateway.py", "from auth import validateLogin as check\n\ndef serve():\n    return check()\n")
+        self.write("web.py", "from gateway import serve\n\ndef endpoint():\n    return serve()\n")
+
+    def test_graph_relationships_admit_nonlexical_dependencies_and_callers_into_context(self):
+        self.graph_fixture()
+        ordinary = self.select("Inspect validateLogin", role="reviewer", compact=True)
+        self.assertNotIn("storage.py", self.paths(ordinary))
+        self.assertNotIn("web.py", self.paths(ordinary))
+        for mode in ("map_preview", "map_maintain"):
+            with self.subTest(mode=mode):
+                packet = self.select("Inspect validateLogin", role="reviewer", compact=True,
+                                     packet_tokens=10000, **{mode: True})
+                for related in ("storage.py", "web.py"):
+                    self.assertIn(related, self.paths(packet))
+                    row = next(row for row in packet["context"] if row["path"] == related)
+                    self.assertIn("task graph relationship", row["reason"])
+                    excerpt = next(item for item in packet["excerpts"] if item["path"] == related)
+                    self.assertIn("def fetch" if related == "storage.py" else "def endpoint", excerpt["content"])
+                graph = packet["project_graph"]
+                labels = {node["id"]: node["label"] for node in graph["nodes"]}
+                calls = {(labels[edge["from"]], labels[edge["to"]])
+                         for edge in graph["edges"] if edge["kind"] == "calls"}
+                self.assertIn(("validateLogin", "fetch"), calls)
+                self.assertIn(("endpoint", "serve"), calls)
+                if mode == "map_preview":
+                    self.assertFalse((self.project / ".agent-dispatcher").exists())
+                else:
+                    self.assertEqual(graph["maintenance"]["action"], "built")
+
+    def test_graph_retrieval_exclusions_prevent_dependency_reads_and_preserve_global_graph(self):
+        self.graph_fixture()
+        self.select("Inspect validateLogin", compact=True, map_maintain=True)
+        cache = self.project / ".agent-dispatcher/project-graph.json"
+        before = cache.read_bytes()
+        excluded = self.project / "storage.py"
+        with mock.patch("os.open", wraps=os.open) as opening:
+            packet = self.select("Inspect validateLogin", compact=True, map_maintain=True,
+                                 exclude_paths=["storage.py"])
+        self.assertFalse(any(call.args[0] == excluded for call in opening.call_args_list))
+        self.assertNotIn("storage.py", self.paths(packet))
+        self.assertNotIn("storage.py", [item["path"] for item in packet["excerpts"]])
+        graph = packet["project_graph"]
+        self.assertNotIn("storage.py", graph["source_priorities"])
+        self.assertNotIn("storage.py", [source["path"] for source in graph["sources"]])
+        self.assertNotIn("fetch", [node["label"] for node in graph["nodes"]])
+        self.assertEqual(graph["maintenance"]["action"], "deferred")
+        self.assertFalse(graph["maintenance"]["persisted"])
+        self.assertEqual(cache.read_bytes(), before)
+
+    def test_graph_symbols_and_evidence_stay_stable_until_rename_then_refresh(self):
+        self.graph_fixture()
+        first = self.select("Inspect validateLogin", compact=True, map_maintain=True)["project_graph"]
+        cache = self.project / ".agent-dispatcher/project-graph.json"
+        before, stamp = cache.read_bytes(), cache.stat().st_mtime_ns
+        second = self.select("Inspect validateLogin", compact=True, map_maintain=True)["project_graph"]
+        for field in ("nodes", "edges", "sources"):
+            self.assertEqual(first[field], second[field])
+        self.assertEqual(second["maintenance"]["action"], "unchanged")
+        self.assertEqual((cache.read_bytes(), cache.stat().st_mtime_ns), (before, stamp))
+        old_target = next(node["id"] for node in first["nodes"] if node["label"] == "validateLogin")
+        stable_fetch = next(node["id"] for node in first["nodes"] if node["label"] == "fetch")
+        self.write("auth.py", "from storage import fetch\n\ndef authorizeSession():\n    return fetch()\n")
+        self.write("gateway.py", "from auth import authorizeSession as check\n\ndef serve():\n    return check()\n")
+        packet = self.select("Inspect authorizeSession", compact=True, map_maintain=True)
+        graph = packet["project_graph"]
+        self.assertEqual(graph["maintenance"]["action"], "refreshed")
+        self.assertNotEqual(cache.read_bytes(), before)
+        self.assertNotIn(old_target, [node["id"] for node in graph["nodes"]])
+        self.assertNotIn("validateLogin", [node["label"] for node in graph["nodes"]])
+        self.assertIn("authorizeSession", [node["label"] for node in graph["nodes"]])
+        self.assertEqual(next(node["id"] for node in graph["nodes"] if node["label"] == "fetch"), stable_fetch)
+        for source in graph["sources"]:
+            self.assertEqual(source["sha256"], hashlib.sha256((self.project / source["path"]).read_bytes()).hexdigest())
+        for edge in graph["edges"]:
+            evidence = edge["evidence"]
+            self.assertGreaterEqual(evidence["line"], 1)
+            self.assertLessEqual(evidence["line"], len((self.project / evidence["path"]).read_text().splitlines()))
+
+    def test_compact_graph_and_full_role_share_the_serialized_packet_budget(self):
+        self.graph_fixture()
+        packet = self.select("Inspect validateLogin", role="reviewer", compact=True,
+                             map_preview=True, packet_tokens=7000)
+        encoded = json.dumps(packet, ensure_ascii=False, separators=(",", ":"))
+        self.assertLessEqual(len(encoded), 7000 * 4)
+        self.assertEqual(packet["budget"]["estimated_tokens"], (len(encoded) + 3) // 4)
+        self.assertGreater(packet["budget"]["by_source"]["project_graph"], 0)
+        self.assertTrue(packet["project_graph"]["nodes"])
+        self.assertTrue(packet["project_graph"]["edges"])
+        self.assertIn("storage.py", self.paths(packet))
+        supplied = packet["guidance"]["role"]
+        self.assertEqual(supplied["id"], "reviewer")
+        self.assertEqual(supplied["content"], Path(supplied["path"]).read_text())
+        self.assertTrue(packet["read_only"])
+
+    def test_compact_reuse_lifecycle_keeps_budget_and_stores_only_fingerprints(self):
+        marker = "private-source-value-8642"
+        source = self.write("auth.py", f"def validateLogin():\n    return '{marker}'\n")
+        ledger = self.root / "evidence.json"
+        options = dict(compact=True, packet_tokens=4000, reuse_state=ledger, reuse_scope="retained-context-A")
+        first = self.select(**options)
+        self.assertEqual(first["reuse"]["status"], "committed")
+        self.assertEqual(first["reuse"]["reused_count"], 0)
+        self.assertEqual(first["reuse"]["emitted_count"], 1)
+        raw = ledger.read_text()
+        for private in (marker, "auth.py", str(self.project), "retained-context-A", "Fix validateLogin"):
+            self.assertNotIn(private, raw)
+        self.assertEqual(ledger.stat().st_mode & 0o077, 0)
+        second = self.select(**options)
+        self.assertEqual(second["excerpts"], [])
+        self.assertEqual(second["reuse"]["reused_count"], 1)
+        self.assertEqual(second["reuse"]["references"][0]["id"], first["excerpts"][0]["id"])
+        self.assertEqual(self.paths(second), ["auth.py"])
+        source.write_text("def validateLogin():\n    return 'changed evidence'\n")
+        changed = self.select(**options)
+        self.assertEqual(changed["reuse"]["reused_count"], 0)
+        self.assertIn("changed evidence", changed["excerpts"][0]["content"])
+        fresh_scope = self.select(**{**options, "reuse_scope": "new-worker-context"})
+        self.assertEqual(fresh_scope["reuse"]["reused_count"], 0)
+        self.assertEqual(fresh_scope["reuse"]["emitted_count"], 1)
+        for packet in (first, second, changed, fresh_scope):
+            encoded = json.dumps(packet, ensure_ascii=False, separators=(",", ":"))
+            self.assertLessEqual(len(encoded), 4000 * 4)
+            self.assertEqual(packet["budget"]["estimated_tokens"], (len(encoded) + 3) // 4)
+
+    def test_compact_reuse_exclusion_change_and_invalid_ledger_keep_fresh_full_evidence(self):
+        self.write("auth.py", "def validateLogin(): return True\n")
+        self.write("archive/old.py", "def validateLogin(): return False\n")
+        ledger = self.root / "evidence.json"
+        options = dict(compact=True, reuse_state=ledger, reuse_scope="retained-context")
+        self.select(**options)
+        changed_policy = self.select(**options, exclude_paths=["archive"])
+        self.assertEqual(changed_policy["reuse"]["reused_count"], 0)
+        self.assertEqual([item["path"] for item in changed_policy["excerpts"]], ["auth.py"])
+        ledger.write_text('{"unrecognized": "leave me intact"}')
+        raw = ledger.read_bytes()
+        failed = self.select(**options)
+        self.assertEqual(failed["reuse"]["status"], "unavailable")
+        self.assertEqual(failed["reuse"]["reused_count"], 0)
+        self.assertEqual({item["path"] for item in failed["excerpts"]}, {"auth.py", "archive/old.py"})
+        self.assertEqual(ledger.read_bytes(), raw)
+
+    def test_compact_cli_reuse_rejects_relative_or_project_state_without_dropping_evidence(self):
+        self.write("auth.py", "def validateLogin(): return True\n")
+        for path in ("relative-ledger.json", str(self.project / "ledger.json")):
+            with self.subTest(path=path):
+                child = subprocess.run(
+                    [sys.executable, "-B", str(ROOT / "context.py"), "--project", str(self.project),
+                     "--task", "Fix validateLogin", "--pack", str(ROOT), "--compact",
+                     "--reuse-state", path, "--reuse-scope", "retained-context", "--json"],
+                    capture_output=True, text=True, cwd=self.root, check=True)
+                packet = json.loads(child.stdout)
+                self.assertEqual(packet["reuse"]["status"], "unavailable")
+                self.assertEqual(packet["reuse"]["reused_count"], 0)
+                self.assertEqual([item["path"] for item in packet["excerpts"]], ["auth.py"])
+                self.assertFalse((self.root / path).exists())
+
+    def test_compact_changed_file_seeds_cover_staged_adds_and_do_not_override_exclusions(self):
+        self.write("a.py", "def alpha(): return 1\n")
+        self.write("z.py", "def omega(): return 2\n")
+        self.write("untracked.py", "def untracked(): return 3\n")
+        subprocess.run(["git", "add", "a.py", "z.py"], cwd=self.project, check=True)
+        for role in ("reviewer", "refactoring-migration-specialist"):
+            with self.subTest(role=role):
+                packet = self.select("Inspect the current changes", role=role, compact=True, exclude_paths=["z.py"])
+                self.assertEqual(packet["change_focus"]["paths"], ["a.py"])
+                self.assertEqual(self.paths(packet), ["a.py"])
+                self.assertIn("uncommitted change", packet["context"][0]["reason"])
+                schema = json.loads((ROOT / "catalog/context-plan.schema.json").read_text())
+                allowed_matches = schema["properties"]["context"]["items"]["properties"]["match"]["enum"]
+                self.assertIn(packet["context"][0]["match"], allowed_matches)
+
+    def test_compact_changed_file_seeds_are_relative_to_nested_project_and_include_unstaged_edits(self):
+        self.write("package/edit.py", "def alpha(): return 1\n")
+        self.write("package/stable.py", "def beta(): return 2\n")
+        self.write("outside.py", "def other(): return 3\n")
+        subprocess.run(["git", "add", "."], cwd=self.project, check=True)
+        subprocess.run(["git", "-c", "core.hooksPath=/dev/null", "-c", "commit.gpgsign=false",
+                        "-c", "user.name=Dispatcher Test", "-c", "user.email=test@example.invalid",
+                        "commit", "-qm", "Fixture base"], cwd=self.project, check=True)
+        self.write("package/edit.py", "def alpha(): return 4\n")
+        self.write("package/new.py", "def gamma(): return 5\n")
+        self.write("outside.py", "def other(): return 6\n")
+        subprocess.run(["git", "add", "package/new.py", "outside.py"], cwd=self.project, check=True)
+        packet = context.select_context(self.project / "package", "Review current changes",
+                                        role="reviewer", pack=ROOT, compact=True)
+        self.assertEqual(packet["change_focus"]["paths"], ["edit.py", "new.py"])
+        self.assertEqual(set(self.paths(packet)), {"edit.py", "new.py"})
+        self.assertNotIn("outside.py", json.dumps(packet))
+
+    def test_relocated_compact_helpers_use_packaged_modules_and_guidance_not_project_namesakes(self):
+        self.write("auth.py", "def validateLogin(): return True\n")
+        for name in ("context_packet", "context_reuse", "project_map", "project_graph", "resources", "preferences"):
+            self.write(name + ".py", f"raise RuntimeError('project {name} must not execute')\n")
+        for layout in ("manual", "codex", "claude-plugin"):
+            with self.subTest(layout=layout):
+                pack = self.root / ("compact-" + layout)
+                runtime = pack / "scripts/runtime" if layout == "codex" else pack
+                runtime.mkdir(parents=True)
+                shutil.copytree(ROOT / "decision", runtime / "decision", ignore=shutil.ignore_patterns("__pycache__"))
+                shutil.copytree(ROOT / "catalog", runtime / "catalog")
+                relative = {"manual": "context.py", "codex": "scripts/context.py",
+                            "claude-plugin": "skills/agent-dispatcher/context.py"}[layout]
+                script = pack / relative
+                script.parent.mkdir(parents=True, exist_ok=True)
+                helpers = ("context", "context_packet", "context_reuse", "project_map", "resources", "preferences")
+                for name in helpers:
+                    shutil.copyfile(ROOT / (name + ".py"), script.parent / (name + ".py"))
+                if (ROOT / "project_graph.py").is_file():
+                    shutil.copyfile(ROOT / "project_graph.py", script.parent / "project_graph.py")
+                role_relative = ("references/roles/reviewer.md" if layout == "codex" else
+                                 "skills/agent-dispatcher/roles/reviewer.md" if layout == "claude-plugin" else "roles/reviewer.md")
+                guide_relative = "references/skills/quality/test-strategy/GUIDE.md" if layout == "codex" else "lib/test-strategy/GUIDE.md"
+                role_path, guide_path = pack / role_relative, pack / guide_relative
+                role_path.parent.mkdir(parents=True, exist_ok=True)
+                guide_path.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(ROOT / "skills/agent-dispatcher/roles/reviewer.md", role_path)
+                shutil.copyfile(ROOT / "skills/quality/test-strategy/SKILL.md", guide_path)
+                (runtime / "catalog/resource-paths.json").write_text(json.dumps({
+                    "schema_version": 1, "layout": layout,
+                    "roles": {"reviewer": role_relative}, "guides": {"test-strategy": guide_relative}}))
+                child = subprocess.run(
+                    [sys.executable, "-B", str(script), "--project", str(self.project), "--task-file", "-",
+                     "--role", "reviewer", "--compact", "--guide", "test-strategy", "--map-preview", "--json"],
+                    input="Review validateLogin in auth.py", capture_output=True, text=True,
+                    cwd=self.project, check=True)
+                packet = json.loads(child.stdout)
+                self.assertEqual(packet["guidance"]["role"]["path"], str(role_path))
+                self.assertEqual(packet["guidance"]["guides"][0]["content"], guide_path.read_text())
+                self.assertEqual(packet["project_map"]["evidence_origin"], "preview")
+                self.assertIn("auth.py", self.paths(packet))
+                self.assertEqual(packet["reuse"]["status"], "disabled")
+        self.assertFalse((self.project / ".agent-dispatcher").exists())
+
     def test_imports_admit_at_most_two_neighbors_and_never_two_hops(self):
         self.write("src/auth.ts", 'import { one } from "./one";\nimport "./two";\nimport "./three";\nexport function validateLogin() {}\n')
         self.write("src/one.ts", 'import "./deep";\nexport const one = 1;\n')

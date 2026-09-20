@@ -19,7 +19,11 @@ INVENTORY.template.md                 availability and setup inspection shared b
 DOCTOR.template.md, doctor.py          read-only health checks and setup recommendations
 install_claude.py                     staged manual Claude installation and rollback
 CONTEXT.template.md, context.py       concise context procedure and local excerpt selector
-PROJECT-MAP.template.md, project_map.py source-linked facts, explicit refresh, and freshness checks
+context_packet.py, context_reuse.py   complete packet budget and retained-context evidence reuse
+PROJECT-MAP.template.md, project_map.py source-linked facts, automatic maintenance, and freshness
+project_graph.py                     deterministic structural index and task/role projection
+VERIFICATION.template.md, verification.py task-scoped check receipts and completion evidence
+preferences.py                       saved output and requested-effort settings
 CONTEXT-REFERENCE.template.md         advanced context reference and worked plan example
 CONTROLS.template.md                  Claude activation and configuration details
 DELEGATION.template.md                on-demand chaining and delegation guidance
@@ -46,8 +50,14 @@ python3 test_release.py   # full installer lifecycle and public-release regressi
 python3 test_codex.py     # Codex package, installer, activation, and offline routing
 python3 test_doctor.py    # health checks, full inventory, evidence, and recommendations
 python3 test_context.py   # bounded local retrieval, excerpts, ranking, and exclusions
+python3 test_context_packet.py # serialized budget, supplied guidance, and evidence trimming
+python3 test_context_reuse.py # retained evidence fingerprints, invalidation, and safe state
 python3 test_project_map.py # source-backed maps, staleness, safe writes, and context integration
+python3 test_project_graph.py # structural extraction, bounded ranking, and cache safety
 python3 test_e2e.py       # native-client evaluation runner, offline fixtures only
+python3 test_verification.py # executed checks, freshness, failures, and evidence limits
+python3 test_preferences.py # external saved preferences, isolation, and safe writes
+python3 test_reporting_package.py # check/report helpers across host layouts
 ```
 
 CI runs the validation suites before any separate build step, so regeneration cannot hide

@@ -238,7 +238,10 @@ def stage_pack(repo, destination):
             copy_tree(source, destination / "lib" / source.name)
     for name in ("recipes", "decision", "catalog"):
         copy_tree(repo / name, destination / name)
-    for name in ("doctor.py", "context.py", "project_map.py", "resources.py"):
+    for name in ("doctor.py", "context.py", "context_packet.py", "context_reuse.py", "project_map.py", "project_graph.py",
+                 "resources.py", "verification.py", "preferences.py"):
+        copy_file(repo / name, destination / name)
+    for name in ("LICENSE", "NOTICE"):
         copy_file(repo / name, destination / name)
     manifest_path = destination / "catalog/resource-paths.json"
     manifest = json.loads(manifest_path.read_text())
@@ -247,8 +250,9 @@ def stage_pack(repo, destination):
     manifest["guides"] = {ident: path.replace("skills/", "lib/", 1) for ident, path in manifest["guides"].items()}
     manifest_path.write_text(json.dumps(manifest, indent=2) + "\n")
     required = ("resources.py", "catalog/resource-paths.json", "SKILL.md", "INDEX.md", "CONTEXT.md", "CONTEXT-REFERENCE.md", "ROLES.md",
-                "CONTROLS.md", "DELEGATION.md", "PROJECT-MAP.md", "jev.md", "roles", "lib", "recipes",
-                "decision/__main__.py", "decision/redact.py", "catalog/loadouts.json", "doctor.py", "context.py", "project_map.py")
+                "CONTROLS.md", "DELEGATION.md", "PROJECT-MAP.md", "VERIFICATION.md", "verification.py", "preferences.py", "jev.md", "roles", "lib", "recipes",
+                "decision/__main__.py", "decision/redact.py", "catalog/loadouts.json", "doctor.py", "context.py", "project_map.py",
+                "context_packet.py", "context_reuse.py", "project_graph.py")
     if any(not (destination / name).exists() for name in required):
         raise ValueError("staged dispatcher pack is incomplete")
 

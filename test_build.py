@@ -38,7 +38,9 @@ GENERATED = ["skills/agent-dispatcher/DOCTOR.md", "skills/agent-dispatcher/docto
 GENERATED += ["skills/agent-dispatcher/" + name for name in build.REFERENCE_FILES]
 GENERATED.append("skills/agent-dispatcher/context.py")
 GENERATED.append("skills/agent-dispatcher/project_map.py")
+GENERATED.extend("skills/agent-dispatcher/" + name for name in ("context_packet.py", "context_reuse.py", "project_graph.py"))
 GENERATED.extend(["skills/agent-dispatcher/resources.py", "catalog/resource-paths.json"])
+GENERATED.extend(["skills/agent-dispatcher/verification.py", "skills/agent-dispatcher/preferences.py"])
 
 
 def drift():
@@ -387,7 +389,8 @@ def main():
               all(text in role_index for text in (f"Alias: `{role['slug']}`", role['use_when'], role['not_for'])))
     cmds = sorted(build.CMDS.glob("agent-*.md"))
     # Inspection and configuration commands do not force a specialist role.
-    NON_ROLE_CMDS = ("agent-context.md", "agent-decision.md", "agent-inventory.md", "agent-doctor.md", "agent-map.md")
+    NON_ROLE_CMDS = ("agent-context.md", "agent-decision.md", "agent-inventory.md", "agent-doctor.md", "agent-map.md",
+                     "agent-verify.md", "agent-preferences.md")
     role_cmds = [c for c in cmds if c.name not in NON_ROLE_CMDS]
     check("one command per role, plus inspection and configuration commands",
           len(role_cmds) == len(roles)

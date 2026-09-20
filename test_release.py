@@ -324,6 +324,8 @@ class RecoverableInstallerTests(unittest.TestCase):
         self.config = self.root / "config"
         self.config.mkdir()
         sources = {
+            "LICENSE": "MIT fixture license",
+            "NOTICE": "Fixture attribution",
             "skills/agent-dispatcher/SKILL.md": "dispatcher v1",
             "skills/agent-dispatcher/INDEX.md": "index",
             "skills/agent-dispatcher/CONTEXT.md": "context",
@@ -332,6 +334,7 @@ class RecoverableInstallerTests(unittest.TestCase):
             "skills/agent-dispatcher/CONTROLS.md": "controls",
             "skills/agent-dispatcher/DELEGATION.md": "delegation",
             "skills/agent-dispatcher/PROJECT-MAP.md": "project map",
+            "skills/agent-dispatcher/VERIFICATION.md": "verification and preferences",
             "skills/agent-dispatcher/jev.md": "decision guide",
             "skills/agent-dispatcher/roles/implementer.md": "implementer",
             "skills/testing/check/SKILL.md": "guide",
@@ -346,8 +349,13 @@ class RecoverableInstallerTests(unittest.TestCase):
             }),
             "doctor.py": "# read-only doctor\n",
             "context.py": "# read-only selector\n",
+            "context_packet.py": "# whole packet budget\n",
+            "context_reuse.py": "# optional retained evidence ledger\n",
+            "project_graph.py": "# source-backed structural graph\n",
             "project_map.py": "# explicit map builder and read-only inspector\n",
             "resources.py": "# read-only package resource resolver\n",
+            "verification.py": "# task-scoped check evidence\n",
+            "preferences.py": "# saved dispatcher preferences\n",
             "hooks/agent-dispatcher-activate.sh": "#!/bin/bash\n",
             "commands/agent-reviewer.md": "review v1",
             "commands/agent-implementer.md": "implement v1",

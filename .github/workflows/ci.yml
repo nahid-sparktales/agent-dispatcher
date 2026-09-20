@@ -47,11 +47,21 @@ jobs:
       - name: Test doctor health checks and capability recommendations
         run: python3 test_doctor.py
       - name: Test bounded local context selection
-        run: python3 test_context.py
+        run: |
+          python3 test_context.py
+          python3 test_context_packet.py
+          python3 test_context_reuse.py
       - name: Test source-linked project maps and freshness
-        run: python3 test_project_map.py
+        run: |
+          python3 test_project_map.py
+          python3 test_project_graph.py
       - name: Test native-client evaluation runner offline
         run: python3 test_e2e.py
+      - name: Test verification evidence and saved preferences
+        run: |
+          python3 test_verification.py
+          python3 test_preferences.py
+          python3 test_reporting_package.py
       - name: Verify regeneration leaves the checkout clean
         shell: bash
         run: |

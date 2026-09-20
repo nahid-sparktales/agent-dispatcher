@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Explicitly build or refresh a compact, source-verified local project map.
+"""Build, maintain, or inspect a compact, source-verified local project map.
 
 `show` is read-only. Facts are evidence, never instructions. Discovered commands are
 recorded without execution; no model, network, background task, or host config is used.
@@ -32,6 +32,7 @@ MAX_SOURCE_PATH = 240
 KINDS = ("feature", "dependency", "test_command", "decision")
 QUOTAS = {"feature": 40, "dependency": 40, "test_command": 25, "decision": 15}
 HEX = re.compile(r"[a-f0-9]{64}\Z")
+_EXPECTED_UNSET = object()
 COMMAND = re.compile(r"^(?:(?:python3?|uv run python3?)(?: -B)? (?:-m (?:pytest|unittest)\b|test[\w./-]*\.py\b)|"
                      r"(?:uv run )?pytest\b|(?:npm|pnpm|yarn) (?:run )?(?:test|check|lint|typecheck|verify)\b|"
                      r"(?:npx )?(?:vitest|jest)\b|make (?:test|check|lint|verify)\b|cargo test\b|go test\b|"
@@ -358,7 +359,13 @@ def _extract(path, text, sha, helper):
     return entries
 
 
-def _choose(snapshot, helper, scrub):
+def _choose(snapshot, helper, scrub, extracted=None, existing=None):
+    # A matching source hash alone cannot authenticate a persisted claim. Derive
+    # support from this call's safe source text before reusing any stored entry.
+    extracted = {} if extracted is None else extracted
+    previous = {}
+    for entry in existing["entries"] if existing is not None else ():
+        previous.setdefault(entry["source"]["path"], []).append(entry)
     counts = Counter()
     chosen, sources = [], set()
     dropped = 0
@@ -370,19 +377,23 @@ def _choose(snapshot, helper, scrub):
     for path in sorted(snapshot["texts"], key=priority):
         if not _safe_path(path) or scrub(path) != path:
             continue
-        for entry in _extract(path, snapshot["texts"][path], snapshot["hashes"][path], helper):
+        if path not in extracted:
+            extracted[path] = _extract(path, snapshot["texts"][path], snapshot["hashes"][path], helper)
+        for entry in extracted[path]:
             if counts[entry["kind"]] >= QUOTAS[entry["kind"]] or (path not in sources and len(sources) >= MAX_SOURCES):
                 dropped += 1
                 continue
-            chosen.append(entry)
+            # Reuse only an identical, independently supported fact, including
+            # its current source hash. Changed/new sources use new extraction.
+            chosen.append(next((old for old in previous.get(path, ()) if old == entry), entry))
             counts[entry["kind"]] += 1
             sources.add(path)
     return chosen, [{"path": path, "sha256": snapshot["hashes"][path]} for path in sorted(sources)], dropped
 
 
-def _derive_map(snapshot, helper, scrub):
+def _derive_map(snapshot, helper, scrub, extracted=None, existing=None):
     """Pure derivation shared by explicit persistence and read-only previews."""
-    entries, sources, dropped = _choose(snapshot, helper, scrub)
+    entries, sources, dropped = _choose(snapshot, helper, scrub, extracted, existing)
     record = _scan_record(snapshot)
     record["omitted_facts"] = dropped
     data = {"owner": OWNER, "schema_version": SCHEMA_VERSION, "scan": record,
@@ -452,9 +463,11 @@ def _state_fd(root, create=False):
         raise ProjectMapError("Project map directory is unsafe or inaccessible; symlinks are not followed.") from None
 
 
-def _read_state(fd):
+def _read_state(fd, *, state_file=STATE_FILE, validator=_valid_map, max_bytes=MAX_MAP_BYTES):
+    if not isinstance(state_file, str) or not re.fullmatch(r"[a-z][a-z0-9-]{0,63}\.json", state_file):
+        raise ProjectMapError("Cache target must be a bounded local JSON filename.")
     try:
-        source = os.open(STATE_FILE, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0), dir_fd=fd)
+        source = os.open(state_file, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0), dir_fd=fd)
     except FileNotFoundError:
         return None, None
     except OSError:
@@ -463,14 +476,14 @@ def _read_state(fd):
         meta = os.fstat(source)
         if not stat.S_ISREG(meta.st_mode) or meta.st_uid != os.getuid() or meta.st_nlink != 1:
             raise ProjectMapError("Project map target must be a regular, singly linked file owned by the current user.")
-        if meta.st_size > MAX_MAP_BYTES:
+        if meta.st_size > max_bytes:
             raise ProjectMapError("Project map exceeds its 128 KiB limit; left untouched.")
         with os.fdopen(source, "rb", closefd=False) as handle:
-            raw = handle.read(MAX_MAP_BYTES + 1)
-        if len(raw) > MAX_MAP_BYTES:
+            raw = handle.read(max_bytes + 1)
+        if len(raw) > max_bytes:
             raise ProjectMapError("Project map exceeds its 128 KiB limit; left untouched.")
         try:
-            data = _valid_map(json.loads(raw))
+            data = validator(json.loads(raw))
         except (ValueError, TypeError, KeyError, RecursionError) as exc:
             if isinstance(exc, ProjectMapError):
                 raise
@@ -480,25 +493,30 @@ def _read_state(fd):
         os.close(source)
 
 
-def _load(root):
+def _load(root, *, state_file=STATE_FILE, validator=_valid_map, max_bytes=MAX_MAP_BYTES):
     fd = _state_fd(root)
     if fd is None:
         return None
     try:
-        return _read_state(fd)[0]
+        return _read_state(fd, state_file=state_file, validator=validator, max_bytes=max_bytes)[0]
     finally:
         os.close(fd)
 
 
-def _write(root, data, refresh):
+def _write(root, data, refresh, *, expected=_EXPECTED_UNSET, state_file=STATE_FILE,
+           validator=_valid_map, max_bytes=MAX_MAP_BYTES):
+    if not isinstance(state_file, str) or not re.fullmatch(r"[a-z][a-z0-9-]{0,63}\.json", state_file):
+        raise ProjectMapError("Cache target must be a bounded local JSON filename.")
     raw = (json.dumps(data, indent=2, ensure_ascii=False) + "\n").encode("utf-8")
-    if len(raw) > MAX_MAP_BYTES:
+    if len(raw) > max_bytes:
         raise ProjectMapError("Generated project map exceeds its 128 KiB limit; existing state left untouched.")
     fd = _state_fd(root, create=True)
-    temporary = ".project-map-" + secrets.token_hex(8) + ".tmp"
+    temporary = "." + Path(state_file).stem + "-" + secrets.token_hex(8) + ".tmp"
     created = False
     try:
-        existing, before = _read_state(fd)
+        existing, before = _read_state(fd, state_file=state_file, validator=validator, max_bytes=max_bytes)
+        if expected is not _EXPECTED_UNSET and existing != expected:
+            raise ProjectMapError("Project map changed during maintenance; concurrent changes left untouched.")
         if existing is not None and not refresh:
             raise ProjectMapError("An owned project map already exists; use refresh to replace it.")
         if existing is None and refresh:
@@ -509,14 +527,14 @@ def _write(root, data, refresh):
             handle.write(raw)
             handle.flush()
             os.fsync(handle.fileno())
-        _, current = _read_state(fd)
+        _, current = _read_state(fd, state_file=state_file, validator=validator, max_bytes=max_bytes)
         if current != before:
             raise ProjectMapError("Project map changed during construction; concurrent changes left untouched.")
         if refresh:
-            os.replace(temporary, STATE_FILE, src_dir_fd=fd, dst_dir_fd=fd)
+            os.replace(temporary, state_file, src_dir_fd=fd, dst_dir_fd=fd)
         else:
             # Unlike replace, link fails atomically if another writer created the destination.
-            os.link(temporary, STATE_FILE, src_dir_fd=fd, dst_dir_fd=fd, follow_symlinks=False)
+            os.link(temporary, state_file, src_dir_fd=fd, dst_dir_fd=fd, follow_symlinks=False)
             os.unlink(temporary, dir_fd=fd)
         created = False
     except ProjectMapError:
@@ -554,12 +572,12 @@ def _coverage(snapshot):
             "excluded_files": len(snapshot.get("task_excluded_paths", [])) if snapshot else 0}
 
 
-def _report(root, data, snapshot, helper, scrub, task=None):
+def _report(root, data, snapshot, helper, scrub, task=None, *, extracted=None):
     current = _scan_record(snapshot)
     valid = []
     stale = []
     excluded = 0
-    derived = {}
+    derived = {} if extracted is None else extracted
     for entry in data["entries"]:
         path = entry["source"]["path"]
         if helper._excluded(path, snapshot.get("exclude_paths", ())):
@@ -649,15 +667,90 @@ def build_map(project, pack=None, refresh=False):
     return report
 
 
-def context_entries(project, task, pack=None, snapshot=None, *, preview=False):
-    """Bounded read-only enrichment; never influences lexical ranking or excerpt budgets."""
-    preview_state = {"requested": preview, "used": False, "persisted": False}
+def maintain_map(project, pack=None, snapshot=None):
+    """Maintain only an owned cache from one complete, unfiltered safe scan.
+
+    Partial scans still yield current evidence, but never replace global state.
+    Persisted facts are untrusted and revalidated even when their source hash
+    matches. Reuse the call's extraction results for selection and reporting.
+    """
+    maintenance = {"requested": True, "action": "unavailable", "persisted": False, "reused_facts": 0}
     try:
-        if type(preview) is not bool:
-            raise ProjectMapError("Preview must be a boolean.")
         root = _root(project)
         helper = _context()
         scrub = helper._scrubber(helper.find_pack(pack))
+        # Refuse foreign, malformed, or unsafe state before any scan or write.
+        existing = _load(root)
+        snapshot = snapshot if snapshot is not None else _scan(root, helper, scrub)
+        extracted = {}
+        prior = (_report(root, existing, snapshot, helper, scrub, extracted=extracted)
+                 if existing is not None else None)
+        cache_status = prior["status"] if prior else "missing"
+        data = _derive_map(snapshot, helper, scrub, extracted, existing)
+        if existing is not None:
+            maintenance["reused_facts"] = sum(entry in existing["entries"] for entry in data["entries"])
+        # Scope metadata is intentionally not added to the persistent schema.
+        # Even an exclusion that currently matches nothing remains task policy.
+        partial = (not snapshot["complete"] or bool(snapshot.get("exclude_paths"))
+                   or bool(snapshot.get("task_excluded_paths")))
+        diagnostic = None
+        if partial:
+            maintenance["action"] = "deferred"
+            diagnostic = "Project-map maintenance deferred: the current scan is partial or task-filtered; no global cache was saved."
+        elif data == existing:
+            maintenance["action"] = "unchanged"
+            cache_status = "fresh"
+        else:
+            try:
+                _write(root, data, refresh=existing is not None, expected=existing)
+                maintenance.update(action="refreshed" if existing is not None else "built", persisted=True)
+                cache_status = "fresh"
+            except ProjectMapError as exc:
+                diagnostic = "Project-map maintenance could not save the cache. " + str(exc)
+        # A freshly derived task subset is verified against that subset, not
+        # against the unfiltered inventory of the prior whole-project scan.
+        scoped = {key: value for key, value in snapshot.items() if key != "inventory_paths"}
+        report = _report(root, data, scoped, helper, scrub, extracted=extracted)
+        report.update(status=cache_status, cache_status=cache_status, maintenance=maintenance,
+                      read_only=not maintenance["persisted"],
+                      evidence_origin="stored" if maintenance["action"] in {"built", "refreshed", "unchanged"}
+                      else "current_scan")
+        report["refresh_recommended"] = maintenance["action"] in {"deferred", "unavailable"}
+        report["counts"]["withheld"] = prior["counts"]["withheld"] if prior else 0
+        report["counts"]["task_excluded"] = prior["counts"].get("task_excluded", 0) if prior else 0
+        if diagnostic:
+            report["diagnostics"] = [diagnostic] + [d for d in report["diagnostics"]
+                                                    if not d.startswith("Run project-map refresh explicitly")]
+        return report
+    except (ProjectMapError, OSError, ValueError, TypeError, KeyError):
+        return {"schema_version": SCHEMA_VERSION, "read_only": True, "status": "unavailable",
+                "cache_status": "unavailable", "evidence_origin": "none", "entries": [],
+                "counts": {"stored": 0, "fresh": 0, "withheld": 0, "shown": 0},
+                "coverage": _coverage(snapshot), "maintenance": maintenance, "refresh_recommended": False,
+                "diagnostics": ["Project map is invalid or unsafe; no cached facts used and existing state left untouched."]}
+
+
+def context_entries(project, task, pack=None, snapshot=None, *, preview=False, maintain=False):
+    """Bounded enrichment; persistence is enabled only by the explicit maintain flag."""
+    preview_state = {"requested": preview, "used": False, "persisted": False}
+    maintenance_state = {"requested": maintain, "action": "unavailable" if maintain else "not_requested",
+                         "persisted": False, "reused_facts": 0}
+    try:
+        if type(preview) is not bool or type(maintain) is not bool:
+            raise ProjectMapError("Preview and maintenance must be booleans.")
+        root = _root(project)
+        helper = _context()
+        scrub = helper._scrubber(helper.find_pack(pack))
+        if task is not None and (not isinstance(task, str) or len(task) > helper.MAX_TASK_CHARS):
+            raise ProjectMapError("Task filter exceeds the supported size or has an invalid type; contents withheld.")
+        if maintain:
+            report = maintain_map(root, pack=pack, snapshot=snapshot)
+            maintenance_state = report["maintenance"]
+            report["entries"] = _matching(report["entries"], scrub(task) if task else None, helper, root)
+            return _context_report(report, report["cache_status"], report["evidence_origin"],
+                                   report["coverage"], preview_state, maintenance_state,
+                                   report["counts"]["withheld"], report["counts"].get("task_excluded", 0),
+                                   report["refresh_recommended"], report["diagnostics"])
         if preview and snapshot is None:
             snapshot = _scan(root, helper, scrub)
         report = inspect_map(project, task=task, pack=pack, _snapshot=snapshot)
@@ -680,8 +773,14 @@ def context_entries(project, task, pack=None, snapshot=None, *, preview=False):
     except (ProjectMapError, OSError, ValueError, TypeError):
         return {"status": "unavailable", "entries": [], "estimated_tokens": 0,
                 "cache_status": "unavailable", "evidence_origin": "none", "coverage": _coverage(snapshot),
-                "preview": preview_state,
+                "preview": preview_state, "maintenance": maintenance_state,
                 "refresh_recommended": False, "diagnostics": ["Project map is invalid or unsafe; no cached facts used."]}
+    return _context_report(report, cache_status, origin, _coverage(snapshot), preview_state, maintenance_state,
+                           cached_withheld, task_excluded, refresh_recommended, diagnostics)
+
+
+def _context_report(report, cache_status, origin, coverage, preview_state, maintenance_state,
+                    cached_withheld, task_excluded, refresh_recommended, diagnostics):
     selected, chars = [], 0
     for entry in report["entries"]:
         cost = len(json.dumps(entry, ensure_ascii=False))
@@ -690,7 +789,7 @@ def context_entries(project, task, pack=None, snapshot=None, *, preview=False):
         selected.append(entry)
         chars += cost
     return {"status": cache_status, "cache_status": cache_status, "entries": selected,
-            "evidence_origin": origin, "coverage": _coverage(snapshot), "preview": preview_state,
+            "evidence_origin": origin, "coverage": coverage, "preview": preview_state, "maintenance": maintenance_state,
             "estimated_tokens": math.ceil(chars / 4), "fresh_facts": report["counts"]["fresh"],
             "withheld_facts": cached_withheld, "task_excluded_facts": task_excluded,
             "refresh_recommended": refresh_recommended, "diagnostics": diagnostics}

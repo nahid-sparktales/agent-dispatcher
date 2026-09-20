@@ -43,8 +43,8 @@ SCHEMA_VERSION = "2.2.0"
 # Flat references have the same names in Claude's pack and Codex's references/.
 REFERENCE_FILES = ("ROLES.md", "CONTROLS.md", "DELEGATION.md", "CONTEXT.md",
                    "CONTEXT-REFERENCE.md", "SIGNALS.md", "INDEX.md", "ACTIVITY.md",
-                   "INVENTORY.md", "DOCTOR.md", "PROJECT-MAP.md", "jev.md")
-TEMPLATED_REFERENCES = ("CONTROLS.md", "DELEGATION.md", "CONTEXT.md", "CONTEXT-REFERENCE.md", "PROJECT-MAP.md")
+                   "INVENTORY.md", "DOCTOR.md", "PROJECT-MAP.md", "VERIFICATION.md", "jev.md")
+TEMPLATED_REFERENCES = ("CONTROLS.md", "DELEGATION.md", "CONTEXT.md", "CONTEXT-REFERENCE.md", "PROJECT-MAP.md", "VERIFICATION.md")
 
 
 def reference_text(name, d, host="claude"):
@@ -62,6 +62,10 @@ def reference_text(name, d, host="claude"):
         "{{CONTEXT_INSPECT_COMMAND}}": "$agent-dispatcher context" if codex else "/agent-context",
         "{{MAP_COMMAND}}": "python3 -B PACK/" + ("scripts/" if codex else "") + "project_map.py",
         "{{MAP_INSPECT_COMMAND}}": "$agent-dispatcher map" if codex else "/agent-map",
+        "{{VERIFICATION_COMMAND}}": "python3 -B PACK/" + ("scripts/" if codex else "") + "verification.py",
+        "{{PREFERENCES_COMMAND}}": "python3 -B PACK/" + ("scripts/" if codex else "") + "preferences.py",
+        "{{VERIFY_CONTROL}}": "$agent-dispatcher verify" if codex else "/agent-verify",
+        "{{PREFERENCES_CONTROL}}": "$agent-dispatcher preferences" if codex else "/agent-preferences",
         "{{DECISION_COMMAND}}": 'python3 PACK/scripts/decide.py --project PROJECT plan --task "<the request>"' if codex else 'PYTHONPATH=RUNTIME python3 -m decision plan --task "<the request>"',
         "{{DECISION_STATUS_COMMAND}}": "python3 PACK/scripts/decide.py --project PROJECT status" if codex else "PYTHONPATH=RUNTIME python3 -m decision status",
         "{{DECISION_RUNTIME_NOTE}}": ("PACK is the installed skill directory; --project explicitly selects the workspace." if codex else
@@ -541,7 +545,8 @@ def write_context(d):
         + signal_reference(d) + "\n")
     for name in TEMPLATED_REFERENCES:
         (ADAPTER / name).write_text(reference_text(name, d))
-    for name in ("context.py", "project_map.py", "resources.py"):
+    for name in ("context.py", "context_packet.py", "context_reuse.py", "project_map.py", "project_graph.py",
+                 "resources.py", "verification.py", "preferences.py"):
         (ADAPTER / name).write_bytes((ROOT / name).read_bytes())
     (ADAPTER / "jev.md").write_text(decision_guide())
 
@@ -799,24 +804,35 @@ def write_commands(d):
     for r in d["roles"]:
         loadout = (
             "For substantial workspace work, first run `python3 -B PACK/context.py --project PROJECT "
-            "--task-file - --role " + r["id"] + " --map-preview --json` before reading guides or "
+            "--task-file - --role " + r["id"] + " --compact --map-maintain --json` before reading guides or "
             "manual investigation. This is the first discretionary workspace action: no preliminary "
             "listings, searches, contract/source reads, tests or task-file writes. Mandatory host "
             "instruction discovery is exempt. PACK is the dispatcher directory; quote absolute paths "
             "and send the full unchanged request on stdin. Multi-file bugs, architecture and source-backed documentation "
             "qualify even in small projects. Skip controls, trivial work, one obvious known-file "
-            "change and no-workspace tasks. Use returned excerpts, exclusion_policy and exact resources paths. "
+            "change and no-workspace tasks. Use --map-preview when writes are disallowed. "
+            "Use returned excerpts, exclusion_policy and supplied guidance bodies without duplicate reads. "
+            "Use exact resources paths only for needed bodies not supplied. "
             "Read only the next needed guides, normally zero to two; preserve essential verification. "
             "If unavailable, continue targeted reads with the role's method. CONTEXT.md holds limits "
             "and explicit evidence exclusions; retain them during later reads. No-edit is not no-read. "
             "Run validators inline with python3 -B - and quoted stdin; do not save temporary scripts "
             "or task text beside the project or in shared /tmp. Necessary authorized scratch work "
             "uses an owned temporary-directory context; verify removal and disclose failed cleanup.\n\n")
+        loadout += (
+            "Use returned preferences; when guided work needs unknown preferences, read "
+            "PACK/preferences.py show --project PROJECT --json with python3 -B once. "
+            "Saved effort requests do not prove the host changed effort. "
+            "Before checks, read VERIFICATION.md beside the dispatcher SKILL.md; record authorized "
+            "checks and inspect their freshness before reporting. Never wrap a denied command to bypass it. "
+            "Default final output is ELI5 succinct: answer first, plain language, usually under 150 words; "
+            "include actual results and unresolved limits.\n\n")
         (CMDS / f"agent-{r['slug']}.md").write_text(
             f"---\ndescription: \"Work as the {r['name']} agent — {r['summary']}\"\n"
             f"argument-hint: \"[task]\"\n---\n\n"
             f"Use role `{r['id']}` for this request. For substantial workspace work, prepare context "
-            f"as described below first, then read the dispatcher skill's `roles/{r['id']}.md`. Stay in it for "
+            f"as described below first, then use supplied guidance.role or read the dispatcher skill's "
+            f"`roles/{r['id']}.md` if absent. Stay in it for "
             f"this request and the ones that follow, until the user picks another role or says to "
             f"stop.\n\n"
             f"It sits next to that skill's SKILL.md — `{SKILL_DIR}/roles/{r['id']}.md` for a "
@@ -838,6 +854,14 @@ def write_commands(d):
     # otherwise have to be brace-doubled — and dropping the placeholder while rewording would
     # substitute nothing without a word. sub() raises on the miss; str.replace ignores the rest.
     (CMDS / "agent-context.md").write_text(sub(INSPECTOR, "{{SKILL_DIR}}", SKILL_DIR))
+    for name, description in (("verify", "Run or inspect task verification evidence"),
+                              ("preferences", "Inspect or save output and requested-effort preferences")):
+        (CMDS / f"agent-{name}.md").write_text(
+            f'---\ndescription: "{description}."\nargument-hint: "[action] [options]"\n---\n\n'
+            'Read VERIFICATION.md beside the dispatcher SKILL.md '
+            f'(`{SKILL_DIR}/VERIFICATION.md` for a manual install, or inside the plugin). '
+            'Follow its exact helper commands. Preserve the active role and activation state. '
+            'These controls grant no new permissions; a saved effort request is not a confirmed host setting.\n\n$ARGUMENTS\n')
     (CMDS / "agent-map.md").write_text(
         '---\ndescription: "Build, inspect, or refresh a source-linked project map."\n'
         'argument-hint: "[show | build | refresh] [request]"\n---\n\n'

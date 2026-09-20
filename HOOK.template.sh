@@ -39,21 +39,24 @@ done
 
 printf 'AGENT DISPATCHER ACTIVE (perpetual mode) — this pack lives at %s\n\n' "$pack"
 cat <<'DISPATCH'
-Read PACK/SKILL.md for the common workflow and controls. Honor forced-role persistence,
+Read PACK/SKILL.md for direct/guided/coordinated profiles and controls. Simple unambiguous,
+low-risk tasks use the direct path with native checks and no extra role/helper/preference reads.
+Forced roles and explicitly requested workflows retain their required guidance. Honor forced-role persistence,
 user instructions, host permissions and disabled skills. For substantial workspace tasks,
 select the role then run python3 -B PACK/context.py --project PROJECT --task-file - --role ID
---map-preview --json as the first discretionary workspace action: before listings, searches,
+--compact --map-maintain --json as the first discretionary workspace action: before listings, searches,
 contract/source reads, tests or task-file writes. Mandatory host instructions are exempt.
 Pass the full unchanged task on quoted stdin. Preserve returned exclusion_policy in later reads.
-Use exact resources paths and excerpts; read only the guides needed next. Multi-file bugs,
+Use --map-preview when writes are disallowed. Consume supplied role/guide bodies and excerpts
+without rereading; use exact resources paths only for needed missing bodies. Multi-file bugs,
 architecture and source-backed documentation qualify even in small projects. Controls,
 trivial work, one obvious known-file change and no-workspace tasks bypass the helper.
 Use targeted reads if unavailable. Read PACK/CONTEXT.md only for details or inspection.
 Default role tie-breaks: plans -> planner; reviews -> reviewer; repository questions without
 an artifact -> explorer; source-backed documentation/report updates -> documentation-writer;
 clear implementation changes -> implementer. Honor specialist exclusions and justified exceptions.
-Read the selected role before substantive work. No broad guide globs or full indexes.
-Default compact activity names role, guides actually read, tools/MCPs selected with progress.
+For guided/coordinated work consume the selected role before substantive work. No broad guide globs or full indexes.
+Guided/coordinated activity names role, guides actually read and tools/MCPs selected with progress.
 ACTIVITY.md owns style controls; DELEGATION.md owns chaining and independent subagent work.
 Never route or chain out of a forced role; a plan request ends with a plan. Same-session
 review is a self-check. Missing capabilities do not authorize installation or invented checks.

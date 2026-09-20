@@ -29,11 +29,23 @@ not, the agent says which check could not be performed — it does not quietly d
 | Performance | Baseline and comparable after-measurement, same conditions, not one fast run | `performance-profiling` |
 | Security fix | The original boundary re-tested with the input that exposed it — by someone who did not write the fix | `secure-code-review` |
 | Deployment | The revision actually serving, health signals, a smoke path — not "the command returned 0" | `release-verification` |
-| Documentation | Every command run, every link followed, every example executed | `documentation-verification` |
+| Documentation | Source-backed reports: verify citations and claims; runnable guides: execute relevant commands/examples when available | `documentation-verification` |
 | Agent or prompt change | A representative eval suite, with the regression detected | `agent-evals` |
 | MCP integration | Success, failure, and authorization-failure paths | `api-contract-verification` |
 
 ## Degrading honestly
+
+Implementation checks can use the shared [task receipt helper](../skills/agent-dispatcher/VERIFICATION.md).
+It records command outcomes and file fingerprints, then reports whether the result still
+matches the workspace. Inspect immediately before reporting; later changes require affected
+checks to be rerun. Zero tests, unknown counts, failed checks, denied/not-run notes and stale
+results are distinct. A receipt does not prove browser behavior, external dependency state,
+cleanup or whole-task completion. It is editable local evidence, not a security attestation.
+No observer or automatic test execution is enabled. Store receipts only in an authorized
+host-owned task directory outside the project.
+
+Final summaries default to ELI5 succinct: a brief explanation of the change, observed results
+and remaining gaps. Detailed output expands the evidence; it cannot upgrade uncertainty.
 
 The failure mode this pack cares most about is a confident report of a check that never ran.
 

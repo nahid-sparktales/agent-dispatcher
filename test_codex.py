@@ -14,6 +14,7 @@ import unittest
 from unittest.mock import patch
 
 import build
+from preferences import get_preferences
 from build_codex import adapt, export_package
 from install_codex import activation_module, install
 from install_claude import stage_pack
@@ -125,13 +126,22 @@ print(json.dumps([module.resolve_resources(sys.argv[2], role) for role in json.l
     def test_full_context_workflows_reduce_recorded_bytes_by_at_least_35_percent(self):
         baseline = json.loads((ROOT / "evals/context/workflow-baseline.json").read_text())
         self.assertEqual(baseline["schema_version"], 1)
-        # The compact workflow loads guides that fit the deliverable; candidate
-        # metadata is counted too, rather than hiding the discovery cost.
+        # Normal work consumes the helper result directly; CONTEXT.md is for
+        # limits/inspection, not a required startup read. Count the newly required
+        # verification reference and candidate metadata, including their overhead.
         workflows = {
             "authentication": ("implementer", ("regression-testing", "authentication")),
             "map_refresh": ("documentation-writer", ("documentation-verification",)),
             "architecture_report": ("documentation-writer", ("technical-writing", "documentation-verification")),
         }
+        # Saved display/effort requests are instruction-bearing helper metadata too.
+        # Isolate defaults from the developer's real saved preferences and normalize
+        # the state location just as package locations are normalized to PACK below.
+        preference_state = self.root / "workflow-default-preferences"
+        preferences = get_preferences(project=ROOT, state_dir=preference_state)
+        self.assertFalse(preference_state.exists())
+        preferences["storage_path"] = "STATE/preferences.json"
+        preference_bytes = len(json.dumps(preferences, ensure_ascii=False, separators=(",", ":")).encode("utf-8"))
         manual = self.root / "manual-budget-pack"
         stage_pack(ROOT, manual)
         layouts = (("claude", ROOT, ROOT / "skills/agent-dispatcher", ROOT / "catalog", ROOT / "resources.py"),
@@ -151,9 +161,10 @@ print(json.dumps([module.resolve_resources(sys.argv[2], role) for role in json.l
                     self.assertEqual(resources["role"]["id"], role)
                     self.assertTrue(set(loaded_guides) <= {g["id"] for g in resources["guides"]})
                     normalized = json.dumps(resources, ensure_ascii=False, separators=(",", ":")).replace(str(pack), "PACK")
-                    files = [entry, refs / "CONTEXT.md", Path(resources["role"]["path"]),
+                    files = [entry, refs / "VERIFICATION.md", Path(resources["role"]["path"]),
                              *(pack / manifest["guides"][ident] for ident in loaded_guides)]
-                    measured = sum(len(path.read_bytes()) for path in files) + len(normalized.encode("utf-8"))
+                    measured = (sum(len(path.read_bytes()) for path in files)
+                                + len(normalized.encode("utf-8")) + preference_bytes)
                     self.assertLessEqual(measured * 100, previous["total_bytes"] * 65,
                                          {"bytes": measured, "baseline": previous["total_bytes"],
                                           "loaded_guides": loaded_guides})

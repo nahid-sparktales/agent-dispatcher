@@ -144,9 +144,51 @@ and the other role aliases work the same way. Activation arguments such as `on h
 /agent-dispatcher Compare the approaches already used in this repository and recommend one.
 ```
 
-Routing follows the requested deliverable. A UI task can move through designer, implementer,
-and tester; a label change goes straight to implementation. Trivial edits need no role or
-context plan. While active, the dispatcher re-routes when the kind of work changes.
+Routing follows the requested deliverable, using three execution profiles without an extra
+router or model call:
+
+- **Direct:** trivial work or one safe, obvious edit in a known file. Skip role/guide loading,
+  context preparation, preference lookups and reporting references; use known preferences or
+  defaults and check the result with native tools. Required checks still apply.
+- **Guided:** work needing specialist judgment or investigation. Select a role, prepare context
+  before substantial investigation, and load only the guidance the task needs.
+- **Coordinated:** guided work with useful independent subtasks. Give workers separate scopes
+  and combine their evidence using the host's subagent tools.
+
+Security-sensitive work, configuration or behavior ambiguity, and multi-file tasks stay guided.
+If a direct task reveals wider scope or uncertainty, prepare before investigating further.
+Explicitly selected roles, invoked workflows, user instructions and host permissions always
+win. Profiles do not switch the host's model, effort or permissions.
+
+### Prepare less repeated context
+
+Substantial work uses a compact context packet containing source excerpts, the selected role's
+instructions, and resource locations. Supplied guidance is consumed directly instead of read
+again from its file. Guides remain selective: repeatable `--guide ID` can include eligible guide
+bodies, while unselected resources remain candidates.
+
+`--packet-tokens N` bounds the estimated size of the whole compact packet, including guidance,
+metadata, diagnostics, map facts, graph views and excerpts. This is not a measurement of the host's full
+context window or model usage. Normal preparation uses `--compact`; omit it with `--json` for
+full inspection. Missing required evidence still needs investigation; a small packet is not
+proof of completeness.
+
+During substantial source work, `--map-maintain` uses the same scan to maintain the source-linked
+project map and structural graph when safe writes are permitted. Excluded or incomplete scans defer persistence;
+unsafe destinations leave a read-only result with diagnostics. Use `--map-preview` when writes
+are disallowed. Map facts are evidence, never authorization to run their declared commands.
+
+Repeated preparation may opt into `--reuse-state ABS --reuse-scope ID`, using an authorized
+absolute state path outside the project. Reuse references only within the same context that
+still retains the earlier content. Changed evidence is supplied again. A fresh chat, new worker
+or lost/compacted evidence needs a fresh scope or full output. This does not enable automatic
+cross-chat memory, an observer or background processing. See the
+[context procedure](skills/agent-dispatcher/CONTEXT.md) for limits and inspection controls.
+The [project-intelligence design](docs/project-intelligence.md) explains the flow, research
+inspiration and what still needs benchmarking.
+
+These mechanisms bound preparation and avoid unnecessary loading; savings in completed-task
+time or model usage require matched live evaluations and are not guaranteed.
 
 ### Choose a role or inspect a decision
 
@@ -163,6 +205,8 @@ context plan. While active, the dispatcher re-routes when the kind of work chang
 | `/agent-context explain` | Explain the role, skills, and tools selected. |
 | `/agent-context verbose` | Include candidates, dropped files, and the context budget. |
 | `/agent-decision` | Show optional decision-engine configuration and status. |
+| `/agent-verify run\|show\|note` | Record actual checks, inspect freshness, or disclose a check that wasn't run. |
+| `/agent-preferences show\|set` | Inspect or save output style and requested effort. |
 
 A directly selected role stays active until you choose another or stop the dispatcher.
 
@@ -205,6 +249,33 @@ and the final report names tools used and checks performed. Trivial tasks skip t
 The setting lasts for the conversation; new conversations default to compact. It changes
 activity reporting, not routing, permissions, or the length of the requested deliverable.
 `context verbose` remains a one-time inspection of the context plan.
+
+### Short answers backed by checks
+
+Final replies default to **ELI5 succinct**: plain language, answer first, usually under 150
+words. They say what changed, what actually passed and what remains unchecked. This style is
+adapted from [isas1/skills](https://github.com/isas1/skills/tree/main/skills/eli5-succinct)
+under MIT; see [NOTICE](NOTICE). Detailed evidence stays available separately.
+
+Save preferences in Codex:
+
+```text
+$agent-dispatcher preferences set --output eli5-succinct --effort low
+$agent-dispatcher preferences show
+```
+
+Claude uses `/agent-preferences` with the same arguments. Add `--project PROJECT` when setting
+a project override. Settings live outside the project in Dispatcher-owned configuration.
+Low effort is a **saved request**, not proof the host changed its active setting; the helper
+never edits Claude or Codex model configuration. Default effort is `host` until changed.
+Activity `output compact|verbose` remains separate.
+
+The verification helper wraps authorized commands, records their outcomes and fingerprints
+workspace files. Inspecting the receipt after an edit marks earlier results stale. Failed
+checks, zero tests, unknown counts and checks not run remain distinct. It does not infer
+behavioral coverage, validate external services, or bypass permission denials. Receipts are
+explicit task-owned files outside the workspace, not a background observer. See the
+[verification guide](skills/agent-dispatcher/VERIFICATION.md) for commands and coverage limits.
 
 ### List what is usable and what needs setup
 
@@ -282,14 +353,21 @@ $agent-dispatcher map refresh
 
 In Claude Code use `/agent-map build`, `/agent-map show authentication`, and
 `/agent-map refresh`. Build and refresh write `.agent-dispatcher/project-map.json`
-inside the project. Inspection and context selection only read it; they do not change
-host settings or run discovered commands.
+inside the project. Inspection stays read-only. Substantial guided work requests automatic
+maintenance with `context.py --compact --map-maintain`; neither mode changes host settings
+or runs discovered commands. Use `--map-preview` if writes are disallowed.
 
 The context selector includes a small set of relevant facts whose sources still match.
 Changed, deleted, newly ignored, or unsupported facts are withheld. New files and scan
-limits are reported as coverage gaps; refresh explicitly to update the snapshot.
+limits are reported as coverage gaps; complete scans can refresh the snapshot automatically.
 The map describes recognized source patterns and documented decisions, not a complete
 architecture model or proof that a test command succeeds.
+
+An optional `.agent-dispatcher/project-graph.json` preserves a bounded structural index alongside
+the fact map. Task-seeded graph ranking selects symbols, relationships and candidate tests for
+the current role, and related sources influence excerpt retrieval. Python definitions and a
+conservative subset of direct calls use the standard AST parser; JavaScript/TypeScript imports
+are labeled inferred candidates. Possible paths are static hints, not runtime traces or coverage.
 
 The standalone helper supports `build`, `show`, and `refresh`, `--project`, optional
 `--task`, `--pack`, and `--json`:
@@ -614,7 +692,10 @@ python3 test_release.py
 python3 test_codex.py
 python3 test_doctor.py
 python3 test_context.py
+python3 test_context_packet.py
+python3 test_context_reuse.py
 python3 test_project_map.py
+python3 test_project_graph.py
 python3 test_e2e.py
 ```
 

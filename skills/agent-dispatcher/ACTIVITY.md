@@ -1,5 +1,10 @@
 # Activity output
 
+Final replies default to ELI5 succinct: answer first, plain language, usually under 150 words.
+State the change, observed checks and unresolved gaps. Saved `preferences` output/effort are
+separate from conversation-only compact/verbose activity. Read VERIFICATION.md for evidence
+receipts or preference changes. A saved effort request is not confirmation of the host's setting.
+
 
 Default to **compact** output. `output compact` and `output verbose` change the activity
 announcement style for this conversation; `output` reports the current style. Accept plain
