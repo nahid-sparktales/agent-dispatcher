@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Add an explicitly built local project map with source fingerprints, stale-fact exclusion,
+  read-only context enrichment, and matching Claude/Codex commands.
+- Expand stock-versus-dispatcher evaluation fixtures for multi-file retrieval, stale project
+  knowledge, and source-backed architecture discovery, with private acceptance checks.
+
 - Add local, read-only context selection with ranked code passages, source locations,
   bounded scanning and explicit exclusions for Claude Code and Codex.
 - Reduce dispatcher entrypoints and the concise context procedure to at most 6 KiB each,

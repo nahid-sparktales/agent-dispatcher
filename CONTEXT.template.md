@@ -39,6 +39,8 @@ Use returned excerpts directly, with their paths/ranges, reasons, exclusions, bu
 limits. Check coverage; ranking is not proof of completeness. Do not re-read emitted ranges
 unchanged: use further reads for gaps or changed source. If Python or the helper is
 unavailable, say so and apply the bounded manual method below; continue achievable work.
+Existing project maps add fresh, source-checked facts separately; stale facts are withheld.
+For map build/refresh controls, read [PROJECT-MAP.md](PROJECT-MAP.md).
 
 ## Skills, evidence, and checks
 

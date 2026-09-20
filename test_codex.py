@@ -144,6 +144,51 @@ class CodexPackageTests(unittest.TestCase):
             self.assertEqual(row["source"], self.data["mcp"][row["id"]].get("source"))
             self.assertEqual(row["auth"], self.data["mcp"][row["id"]].get("auth"))
 
+    def test_project_map_parity_freshness_and_read_only_context_across_hosts(self):
+        project = self.root / "map-project"
+        project.mkdir()
+        subprocess.run(["git", "init", "-q", str(project)], check=True)
+        source = project / "auth.py"
+        source.write_text("def validate_login(name):\n    return bool(name)\n")
+        (project / "package.json").write_text(json.dumps({"scripts": {"test": "python3 -m unittest"},
+                                                       "dependencies": {"example-auth": "1.0.0"}}))
+        manual = self.root / "manual-map-pack"
+        stage_pack(ROOT, manual)
+        folders = [ROOT, manual, ROOT / "skills/agent-dispatcher", self.pack / "scripts"]
+        env = dict(os.environ, PYTHONDONTWRITEBYTECODE="1", AGENT_DISPATCHER_DECISION_MODE="required")
+
+        def invoke(folder, helper, args):
+            result = subprocess.run([sys.executable, "-B", str(folder / helper), *args,
+                                     "--project", str(project), "--json"],
+                                    cwd=self.root, env=env, capture_output=True, text=True, timeout=15)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            return json.loads(result.stdout)
+
+        def snapshot(folder):
+            return {str(p.relative_to(folder)): (p.read_bytes(), p.stat().st_mtime_ns)
+                    for p in folder.rglob("*") if p.is_file()}
+
+        for folder in folders:
+            self.assertEqual((folder / "project_map.py").read_bytes(), (ROOT / "project_map.py").read_bytes())
+        invoke(ROOT, "project_map.py", ["build"])
+        before = [snapshot(folder) for folder in (project, manual, self.pack)]
+        reports = [invoke(folder, "project_map.py", ["show", "--task", "validate_login"]) for folder in folders]
+        self.assertTrue(reports[0]["entries"])
+        for report in reports[1:]:
+            self.assertEqual(reports[0], report)
+        contexts = [invoke(folder, "context.py", ["--task", "validate_login", "--size", "small"]) for folder in folders]
+        self.assertTrue(contexts[0]["project_map"]["entries"])
+        for result in contexts[1:]:
+            self.assertEqual(contexts[0]["project_map"], result["project_map"])
+        self.assertEqual(before, [snapshot(folder) for folder in (project, manual, self.pack)])
+        source.write_text("def validate_login(name):\n    return bool(name.strip())\n")
+        for folder in folders:
+            stale = invoke(folder, "project_map.py", ["show"])
+            self.assertFalse(any(e["source"]["path"] == "auth.py" for e in stale["entries"]))
+        invoke(self.pack / "scripts", "project_map.py", ["refresh"])
+        refreshed = invoke(manual, "project_map.py", ["show"])
+        self.assertTrue(any(e["source"]["path"] == "auth.py" for e in refreshed["entries"]))
+
     def test_optional_decision_cli_runs_outside_package(self):
         project = self.root / "project"
         project.mkdir(exist_ok=True)

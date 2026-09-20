@@ -36,6 +36,7 @@ GENERATED = ["skills/agent-dispatcher/DOCTOR.md", "skills/agent-dispatcher/docto
              "docs/context-engine.md"]
 GENERATED += ["skills/agent-dispatcher/" + name for name in build.REFERENCE_FILES]
 GENERATED.append("skills/agent-dispatcher/context.py")
+GENERATED.append("skills/agent-dispatcher/project_map.py")
 
 
 def drift():
@@ -365,7 +366,7 @@ def main():
               all(text in role_index for text in (f"Alias: `{role['slug']}`", role['use_when'], role['not_for'])))
     cmds = sorted(build.CMDS.glob("agent-*.md"))
     # Inspection and configuration commands do not force a specialist role.
-    NON_ROLE_CMDS = ("agent-context.md", "agent-decision.md", "agent-inventory.md", "agent-doctor.md")
+    NON_ROLE_CMDS = ("agent-context.md", "agent-decision.md", "agent-inventory.md", "agent-doctor.md", "agent-map.md")
     role_cmds = [c for c in cmds if c.name not in NON_ROLE_CMDS]
     check("one command per role, plus inspection and configuration commands",
           len(role_cmds) == len(roles)
@@ -375,6 +376,10 @@ def main():
         m = re.search(r"roles/([a-z0-9-]+)\.md", c.read_text())
         check(f"command {c.name} points at a real role", m and m.group(1) in ids)
     inspector = (build.CMDS / "agent-context.md").read_text()
+    map_command = (build.CMDS / "agent-map.md").read_text()
+    check("project map control reaches its guide without executing the task",
+          "PROJECT-MAP.md" in map_command and "inspection is read-only" in map_command
+          and "Do not execute discovered commands" in map_command)
     check("inspector sends the reader to CONTEXT.md", "CONTEXT.md" in inspector)
     check("inspector does not do the work", "Do not do the work." in inspector)
     check("inspector offers local context build without executing the task",

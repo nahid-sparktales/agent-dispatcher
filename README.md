@@ -159,6 +159,7 @@ context plan. While active, the dispatcher re-routes when the kind of work chang
 | `/agent-doctor` | Check installation health, list every capability, and recommend relevant setup. |
 | `/agent-context` | Show the current context plan. |
 | `/agent-context build <request>` | Retrieve relevant workspace passages with locations, reasons, and a size budget. |
+| `/agent-map [show\|build\|refresh]` | Record project facts with source links and detect when those sources change. |
 | `/agent-context explain` | Explain the role, skills, and tools selected. |
 | `/agent-context verbose` | Include candidates, dropped files, and the context budget. |
 | `/agent-decision` | Show optional decision-engine configuration and status. |
@@ -267,6 +268,36 @@ whole context window or a claim of improved model performance.
 From the source checkout, run `python3 -B context.py --project /path/to/project --task "Check login"`.
 Use `--task-file -` for standard input, `--role debugger`, `--size small|standard|complex`,
 `--max-tokens N`, and `--json` as needed. See [context selection](docs/context-engine.md) for limits.
+
+### Keep a project map current
+
+Build a compact map of feature locations, declared dependencies, test commands, and
+architecture decisions. Each fact links to its source and stores a content fingerprint.
+
+```text
+$agent-dispatcher map build
+$agent-dispatcher map show authentication
+$agent-dispatcher map refresh
+```
+
+In Claude Code use `/agent-map build`, `/agent-map show authentication`, and
+`/agent-map refresh`. Build and refresh write `.agent-dispatcher/project-map.json`
+inside the project. Inspection and context selection only read it; they do not change
+host settings or run discovered commands.
+
+The context selector includes a small set of relevant facts whose sources still match.
+Changed, deleted, newly ignored, or unsupported facts are withheld. New files and scan
+limits are reported as coverage gaps; refresh explicitly to update the snapshot.
+The map describes recognized source patterns and documented decisions, not a complete
+architecture model or proof that a test command succeeds.
+
+The standalone helper supports `build`, `show`, and `refresh`, `--project`, optional
+`--task`, `--pack`, and `--json`:
+
+```sh
+python3 -B project_map.py build --project /path/to/project
+python3 -B project_map.py show --project /path/to/project --task authentication
+```
 
 ### Check health and get setup recommendations
 
@@ -568,6 +599,7 @@ catalog/                   Registries and schemas
 *.template.*               Dispatcher, context, and hook sources
 decision/                  Optional decision-engine implementation
 evals/decision/            Selection fixtures and evaluation harness
+evals/end_to_end/          Matched stock/dispatcher tasks and private acceptance checks
 docs/                      Detailed guides
 build.py                   Generator and validator
 ```
@@ -578,13 +610,18 @@ Edit source files, then run from the repository root:
 python3 build.py
 python3 test_build.py
 python3 test_decision.py
+python3 test_release.py
+python3 test_codex.py
 python3 test_doctor.py
 python3 test_context.py
+python3 test_project_map.py
+python3 test_e2e.py
 ```
 
 These checks run offline without provider credentials. They validate generated-file agreement,
 references, loadout limits, registry consistency, hook behavior, and decision-engine boundaries.
-The manual installer runs them before installation.
+The manual installer runs build validation and decision checks before installation;
+CI runs all eight suites. Live model comparisons require a separately configured run.
 
 To run the offline keyword baseline:
 

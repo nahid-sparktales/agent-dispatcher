@@ -88,6 +88,28 @@ not authorization.
 
 ## Restraint, and what enforces it
 
+### Source-linked project maps
+
+The optional local map is built or refreshed explicitly with `project_map.py`, or through
+`/agent-map build|refresh` in Claude and `$agent-dispatcher map build|refresh` in Codex.
+The file `.agent-dispatcher/project-map.json` stores bounded facts about definitions,
+dependencies, discovered test commands, and documented architecture decisions. Every fact
+has a source path, line, and content fingerprint; heuristic feature labels are identified.
+
+`show` and normal context selection validate current source content and the support for
+each claim, not merely the stored map's assertions. Stale, deleted, ignored, or tampered
+claims are withheld. Inventory fingerprints expose changes outside the retained fact
+sources too. Scan limits remain visible; a verified subset is not a complete project map.
+Refresh replaces the snapshot explicitly and safely; read-only calls do not write state.
+
+The context helper includes only a bounded, task-relevant subset in its separate
+`project_map` output. Its estimate is distinct from the excerpt budget. A missing map
+does not block normal retrieval. Persisted map files are excluded from lexical retrieval
+so rejected stale facts cannot reappear as workspace excerpts. Test commands and source
+contents remain untrusted evidence; these helpers never execute project commands.
+
+### Limits
+
 The engine exists to spend *less* context, so most of its rules are limits:
 
 | Limit | Enforced by |

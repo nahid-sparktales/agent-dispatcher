@@ -7,6 +7,15 @@ evaluations in `../decision`. Results stay separate by client.
 The starter suite validates the harness. It is not evidence that the dispatcher
 improves real project work. Add representative tasks before making that claim.
 
+To distinguish the effects of context retrieval, smaller instructions, and project maps,
+prepare separate experiments from frozen package revisions that add one change at a time.
+Use the same fixture snapshot, models, efforts, authentication modes, seed, CLI versions,
+and trial budgets, and retain every report. Run each revision's own smoke checks before
+its pilot; package changes invalidate older smoke evidence. Compare each revision with
+its matched stock condition and keep clients separate. The combined treatment alone
+cannot attribute an improvement to a particular feature. This process needs no new
+runtime ablation flags and does not license claims from unrun experiments.
+
 ## Prepare without using a model
 
 Run from the repository root with Python 3.10 or newer. No extra Python packages
@@ -84,7 +93,7 @@ python3 evals/end_to_end/run.py run --config dist/evals/local/config.json --suit
 ```
 
 Smoke performs 8 runs: greeting edit and interval-merging bug fix, once per
-condition per client. Pilot performs 96 separate runs: 12 fixtures, twice per
+condition per client. Pilot performs 120 separate runs: 15 fixtures, twice per
 condition per client. Smoke must first establish valid startup, invocation, and
 event capture using the same configuration and CLI versions. A fixture failure
 can be a legitimate smoke result; missing dispatcher invocation cannot establish
@@ -165,7 +174,11 @@ See [fixture manifest documentation](fixtures/README.md) for adding real tasks.
 Pass `prepare --fixtures /path/to/manifest.json` to freeze a custom suite. Exactly
 two fixtures must have `smoke: true`; pilot size follows the number of fixtures.
 The default suite covers small edits, bugs, features, reviews, planning, research
-from supplied documents, missing information and scope. It does not establish
+from supplied documents, missing information, scope, multi-file context retrieval,
+stale project-summary refresh, and architecture reports with source citations.
+The context tasks use matched ordinary project requests, not dispatcher-only commands;
+they check outcomes without requiring either client to use a particular helper.
+They do not establish runtime cache behavior, which the project-map tests cover, or
 results for UI/browser work, live integrations, hooks or long conversations.
 
 ```sh

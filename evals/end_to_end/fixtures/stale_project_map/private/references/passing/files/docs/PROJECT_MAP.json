@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "entries": [
+    {
+      "id": "entrypoint",
+      "value": "service.worker:run_job",
+      "evidence": {
+        "path": "service/worker.py",
+        "start_line": 5,
+        "end_line": 5,
+        "quote": "def run_job(operation):",
+        "sha256": "efffccf5decd1832b86b937fc17b68df45e4ad594d6d0bc5513490873f0f4557"
+      }
+    },
+    {
+      "id": "max_attempts",
+      "value": 4,
+      "evidence": {
+        "path": "service/policy.py",
+        "start_line": 1,
+        "end_line": 1,
+        "quote": "MAX_ATTEMPTS = 4",
+        "sha256": "c686b7bb2721b1eb5db8087f964c9b039b732fd0850a7e568f4236668819541b"
+      }
+    },
+    {
+      "id": "retry_exception",
+      "value": "TemporaryFailure",
+      "evidence": {
+        "path": "service/worker.py",
+        "start_line": 9,
+        "end_line": 9,
+        "quote": "        except TemporaryFailure:",
+        "sha256": "efffccf5decd1832b86b937fc17b68df45e4ad594d6d0bc5513490873f0f4557"
+      }
+    },
+    {
+      "id": "test_command",
+      "value": "python3 -m unittest discover -s tests",
+      "evidence": {
+        "path": "Makefile",
+        "start_line": 2,
+        "end_line": 2,
+        "quote": "\tpython3 -m unittest discover -s tests",
+        "sha256": "b153ed19973fe6721ac19533e6a565e754b2a8b8eb8dd732a65ca45a979cddc2"
+      }
+    }
+  ]
+}

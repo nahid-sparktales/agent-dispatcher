@@ -1,0 +1,4 @@
+[project]
+name = "session-api"
+version = "0.1.0"
+dependencies = []

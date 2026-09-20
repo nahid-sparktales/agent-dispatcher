@@ -56,6 +56,12 @@ workspace tasks. It needs no model provider; unavailable search tools or partial
 diagnostics and ordinary targeted investigation continues. Existing context inspection modes
 remain available. `CONTEXT.md` is the concise procedure; detailed references are loaded on demand.
 
+`/agent-map build` records a source-linked project map; `show <request>` inspects relevant
+facts and `refresh` updates it. The shared `PROJECT-MAP.md` guide documents `project_map.py`.
+Only build/refresh writes `.agent-dispatcher/project-map.json` in the project. Context
+selection checks source fingerprints and support before using existing facts, and reports
+stale or incomplete coverage without silently refreshing. Plugin commands use the usual prefix.
+
 ## Doctor
 
 `/agent-doctor` or `/agent-dispatcher doctor` checks package health and the entire capability

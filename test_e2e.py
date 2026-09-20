@@ -110,11 +110,19 @@ print(json.dumps(result))
 
 
 class SchedulingTests(unittest.TestCase):
-    fixtures = [{"id": f"task-{i}", "smoke": i < 2} for i in range(12)]
+    fixtures = [{"id": f"task-{i}", "smoke": i < 2} for i in range(15)]
 
     def test_smoke_and_pilot_counts(self):
         self.assertEqual(len(runner.schedule(self.fixtures, "smoke", 4)), 8)
-        self.assertEqual(len(runner.schedule(self.fixtures, "pilot", 4)), 96)
+        self.assertEqual(len(runner.schedule(self.fixtures, "pilot", 4)), 120)
+
+    def test_current_suite_keeps_two_smoke_tasks_and_pairs_every_pilot_task(self):
+        from evals.end_to_end.grading import load_suite
+        fixtures = load_suite()
+        self.assertEqual(len(runner.schedule(fixtures, "smoke", 4)), 8)
+        pilot = runner.schedule(fixtures, "pilot", 4)
+        self.assertEqual(len(pilot), len(fixtures) * len(runner.CLIENTS) * len(runner.CONDITIONS) * 2)
+        self.assertEqual({row['fixture_id'] for row in pilot}, {item['id'] for item in fixtures})
 
     def test_seed_reproduces_pairs_not_best_of_selection(self):
         a = runner.schedule(self.fixtures, "pilot", 41)

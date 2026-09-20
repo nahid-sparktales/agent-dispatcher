@@ -64,6 +64,12 @@ The helper is local and read-only, with no model requests, persistent index or a
 Existing context inspection modes remain available. Entry instructions and `references/CONTEXT.md`
 are capped at 6 KiB each; additional references load only when their workflow is needed.
 
+`$agent-dispatcher map build` records a local source-linked project map; `map show <request>`
+inspects relevant facts and `map refresh` updates it. The helper is `scripts/project_map.py`
+with instructions in `references/PROJECT-MAP.md`. Only build/refresh writes
+`.agent-dispatcher/project-map.json` in the project. Context selection validates existing map
+facts, withholds stale claims, and reports incomplete coverage without changing the map.
+
 ## Activity output
 
 Compact summaries name the role, skills/guides actually read, selected built-in tools, and

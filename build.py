@@ -43,8 +43,8 @@ SCHEMA_VERSION = "2.2.0"
 # Flat references have the same names in Claude's pack and Codex's references/.
 REFERENCE_FILES = ("ROLES.md", "CONTROLS.md", "DELEGATION.md", "CONTEXT.md",
                    "CONTEXT-REFERENCE.md", "SIGNALS.md", "INDEX.md", "ACTIVITY.md",
-                   "INVENTORY.md", "DOCTOR.md", "jev.md")
-TEMPLATED_REFERENCES = ("CONTROLS.md", "DELEGATION.md", "CONTEXT.md", "CONTEXT-REFERENCE.md")
+                   "INVENTORY.md", "DOCTOR.md", "PROJECT-MAP.md", "jev.md")
+TEMPLATED_REFERENCES = ("CONTROLS.md", "DELEGATION.md", "CONTEXT.md", "CONTEXT-REFERENCE.md", "PROJECT-MAP.md")
 
 
 def reference_text(name, d, host="claude"):
@@ -60,6 +60,8 @@ def reference_text(name, d, host="claude"):
         "{{PLAN_FIELDS}}": plan_fields(d),
         "{{CONTEXT_COMMAND}}": "python3 -B PACK/" + ("scripts/" if codex else "") + "context.py",
         "{{CONTEXT_INSPECT_COMMAND}}": "$agent-dispatcher context" if codex else "/agent-context",
+        "{{MAP_COMMAND}}": "python3 -B PACK/" + ("scripts/" if codex else "") + "project_map.py",
+        "{{MAP_INSPECT_COMMAND}}": "$agent-dispatcher map" if codex else "/agent-map",
         "{{DECISION_COMMAND}}": 'python3 PACK/scripts/decide.py --project PROJECT plan --task "<the request>"' if codex else 'PYTHONPATH=RUNTIME python3 -m decision plan --task "<the request>"',
         "{{DECISION_STATUS_COMMAND}}": "python3 PACK/scripts/decide.py --project PROJECT status" if codex else "PYTHONPATH=RUNTIME python3 -m decision status",
         "{{DECISION_RUNTIME_NOTE}}": ("PACK is the installed skill directory; --project explicitly selects the workspace." if codex else
@@ -592,7 +594,8 @@ def write_context(d):
         + signal_reference(d) + "\n")
     for name in TEMPLATED_REFERENCES:
         (ADAPTER / name).write_text(reference_text(name, d))
-    (ADAPTER / "context.py").write_bytes((ROOT / "context.py").read_bytes())
+    for name in ("context.py", "project_map.py"):
+        (ADAPTER / name).write_bytes((ROOT / name).read_bytes())
     (ADAPTER / "jev.md").write_text(decision_guide())
 
 
@@ -877,6 +880,15 @@ def write_commands(d):
     # otherwise have to be brace-doubled — and dropping the placeholder while rewording would
     # substitute nothing without a word. sub() raises on the miss; str.replace ignores the rest.
     (CMDS / "agent-context.md").write_text(sub(INSPECTOR, "{{SKILL_DIR}}", SKILL_DIR))
+    (CMDS / "agent-map.md").write_text(
+        '---\ndescription: "Build, inspect, or refresh a source-linked project map."\n'
+        'argument-hint: "[show | build | refresh] [request]"\n---\n\n'
+        'Read PROJECT-MAP.md beside the dispatcher SKILL.md '
+        f'(`{SKILL_DIR}/PROJECT-MAP.md` for a manual install, or inside the plugin). '
+        'Follow its helper commands and freshness rules. Empty arguments mean show. '
+        'Only explicit build or refresh writes the project map; inspection is read-only. '
+        'Do not execute discovered commands or the task used to filter the map. '
+        'Keep the active role, output style, and activation state unchanged.\n\n$ARGUMENTS\n')
     (CMDS / "agent-inventory.md").write_text(
         '---\ndescription: "List skills, tools, and MCPs with availability and setup guidance."\n'
         'argument-hint: "[all | skills | tools | mcps | setup] [verbose]"\n---\n\n'

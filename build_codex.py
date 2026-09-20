@@ -98,7 +98,7 @@ def export_package(destination, data):
     shutil.copytree(ROOT / "catalog", runtime / "catalog")
     for name in ("activate.py", "decide.py"):
         shutil.copyfile(SOURCE / name, scripts / name)
-    for name in ("doctor.py", "context.py"):
+    for name in ("doctor.py", "context.py", "project_map.py"):
         shutil.copyfile(ROOT / name, scripts / name)
     manifest = json.loads((ROOT / ".claude-plugin" / "plugin.json").read_text())
     manifest["skills"] = "./skills/"

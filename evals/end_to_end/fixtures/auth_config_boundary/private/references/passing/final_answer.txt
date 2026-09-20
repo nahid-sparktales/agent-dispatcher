@@ -1,0 +1,1 @@
+Fixed parsing in the live settings loader and added regression coverage.

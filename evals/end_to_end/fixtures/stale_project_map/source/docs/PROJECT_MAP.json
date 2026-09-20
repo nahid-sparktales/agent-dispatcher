@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "entries": [
+    {
+      "id": "entrypoint",
+      "value": "worker:run",
+      "evidence": {
+        "path": "worker.py",
+        "start_line": 1,
+        "end_line": 1,
+        "quote": "def run(operation):",
+        "sha256": "85af065cd476beb79c27c3a7b5a44d2bbd4e63335c4e9f0e6642e606906a52e2"
+      }
+    },
+    {
+      "id": "max_attempts",
+      "value": 3,
+      "evidence": {
+        "path": "service/policy.py",
+        "start_line": 1,
+        "end_line": 1,
+        "quote": "MAX_ATTEMPTS = 3",
+        "sha256": "9a32d2493e33edcee15689133228d6a337c89aa46c0f0fe46ca9dc6e3a906989"
+      }
+    },
+    {
+      "id": "retry_exception",
+      "value": "RuntimeError",
+      "evidence": {
+        "path": "service/old_errors.py",
+        "start_line": 1,
+        "end_line": 1,
+        "quote": "RETRY_ERROR = RuntimeError",
+        "sha256": "875fc2f2efeff87eff990e0229731c9b607295d43d29de87dba3b0aba840e982"
+      }
+    },
+    {
+      "id": "test_command",
+      "value": "pytest",
+      "evidence": {
+        "path": "Makefile",
+        "start_line": 2,
+        "end_line": 2,
+        "quote": "\tpytest",
+        "sha256": "073d60331d30e9ee45a26e61131d2ad1046bb4be84f68721186c0599306da1a5"
+      }
+    }
+  ]
+}

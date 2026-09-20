@@ -1,0 +1,117 @@
+{
+  "schema_version": 1,
+  "entrypoint": {
+    "value": "flowdesk.api:handle_request",
+    "evidence": {
+      "path": "flowdesk/api.py",
+      "start_line": 5,
+      "end_line": 5,
+      "quote": "def handle_request(method, path, payload=None, store=None):",
+      "sha256": "8cdeffc074baed91e7049786aaccd0e9c2fb38aa0aabceae672ce020056ac9e8"
+    }
+  },
+  "features": [
+    {
+      "id": "list_tasks",
+      "value": "GET /tasks",
+      "evidence": {
+        "path": "flowdesk/api.py",
+        "start_line": 7,
+        "end_line": 8,
+        "quote": "    if method == \"GET\" and path == \"/tasks\":\n        return service.list_tasks()",
+        "sha256": "8cdeffc074baed91e7049786aaccd0e9c2fb38aa0aabceae672ce020056ac9e8"
+      }
+    },
+    {
+      "id": "create_task",
+      "value": "POST /tasks",
+      "evidence": {
+        "path": "flowdesk/api.py",
+        "start_line": 9,
+        "end_line": 10,
+        "quote": "    if method == \"POST\" and path == \"/tasks\":\n        return service.add_task(payload[\"title\"])",
+        "sha256": "8cdeffc074baed91e7049786aaccd0e9c2fb38aa0aabceae672ce020056ac9e8"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "handle_request",
+      "to": "TaskService.list_tasks",
+      "evidence": {
+        "path": "flowdesk/api.py",
+        "start_line": 8,
+        "end_line": 8,
+        "quote": "        return service.list_tasks()",
+        "sha256": "8cdeffc074baed91e7049786aaccd0e9c2fb38aa0aabceae672ce020056ac9e8"
+      }
+    },
+    {
+      "from": "handle_request",
+      "to": "TaskService.add_task",
+      "evidence": {
+        "path": "flowdesk/api.py",
+        "start_line": 10,
+        "end_line": 10,
+        "quote": "        return service.add_task(payload[\"title\"])",
+        "sha256": "8cdeffc074baed91e7049786aaccd0e9c2fb38aa0aabceae672ce020056ac9e8"
+      }
+    },
+    {
+      "from": "TaskService.list_tasks",
+      "to": "MemoryTaskStore.list_tasks",
+      "evidence": {
+        "path": "flowdesk/service.py",
+        "start_line": 6,
+        "end_line": 6,
+        "quote": "        return self.store.list_tasks()",
+        "sha256": "4482ef1887c5f57145f0891ab75a09ba122f6b18980b2a50ff798ac5decfd43d"
+      }
+    },
+    {
+      "from": "TaskService.add_task",
+      "to": "MemoryTaskStore.add_task",
+      "evidence": {
+        "path": "flowdesk/service.py",
+        "start_line": 12,
+        "end_line": 12,
+        "quote": "        return self.store.add_task(title)",
+        "sha256": "4482ef1887c5f57145f0891ab75a09ba122f6b18980b2a50ff798ac5decfd43d"
+      }
+    }
+  ],
+  "dependencies": {
+    "value": [
+      "sqlite3"
+    ],
+    "evidence": {
+      "path": "pyproject.toml",
+      "start_line": 4,
+      "end_line": 4,
+      "quote": "dependencies = [\"typing-extensions>=4.8\"]",
+      "sha256": "210074e46fc188b815c22ca294b013803307e4c4939d05dac3182b55e68d3c82"
+    }
+  },
+  "test_command": {
+    "value": "python3 -m unittest discover -s tests -v",
+    "evidence": {
+      "path": "Makefile",
+      "start_line": 2,
+      "end_line": 2,
+      "quote": "\tpython3 -m unittest discover -s tests -v",
+      "sha256": "80e8972a14f0b37b2340d116cff36a14cc5b45185c11c036305716967e3d30da"
+    }
+  },
+  "decision": {
+    "id": "storage",
+    "value": "sqlite",
+    "status": "accepted",
+    "evidence": {
+      "path": "docs/proposals/sqlite.md",
+      "start_line": 3,
+      "end_line": 4,
+      "quote": "Status: proposed\nBackend: sqlite",
+      "sha256": "dd7609950f8642ac695267a2be3706d0fa65a027fb4801e4656dcaad968a3ccc"
+    }
+  }
+}

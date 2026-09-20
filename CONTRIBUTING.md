@@ -19,6 +19,7 @@ INVENTORY.template.md                 availability and setup inspection shared b
 DOCTOR.template.md, doctor.py          read-only health checks and setup recommendations
 install_claude.py                     staged manual Claude installation and rollback
 CONTEXT.template.md, context.py       concise context procedure and local excerpt selector
+PROJECT-MAP.template.md, project_map.py source-linked facts, explicit refresh, and freshness checks
 CONTEXT-REFERENCE.template.md         advanced context reference and worked plan example
 CONTROLS.template.md                  Claude activation and configuration details
 DELEGATION.template.md                on-demand chaining and delegation guidance
@@ -45,6 +46,7 @@ python3 test_release.py   # full installer lifecycle and public-release regressi
 python3 test_codex.py     # Codex package, installer, activation, and offline routing
 python3 test_doctor.py    # health checks, full inventory, evidence, and recommendations
 python3 test_context.py   # bounded local retrieval, excerpts, ranking, and exclusions
+python3 test_project_map.py # source-backed maps, staleness, safe writes, and context integration
 python3 test_e2e.py       # native-client evaluation runner, offline fixtures only
 ```
 

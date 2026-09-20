@@ -1,0 +1,73 @@
+{
+  "owner": "agent-dispatcher-project-map",
+  "schema_version": 1,
+  "scan": {
+    "complete": true,
+    "files": 10,
+    "readable_files": 10,
+    "bytes": 3195,
+    "path_fingerprint": "ac8b0fa2889b7732123e0114da41380f67e54e0ad68d4acf3d256322646ae577",
+    "content_fingerprint": "b398089201cbe642e7952fa030f2f88e91e0ad472c693806d861407b2a14d562",
+    "omitted_facts": 0
+  },
+  "sources": [
+    {
+      "path": "Makefile",
+      "sha256": "073d60331d30e9ee45a26e61131d2ad1046bb4be84f68721186c0599306da1a5"
+    },
+    {
+      "path": "service/old_errors.py",
+      "sha256": "32d468e98992570120389e8ede26ce66e3358927529c9566d74c621e49903275"
+    },
+    {
+      "path": "worker.py",
+      "sha256": "3dcde98e834220ea596f7bff675138d4ff82e2b1bc7e458ba24fdf19f6ffb4cb"
+    }
+  ],
+  "entries": [
+    {
+      "kind": "test_command",
+      "label": "make test",
+      "detail": "Declared Make target: test",
+      "basis": "heuristic",
+      "source": {
+        "path": "Makefile",
+        "line": 1,
+        "sha256": "073d60331d30e9ee45a26e61131d2ad1046bb4be84f68721186c0599306da1a5"
+      }
+    },
+    {
+      "kind": "test_command",
+      "label": "pytest",
+      "detail": "Documented check command: pytest",
+      "basis": "declared",
+      "source": {
+        "path": "Makefile",
+        "line": 2,
+        "sha256": "073d60331d30e9ee45a26e61131d2ad1046bb4be84f68721186c0599306da1a5"
+      }
+    },
+    {
+      "kind": "feature",
+      "label": "LegacyFailure",
+      "detail": "Candidate feature location; definition: class LegacyFailure(RuntimeError):",
+      "basis": "heuristic",
+      "source": {
+        "path": "service/old_errors.py",
+        "line": 1,
+        "sha256": "32d468e98992570120389e8ede26ce66e3358927529c9566d74c621e49903275"
+      }
+    },
+    {
+      "kind": "feature",
+      "label": "run",
+      "detail": "Candidate feature location; definition: def run(operation):",
+      "basis": "heuristic",
+      "source": {
+        "path": "worker.py",
+        "line": 1,
+        "sha256": "3dcde98e834220ea596f7bff675138d4ff82e2b1bc7e458ba24fdf19f6ffb4cb"
+      }
+    }
+  ]
+}

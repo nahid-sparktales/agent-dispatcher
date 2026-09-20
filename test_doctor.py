@@ -54,7 +54,7 @@ class DoctorTests(unittest.TestCase):
         write(self.pack / "SKILL.md", "# Dispatcher")
         write(self.pack / "roles/reviewer.md", "# Reviewer")
         for file in ("INDEX.md", "CONTEXT.md", "CONTEXT-REFERENCE.md", "ROLES.md", "CONTROLS.md",
-                     "DELEGATION.md", "jev.md", "DOCTOR.md", "doctor.py", "context.py"):
+                     "DELEGATION.md", "PROJECT-MAP.md", "jev.md", "DOCTOR.md", "doctor.py", "context.py", "project_map.py"):
             write(self.pack / file, "fixture")
 
     def inspect(self, **kwargs):
@@ -201,6 +201,12 @@ class DoctorTests(unittest.TestCase):
         health = self.row(self.inspect(), "package-files")
         self.assertEqual(health["status"], "needs_setup")
         self.assertIn("decision/redact.py", health["missing_files"])
+
+    def test_project_map_helper_is_required_for_package_health(self):
+        (self.pack / "project_map.py").unlink()
+        health = self.row(self.inspect(), "package-files")
+        self.assertEqual(health["status"], "needs_setup")
+        self.assertIn("project_map.py", health["missing_files"])
 
     def test_plugin_runtime_dependencies_are_resolved_from_catalog(self):
         plugin = self.root / "plugin"

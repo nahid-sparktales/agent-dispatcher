@@ -238,11 +238,11 @@ def stage_pack(repo, destination):
             copy_tree(source, destination / "lib" / source.name)
     for name in ("recipes", "decision", "catalog"):
         copy_tree(repo / name, destination / name)
-    for name in ("doctor.py", "context.py"):
+    for name in ("doctor.py", "context.py", "project_map.py"):
         copy_file(repo / name, destination / name)
     required = ("SKILL.md", "INDEX.md", "CONTEXT.md", "CONTEXT-REFERENCE.md", "ROLES.md",
-                "CONTROLS.md", "DELEGATION.md", "jev.md", "roles", "lib", "recipes",
-                "decision/__main__.py", "decision/redact.py", "catalog/loadouts.json", "doctor.py", "context.py")
+                "CONTROLS.md", "DELEGATION.md", "PROJECT-MAP.md", "jev.md", "roles", "lib", "recipes",
+                "decision/__main__.py", "decision/redact.py", "catalog/loadouts.json", "doctor.py", "context.py", "project_map.py")
     if any(not (destination / name).exists() for name in required):
         raise ValueError("staged dispatcher pack is incomplete")
 

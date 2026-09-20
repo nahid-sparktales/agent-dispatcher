@@ -1,0 +1,4 @@
+[project]
+name = "flowdesk"
+version = "0.1.0"
+dependencies = ["typing-extensions>=4.8"]

@@ -1,7 +1,7 @@
 ---
 name: agent-dispatcher
 description: Route work to a specialist role and load its task-specific guidance. Use when the user invokes /agent-dispatcher, names a specialist or /agent-<role> command, or asks to inspect or change dispatcher routing and activation.
-argument-hint: "[role-id | context [build|explain|verbose] | doctor | inventory | on | off | status | output compact|verbose]"
+argument-hint: "[role-id | context [build|explain|verbose] | map | doctor | inventory | on | off | status | output compact|verbose]"
 ---
 
 # Agent Dispatcher
@@ -26,6 +26,7 @@ Inspection controls keep the role and do not execute the task; stopping drops th
 | --- | --- |
 | `on`, `on here`, `off`, `off here`, `off everywhere`, `status`; "always on", "stop dispatcher", "normal mode" | [CONTROLS.md](CONTROLS.md). Stopping drops the role immediately; bare `off` means this session. |
 | `context`, `context build`, `context explain`, `context verbose`, or `/agent-context` | [CONTEXT.md](CONTEXT.md). Inspect or build context read-only; do not execute the task. |
+| `map [show\|build\|refresh] [request]`, `/agent-map` | [PROJECT-MAP.md](PROJECT-MAP.md). Source-linked facts and freshness. |
 | `inventory [all\|skills\|tools\|mcps\|setup] [verbose]`, `/agent-inventory` | [INVENTORY.md](INVENTORY.md). Inspect usability and setup only. |
 | `doctor [all\|skills\|tools\|mcps\|setup] [role-id]`, `/agent-doctor` | [DOCTOR.md](DOCTOR.md). Health, full inventory, and recommendations; no connections or installs. |
 | `/agent-decision [off\|auto\|required]` | [CONTROLS.md](CONTROLS.md). Optional decision configuration; scopes ship disabled. |

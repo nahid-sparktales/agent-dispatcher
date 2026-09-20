@@ -18,10 +18,11 @@ class FixtureTests(unittest.TestCase):
 
     def test_suite_shape_and_balanced_categories(self):
         from collections import Counter
-        self.assertEqual(len(self.fixtures), 12)
+        self.assertEqual(len(self.fixtures), 15)
         self.assertEqual(Counter(f['category'] for f in self.fixtures), {
             'small_edit': 2, 'bug_fix': 2, 'feature': 2, 'review': 2,
-            'plan': 1, 'research': 1, 'ambiguity': 1, 'scope': 1})
+            'plan': 1, 'research': 1, 'ambiguity': 1, 'scope': 1,
+            'context_retrieval': 1, 'context_freshness': 1, 'architecture_discovery': 1})
         self.assertEqual({f['id'] for f in self.fixtures if f['smoke']}, {'greeting', 'merge_intervals'})
         self.assertTrue(all(f['timeout_seconds'] == 600 for f in self.fixtures))
         self.assertTrue(all(len(f['fixture_digest']) == 64 for f in self.fixtures))
@@ -139,6 +140,131 @@ class FixtureTests(unittest.TestCase):
             one['fixtures'][0]['timeout_seconds'] = True
             manifest.write_text(json.dumps(one))
             with self.assertRaises(ValueError): load_suite(manifest)
+
+
+class ContextOutcomeFixtureTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.fixtures = {item['id']: item for item in load_suite()}
+
+    def rejected_mutation(self, task_id, mutate):
+        fixture = self.fixtures[task_id]
+        reference = Path(fixture['references_dir']) / 'passing'
+        with tempfile.TemporaryDirectory() as temp:
+            final = Path(temp) / 'final'
+            shutil.copytree(reference / 'files', final)
+            mutate(final)
+            result = grade(fixture, final, 'Claimed success, independently checked below.')
+        self.assertFalse(result['passed'], result['checks'])
+        self.assertFalse(any(check['name'] in {'evaluator_process', 'evaluator_output', 'evaluator_timeout'}
+                             for check in result['checks']), result['checks'])
+        return result
+
+    def change_report(self, task_id, path, mutate):
+        def apply(root):
+            target = root / path
+            value = json.loads(target.read_text())
+            mutate(value)
+            target.write_text(json.dumps(value))
+        return self.rejected_mutation(task_id, apply)
+
+    def test_live_auth_grader_rejects_disabled_everyone_and_partial_parser_shortcuts(self):
+        settings = 'from dataclasses import dataclass\n@dataclass(frozen=True)\nclass Settings:\n    allow_guest: bool = False\n'
+        variants = {
+            'always_false': settings + 'def load_settings(env):\n    return Settings(False)\n',
+            'only_literal_true': settings + 'def load_settings(env):\n    return Settings(env.get("APP_ALLOW_GUEST") == "true")\n',
+            'original_truthiness': settings + 'def load_settings(env):\n    return Settings(bool(env.get("APP_ALLOW_GUEST", False)))\n',
+        }
+        for name, code in variants.items():
+            with self.subTest(shortcut=name):
+                self.rejected_mutation('auth_config_boundary',
+                                       lambda root: (root / 'session_api/settings.py').write_text(code))
+
+    def test_candidate_green_tests_do_not_rescue_the_unfixed_live_parser(self):
+        source = Path(self.fixtures['auth_config_boundary']['source_dir'])
+        def fake_tests(root):
+            (root / 'session_api/settings.py').write_bytes((source / 'session_api/settings.py').read_bytes())
+            (root / 'tests/test_auth_config.py').write_text('assert True\n')
+        self.rejected_mutation('auth_config_boundary', fake_tests)
+
+    def test_correct_parser_with_empty_green_tests_does_not_claim_regression_coverage(self):
+        result = self.rejected_mutation('auth_config_boundary',
+            lambda root: (root / 'tests/test_auth_config.py').write_text('assert True\n'))
+        self.assertTrue(any(check['name'] == 'regression_catches_original_bug' and not check['passed']
+                            for check in result['checks']))
+
+    def test_auth_grader_rejects_changes_to_protected_router_despite_correct_parser(self):
+        result = self.rejected_mutation('auth_config_boundary',
+            lambda root: (root / 'session_api/api.py').write_text((root / 'session_api/api.py').read_text() + '\n# unrelated edit\n'))
+        self.assertTrue(any(check['name'] == 'preserve_out_of_scope_sources' and not check['passed']
+                            for check in result['checks']))
+
+    def test_stale_summary_rejects_hash_path_quote_range_and_claim_shortcuts(self):
+        mutations = {
+            'false_value_with_valid_citation': lambda d: d['entries'][1].update(value=3),
+            'stale_hash': lambda d: d['entries'][1]['evidence'].update(sha256='0' * 64),
+            'renamed_path': lambda d: d['entries'][0]['evidence'].update(path='worker.py'),
+            'deleted_path': lambda d: d['entries'][2]['evidence'].update(path='service/old_errors.py'),
+            'fabricated_quote': lambda d: d['entries'][1]['evidence'].update(quote='MAX_ATTEMPTS = 3'),
+            'invalid_range': lambda d: d['entries'][1]['evidence'].update(start_line=0),
+            'bool_line_number': lambda d: d['entries'][1]['evidence'].update(start_line=True),
+            'outside_path': lambda d: d['entries'][1]['evidence'].update(path='../service/policy.py'),
+            'duplicate_fact': lambda d: d['entries'].__setitem__(1, copy.deepcopy(d['entries'][0])),
+            'boolean_schema_version': lambda d: d.update(schema_version=True),
+        }
+        for name, mutate in mutations.items():
+            with self.subTest(shortcut=name):
+                self.change_report('stale_project_map', 'docs/PROJECT_MAP.json', mutate)
+
+    def test_real_frozen_cache_is_stale_and_inspection_does_not_refresh_it(self):
+        import project_map
+        source = Path(self.fixtures['stale_project_map']['source_dir'])
+        with tempfile.TemporaryDirectory() as temp:
+            project = Path(temp) / 'project'
+            shutil.copytree(source, project)
+            state = project / '.agent-dispatcher/project-map.json'
+            before = tree_digest(project)
+            snapshot = json.loads(state.read_text())
+            self.assertEqual(snapshot['owner'], 'agent-dispatcher-project-map')
+            report = project_map.inspect_map(project, pack=Path(__file__).parent)
+            self.assertEqual(report['status'], 'stale')
+            self.assertGreater(report['counts']['withheld'], 0)
+            paths = {row['path'] for row in report['stale_sources']}
+            self.assertTrue({'Makefile', 'worker.py', 'service/old_errors.py'} <= paths)
+            self.assertFalse(any(row['source']['path'] in paths for row in report['entries']))
+            self.assertEqual(before, tree_digest(project))
+
+    def test_map_refresh_task_cannot_rewrite_protected_cache_or_source_to_match_a_claim(self):
+        for path in ('.agent-dispatcher/project-map.json', 'service/policy.py'):
+            with self.subTest(path=path):
+                result = self.rejected_mutation('stale_project_map',
+                    lambda root: (root / path).write_text((root / path).read_text() + '\n'))
+                self.assertTrue(any(check['name'] == 'preserve_out_of_scope_sources' and not check['passed']
+                                    for check in result['checks']))
+
+    def test_architecture_report_rejects_false_facts_even_with_current_hashes(self):
+        mutations = {
+            'proposal_as_accepted_backend': lambda d: d['decision'].update(value='sqlite'),
+            'undeclared_dependency': lambda d: d['dependencies'].update(value=['sqlite3']),
+            'guessed_test_command': lambda d: d['test_command'].update(value='pytest'),
+            'retired_entrypoint': lambda d: d['entrypoint'].update(value='prototype.sqlite_api:handle_request'),
+            'invented_route': lambda d: d['features'][0].update(value='DELETE /tasks'),
+            'duplicate_edge': lambda d: d['edges'].__setitem__(1, copy.deepcopy(d['edges'][0])),
+            'import_is_not_callsite': lambda d: d['edges'][0]['evidence'].update(start_line=1, end_line=1,
+                                quote='from flowdesk.service import TaskService'),
+            'stale_hash': lambda d: d['entrypoint']['evidence'].update(sha256='f' * 64),
+            'wrong_quote': lambda d: d['decision']['evidence'].update(quote='Status: accepted\nBackend: sqlite'),
+            'oversized_range': lambda d: d['entrypoint']['evidence'].update(end_line=30),
+        }
+        for name, mutate in mutations.items():
+            with self.subTest(shortcut=name):
+                self.change_report('architecture_evidence', 'architecture.json', mutate)
+
+    def test_structured_outputs_are_graded_without_final_prose_keyword_scoring(self):
+        for task_id in ('stale_project_map', 'architecture_evidence'):
+            fixture = self.fixtures[task_id]
+            good = Path(fixture['references_dir']) / 'passing'
+            self.assertTrue(grade(fixture, good / 'files', 'No artifact facts repeated here.')['passed'])
 
 
 if __name__ == '__main__':

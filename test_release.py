@@ -286,6 +286,17 @@ class InstallerTests(unittest.TestCase):
                                       capture_output=True, text=True, timeout=10)
             self.assertEqual(selected.returncode, 0, selected.stderr)
             self.assertIn("session.py", [row["path"] for row in json.loads(selected.stdout)["context"]])
+            action = "refresh" if (project / ".agent-dispatcher/project-map.json").exists() else "build"
+            mapped = subprocess.run([sys.executable, "-B", str(pack / "project_map.py"), action,
+                                     "--project", str(project), "--json"], cwd=self.root, env=self.env,
+                                    capture_output=True, text=True, timeout=10)
+            self.assertEqual(mapped.returncode, 0, mapped.stderr)
+            inspected = subprocess.run([sys.executable, "-B", str(pack / "project_map.py"), "show",
+                                        "--project", str(project), "--json"], cwd=self.root, env=self.env,
+                                       capture_output=True, text=True, timeout=10)
+            self.assertEqual(inspected.returncode, 0, inspected.stderr)
+            self.assertTrue(any(row["source"]["path"] == "session.py"
+                                for row in json.loads(inspected.stdout)["entries"]))
             if iteration == 0:
                 # Emulate a previous release's registration before exercising the update.
                 ours[0]["command"] = f'bash "{self.config}/hooks/agent-dispatcher-activate.sh"'
@@ -320,6 +331,7 @@ class RecoverableInstallerTests(unittest.TestCase):
             "skills/agent-dispatcher/ROLES.md": "roles",
             "skills/agent-dispatcher/CONTROLS.md": "controls",
             "skills/agent-dispatcher/DELEGATION.md": "delegation",
+            "skills/agent-dispatcher/PROJECT-MAP.md": "project map",
             "skills/agent-dispatcher/jev.md": "decision guide",
             "skills/agent-dispatcher/roles/implementer.md": "implementer",
             "skills/testing/check/SKILL.md": "guide",
@@ -329,6 +341,7 @@ class RecoverableInstallerTests(unittest.TestCase):
             "catalog/loadouts.json": "{}",
             "doctor.py": "# read-only doctor\n",
             "context.py": "# read-only selector\n",
+            "project_map.py": "# explicit map builder and read-only inspector\n",
             "hooks/agent-dispatcher-activate.sh": "#!/bin/bash\n",
             "commands/agent-reviewer.md": "review v1",
             "commands/agent-implementer.md": "implement v1",

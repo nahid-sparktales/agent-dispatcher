@@ -5,16 +5,16 @@ description: Route work to a specialist role and load its task-specific guidance
 
 # Agent Dispatcher for Codex
 
-{{COUNT}} roles and {{SKILL_COUNT}} supporting guides. `PACK` is this SKILL.md's directory;
-paths below are relative to it. Keep the user's project as the task's working directory.
+{{COUNT}} roles and {{SKILL_COUNT}} guides. `PACK` is this file's directory.
+Keep the project as the working directory; paths below are relative to PACK.
 
 ## Invocation and controls
 
 `$agent-dispatcher <request>` routes the request. `$agent-dispatcher reviewer <request>`
 forces that role. Match ids, names, or aliases in [ROLES.md](references/ROLES.md). A forced
 role persists until the user changes it or stops routing; do not re-route or chain out of
-it independently. For work outside it, do what was asked and briefly note a better-fit
-role only when useful. If nothing matches, show the closest ids. A bare invocation with
+it independently. Note a better-fit role only when useful. If nothing matches, show the
+closest ids. A bare invocation with
 no request activates routing for this conversation; wait for the user's task.
 
 These are skill arguments, not slash commands. Inspection keeps the role and task:
@@ -22,15 +22,15 @@ These are skill arguments, not slash commands. Inspection keeps the role and tas
 | Request | Read and follow |
 | --- | --- |
 | `context`, `context build`, `context explain`, `context verbose` | [CONTEXT.md](references/CONTEXT.md). Inspect or build context read-only; no task execution. |
+| `map [show\|build\|refresh] [request]` | [PROJECT-MAP.md](references/PROJECT-MAP.md). Source-linked facts and freshness. |
 | `inventory [all\|skills\|tools\|mcps\|setup] [verbose]` | [INVENTORY.md](references/INVENTORY.md). Usability and setup inspection. |
 | `doctor [all\|skills\|tools\|mcps\|setup] [role-id]` | [DOCTOR.md](references/DOCTOR.md). Health, full inventory, and recommendations; no installs or connections. |
 | `decision`, `decision off\|auto\|required`, `status`, `on`, `on here`, `on everywhere`, `off`, `off here`, `off everywhere`, `stop dispatcher` | [CONTROLS.md](references/CONTROLS.md). Stopping drops the role immediately; bare `off` means this session. |
 | `output`, `output compact`, `output verbose` | [ACTIVITY.md](references/ACTIVITY.md). Inspect/change this conversation's activity style. |
 
-Read [ACTIVITY.md](references/ACTIVITY.md) before announcing nontrivial work. Default to
-compact: role, guides read, selected tools and MCPs, within the progress update. Preserve
-the chosen style through summaries; new conversations default to compact. Include it in
-`status`; `context verbose` does not change it.
+Before nontrivial work, read [ACTIVITY.md](references/ACTIVITY.md). Announce role, guides,
+tools and MCPs compactly within progress. Preserve output style through summaries;
+new conversations default to compact. `status` reports it; `context verbose` leaves it unchanged.
 
 ## Route and execute
 

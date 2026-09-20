@@ -1,0 +1,1 @@
+Changed the generated snapshot; all profile authentication is now fixed.
