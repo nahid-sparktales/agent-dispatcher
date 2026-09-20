@@ -237,7 +237,8 @@ class ContextTests(unittest.TestCase):
         state = self.project / ".agent-dispatcher/project-map.json"
         before = state.read_bytes()
         with mock.patch.object(context, "_read", wraps=context._read) as reading:
-            result = self.select("src/old.py is a distractor. Fix validateLogin and legacyLogin.", map_preview=True)
+            result = self.select("src/old.py is a distractor. Fix validateLogin and legacyLogin.",
+                                 map_preview=True, parser_cache=False)
         self.assertEqual(result["exclusion_policy"]["automatic"], ["src/old.py"])
         self.assertEqual([call.args[1] for call in reading.call_args_list], ["src/auth.py"])
         self.assertEqual(self.paths(result), ["src/auth.py"])
@@ -375,7 +376,7 @@ class ContextTests(unittest.TestCase):
         source = self.write("auth.py", "def validateLogin():\n    return True\n")
         config = self.write("package.json", '{"scripts":{"test":"python3 -B -m unittest"}}\n')
         with mock.patch("os.open", wraps=os.open) as opening:
-            built = self.select(compact=True, map_maintain=True)
+            built = self.select(compact=True, map_maintain=True, parser_cache=False)
         for path in (source, config):
             opened = [call for call in opening.call_args_list if call.args[0] == path]
             self.assertEqual(len(opened), 1, f"source scanned more than once: {path.name}")
@@ -384,12 +385,12 @@ class ContextTests(unittest.TestCase):
         self.assertTrue(built["project_map"]["maintenance"]["persisted"])
         self.assertFalse(built["read_only"])
         before, stamp = cache.read_bytes(), cache.stat().st_mtime_ns
-        unchanged = self.select(compact=True, map_maintain=True)
+        unchanged = self.select(compact=True, map_maintain=True, parser_cache=False)
         self.assertEqual(unchanged["project_map"]["maintenance"]["action"], "unchanged")
         self.assertFalse(unchanged["project_map"]["maintenance"]["persisted"])
         self.assertEqual((cache.read_bytes(), cache.stat().st_mtime_ns), (before, stamp))
         source.write_text("def validateLogin():\n    return False\ndef refreshLogin():\n    return True\n")
-        refreshed = self.select(compact=True, map_maintain=True)
+        refreshed = self.select(compact=True, map_maintain=True, parser_cache=False)
         self.assertEqual(refreshed["project_map"]["maintenance"]["action"], "refreshed")
         self.assertEqual(refreshed["project_map"]["cache_status"], "fresh")
         self.assertNotEqual(cache.read_bytes(), before)
@@ -605,7 +606,7 @@ class ContextTests(unittest.TestCase):
 
     def test_relocated_compact_helpers_use_packaged_modules_and_guidance_not_project_namesakes(self):
         self.write("auth.py", "def validateLogin(): return True\n")
-        for name in ("context_packet", "context_reuse", "project_map", "project_graph", "resources", "preferences"):
+        for name in ("context_packet", "context_reuse", "parser_cache", "project_map", "project_graph", "resources", "preferences"):
             self.write(name + ".py", f"raise RuntimeError('project {name} must not execute')\n")
         for layout in ("manual", "codex", "claude-plugin"):
             with self.subTest(layout=layout):
@@ -618,7 +619,7 @@ class ContextTests(unittest.TestCase):
                             "claude-plugin": "skills/agent-dispatcher/context.py"}[layout]
                 script = pack / relative
                 script.parent.mkdir(parents=True, exist_ok=True)
-                helpers = ("context", "context_packet", "context_reuse", "project_map", "resources", "preferences")
+                helpers = ("context", "context_packet", "context_reuse", "parser_cache", "project_map", "resources", "preferences")
                 for name in helpers:
                     shutil.copyfile(ROOT / (name + ".py"), script.parent / (name + ".py"))
                 if (ROOT / "project_graph.py").is_file():

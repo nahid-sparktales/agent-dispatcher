@@ -380,7 +380,8 @@ class ProjectMapTests(unittest.TestCase):
         self.write("archive/auth.py", "def validate_new_archive(): pass\n")
         before = self.snapshot()
         with mock.patch.object(context, "_read", wraps=context._read) as reading:
-            result = context.select_context(self.project, "validate", pack=ROOT, exclude_paths=["archive"], map_preview=True)
+            result = context.select_context(self.project, "validate", pack=ROOT, exclude_paths=["archive"],
+                                            map_preview=True, parser_cache=False)
         mapping = result["project_map"]
         self.assertEqual([call.args[1] for call in reading.call_args_list], ["auth.py"])
         self.assertEqual({e["source"]["path"] for e in mapping["entries"]}, {"auth.py"})

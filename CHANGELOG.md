@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Reuse unchanged redacted sources, Python ASTs, and map facts through a private authenticated
+  host cache populated by unrestricted map maintenance. Preserve exclusions, scan limits,
+  read-only and write-scope restrictions; reuse unchanged graphs and resolve cross-file edges
+  when scoped source inputs change. Report actual
+  read/parse reuse and provide `--no-parser-cache` for a full source reread and extraction.
 - Add an explicitly built local project map with source fingerprints, stale-fact exclusion,
   read-only context enrichment, and matching Claude/Codex commands.
 - Expand stock-versus-dispatcher evaluation fixtures for multi-file retrieval, stale project

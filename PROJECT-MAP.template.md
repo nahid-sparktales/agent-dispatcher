@@ -31,8 +31,8 @@ claims. Correct their source and refresh the map.
 
 During substantial source work, use the context selector with --map-maintain to create or
 update the local cache from its existing safe scan. This reuses that scan rather than
-opening the project a second time. Unchanged source hashes allow supported cached facts
-to be reused, but every persisted claim is revalidated against the current source text.
+opening the project a second time. Every persisted map claim is checked against supported
+source extraction; project map and graph files remain untrusted inputs.
 New, changed, removed, and newly ignored sources are reflected in the next complete scan.
 Identical map content causes no write. No task text or exclusion policy is saved.
 
@@ -80,10 +80,36 @@ The helper uses local Git/ripgrep enumeration and the selector's file safety and
 rules. It has no model calls, external services, persistent processes, or background refresh.
 Recognized credential patterns are scrubbed, but detection is incomplete. Map context has
 its own bounded output and token estimate, separate from the workspace excerpt budget.
-The scan still reads permitted source text and computes hashes; no filesystem-read or
-performance savings beyond scan reuse are promised. Host instruction discovery remains
+The incremental cache described below can avoid reading and parsing unchanged sources.
+Host instruction discovery remains
 responsible for applicable project rules. The host also owns agent coordination, waiting,
 and worktree isolation; the map does not launch or supervise workers.
+
+## Incremental source and parser cache
+
+Unrestricted --map-maintain calls automatically populate a private authenticated host cache
+at `~/.cache/agent-dispatcher/parser-v1`. It stores redacted source text, source fingerprints,
+Python syntax trees, extracted map facts, and derived graphs. Later preview or maintenance calls can reuse
+permitted unchanged entries. Ignore rules, task exclusions, and source safety checks still
+apply before a lookup. Cache entries bind the project, file metadata, and extraction policy;
+parser or policy changes invalidate reuse. Project-local map or graph edits cannot supply
+trusted parser results.
+
+Preview, read-only requests, and explicit limited write scopes never create or update this
+host cache; partial or task-excluded scans also defer writes. Cache misses still use the
+ordinary bounded source scan. An unchanged graph can be reused; cross-file links are resolved
+again whenever the scoped source inputs change, so a changed import or target cannot leave
+an old call edge in place. Cold and warm calls have the same file and logical byte limits.
+
+The `parser_cache` output reports `source_hits`, `source_misses`, `source_bytes_read`,
+`logical_source_bytes`, `parsed_files`, `reused_parses`, `graph_hits`, and `graph_misses`. `writes` records
+any host-cache mutation; `records_saved` and `write_failures` distinguish persistence outcomes.
+Host-cache writes make `read_only` false; `project_read_only` reports
+project writes separately. A metadata match is an incremental filesystem
+shortcut, not a new content hash on every call. Use --no-parser-cache to disable all parser
+cache reads and writes and reread sources for a full extraction. Redaction remains best effort;
+the private cache is local project data, not a guarantee that every secret was recognized.
+This cache is used by context map modes; standalone map build and refresh still scan sources.
 
 ## Optional structural graph
 

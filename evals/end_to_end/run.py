@@ -57,6 +57,8 @@ def validate_config(config, live=False):
         raise ValueError("seed must be an integer")
     if type(config.get("timeout_seconds")) is not int or not 1 <= config["timeout_seconds"] <= 3600:
         raise ValueError("timeout_seconds must be an integer between 1 and 3600")
+    if type(config.get("warm_project_index", False)) is not bool:
+        raise ValueError("warm_project_index must be a boolean")
     profiles = []
     for client, spec in config["clients"].items():
         if not isinstance(spec, dict):
@@ -124,8 +126,11 @@ def stage_packages(destination, clients=CLIENTS):
                 "package_digests": {c: rt.digest_tree(destination / c) for c in clients}}
 
 
-def prepare(output, suite_path=None, models=None, efforts=None, auth=None, seed=20260919, clients=CLIENTS):
+def prepare(output, suite_path=None, models=None, efforts=None, auth=None, seed=20260919, clients=CLIENTS,
+            warm_project_index=False):
     from evals.end_to_end.grading import load_suite
+    if type(warm_project_index) is not bool:
+        raise ValueError("warm_project_index must be a boolean")
     clients = selected_clients(clients)
     output = Path(output).absolute()
     if output.exists():
@@ -155,6 +160,7 @@ def prepare(output, suite_path=None, models=None, efforts=None, auth=None, seed=
     provenance["fixtures_digest"] = rt.digest_tree(output / "fixtures")
     provenance["runner_digest"] = rt.digest_tree(Path(__file__).parent, {"fixtures", "__pycache__"})
     config = {"schema_version": 1, "created_at": now(), "seed": seed, "timeout_seconds": 600,
+              "warm_project_index": warm_project_index,
               "output_dir": str(output), "provenance": provenance, "clients": {}}
     for client in clients:
         profile = profile_root / client
@@ -223,6 +229,12 @@ def workspace_for(config, client, condition, fixture=None):
                 raise ValueError("fixtures cannot supply agent configuration or repository history")
             rt.copy_files(files, workspace)
         subprocess.run(["git", "init", "--quiet", str(workspace)], check=True, capture_output=True)
+        if client == "codex":
+            # The treatment skill lives inside its workspace. Hide that injected
+            # package from project indexing in both conditions, without adding a
+            # task exclusion that would correctly defer complete-map persistence.
+            with (workspace / ".git/info/exclude").open("a", encoding="utf-8") as exclusions:
+                exclusions.write("\n.agents/\n")
         skill = None
         expected_digest = None
         if client == "claude":
@@ -348,7 +360,19 @@ def run_trial(config, batch, row, fixture):
     result["activity"] = activity.empty()
     try:
         with workspace_for(config, client, condition, fixture) as (workspace, skill):
+            graded_fixture = fixture
+            if config.get("warm_project_index", False):
+                from evals.end_to_end.warmup import warm_project_indexes, fixture_after_warmup
+                result["index_setup"] = warm_project_indexes(config, client, workspace)
+                rt.write_json(artifacts / "index-setup.json", result["index_setup"])
+                if not result["index_setup"]["ok"]:
+                    raise ValueError("Warm project-index setup failed; no model task started. " +
+                                     " ".join(result["index_setup"]["diagnostics"]))
             initial = rt.tree_files(workspace, rt.EXCLUDED)
+            if config.get("warm_project_index", False):
+                validate_final_artifacts(initial, {})
+                rt.copy_files(initial, artifacts / "initial")
+                graded_fixture = fixture_after_warmup(fixture, artifacts / "initial")
             result["starting_files_digest"] = rt.digest_files(initial)
             check = adapters.doctor(client, spec, workspace, skill)
             result["cli_version"] = check.get("version")
@@ -407,7 +431,7 @@ def run_trial(config, batch, row, fixture):
                 elif execution["output_overflow"] or execution.get("cleanup_warning") or execution["returncode"] != 0 or parsed["status"] != "completed":
                     result["status"] = "infrastructure_error"
                 else:
-                    result["auto_grade"] = grade(fixture, artifacts / "final", result["final_answer"])
+                    result["auto_grade"] = grade(graded_fixture, artifacts / "final", result["final_answer"])
                     passed = result["auto_grade"]["passed"]
                     if condition == "dispatcher" and not result["treatment_invoked"]:
                         passed = False
@@ -538,6 +562,8 @@ def main(argv=None):
     p.add_argument("--output", type=Path, required=True)
     p.add_argument("--fixtures", type=Path)
     p.add_argument("--seed", type=int, default=20260919)
+    p.add_argument("--warm-project-index", action="store_true",
+                   help="prepare project indexes before each timed task in both conditions")
     p.add_argument("--clients", nargs="+", choices=CLIENTS, default=list(CLIENTS),
                    help="clients to evaluate (default: codex claude); selection persists in config")
     for client in CLIENTS:
@@ -560,7 +586,8 @@ def main(argv=None):
             config_path = prepare(args.output, args.fixtures,
                                   {c: getattr(args, c + "_model") for c in CLIENTS},
                                   {c: getattr(args, c + "_effort") for c in CLIENTS},
-                                  {c: getattr(args, c + "_auth") for c in CLIENTS}, args.seed, clients=args.clients)
+                                  {c: getattr(args, c + "_auth") for c in CLIENTS}, args.seed, clients=args.clients,
+                                  warm_project_index=args.warm_project_index)
             print(f"Prepared {config_path}; no model runs started.")
             print("Use native login with the dedicated profile directories in this configuration, or provider API environment variables.")
         elif args.command in ("doctor", "run"):

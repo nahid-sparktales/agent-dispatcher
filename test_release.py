@@ -351,6 +351,7 @@ class RecoverableInstallerTests(unittest.TestCase):
             "context.py": "# read-only selector\n",
             "context_packet.py": "# whole packet budget\n",
             "context_reuse.py": "# optional retained evidence ledger\n",
+            "parser_cache.py": "# private incremental source and parser cache\n",
             "project_graph.py": "# source-backed structural graph\n",
             "project_map.py": "# explicit map builder and read-only inspector\n",
             "resources.py": "# read-only package resource resolver\n",

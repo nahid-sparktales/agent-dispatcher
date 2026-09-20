@@ -259,6 +259,75 @@ class PipelineIntegrationTests(unittest.TestCase):
         self.assertTrue((self.root/'second-packages/codex/SKILL.md').is_file())
         self.assertTrue((self.root/'second-packages/claude/SKILL.md').is_file())
 
+    def test_warm_setup_precedes_model_timing_and_paired_initial_snapshot(self):
+        from evals.end_to_end import warmup
+        self.config['warm_project_index'] = True
+
+        def setup(config, client, workspace):
+            self.assertTrue((workspace / 'greeting.py').is_file())
+            rt.copy_files({path: b'{}\n' for path in warmup.INDEX_PATHS}, workspace)
+            return {'ok': True, 'elapsed_seconds': 1234.0, 'excluded_from_task_timing': True,
+                    'diagnostics': []}
+
+        results = []
+        batch = self.root / 'warm-paired'
+        batch.mkdir()
+        with self.native_fakes(), patch.object(warmup, 'warm_project_indexes', side_effect=setup):
+            for condition in runner.CONDITIONS:
+                row = {'id': condition, 'client': 'claude', 'condition': condition,
+                       'fixture_id': 'greeting', 'repetition': 1}
+                result = runner.run_trial(self.config, batch, row, self.fixture_by_id['greeting'])
+                results.append(result)
+                self.assertEqual(result['status'], 'completed', result)
+                self.assertLess(result['elapsed_seconds'], result['index_setup']['elapsed_seconds'])
+                evidence = batch / result['artifact_dir']
+                self.assertTrue((evidence / 'index-setup.json').is_file())
+                for path in warmup.INDEX_PATHS:
+                    self.assertEqual((evidence / 'initial' / path).read_bytes(), b'{}\n')
+                    self.assertEqual((evidence / 'final' / path).read_bytes(), b'{}\n')
+        runner.reconcile_pair(results)
+        self.assertEqual(results[0]['starting_files_digest'], results[1]['starting_files_digest'])
+        self.assertTrue(all(r['status'] == 'completed' for r in results))
+
+    def test_real_codex_warm_pairs_exclude_installed_skill_from_project_index(self):
+        from evals.end_to_end import warmup
+        home = self.root.resolve() / 'warm-cache-home'
+        home.mkdir()
+        initial = []
+        with patch.dict(os.environ, {'HOME': str(home)}):
+            for condition in runner.CONDITIONS:
+                with runner.workspace_for(self.config, 'codex', condition,
+                                          self.fixture_by_id['greeting']) as (workspace, skill):
+                    result = warmup.warm_project_indexes(self.config, 'codex', workspace)
+                    self.assertTrue(result['ok'], result)
+                    files = rt.tree_files(workspace, rt.EXCLUDED)
+                    initial.append(rt.digest_files(files))
+                    graph = json.loads(files['.agent-dispatcher/project-graph.json'])
+                    self.assertTrue(all(not s['path'].startswith('.agents/') for s in graph['sources']))
+        self.assertEqual(initial[0], initial[1])
+
+    def test_warm_trial_preservation_checks_detect_generated_cache_mutation(self):
+        from evals.end_to_end import warmup
+        self.config['warm_project_index'] = True
+        fixture = copy.deepcopy(self.fixture_by_id['greeting'])
+        fixture['checks'].append({'kind': 'unchanged', 'name': 'protected_scope', 'paths': [],
+                                  'no_extra_files': True})
+        self.fake.write_text(FAKE_CLIENT +
+                            "\nPath('.agent-dispatcher/project-graph.json').write_text('tampered')\n")
+
+        def setup(config, client, workspace):
+            rt.copy_files({path: b'{}\n' for path in warmup.INDEX_PATHS}, workspace)
+            return {'ok': True, 'elapsed_seconds': 0.01, 'diagnostics': []}
+
+        row = {'id': 'warm-scope', 'client': 'claude', 'condition': 'baseline',
+               'fixture_id': 'greeting', 'repetition': 1}
+        with self.native_fakes(), patch.object(warmup, 'warm_project_indexes', side_effect=setup):
+            result = runner.run_trial(self.config, self.root / 'warm-scope', row, fixture)
+        self.assertEqual(result['status'], 'task_failure', result)
+        scope = next(c for c in result['auto_grade']['checks'] if c['name'] == 'protected_scope')
+        self.assertFalse(scope['passed'])
+        self.assertIn('project-graph.json', scope['detail'])
+
     def one_trial(self, name="scope"):
         batch = self.root / name
         batch.mkdir()

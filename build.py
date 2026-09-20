@@ -546,7 +546,7 @@ def write_context(d):
         + signal_reference(d) + "\n")
     for name in TEMPLATED_REFERENCES:
         (ADAPTER / name).write_text(reference_text(name, d))
-    for name in ("context.py", "context_packet.py", "context_reuse.py", "project_map.py", "project_graph.py",
+    for name in ("context.py", "context_packet.py", "context_reuse.py", "parser_cache.py", "project_map.py", "project_graph.py",
                  "resources.py", "verification.py", "preferences.py", "change_audit.py"):
         (ADAPTER / name).write_bytes((ROOT / name).read_bytes())
     (ADAPTER / "jev.md").write_text(decision_guide())

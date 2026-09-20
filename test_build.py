@@ -38,7 +38,7 @@ GENERATED = ["skills/agent-dispatcher/DOCTOR.md", "skills/agent-dispatcher/docto
 GENERATED += ["skills/agent-dispatcher/" + name for name in build.REFERENCE_FILES]
 GENERATED.append("skills/agent-dispatcher/context.py")
 GENERATED.append("skills/agent-dispatcher/project_map.py")
-GENERATED.extend("skills/agent-dispatcher/" + name for name in ("context_packet.py", "context_reuse.py", "project_graph.py"))
+GENERATED.extend("skills/agent-dispatcher/" + name for name in ("context_packet.py", "context_reuse.py", "parser_cache.py", "project_graph.py"))
 GENERATED.extend(["skills/agent-dispatcher/resources.py", "catalog/resource-paths.json"])
 GENERATED.extend(["skills/agent-dispatcher/verification.py", "skills/agent-dispatcher/preferences.py",
                   "skills/agent-dispatcher/change_audit.py"])

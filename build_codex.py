@@ -103,7 +103,7 @@ def export_package(destination, data):
     }, indent=2) + "\n")
     for name in ("activate.py", "decide.py"):
         shutil.copyfile(SOURCE / name, scripts / name)
-    for name in ("doctor.py", "context.py", "context_packet.py", "context_reuse.py", "project_map.py", "project_graph.py",
+    for name in ("doctor.py", "context.py", "context_packet.py", "context_reuse.py", "parser_cache.py", "project_map.py", "project_graph.py",
                  "resources.py", "verification.py", "preferences.py", "change_audit.py"):
         shutil.copyfile(ROOT / name, scripts / name)
     manifest = json.loads((ROOT / ".claude-plugin" / "plugin.json").read_text())

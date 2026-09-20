@@ -163,7 +163,9 @@ def derive_graph(snapshot, helper, scrub):
             # Treat warnings as opaque parsing detail, not another output path.
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
-                trees[path] = ast.parse(snapshot["texts"][path])
+                cache = snapshot.get("_parser_cache")
+                trees[path] = (cache.parse(path, snapshot["texts"][path]) if cache is not None
+                               else ast.parse(snapshot["texts"][path]))
         except (SyntaxError, ValueError, RecursionError, MemoryError):
             omitted["parse_failures"] += 1
             continue
@@ -489,6 +491,33 @@ def _prune(view, sources):
     view["source_priorities"] = {path: value for path, value in view["source_priorities"].items() if path in paths}
 
 
+def _current_graph(snapshot, helper, scrub):
+    """Reuse only an authenticated graph for these exact current scoped inputs."""
+    cache = snapshot.get("_parser_cache")
+    if cache is None:
+        return derive_graph(snapshot, helper, scrub)
+    key = [helper._scan_record(snapshot), list(snapshot.get("exclude_paths", ())),
+           [[path, hashlib.sha256(text.encode("utf-8")).hexdigest()]
+            for path, text in sorted(snapshot["texts"].items())]]
+    cached = cache.get("graph", key)
+    if cached is not None:
+        try:
+            data = _valid_graph(cached)
+            cache.stats["graph_hits"] = cache.stats.get("graph_hits", 0) + 1
+            # Retain per-file parses for a later changed-file update, without
+            # deserializing ASTs just to use an unchanged resolved graph.
+            for path, text in snapshot["texts"].items():
+                if path.endswith(".py"):
+                    cache.touch("ast", [path, hashlib.sha256(text.encode("utf-8")).hexdigest()])
+            return data
+        except (ValueError, TypeError, KeyError):
+            pass
+    cache.stats["graph_misses"] = cache.stats.get("graph_misses", 0) + 1
+    data = derive_graph(snapshot, helper, scrub)
+    cache.put("graph", key, data)
+    return data
+
+
 def query_graph(project, task, role=None, pack=None, snapshot=None, *, maintain=False,
                 preview=False, writable_paths=None):
     """Return a small task view and source-priority hints; never enumerate/read sources."""
@@ -518,7 +547,7 @@ def query_graph(project, task, role=None, pack=None, snapshot=None, *, maintain=
         except (ValueError, TypeError, KeyError, OSError):
             safe_state = False
             base["diagnostics"].append("Graph cache is malformed, foreign, or unsafe; left untouched. Current source evidence is used instead.")
-        data = derive_graph(snapshot, helper, scrub)
+        data = _current_graph(snapshot, helper, scrub)
         partial = not snapshot["complete"] or bool(snapshot.get("exclude_paths")) or bool(snapshot.get("task_excluded_paths"))
         status = "unavailable" if not safe_state else "missing" if existing is None else "fresh" if data == existing else "stale"
         if partial and safe_state:

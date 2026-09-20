@@ -43,6 +43,35 @@ created, and doctor/run inspect or launch only those clients. A Claude-only expe
 does not need Codex installed or authenticated. Keep the selection fixed during a run;
 changing it invalidates prior smoke evidence along with other configuration changes.
 
+### Evaluate an already indexed project
+
+Add `--warm-project-index` to `prepare` when measuring tasks after initial indexing.
+Before **each** native task, the runner uses the frozen package to generate a project
+fact map, relationship graph, and host-private incremental parser cache, then performs
+a read-only verification pass. Setup must establish complete, fresh indexes and show
+zero source reads, parse misses, or writes on that warm pass. Any setup failure stops
+the experiment before a model request. Both stock and Dispatcher receive the same
+source, map, and graph files; only Dispatcher receives the installed skill.
+
+Indexing and verification happen **outside** the task timer and model usage measurements.
+Their separate durations and parser-cache counters are saved in each trial's
+`index-setup.json` and result metadata. Post-setup files are saved under `initial/` and
+their hashes are compared between paired conditions. Protected-file and extra-file
+checks use that snapshot, and fixtures with preservation checks also protect both
+generated project indexes. Thus setup writes do not count as agent writes, but later
+out-of-scope cache modifications still fail grading. Cold mode remains the default;
+changing the warm setting invalidates smoke evidence.
+
+Use a separately named warm fixture variant if the original prompt says a Dispatcher
+metadata cache is stale: regenerating that cache changes the premise. For example,
+keep the stale requested `docs/PROJECT_MAP.json` report in `stale_project_map`, but
+rename the variant and replace only the sentence about stale internal metadata with
+an instruction to validate and preserve the prepared indexes. Keep original fixtures
+and old results unchanged. Report warm results as a different experiment, not an exact
+historical replication or evidence of first-use speed. The combined treatment does
+not isolate parser benefits; measure cold/warm reads, parses, and clean-rebuild equality
+separately with local benchmarks.
+
 Edit the generated configuration to set **explicit model identifiers and effort
 settings** for each selected client. Keep each fixed throughout an experiment. Set each
 client's `auth` to `subscription` or `api`; mixed authentication modes across

@@ -334,7 +334,8 @@ commands still inspect the context plan.
 The selector searches local files, favors definitions and related tests, and follows at most one
 hop of simple relative imports. It respects ignore rules, skips generated and sensitive files,
 and reports when scan limits or unavailable search tools leave gaps. It uses no model requests,
-network services, persistent index, or background process. A limited result is a starting point:
+network services or background process. Optional maps and the private incremental cache retain
+bounded local evidence. A limited result is a starting point:
 the agent can read additional evidence when needed.
 
 The dispatcher entrypoint and concise context guide are each capped at 6 KiB per host. Role
@@ -374,6 +375,16 @@ the fact map. Task-seeded graph ranking selects symbols, relationships and candi
 the current role, and related sources influence excerpt retrieval. Python definitions and a
 conservative subset of direct calls use the standard AST parser; JavaScript/TypeScript imports
 are labeled inferred candidates. Possible paths are static hints, not runtime traces or coverage.
+
+Unrestricted `--map-maintain` calls also populate a private authenticated parser cache under
+`~/.cache/agent-dispatcher/parser-v1`. Subsequent context map modes can reuse permitted unchanged redacted
+sources, Python syntax trees, map facts, and the graph. Cross-file relationships are resolved
+again when the scoped source inputs change.
+Preview, read-only requests, and limited write scopes never write this cache. The `parser_cache`
+result reports reads, reuse, parsing, and actual versus logical source bytes. File metadata
+matches avoid repeated reads but are not fresh content hashes; `--no-parser-cache` disables
+cache reads and writes for full extraction. Task exclusions and scan limits apply in both modes.
+The project-local map and graph remain untrusted and cannot replace validated extraction.
 
 The standalone helper supports `build`, `show`, and `refresh`, `--project`, optional
 `--task`, `--pack`, and `--json`:
@@ -700,6 +711,8 @@ python3 test_doctor.py
 python3 test_context.py
 python3 test_context_packet.py
 python3 test_context_reuse.py
+python3 test_parser_cache.py
+python3 test_incremental_context.py
 python3 test_project_map.py
 python3 test_project_graph.py
 python3 test_e2e.py
@@ -708,7 +721,7 @@ python3 test_e2e.py
 These checks run offline without provider credentials. They validate generated-file agreement,
 references, loadout limits, registry consistency, hook behavior, and decision-engine boundaries.
 The manual installer runs build validation and decision checks before installation;
-CI runs all eight suites. Live model comparisons require a separately configured run.
+CI runs the full offline suite. Live model comparisons require a separately configured run.
 
 To run the offline keyword baseline:
 

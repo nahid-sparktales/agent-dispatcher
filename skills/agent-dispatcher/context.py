@@ -150,7 +150,9 @@ def _scrubber(pack):
     for path in (pack / "decision/redact.py", pack / "scripts/runtime/decision/redact.py"):
         if path.is_file():
             namespace = {"__name__": "_dispatcher_context_redact"}
-            exec(compile(path.read_text(encoding="utf-8"), str(path), "exec"), namespace)
+            source = path.read_text(encoding="utf-8")
+            exec(compile(source, str(path), "exec"), namespace)
+            namespace["scrub"]._dispatcher_policy = hashlib.sha256(source.encode("utf-8")).hexdigest()
             return namespace["scrub"]
     raise ContextError("Dispatcher redaction helper missing; repair the installed pack.")
 
@@ -784,7 +786,8 @@ def _finish_packet(result, pack, packet_tokens, guide_ids, reuse_state, reuse_sc
 def select_context(project, task, role=None, size="standard", max_tokens=None, pack=None,
                    *, exclude_paths=(), map_preview=False, auto_exclude=True,
                    compact=False, packet_tokens=None, guide_ids=(), map_maintain=False,
-                   reuse_state=None, reuse_scope=None, writable_paths=None, audit=False, _delivery=None):
+                   reuse_state=None, reuse_scope=None, writable_paths=None, audit=False,
+                   parser_cache=True, _delivery=None):
     """Prepare context; an explicit audit captures helper writes before they happen."""
     if type(audit) is not bool:
         raise ContextError("Task audit must be a boolean.")
@@ -794,7 +797,8 @@ def select_context(project, task, role=None, size="standard", max_tokens=None, p
                                exclude_paths=exclude_paths, map_preview=map_preview, auto_exclude=auto_exclude,
                                compact=compact, packet_tokens=packet_tokens, guide_ids=guide_ids,
                                map_maintain=map_maintain, reuse_state=reuse_state, reuse_scope=reuse_scope,
-                               writable_paths=writable_paths, _delivery=_delivery, _audit_pending=pending)
+                               writable_paths=writable_paths, parser_cache=parser_cache,
+                               _delivery=_delivery, _audit_pending=pending)
     except BaseException:
         if pending:
             cleanup = _discard_audit(pending[0])
@@ -816,7 +820,8 @@ def _discard_audit(handle):
 def _select_context(project, task, role=None, size="standard", max_tokens=None, pack=None,
                     *, exclude_paths=(), map_preview=False, auto_exclude=True,
                     compact=False, packet_tokens=None, guide_ids=(), map_maintain=False,
-                    reuse_state=None, reuse_scope=None, writable_paths=None, _delivery=None, _audit_pending=None):
+                    reuse_state=None, reuse_scope=None, writable_paths=None, parser_cache=True,
+                    _delivery=None, _audit_pending=None):
     """Select evidence; opt-in maintenance/reuse writes only bounded owned state."""
     if not isinstance(task, str) or not task.strip() or len(task) > MAX_TASK_CHARS:
         raise ContextError("Task must contain 1–16000 characters; task contents withheld.")
@@ -830,6 +835,8 @@ def _select_context(project, task, role=None, size="standard", max_tokens=None, 
         raise ContextError("Automatic exclusion must be a boolean.")
     if type(map_maintain) is not bool or type(compact) is not bool:
         raise ContextError("Compact output and map maintenance must be booleans.")
+    if type(parser_cache) is not bool:
+        raise ContextError("Parser cache must be a boolean.")
     if packet_tokens is not None and (type(packet_tokens) is not int or not 256 <= packet_tokens <= 100000):
         raise ContextError("Packet budget must be an integer between 256 and 100000.")
     if not compact and (packet_tokens is not None or guide_ids or reuse_state is not None or reuse_scope is not None):
@@ -868,6 +875,14 @@ def _select_context(project, task, role=None, size="standard", max_tokens=None, 
     task_excluded = [path for path in paths if _excluded(path, excluded_paths)]
     if any(path in explicit and _excluded(path, manual_exclusions) for path in task_excluded):
         diagnostics.append("An explicitly named path was also excluded; the exclusion takes precedence.")
+    # A private cache is never an escape hatch around project write scope. Only
+    # unrestricted maintenance may populate it; preview can reuse existing data.
+    incremental = None
+    cache_writable = (map_maintain and not map_preview and writable_paths is None
+                      and not excluded_paths and all(s["allowed"] for s in cache_scope.values()))
+    if parser_cache and (map_preview or map_maintain):
+        incremental = _parser_cache(root, writable=cache_writable,
+                                    policy_extra=getattr(scrub, "_dispatcher_policy", None))
     texts, candidates, hashes = {}, {}, {}
     scanned = 0
     scan_complete = not any("partial" in d or "enumeration unavailable" in d for d in diagnostics)
@@ -877,7 +892,12 @@ def _select_context(project, task, role=None, size="standard", max_tokens=None, 
         if reason:
             excluded.append({"path": scrub(path), "reason": reason})
             continue
-        text, used, reason = _read(root, path, MAX_SCAN_BYTES - scanned)
+        if incremental is not None:
+            text, used, reason, raw_sha = incremental.read(
+                path, MAX_SCAN_BYTES - scanned, _read, lambda value: _redact_source(value, scrub))
+        else:
+            text, used, reason = _read(root, path, MAX_SCAN_BYTES - scanned)
+            raw_sha = None
         scanned += used
         if reason:
             excluded.append({"path": scrub(path), "reason": reason})
@@ -887,8 +907,9 @@ def _select_context(project, task, role=None, size="standard", max_tokens=None, 
                 diagnostics.append("Text scanning reached the 32 MiB limit; results are partial.")
                 break
             continue
-        hashes[path] = hashlib.sha256(text.encode("utf-8")).hexdigest()
-        text = _redact_source(text, scrub)
+        hashes[path] = raw_sha or hashlib.sha256(text.encode("utf-8")).hexdigest()
+        if incremental is None:
+            text = _redact_source(text, scrub)
         texts[path] = text
         candidate = _candidate(path, text, terms, identifiers, phrases, explicit, hints, role_id)
         if candidate:
@@ -910,6 +931,9 @@ def _select_context(project, task, role=None, size="standard", max_tokens=None, 
                 "hashes": hashes, "bytes": scanned, "complete": scan_complete, "changed_paths": changed,
                 "cache_write_scope": cache_scope,
                 "diagnostics": [d for d in diagnostics if "partial" in d or "enumeration unavailable" in d]}
+    if incremental is not None:
+        snapshot["_parser_cache"] = incremental
+        incremental.writable = cache_writable and scan_complete
     audit_report = None
     if _audit_pending is not None:
         try:
@@ -1050,6 +1074,15 @@ def _select_context(project, task, role=None, size="standard", max_tokens=None, 
                        "Token estimates cover excerpts only, at four characters per token.",
                        "Credential-shaped redaction is best-effort; it cannot identify every secret.",
                        "No model, network or project execution was used. Map persistence is reported in maintenance fields."]}
+    if incremental is not None:
+        incremental.finish()
+        result["parser_cache"] = dict(incremental.stats, enabled=True,
+                                      write_allowed=incremental.writable, logical_source_bytes=scanned)
+        result["project_read_only"] = not wrote_project
+        if incremental.stats.get("writes", 0):
+            result["read_only"] = False
+        if incremental.stats.get("write_failures", 0):
+            result["diagnostics"].append("Private parser-cache persistence failed; current evidence remains usable, but future calls may repeat extraction.")
     if graph_evidence is not None:
         result["project_graph"] = graph_evidence
     if audit_report is not None:
@@ -1062,6 +1095,14 @@ def _select_context(project, task, role=None, size="standard", max_tokens=None, 
                                   "total": len(changed), "scope": "allowed readable tracked files; relevance still required"}
         return _finish_packet(result, base, packet_tokens, guide_ids, reuse_state, reuse_scope, _delivery)
     return result
+
+
+def _parser_cache(project, *, writable, policy_extra=None):
+    """Load a trusted packaged helper; missing optional state falls back to a scan."""
+    try:
+        return _sibling("parser_cache")["Cache"](project, writable=writable, policy_extra=policy_extra)
+    except (OSError, ValueError, TypeError, KeyError):
+        return None
 
 
 def render(result):
@@ -1140,6 +1181,7 @@ def main(argv=None):
     parser.add_argument("--no-auto-exclude", action="store_true", help="Disable conservative task-derived evidence exclusions for inspection")
     parser.add_argument("--map-preview", action="store_true", help="Derive a read-only map preview when the cache is missing or stale; use for substantial source/map work")
     parser.add_argument("--map-maintain", action="store_true", help="Maintain local project indexes from the same safe scan; partial scans defer writes")
+    parser.add_argument("--no-parser-cache", action="store_true", help="Read and parse sources afresh; do not use or update the private incremental cache")
     parser.add_argument("--writable-path", action="append", help="Limit optional cache writes to literal relative files/subtrees (directory ends in /); repeatable, never overrides task restrictions")
     parser.add_argument("--compact", action="store_true", help="Supply role guidance and budget the entire context packet")
     parser.add_argument("--packet-tokens", type=int, help="Compact packet limit, estimated at four characters per token")
@@ -1163,7 +1205,8 @@ def main(argv=None):
                                 auto_exclude=not args.no_auto_exclude, compact=args.compact,
                                 packet_tokens=args.packet_tokens, guide_ids=args.guide,
                                 map_maintain=args.map_maintain, reuse_state=args.reuse_state, reuse_scope=args.reuse_scope,
-                                writable_paths=args.writable_path, audit=args.audit, _delivery=delivery)
+                                writable_paths=args.writable_path, audit=args.audit,
+                                parser_cache=not args.no_parser_cache, _delivery=delivery)
     except (ContextError, OSError, UnicodeError) as exc:
         print(str(exc) if isinstance(exc, ContextError) else "Context input could not be read; contents withheld.", file=sys.stderr)
         return 2

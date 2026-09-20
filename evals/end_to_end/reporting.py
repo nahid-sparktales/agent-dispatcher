@@ -756,6 +756,12 @@ def report(batch_dir: Path) -> dict:
         ],
         "clients": {},
     }
+    if batch.get("config", {}).get("warm_project_index", False):
+        result["limitations"].append(
+            "Warm-index experiment: both conditions start with generated project maps and graphs. "
+            "Initial indexing and a parser-cache verification pass occur before native task timing; "
+            "their measurements are saved separately in each trial's index-setup.json. "
+            "These results do not measure first-use indexing cost or isolate parser effects.")
     lines = ["# Agent dispatcher end-to-end evaluation", "", f"Suite: {batch.get('suite', 'unknown')}. Randomization seed: {batch.get('seed', 'unknown')}.", "", *["- " + item for item in result["limitations"]], ""]
     for client in clients:
         subset = [trial for trial in trials if trial["client"] == client]

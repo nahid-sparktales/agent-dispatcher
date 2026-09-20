@@ -359,6 +359,27 @@ def _extract(path, text, sha, helper):
     return entries
 
 
+def _source_facts(snapshot, path, helper):
+    """Only the private authenticated parser cache may supply extraction results.
+
+    Project map JSON remains untrusted, even if its source fingerprint matches.
+    The policy fingerprint and both text hashes bind this pure extraction.
+    """
+    text, sha = snapshot["texts"][path], snapshot["hashes"][path]
+    cache = snapshot.get("_parser_cache")
+    if cache is None:
+        return _extract(path, text, sha, helper)
+    key = json.dumps([path, sha, _digest(text.encode("utf-8"))], separators=(",", ":"))
+    facts = cache.get("facts", key)
+    if isinstance(facts, list):
+        cache.stats["fact_hits"] = cache.stats.get("fact_hits", 0) + 1
+        return facts
+    cache.stats["fact_misses"] = cache.stats.get("fact_misses", 0) + 1
+    facts = _extract(path, text, sha, helper)
+    cache.put("facts", key, facts)
+    return facts
+
+
 def _choose(snapshot, helper, scrub, extracted=None, existing=None):
     # A matching source hash alone cannot authenticate a persisted claim. Derive
     # support from this call's safe source text before reusing any stored entry.
@@ -378,7 +399,7 @@ def _choose(snapshot, helper, scrub, extracted=None, existing=None):
         if not _safe_path(path) or scrub(path) != path:
             continue
         if path not in extracted:
-            extracted[path] = _extract(path, snapshot["texts"][path], snapshot["hashes"][path], helper)
+            extracted[path] = _source_facts(snapshot, path, helper)
         for entry in extracted[path]:
             if counts[entry["kind"]] >= QUOTAS[entry["kind"]] or (path not in sources and len(sources) >= MAX_SOURCES):
                 dropped += 1
@@ -589,7 +610,7 @@ def _report(root, data, snapshot, helper, scrub, task=None, *, extracted=None):
             reason = "source changed"
         else:
             if path not in derived:
-                derived[path] = _extract(path, snapshot["texts"][path], snapshot["hashes"][path], helper)
+                derived[path] = _source_facts(snapshot, path, helper)
             reason = None if entry in derived[path] else "stored fact not supported by source extraction"
         if reason:
             stale.append({"path": scrub(path), "reason": reason})

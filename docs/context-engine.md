@@ -43,7 +43,8 @@ subsequent investigation. Inspection can disable inference without changing manu
 Read-only map previews reuse the same scan when eligible work has a missing or stale cache. Saved
 cache status stays separate from evidence origin; previews never create or refresh files. The map's
 eight-fact/1,000-estimated-token limit remains separate from excerpts. Task filtering is distinguished
-from incomplete coverage. Explicit map build/refresh commands retain sole responsibility for writes.
+from incomplete coverage. Authorized `--map-maintain` calls can update the map and graph;
+read-only requests and explicit write boundaries restrict those writes.
 
 The workflow size baseline includes role and guide bodies, not only entrypoints. Tests require at
 least 35% fewer bytes for the representative authentication, map-refresh and architecture workflows.
@@ -172,7 +173,7 @@ that *feed* selection rather than limiting it. Both are rendered into installed 
 signals into `INDEX.md`, hints into each rendered role file and the packaged catalog used by
 the local helper. The helper uses role hints as secondary terms rather than literal globs.
 
-## Retrieval, and why there is no index
+## Retrieval and incremental extraction
 
 The read-only `context.py` helper implements local retrieval for both hosts. It accepts
 `--project`, either `--task` or `--task-file -`, and optional `--role`, `--size`, `--max-tokens`,
@@ -192,16 +193,28 @@ Generated/vendor files, binaries, credential files and symlink escapes are exclu
 credential patterns are redacted before rendering, which is not a guarantee of secret detection.
 Empty, capped or incomplete results remain explicit; further targeted investigation is allowed.
 
-The helper performs no writes, network requests, persistent indexing, project code execution,
-or observation workflow. Its token estimate covers supplied workspace passages rather than the
-model's entire context window. `context build` only inspects; during an ordinary active task the
-dispatcher uses the same helper when substantial or unfamiliar local work warrants it.
+The helper makes no network requests and executes no project code or observation workflow.
+Ordinary inspection stays read-only; authorized map maintenance can persist the map and graph.
+Its token estimate covers supplied workspace passages rather than the model's entire context
+window. During an ordinary active task the dispatcher uses the helper when substantial or
+unfamiliar local work warrants it.
 
 Lexical search, path search, symbol-shaped search, a little structure, and one bounded hop along
-local imports. No embeddings, no vector store, no code graph: the goal is to find the four files
-that matter, and this finds them. Ranking is additive and ordinal — it orders results and is not a
+local imports supply retrieval candidates. Map modes also derive a bounded structural graph,
+whose task and role projection can promote related sources. There are no embeddings or vector
+stores. Lexical ranking is additive and ordinal — it orders results and is not a
 probability. Everything retained carries provenance, everything dropped carries a reason, and that
 is what makes `/agent-context` answerable and a bad retrieval diagnosable.
+
+Unrestricted `--map-maintain` also fills a private authenticated host parser cache at
+`~/.cache/agent-dispatcher/parser-v1`. Warm calls can reuse permitted unchanged redacted text,
+Python ASTs, and extracted map facts. All source exclusions still apply, cold and warm logical
+scan bounds match, and unchanged graphs can be reused. Cross-file edges are resolved again
+when scoped source inputs change. Preview, read-only requests,
+and limited write scopes do not write the host cache. A metadata hit is not a newly computed
+content hash; `--no-parser-cache` bypasses all cache reads and writes for a full extraction.
+The `parser_cache` result separates logical bytes inspected from actual bytes read and reports
+read/parse reuse. Project-local map and graph files remain untrusted.
 
 ## Retrieved content is untrusted
 

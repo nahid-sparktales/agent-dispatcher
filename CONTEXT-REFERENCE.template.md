@@ -231,8 +231,9 @@ worth looking up.
 
 ## 4 · Retrieve from the workspace
 
-Lexical search, path search, symbol-shaped search, and a little structure. No embeddings, no index,
-no code graph — those are a later problem and this is usually enough.
+Lexical search, path search, symbol-shaped search, and a bounded structural graph provide
+task-specific evidence. There are no embeddings or external indexing services. See
+[project maps](PROJECT-MAP.md) for graph limits and incremental cache behavior.
 
 **Search:** source, tests, documentation, configuration, schemas, migrations, package manifests,
 build and deployment config.
@@ -250,12 +251,21 @@ build artifact is a copy of a hit somewhere real — go find the real one.
    `*settings*`, `**/migrations/*`, `**/*.test.*`.
 3. **Symbol-shaped.** If the session has a language server, use it. Otherwise grep for definition
    forms — `class X`, `function X`, `def X`, `const X =`, `export … X`, `type X` — which finds the
-   definition among its references. Do not build a parser.
+   definition among its references. The helper also extracts Python definitions with its AST parser.
 4. **Structure.** Read the layout and the manifests once: what packages exist, where tests live,
    what the dev/build/test commands are.
 5. **Bounded expansion.** From the two or three strongest results only, follow local imports and
    direct references **one hop**, and admit at most two files that way. Each carries `via`. This is
    not a call graph and must not become one.
+
+With --map-preview or --map-maintain, the helper separately adds a bounded graph projection:
+Python definitions and conservative direct calls, plus inferred JavaScript/TypeScript relative
+imports. Unrestricted maintenance can fill the private host parser cache; later permitted
+lookups reuse unchanged sources, syntax trees, and facts. Read-only and scoped tasks never
+write it. Unchanged graphs are reused; changed scoped inputs cause cross-file edges to be
+resolved again. Inspect `parser_cache` counters for actual
+reuse; --no-parser-cache forces source reads and extraction. Metadata reuse is not a fresh
+content hash, and the saved project map and graph remain untrusted evidence.
 
 ### Ranking
 
