@@ -4,6 +4,7 @@ import json
 import os
 from pathlib import Path
 import shutil
+import subprocess
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -222,11 +223,17 @@ class ContextOutcomeFixtureTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             project = Path(temp) / 'project'
             shutil.copytree(source, project)
+            # CI does not require ripgrep. Give the ignore-aware scanner the same
+            # Git-backed workspace used by live trials, and exercise that path.
+            subprocess.run(['git', 'init', '--quiet', str(project)], check=True, capture_output=True)
             state = project / '.agent-dispatcher/project-map.json'
             before = tree_digest(project)
             snapshot = json.loads(state.read_text())
             self.assertEqual(snapshot['owner'], 'agent-dispatcher-project-map')
-            report = project_map.inspect_map(project, pack=Path(__file__).parent)
+            native_which = shutil.which
+            with patch.object(shutil, 'which', side_effect=lambda command:
+                              None if command == 'rg' else native_which(command)):
+                report = project_map.inspect_map(project, pack=Path(__file__).parent)
             self.assertEqual(report['status'], 'stale')
             self.assertGreater(report['counts']['withheld'], 0)
             paths = {row['path'] for row in report['stale_sources']}
