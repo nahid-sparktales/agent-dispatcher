@@ -208,12 +208,24 @@ class ContextPacketTests(unittest.TestCase):
         self.assertFalse(graph["source_priorities"])
 
     def test_graph_budget_is_included_and_optional_graph_can_be_trimmed(self):
-        compact = self.compact()
-        compact["project_graph"] = self.graph()
-        out = packet.fit_packet(compact, target=750)
-        self.assertLessEqual(len(packet.dumps(out)), 750 * 4)
-        self.assertIn("project_graph", out["budget"]["by_source"])
-        self.assertGreater(out["packet_omissions"].get("graph_items", 0), 0)
+        for metadata_chars in (0, 512, 2048):
+            with self.subTest(metadata_chars=metadata_chars):
+                compact = self.compact()
+                compact["diagnostics"].append("x" * metadata_chars)
+                compact["resources"]["guides"] = []
+                # Absolute temporary paths vary across hosts. Leave a measured
+                # allowance for graph metadata, but not the complete graph.
+                baseline = packet.fit_packet(compact, target=100000)
+                target = math.ceil(len(packet.dumps(baseline)) / 4) + 128
+                compact["project_graph"] = self.graph()
+                untrimmed = packet.fit_packet(compact, target=100000)
+                self.assertGreater(len(packet.dumps(untrimmed)), target * 4)
+                out = packet.fit_packet(compact, target=target)
+                self.assertLessEqual(len(packet.dumps(out)), target * 4)
+                self.assertIn("project_graph", out["budget"]["by_source"])
+                self.assertGreater(out["packet_omissions"].get("graph_items", 0), 0)
+                self.assertEqual(out["excerpts"], compact["excerpts"])
+                self.assertEqual(out["guidance"], compact["guidance"])
 
     def test_graph_paths_require_surviving_resolved_call_edges(self):
         for kind, confidence in (("imports", "resolved"), ("calls", "inferred")):

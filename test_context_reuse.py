@@ -5,6 +5,7 @@ import io
 import json
 import os
 from pathlib import Path
+import subprocess
 import tempfile
 import unittest
 from unittest import mock
@@ -249,10 +250,27 @@ class ContextReuseTests(unittest.TestCase):
             self.assertEqual(len(result["excerpts"]), 1)
 
     def cli_args(self):
+        # Git supplies ignore-aware enumeration even when ripgrep is unavailable.
+        subprocess.run(["git", "init", "-q", str(self.project)], check=True)
         (self.project / "main.py").write_text("def important_function():\n    return 42\n")
         return ["--project", str(self.project), "--task", "Inspect important_function", "--compact",
                 "--pack", str(Path(__file__).resolve().parent),
                 "--reuse-state", str(self.state), "--reuse-scope", "retained-cli-scope"]
+
+    def test_cli_emits_source_when_ripgrep_is_unavailable(self):
+        stdout = io.StringIO()
+        args = self.cli_args()
+        original_which = context.shutil.which
+
+        def without_ripgrep(command, *args, **kwargs):
+            return None if command == "rg" else original_which(command, *args, **kwargs)
+
+        with mock.patch.object(context.shutil, "which", side_effect=without_ripgrep), \
+                mock.patch("sys.stdout", stdout):
+            self.assertEqual(context.main(args), 0)
+        result = json.loads(stdout.getvalue())
+        self.assertEqual([item["path"] for item in result["excerpts"]], ["main.py"])
+        self.assertTrue(self.state.exists())
 
     def test_cli_write_failure_does_not_record_undelivered_source(self):
         stdout, stderr = io.StringIO(), io.StringIO()
