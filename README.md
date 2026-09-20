@@ -1,5 +1,9 @@
 # agent-dispatcher
 
+<p align="center">
+  <img src="docs/assets/dispatchtony.png" alt="Tony Tony Chopper wearing a headset at a dispatch desk." width="640">
+</p>
+
 [![CI](https://github.com/nahid-sparktales/agent-dispatcher/actions/workflows/ci.yml/badge.svg)](https://github.com/nahid-sparktales/agent-dispatcher/actions/workflows/ci.yml)
 [![Security](https://github.com/nahid-sparktales/agent-dispatcher/actions/workflows/security.yml/badge.svg)](https://github.com/nahid-sparktales/agent-dispatcher/actions/workflows/security.yml)
 
