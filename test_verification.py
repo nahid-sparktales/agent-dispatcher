@@ -67,7 +67,9 @@ class VerificationTests(unittest.TestCase):
         self.assertEqual(result["outcome"], "executed_unknown")
         self.assertIsNone(result["execution"]["test_counts"])
         self.assertFalse(result["execution"]["command"]["complete"])
-        self.assertNotIn("900", self.receipt.read_text())
+        self.assertEqual(result["execution"]["command"]["argv"][-1], "[inline payload omitted]")
+        # Short digit sequences can legitimately occur in fingerprints or timestamps.
+        self.assertNotIn("Ran 900 tests", self.receipt.read_text())
 
     def test_generic_success_is_only_command_success(self):
         result = self.last(self.run_check([sys.executable, "-c", "pass"], kind="check"))
