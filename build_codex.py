@@ -51,33 +51,21 @@ def export_package(destination, data):
           '  display_name: "Agent Dispatcher"\n'
           '  short_description: "Route tasks to focused specialist roles"\n')
 
-    roles = ["# Roles", "", "Match the deliverable and exclusions; read only the selected role.", ""]
     for role in data["roles"]:
         rid = role["id"]
-        roles += [f"## {rid} — {role['name']}", f"Alias: `{role['slug']}`",
-                  f"Use when: {role['use_when']}", f"Not for: {role['not_for']}",
-                  f"[Working method](roles/{rid}.md)", ""]
         text = adapt((build.ADAPTER / "roles" / f"{rid}.md").read_text())
         if "ExitPlanMode" in text:
             raise ValueError(f"unadapted Claude mode control in {rid}")
         write(refs / "roles" / f"{rid}.md", text)
-    write(refs / "ROLES.md", "\n".join(roles))
-    for name in ("CONTEXT.md", "SIGNALS.md", "INDEX.md", "ACTIVITY.md", "INVENTORY.md", "DOCTOR.md"):
-        text = adapt((build.ADAPTER / name).read_text())
+    for name in build.REFERENCE_FILES:
+        if name == "jev.md":
+            continue  # The decision guide gets its host-specific preamble below.
+        text = adapt(build.reference_text(name, data, "codex") if name in build.TEMPLATED_REFERENCES
+                     else (build.ADAPTER / name).read_text())
         for skill_meta in data["skills"]:
             original = skill_meta["path"]
             relative = original.replace("/SKILL.md", "/GUIDE.md")
             text = text.replace(original, "references/" + relative)
-        if name == "CONTEXT.md":
-            text = text.replace("one role, from SKILL.md", "one role, from ROLES.md")
-            text = text.replace("decide the role from `SKILL.md`", "decide the role from `ROLES.md`")
-            text = build.sub(text,
-                             '`python3 -m decision plan --task "<the request>"` from the pack directory — or from anywhere\n'
-                             'with `PYTHONPATH=<pack> python3 -m decision …`',
-                             '`python3 PACK/scripts/decide.py --project PROJECT plan --task "<the request>"`')
-            text = build.sub(text, "`python3 -m decision status`",
-                             "`python3 PACK/scripts/decide.py --project PROJECT status`")
-            text = text.replace("`docs/jev.md`", "`references/jev.md`")
         if name == "INDEX.md":
             text = build.sub(text,
                              "are repo-relative, and an install puts the same tree under the pack's `lib/`.",
@@ -101,7 +89,7 @@ def export_package(destination, data):
           "in place of `python3 -m decision` in the shared guide below. PACK is the skill\n"
           "directory and PROJECT is the user's project. Do not run configuration commands\n"
           "from inside the installed package without selecting the project.\n\n"
-          + (ROOT / "docs" / "jev.md").read_text())
+          + build.decision_guide())
 
     scripts = pack / "scripts"
     runtime = scripts / "runtime"
@@ -110,7 +98,8 @@ def export_package(destination, data):
     shutil.copytree(ROOT / "catalog", runtime / "catalog")
     for name in ("activate.py", "decide.py"):
         shutil.copyfile(SOURCE / name, scripts / name)
-    shutil.copyfile(ROOT / "doctor.py", scripts / "doctor.py")
+    for name in ("doctor.py", "context.py"):
+        shutil.copyfile(ROOT / name, scripts / name)
     manifest = json.loads((ROOT / ".claude-plugin" / "plugin.json").read_text())
     manifest["skills"] = "./skills/"
     manifest["interface"] = {

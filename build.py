@@ -40,6 +40,42 @@ SKILL_DIR = "~/.claude/skills/agent-dispatcher"
 
 SCHEMA_VERSION = "2.2.0"
 
+# Flat references have the same names in Claude's pack and Codex's references/.
+REFERENCE_FILES = ("ROLES.md", "CONTROLS.md", "DELEGATION.md", "CONTEXT.md",
+                   "CONTEXT-REFERENCE.md", "SIGNALS.md", "INDEX.md", "ACTIVITY.md",
+                   "INVENTORY.md", "DOCTOR.md", "jev.md")
+TEMPLATED_REFERENCES = ("CONTROLS.md", "DELEGATION.md", "CONTEXT.md", "CONTEXT-REFERENCE.md")
+
+
+def reference_text(name, d, host="claude"):
+    """Render source references with explicit host paths, without prose substitutions."""
+    source = ROOT / name.replace(".md", ".template.md")
+    if name == "CONTROLS.md" and host == "codex":
+        source = ROOT / "adapters/codex/CONTROLS.template.md"
+    codex = host == "codex"
+    values = {
+        "{{COUNT}}": len(d["roles"]), "{{SKILL_COUNT}}": len(d["skills"]),
+        "{{SIGNAL_COUNT}}": len(d["signals"]), "{{MCP_COUNT}}": len(d["mcp"]),
+        "{{CAPABILITY_COUNT}}": len(d["capabilities"]), "{{SIGNALS}}": signal_ids(d),
+        "{{PLAN_FIELDS}}": plan_fields(d),
+        "{{CONTEXT_COMMAND}}": "python3 -B PACK/" + ("scripts/" if codex else "") + "context.py",
+        "{{CONTEXT_INSPECT_COMMAND}}": "$agent-dispatcher context" if codex else "/agent-context",
+        "{{DECISION_COMMAND}}": 'python3 PACK/scripts/decide.py --project PROJECT plan --task "<the request>"' if codex else 'PYTHONPATH=RUNTIME python3 -m decision plan --task "<the request>"',
+        "{{DECISION_STATUS_COMMAND}}": "python3 PACK/scripts/decide.py --project PROJECT status" if codex else "PYTHONPATH=RUNTIME python3 -m decision status",
+        "{{DECISION_RUNTIME_NOTE}}": ("PACK is the installed skill directory; --project explicitly selects the workspace." if codex else
+            "RUNTIME is the directory containing decision/ and catalog/: PACK for a manual install, "
+            "or the plugin root for a plugin install. Replace RUNTIME with a separately quoted absolute path."),
+        "{{JEV_GUIDE}}": "jev.md",
+        "{{ROLE_PATH}}": "PACK/" + ("references/" if codex else "") + "roles/<id>.md",
+        "{{SKILL_GLOB}}": "PACK/references/skills/**/<id>/GUIDE.md" if codex else "**/<id>/SKILL.md",
+    }
+    template = source.read_text()
+    tokens = set(re.findall(r"\{\{[A-Z_]+\}\}", template))
+    unknown = tokens - values.keys()
+    if unknown:
+        raise SystemExit(f"Unknown reference placeholders in {source.name}: {sorted(unknown)}")
+    return render(template, {token: values[token] for token in sorted(tokens)})
+
 # Role categories -> directory under templates/
 CATEGORIES = {"Core": "core", "Engineering": "engineering",
               "Product & Design": "product-design", "Knowledge & Business": "knowledge-business"}
@@ -554,30 +590,33 @@ def write_context(d):
         "skill, and say the condition was not established.\n\n"
         "The method that uses these is `CONTEXT.md` beside this file.\n\n"
         + signal_reference(d) + "\n")
-    tmpl = (ROOT / "CONTEXT.template.md").read_text()
-    (ADAPTER / "CONTEXT.md").write_text(
-        render(tmpl, {"{{SIGNALS}}": signal_ids(d),
-                      "{{PLAN_FIELDS}}": plan_fields(d),
-                      "{{SIGNAL_COUNT}}": len(d["signals"]),
-                      "{{COUNT}}": len(d["roles"]),
-                      "{{SKILL_COUNT}}": len(d["skills"]),
-                      "{{CAPABILITY_COUNT}}": len(d["capabilities"]),
-                      "{{MCP_COUNT}}": len(d["mcp"])}))
+    for name in TEMPLATED_REFERENCES:
+        (ADAPTER / name).write_text(reference_text(name, d))
+    (ADAPTER / "context.py").write_bytes((ROOT / "context.py").read_bytes())
+    (ADAPTER / "jev.md").write_text(decision_guide())
+
+
+def decision_guide():
+    """Source-only reference links stay usable in self-contained installations."""
+    text = (DOCS / "jev.md").read_text()
+    for old, target in (("adding-an-agent.md", "docs/adding-an-agent.md"),
+                        ("../evals/decision/README.md", "evals/decision/README.md")):
+        text = sub(text, f"]({old})", f"](https://github.com/nahid-sparktales/agent-dispatcher/blob/main/{target})")
+    return text
 
 
 def write_router(d):
-    rows = "\n".join(
-        f"### `{r['id']}` — {r['name']}\n{r['summary']}\n"
-        f"- **Route here when:** {r['use_when']}\n"
-        f"- **Not for:** {r['not_for']}\n"
-        f"- **Signals:** {', '.join(r['tags'])}\n"
-        for r in d["roles"])
+    rows = ["# Roles", "", "Match the deliverable and exclusions; read only the selected role.", "",
+            "Match an exact id, alias, or role name. Also accept `coder` / `dev` for `implementer`.", ""]
+    for r in d["roles"]:
+        rows += [f"## {r['id']} — {r['name']}", f"Alias: `{r['slug']}`",
+                 f"Use when: {r['use_when']}", f"Not for: {r['not_for']}",
+                 f"[Working method](roles/{r['id']}.md)", ""]
+    (ADAPTER / "ROLES.md").write_text("\n".join(rows))
     (ADAPTER / "ACTIVITY.md").write_text((ROOT / "ACTIVITY.template.md").read_text())
     tmpl = (ROOT / "SKILL.template.md").read_text()
     (ADAPTER / "SKILL.md").write_text(
-        # SKILL.template.md stopped carrying the four count placeholders; the calls outlived
-        # them and substituted nothing for several releases. render() is why that is visible.
-        render(tmpl, {"{{ROLES}}": rows, "{{COUNT}}": len(d["roles"])}))
+        render(tmpl, {"{{COUNT}}": len(d["roles"])}))
 
 
 def write_index(d):
@@ -696,12 +735,14 @@ def write_registries(d):
 
 INSPECTOR = """---
 description: "Show the context plan for the current request - the decision engine, agent, skills, stack, workspace retrieval, tools, permissions, verification and budget behind it, and why each was chosen."
-argument-hint: "[explain | verbose | <request to plan for>]"
+argument-hint: "[build <request> | explain | verbose | <request to plan for>]"
 ---
 
 Build the **context plan** for the request below and show it. Do not do the work.
 
-Read `CONTEXT.md` in the agent-dispatcher skill directory - `{{SKILL_DIR}}/CONTEXT.md` for a manual install, inside the plugin's own directory for a plugin install, or glob `**/agent-dispatcher/CONTEXT.md`. It holds the pipeline, the signal table, the retrieval method, the budget and the plan's fields. Follow it, then render the result.
+Read `CONTEXT.md` in the agent-dispatcher skill directory - `{{SKILL_DIR}}/CONTEXT.md` for a manual install, inside the plugin's own directory for a plugin install, or glob `**/agent-dispatcher/CONTEXT.md`. It holds the concise procedure and local context-helper invocation. `CONTEXT-REFERENCE.md` holds the field reference, worked example and advanced decision guidance; load its relevant sections only when needed.
+
+When `$ARGUMENTS` starts with `build`, use the remaining text as the request (or the most recent real request if empty), run the local helper as documented in CONTEXT.md, and show its relevant passages, paths, line numbers, reasons, estimated budget and diagnostics. Stop after inspection; do not execute the requested change. This does not change the active role or activation state.
 
 If `$ARGUMENTS` names a request, plan for that. If it is empty or is only a mode word, plan for the most recent real request in this conversation; if there is none, say so and stop rather than inventing one.
 
@@ -742,7 +783,7 @@ Budget        estimated / target tokens
 
 ## The decision engine
 
-A clean installation has no decision engine configured and this section is one line or nothing. When one is, `CONTEXT.md` section 0 says how to run it; `python3 -m decision status` says whether it is configured at all.
+A clean installation has no decision engine configured and this section is one line or nothing. When one is, `CONTEXT-REFERENCE.md` says how to run it; `python3 -m decision status` says whether it is configured at all. The local context helper does not call the decision provider.
 
 - **Name the engine that actually answered.** `Default` when routing was yours. The engine's name plus a confidence per selection when one answered.
 - **Show a fallback, never hide one.** When an engine was attempted and the default answered instead, say both and why:

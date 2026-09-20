@@ -34,6 +34,8 @@ GENERATED = ["skills/agent-dispatcher/DOCTOR.md", "skills/agent-dispatcher/docto
              "catalog/skills.json", "catalog/loadouts.json", "README.md",
              "docs/skills.md", "docs/mcps.md", "docs/recipes.md",
              "docs/context-engine.md"]
+GENERATED += ["skills/agent-dispatcher/" + name for name in build.REFERENCE_FILES]
+GENERATED.append("skills/agent-dispatcher/context.py")
 
 
 def drift():
@@ -351,8 +353,16 @@ def main():
     print("\ngenerated artifacts agree with sources")
     router = (build.ADAPTER / "SKILL.md").read_text()
     check("router has no unreplaced placeholder", "{{" not in router)
-    check("router catalog == templates",
-          set(re.findall(r"^### `([a-z0-9-]+)`", router, re.M)) == ids)
+    role_index = (build.ADAPTER / "ROLES.md").read_text()
+    check("on-demand role catalog == templates",
+          set(re.findall(r"^## ([a-z0-9-]+) —", role_index, re.M)) == ids)
+    check("entrypoint points to roles instead of embedding their catalog",
+          "ROLES.md" in router and not re.search(r"^### `([a-z0-9-]+)`", router, re.M))
+    check("informal implementation aliases remain reachable",
+          all(alias in role_index for alias in ("`coder`", "`dev`", "`implementer`")))
+    for role in roles:
+        check(f"role index preserves {role['id']} alias and routing boundaries",
+              all(text in role_index for text in (f"Alias: `{role['slug']}`", role['use_when'], role['not_for'])))
     cmds = sorted(build.CMDS.glob("agent-*.md"))
     # Inspection and configuration commands do not force a specialist role.
     NON_ROLE_CMDS = ("agent-context.md", "agent-decision.md", "agent-inventory.md", "agent-doctor.md")
@@ -367,6 +377,8 @@ def main():
     inspector = (build.CMDS / "agent-context.md").read_text()
     check("inspector sends the reader to CONTEXT.md", "CONTEXT.md" in inspector)
     check("inspector does not do the work", "Do not do the work." in inspector)
+    check("inspector offers local context build without executing the task",
+          "build <request>" in inspector and "Stop after inspection" in inspector)
     check("inspector names the decision engine", "decision engine" in inspector.lower())
     check("inspector refuses to print a credential",
           "never print a credential" in inspector.lower())
@@ -392,6 +404,11 @@ def main():
 
     print("\ncontext engine")
     context = (build.ADAPTER / "CONTEXT.md").read_text()
+    context_reference = (build.ADAPTER / "CONTEXT-REFERENCE.md").read_text()
+    check("Claude optional decisions preserve the project working directory",
+          "PYTHONPATH=RUNTIME python3 -m decision plan" in context_reference
+          and "Keep the project as the working directory" in context_reference
+          and "plugin root" in context_reference)
     check("CONTEXT.md has no unreplaced placeholder", "{{" not in context)
     sigs = d["signals"]
     used = {c for r in roles for c in r["skills"]["conditional"]}
@@ -402,7 +419,7 @@ def main():
           all(f"`{s}`" in signals_md and sigs[s]["when_unknown"] in signals_md for s in sigs),
           str([s for s in sigs if f"`{s}`" not in signals_md][:5]))
     check("CONTEXT.md names the vocabulary and delegates the detail",
-          "SIGNALS.md" in context and all(f"`{s}`" in context for s in sigs))
+          "SIGNALS.md" in context and all(f"`{s}`" in context_reference for s in sigs))
     banned = {"permission", "permissions", "grants", "allows", "authorizes", "tools", "mcp"}
     leaky = [s["id"] for s in sigs.values() if banned & set(s)]
     check("no signal carries a permission or tool field", not leaky,
@@ -415,8 +432,8 @@ def main():
     schema = d["plan_schema"]["properties"]
     check("the plan schema holds no execution plan", not ({"steps", "plan", "tasks", "actions"}
           & set(schema)), "a context plan says what is needed, not what will be done")
-    fences = re.findall(r"```json\n(.*?)```", context, re.S)
-    check("CONTEXT.md carries a worked example", len(fences) >= 1)
+    fences = re.findall(r"```json\n(.*?)```", context_reference, re.S)
+    check("advanced context reference carries a worked example", len(fences) >= 1)
     errors = []
     for i, fence in enumerate(fences):
         try:
@@ -515,14 +532,21 @@ def main():
 
     print("\nthe hook, actually run")
     hook_behaviour(roles)
-    check("router stays affordable", len(router) < 34000, f"{len(router)} bytes")
+    check("router stays within 6 KiB UTF-8", len(router.encode("utf-8")) <= 6144,
+          f"{len(router.encode('utf-8'))} bytes")
     # CONTEXT.md is read on demand, but it defines a ~12k-token standard budget; reading it must
     # not eat that budget.
-    for name, cap in (("CONTEXT.md", 24000), ("SIGNALS.md", 32000), ("INDEX.md", 44000)):
+    for name, cap in (("CONTEXT.md", 6144), ("SIGNALS.md", 32000), ("INDEX.md", 44000)):
         size = (build.ADAPTER / name).stat().st_size
-        check(f"{name} fits the budget it is read against", size < cap, f"{size} bytes")
+        check(f"{name} fits the budget it is read against", size <= cap, f"{size} bytes")
 
     print("\ncross-references resolve")
+    for name in ("SKILL.md", *build.REFERENCE_FILES):
+        reference = build.ADAPTER / name
+        broken = [link for link in re.findall(r"\]\(([^)]+)\)", reference.read_text())
+                  if not re.match(r"[a-z]+://|#", link)
+                  and not (reference.parent / link.split("#")[0]).is_file()]
+        check(f"Claude {name} links resolve", not broken, str(broken))
     loadouts = json.loads((build.CATALOG / "loadouts.json").read_text())
     empty = [r["id"] for r in loadouts["roles"]
              if not any(r["skills"][t] for t in build.TIERS) and not r["skills"]["conditional"]]

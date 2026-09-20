@@ -158,6 +158,7 @@ context plan. While active, the dispatcher re-routes when the kind of work chang
 | `/agent-inventory` | List skills, tools, and MCPs with usability and setup status. |
 | `/agent-doctor` | Check installation health, list every capability, and recommend relevant setup. |
 | `/agent-context` | Show the current context plan. |
+| `/agent-context build <request>` | Retrieve relevant workspace passages with locations, reasons, and a size budget. |
 | `/agent-context explain` | Explain the role, skills, and tools selected. |
 | `/agent-context verbose` | Include candidates, dropped files, and the context budget. |
 | `/agent-decision` | Show optional decision-engine configuration and status. |
@@ -236,6 +237,36 @@ links, and fallbacks; compact still lists every entry in the requested scope. Th
 inspects availability without loading every skill, probing accounts, or installing anything.
 It reports discovery limits rather than treating an unseen integration as missing. Usability
 is separate from permission to perform a particular action.
+
+### Build local context
+
+The dispatcher uses a local selector after choosing a role for substantial or unfamiliar
+workspace tasks. It skips trivial edits and configuration controls. To inspect context directly:
+
+```text
+$agent-dispatcher context build Investigate why validate_login rejects valid sessions
+/agent-context build Investigate why validate_login rejects valid sessions
+```
+
+The first form is for Codex, the second for Claude Code. Inspection returns relevant passages,
+file locations, line numbers, selection reasons, exclusions and an estimated size budget; it does
+not perform the requested change. Existing `context`, `context explain`, and `context verbose`
+commands still inspect the context plan.
+
+The selector searches local files, favors definitions and related tests, and follows at most one
+hop of simple relative imports. It respects ignore rules, skips generated and sensitive files,
+and reports when scan limits or unavailable search tools leave gaps. It uses no model requests,
+network services, persistent index, or background process. A limited result is a starting point:
+the agent can read additional evidence when needed.
+
+The dispatcher entrypoint and concise context guide are each capped at 6 KiB per host. Role
+catalogs, configuration controls, delegation and advanced examples live in references read only
+when needed. These are limits on dispatcher instructions and retrieved passages, not the host's
+whole context window or a claim of improved model performance.
+
+From the source checkout, run `python3 -B context.py --project /path/to/project --task "Check login"`.
+Use `--task-file -` for standard input, `--role debugger`, `--size small|standard|complex`,
+`--max-tokens N`, and `--json` as needed. See [context selection](docs/context-engine.md) for limits.
 
 ### Check health and get setup recommendations
 
@@ -548,6 +579,7 @@ python3 build.py
 python3 test_build.py
 python3 test_decision.py
 python3 test_doctor.py
+python3 test_context.py
 ```
 
 These checks run offline without provider credentials. They validate generated-file agreement,

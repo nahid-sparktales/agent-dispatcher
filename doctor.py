@@ -631,13 +631,18 @@ def inspect(pack=None, project=None, host=None, config_dir=None, role=None, evid
         if dependencies and row["category"] in {"bundled_skill", "external_skill"}:
             row["dependencies"] = [{"id": name, "status": known.get(name, {}).get("status", "unknown")} for name in dependencies if isinstance(name, str)]
     ref_base = pack / "references" if (pack / "references/INVENTORY.json").is_file() else pack
-    required = [pack / "SKILL.md"] + [ref_base / name for name in ("INDEX.md", "CONTEXT.md", "DOCTOR.md")]
+    required = [pack / "SKILL.md"] + [ref_base / name for name in (
+        "INDEX.md", "CONTEXT.md", "CONTEXT-REFERENCE.md", "ROLES.md", "CONTROLS.md",
+        "DELEGATION.md", "jev.md", "DOCTOR.md")]
     required += [ref_base / "roles" / (name + ".md") for name in roles]
-    required.append(pack / "scripts/doctor.py" if ref_base != pack else pack / "doctor.py")
+    required += [pack / "scripts" / name if ref_base != pack else pack / name
+                 for name in ("doctor.py", "context.py")]
+    runtime = catalog.parent if catalog else (pack / "scripts/runtime" if ref_base != pack else pack)
+    required += [runtime / "catalog/loadouts.json", runtime / "decision/redact.py"]
     missing_files = [path for path in required if not safe_file(path)]
     health = entry("package-files", "setup", "needs_setup" if missing_files else "usable",
-                   str(len(missing_files)) + " required package files missing or unreadable; repair or reinstall the dispatcher." if missing_files else "Entrypoint, core references, role files and doctor helper are readable.")
-    health["missing_files"] = [str(path.relative_to(pack)) for path in missing_files]
+                   str(len(missing_files)) + " required package files missing or unreadable; repair or reinstall the dispatcher." if missing_files else "Entrypoint, core references, role files and local helpers are readable.")
+    health["missing_files"] = [os.path.relpath(path, pack) for path in missing_files]
     rows.append(health)
     rows.extend(check_setup(pack, host, config, project, evidence, issues))
     # Check references in role loadouts against this inventory without loading role bodies.

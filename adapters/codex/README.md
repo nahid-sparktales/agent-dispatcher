@@ -55,6 +55,15 @@ or `skills`, `tools`, `mcps`, or `setup` to filter the inventory. The helper liv
 callable tools from connections that have successfully been used. The offline CLI reports unknown
 when it has no session evidence. Neither form connects accounts or changes configuration.
 
+## Local context
+
+`$agent-dispatcher context build <request>` returns relevant workspace passages with line numbers,
+reasons and an estimated budget, without doing the requested work. Substantial or unfamiliar
+workspace tasks use `scripts/context.py` after role selection. Small obvious edits skip this step.
+The helper is local and read-only, with no model requests, persistent index or account setup.
+Existing context inspection modes remain available. Entry instructions and `references/CONTEXT.md`
+are capped at 6 KiB each; additional references load only when their workflow is needed.
+
 ## Activity output
 
 Compact summaries name the role, skills/guides actually read, selected built-in tools, and

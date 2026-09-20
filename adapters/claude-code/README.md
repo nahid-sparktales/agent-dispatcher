@@ -48,6 +48,14 @@ not a guarantee against power loss or an uncatchable process termination. If res
 also fails, keep the recovery directory reported by the installer and recover those files before
 retrying. Unrelated commands and settings are preserved.
 
+## Local context
+
+`/agent-context build <request>` returns ranked workspace passages without doing the requested
+work. The dispatcher also uses the local `context.py` helper for substantial or unfamiliar
+workspace tasks. It needs no model provider; unavailable search tools or partial scans produce
+diagnostics and ordinary targeted investigation continues. Existing context inspection modes
+remain available. `CONTEXT.md` is the concise procedure; detailed references are loaded on demand.
+
 ## Doctor
 
 `/agent-doctor` or `/agent-dispatcher doctor` checks package health and the entire capability

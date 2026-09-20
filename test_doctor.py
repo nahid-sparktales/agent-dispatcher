@@ -49,10 +49,12 @@ class DoctorTests(unittest.TestCase):
                                  "verification": []}]}
         write(self.pack / "INVENTORY.json", self.inventory)
         write(self.pack / "catalog/loadouts.json", self.roles)
+        write(self.pack / "decision/redact.py", "# fixture")
         write(self.pack / "lib/review-guide/SKILL.md", "# Review")
         write(self.pack / "SKILL.md", "# Dispatcher")
         write(self.pack / "roles/reviewer.md", "# Reviewer")
-        for file in ("INDEX.md", "CONTEXT.md", "DOCTOR.md", "doctor.py"):
+        for file in ("INDEX.md", "CONTEXT.md", "CONTEXT-REFERENCE.md", "ROLES.md", "CONTROLS.md",
+                     "DELEGATION.md", "jev.md", "DOCTOR.md", "doctor.py", "context.py"):
             write(self.pack / file, "fixture")
 
     def inspect(self, **kwargs):
@@ -192,6 +194,27 @@ class DoctorTests(unittest.TestCase):
         missing.mkdir()
         with self.assertRaises(doctor.DoctorError):
             doctor.find_pack(missing)
+
+    def test_context_helper_dependencies_are_required_for_package_health(self):
+        self.assertEqual(self.row(self.inspect(), "package-files")["status"], "usable")
+        (self.pack / "decision/redact.py").unlink()
+        health = self.row(self.inspect(), "package-files")
+        self.assertEqual(health["status"], "needs_setup")
+        self.assertIn("decision/redact.py", health["missing_files"])
+
+    def test_plugin_runtime_dependencies_are_resolved_from_catalog(self):
+        plugin = self.root / "plugin"
+        plugin.mkdir()
+        (plugin / "skills").mkdir()
+        self.pack.rename(plugin / "skills/agent-dispatcher")
+        self.pack = plugin / "skills/agent-dispatcher"
+        for name in ("catalog", "decision"):
+            (self.pack / name).rename(plugin / name)
+        self.assertEqual(self.row(self.inspect(), "package-files")["status"], "usable")
+        (plugin / "decision/redact.py").unlink()
+        health = self.row(self.inspect(), "package-files")
+        self.assertEqual(health["status"], "needs_setup")
+        self.assertIn("../../decision/redact.py", health["missing_files"])
 
     def test_parent_connection_failure_blocks_exposed_tools_but_preserves_successful_operation_evidence(self):
         for parent in ("auth_required", "missing"):

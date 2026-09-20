@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Add local, read-only context selection with ranked code passages, source locations,
+  bounded scanning and explicit exclusions for Claude Code and Codex.
+- Reduce dispatcher entrypoints and the concise context procedure to at most 6 KiB each,
+  with roles, controls, delegation and advanced context guidance loaded on demand.
+
 - Stage Claude manual installations before replacing live files, with rollback for failed
   replacements and handled interruptions. Preserve recovery backups and a path mapping if
   rollback cannot finish; report post-commit cleanup failures accurately.

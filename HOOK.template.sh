@@ -42,8 +42,8 @@ cat <<'DISPATCH'
 
 Route each request that involves real work to the best-fit specialist role below, then work as that
 role. Match the "not for" line as carefully as the "route here when" line.
-Read PACK/roles/<id>.md before acting as one; read PACK/SKILL.md for the full catalog, the
-chaining rules, or to break a tie.
+Read PACK/roles/<id>.md before acting as one. PACK/ROLES.md holds the full catalog;
+read PACK/DELEGATION.md before chaining or fan-out, and PACK/SKILL.md for controls.
 
 A role's frontmatter names its skills (skills_core, skills_preferred, skills_if_<condition>), its
 MCPs, its recipes and its verification. Read a local skill by globbing **/<id>/SKILL.md —
@@ -52,10 +52,11 @@ ordinary work, not everything that exists. A skill supplies the method; the role
 deliverable and what done means, and neither grants permission. A skill or MCP that is missing is
 not a blocker: say what could not be checked and continue with the role's own method.
 
-Before substantial work, decide what the role needs before deciding what it will do - skills, stack,
-the few files worth reading, tools, and what counts as done. That is a context plan, and it scales:
-none for a typo, four lines for one known file, PACK/CONTEXT.md for anything unfamiliar or fanned
-out. /agent-context renders it without doing the work.
+After role selection, automatically build context for substantial or unfamiliar workspace
+work: read PACK/CONTEXT.md and run its read-only helper. Skip controls, trivial tasks,
+one obvious known-file change, and work without local material. Keep gaps explicit and
+continue with bounded manual reads if the helper is unavailable. /agent-context inspects
+the context without doing the work; /agent-context build explicitly runs the helper.
 
 A slash command or an installed skill that covers the request owns the turn: load it, work inside
 its procedure, keep the role as posture only, and combine its announcement with the activity summary.

@@ -15,10 +15,10 @@ where to put a new one.
 A **context plan** says what an agent needs. An **execution plan** says what it will do. The
 dispatcher owns the first, the specialist owns the second, and the build keeps them apart:
 `test_build.py` fails if [`catalog/context-plan.schema.json`](../catalog/context-plan.schema.json)
-ever grows a `steps`, `tasks` or `actions` field, and it validates `CONTEXT.md`'s worked example
+ever grows a `steps`, `tasks` or `actions` field, and it validates `CONTEXT-REFERENCE.md`'s worked example
 against that schema on every run.
 
-The schema is also what the field table in `CONTEXT.md` is rendered from — via each property's
+The schema is also what the field table in `CONTEXT-REFERENCE.md` is rendered from — via each property's
 `title`, never a truncated `description`, because truncation silently drops the constraint that only
 the description carries.
 
@@ -97,16 +97,39 @@ The engine exists to spend *less* context, so most of its rules are limits:
 | No two skills providing one capability in always-on tiers | `build.py` |
 | A task signal fires for at most two skills | `test_build.py` |
 | The perpetual-mode preamble and the router stay under their byte caps | `test_build.py` |
-| `CONTEXT.md`, `SIGNALS.md` and `INDEX.md` stay under the budget they are read against | `test_build.py` |
-| 3–12 retrieved artifacts, by task size; everything cut is recorded | the method itself |
+| Dispatcher entrypoint and concise `CONTEXT.md` each ≤ 6 KiB per host | `test_build.py`, `test_codex.py` |
+| At most 5 / 8 / 12 files and 2,000 / 6,000 / 15,000 estimated workspace tokens | `context.py` |
 | A rename gets no plan at all | the method itself |
 
 `task_signals` on every skill manifest and `retrieval_hints` on every role are the two additions
 that *feed* selection rather than limiting it. Both are rendered into installed artifacts —
-signals into `INDEX.md`, hints into each rendered role file — because `catalog/` is not installed
-and a field no installed file carries is a field nothing reads.
+signals into `INDEX.md`, hints into each rendered role file and the packaged catalog used by
+the local helper. The helper uses role hints as secondary terms rather than literal globs.
 
 ## Retrieval, and why there is no index
+
+The read-only `context.py` helper implements local retrieval for both hosts. It accepts
+`--project`, either `--task` or `--task-file -`, and optional `--role`, `--size`, `--max-tokens`,
+`--pack`, and `--json`. The default size is `standard`; a token override can lower a size's ceiling.
+The Python API is `select_context(project, task, role=None, size="standard", max_tokens=None, pack=None)`.
+
+Its versioned JSON result supplies `retrieval`, `context`, `excluded`, `budget` and `diagnostics`
+compatible with the corresponding context-plan fields, plus separate `excerpts` containing passage
+text, paths and ranges. It is not a complete context plan: the host retains role/skill selection,
+project-instruction discovery, tool availability and permission decisions. The optional decision
+provider's ranking and verification hooks remain unchanged; source passages are never sent to it.
+
+Git enumerates tracked and untracked files using ignore rules; outside Git the fallback is `rg`.
+If neither can enumerate the workspace, the result reports the limitation instead of walking
+ignored directories. Scans stop at 10,000 files, 256 KiB per text file, or 32 MiB of inspected text.
+Generated/vendor files, binaries, credential files and symlink escapes are excluded. Recognizable
+credential patterns are redacted before rendering, which is not a guarantee of secret detection.
+Empty, capped or incomplete results remain explicit; further targeted investigation is allowed.
+
+The helper performs no writes, network requests, persistent indexing, project code execution,
+or observation workflow. Its token estimate covers supplied workspace passages rather than the
+model's entire context window. `context build` only inspects; during an ordinary active task the
+dispatcher uses the same helper when substantial or unfamiliar local work warrants it.
 
 Lexical search, path search, symbol-shaped search, a little structure, and one bounded hop along
 local imports. No embeddings, no vector store, no code graph: the goal is to find the four files

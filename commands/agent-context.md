@@ -1,11 +1,13 @@
 ---
 description: "Show the context plan for the current request - the decision engine, agent, skills, stack, workspace retrieval, tools, permissions, verification and budget behind it, and why each was chosen."
-argument-hint: "[explain | verbose | <request to plan for>]"
+argument-hint: "[build <request> | explain | verbose | <request to plan for>]"
 ---
 
 Build the **context plan** for the request below and show it. Do not do the work.
 
-Read `CONTEXT.md` in the agent-dispatcher skill directory - `~/.claude/skills/agent-dispatcher/CONTEXT.md` for a manual install, inside the plugin's own directory for a plugin install, or glob `**/agent-dispatcher/CONTEXT.md`. It holds the pipeline, the signal table, the retrieval method, the budget and the plan's fields. Follow it, then render the result.
+Read `CONTEXT.md` in the agent-dispatcher skill directory - `~/.claude/skills/agent-dispatcher/CONTEXT.md` for a manual install, inside the plugin's own directory for a plugin install, or glob `**/agent-dispatcher/CONTEXT.md`. It holds the concise procedure and local context-helper invocation. `CONTEXT-REFERENCE.md` holds the field reference, worked example and advanced decision guidance; load its relevant sections only when needed.
+
+When `$ARGUMENTS` starts with `build`, use the remaining text as the request (or the most recent real request if empty), run the local helper as documented in CONTEXT.md, and show its relevant passages, paths, line numbers, reasons, estimated budget and diagnostics. Stop after inspection; do not execute the requested change. This does not change the active role or activation state.
 
 If `$ARGUMENTS` names a request, plan for that. If it is empty or is only a mode word, plan for the most recent real request in this conversation; if there is none, say so and stop rather than inventing one.
 
@@ -46,7 +48,7 @@ Budget        estimated / target tokens
 
 ## The decision engine
 
-A clean installation has no decision engine configured and this section is one line or nothing. When one is, `CONTEXT.md` section 0 says how to run it; `python3 -m decision status` says whether it is configured at all.
+A clean installation has no decision engine configured and this section is one line or nothing. When one is, `CONTEXT-REFERENCE.md` says how to run it; `python3 -m decision status` says whether it is configured at all. The local context helper does not call the decision provider.
 
 - **Name the engine that actually answered.** `Default` when routing was yours. The engine's name plus a confidence per selection when one answered.
 - **Show a fallback, never hide one.** When an engine was attempted and the default answered instead, say both and why:

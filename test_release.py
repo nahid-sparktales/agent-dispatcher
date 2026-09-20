@@ -275,6 +275,17 @@ class InstallerTests(unittest.TestCase):
             self.assertEqual(report["role"], "reviewer")
             self.assertTrue(report["read_only"])
             self.assertTrue(report["entries"])
+            self.assertEqual(next(row for row in report["entries"] if row["id"] == "package-files")["status"], "usable")
+            project = self.root / "context-project"
+            project.mkdir(exist_ok=True)
+            subprocess.run(["git", "init", "-q", str(project)], check=True)
+            (project / "session.py").write_text("def restore_session():\n    return 'ready'\n")
+            selected = subprocess.run([sys.executable, "-B", str(pack / "context.py"),
+                                       "--project", str(project), "--task", "Check restore_session",
+                                       "--role", "reviewer", "--json"], cwd=self.root, env=self.env,
+                                      capture_output=True, text=True, timeout=10)
+            self.assertEqual(selected.returncode, 0, selected.stderr)
+            self.assertIn("session.py", [row["path"] for row in json.loads(selected.stdout)["context"]])
             if iteration == 0:
                 # Emulate a previous release's registration before exercising the update.
                 ours[0]["command"] = f'bash "{self.config}/hooks/agent-dispatcher-activate.sh"'
@@ -305,12 +316,19 @@ class RecoverableInstallerTests(unittest.TestCase):
             "skills/agent-dispatcher/SKILL.md": "dispatcher v1",
             "skills/agent-dispatcher/INDEX.md": "index",
             "skills/agent-dispatcher/CONTEXT.md": "context",
+            "skills/agent-dispatcher/CONTEXT-REFERENCE.md": "context reference",
+            "skills/agent-dispatcher/ROLES.md": "roles",
+            "skills/agent-dispatcher/CONTROLS.md": "controls",
+            "skills/agent-dispatcher/DELEGATION.md": "delegation",
+            "skills/agent-dispatcher/jev.md": "decision guide",
             "skills/agent-dispatcher/roles/implementer.md": "implementer",
             "skills/testing/check/SKILL.md": "guide",
             "recipes/check.md": "recipe",
             "decision/__main__.py": "# inert engine\n",
+            "decision/redact.py": "# fixture\n",
             "catalog/loadouts.json": "{}",
             "doctor.py": "# read-only doctor\n",
+            "context.py": "# read-only selector\n",
             "hooks/agent-dispatcher-activate.sh": "#!/bin/bash\n",
             "commands/agent-reviewer.md": "review v1",
             "commands/agent-implementer.md": "implement v1",

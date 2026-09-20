@@ -1,0 +1,33 @@
+{
+  "revision": "f92e7ff11de55d82824662fc8fbafd1358655abe",
+  "measurement": "UTF-8 bytes of dispatcher instructions required along explicit reference paths; excludes role/guide bodies and runtime conversation. Not measured model token usage.",
+  "hosts": {
+    "claude": {
+      "file_bytes": {
+        "SKILL.md": 34202,
+        "CONTEXT.md": 23996,
+        "ACTIVITY.md": 2944
+      },
+      "scenario_bytes": {
+        "forced_role": 37146,
+        "ordinary_routing": 37146,
+        "context_inspection": 58198,
+        "activation": 34202
+      }
+    },
+    "codex": {
+      "file_bytes": {
+        "SKILL.md": 6861,
+        "CONTEXT.md": 24016,
+        "ACTIVITY.md": 2944,
+        "ROLES.md": 9818
+      },
+      "scenario_bytes": {
+        "forced_role": 9805,
+        "ordinary_routing": 19623,
+        "context_inspection": 30877,
+        "activation": 6861
+      }
+    }
+  }
+}

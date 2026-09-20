@@ -16,6 +16,7 @@ from unittest.mock import patch
 import build
 from build_codex import export_package
 from install_codex import activation_module, install
+from install_claude import stage_pack
 
 ROOT = Path(__file__).resolve().parent
 
@@ -42,9 +43,13 @@ class CodexPackageTests(unittest.TestCase):
         self.assertEqual(len(list((self.pack / "references/recipes").glob("*.md"))), len(self.data["recipes"]))
 
     def test_references_and_host_translation(self):
-        for file in (self.pack / "SKILL.md", self.pack / "references/ROLES.md"):
+        references = [self.pack / "references" / name for name in build.REFERENCE_FILES]
+        for file in [self.pack / "SKILL.md", *references]:
+            self.assertTrue(file.is_file(), str(file))
+            self.assertNotIn("{{", file.read_text(), str(file))
             for link in re.findall(r"\]\(([^)]+)\)", file.read_text()):
-                self.assertTrue((file.parent / link).is_file(), f"broken link: {file}: {link}")
+                if not re.match(r"[a-z]+://|#", link):
+                    self.assertTrue((file.parent / link.split('#')[0]).is_file(), f"broken link: {file}: {link}")
         index = (self.pack / "references/INDEX.md").read_text()
         for relative in re.findall(r"`(references/[^`]+\.md)`", index):
             self.assertTrue((self.pack / relative).is_file(), relative)
@@ -53,6 +58,70 @@ class CodexPackageTests(unittest.TestCase):
             self.assertNotIn("ExitPlanMode", text)
             self.assertNotIn("~/.claude", text)
         self.assertNotIn("PYTHONPATH=<pack>", (self.pack / "references/CONTEXT.md").read_text())
+        for name in build.TEMPLATED_REFERENCES:
+            text = (self.pack / "references" / name).read_text()
+            self.assertNotIn("~/.claude", text)
+            self.assertNotIn("CLAUDE_CONFIG_DIR", text)
+            self.assertNotIn("python3 -m decision", text)
+
+    def test_entrypoint_budgets_and_required_reading_scenarios(self):
+        baseline = json.loads((ROOT / "evals/context/instruction-baseline.json").read_text())
+        for host, pack in (("claude", ROOT / "skills/agent-dispatcher"), ("codex", self.pack)):
+            refs = pack if host == "claude" else pack / "references"
+            sizes = {name: (refs / name).stat().st_size for name in build.REFERENCE_FILES}
+            sizes["SKILL.md"] = (pack / "SKILL.md").stat().st_size
+            for name in ("SKILL.md", "CONTEXT.md"):
+                self.assertLessEqual(sizes[name], 6144, (host, name, sizes[name]))
+            scenarios = {
+                "forced_role": sizes["SKILL.md"] + sizes["ACTIVITY.md"],
+                "ordinary_routing": sizes["SKILL.md"] + sizes["ACTIVITY.md"] + sizes["ROLES.md"],
+                "context_inspection": sizes["SKILL.md"] + sizes["CONTEXT.md"],
+                "activation": sizes["SKILL.md"] + sizes["CONTROLS.md"],
+            }
+            for name, size in scenarios.items():
+                self.assertLess(size, baseline["hosts"][host]["scenario_bytes"][name], (host, name, size))
+            for name in ("ROLES.md", "CONTROLS.md", "DELEGATION.md", "CONTEXT.md"):
+                self.assertIn(name, (pack / "SKILL.md").read_text())
+            self.assertIn("CONTEXT-REFERENCE.md", (refs / "CONTEXT.md").read_text())
+            entry = (pack / "SKILL.md").read_text()
+            self.assertIn("If a user enabled an optional decision scope", entry)
+            self.assertIn("--agent", entry)
+            self.assertIn("CONTEXT-REFERENCE.md", entry)
+
+    def test_context_selection_matches_source_manual_and_codex_without_writes(self):
+        project = self.root / "selector-project"
+        project.mkdir()
+        subprocess.run(["git", "init", "-q", str(project)], check=True)
+        (project / "auth.py").write_text("def validate_login(password):\n    return bool(password)\n")
+        (project / "test_auth.py").write_text("from auth import validate_login\ndef test_login():\n    assert validate_login('example')\n")
+        (project / "settings.py").write_text("LOGIN_ENABLED = True\n")
+        manual = self.root / "manual-context-pack"
+        stage_pack(ROOT, manual)
+        scripts = [ROOT / "context.py", manual / "context.py", self.pack / "scripts/context.py",
+                   ROOT / "skills/agent-dispatcher/context.py"]
+        self.assertEqual(scripts[0].read_bytes(), scripts[1].read_bytes())
+        self.assertEqual(scripts[0].read_bytes(), scripts[2].read_bytes())
+        self.assertEqual(scripts[0].read_bytes(), (ROOT / "skills/agent-dispatcher/context.py").read_bytes())
+        def snapshot(folder):
+            return {str(p.relative_to(folder)): (p.read_bytes(), p.stat().st_mtime_ns)
+                    for p in folder.rglob("*") if p.is_file()}
+        before = [snapshot(folder) for folder in (project, manual, self.pack)]
+        outputs = []
+        for script in scripts:
+            env = dict(os.environ, AGENT_DISPATCHER_DECISION_MODE="required", PYTHONDONTWRITEBYTECODE="1")
+            result = subprocess.run([sys.executable, "-B", str(script), "--project", str(project),
+                                     "--task-file", "-", "--role", "debugger", "--size", "small", "--json"],
+                                    input="Fix validate_login in auth.py and check related login tests", text=True,
+                                    capture_output=True, cwd=self.root, env=env, timeout=15)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            report = json.loads(result.stdout)
+            self.assertTrue(any(row["path"] == "auth.py" for row in report["context"]))
+            self.assertTrue(report["excerpts"])
+            outputs.append({k: report[k] for k in ("retrieval", "context", "excerpts", "excluded", "budget")})
+        self.assertEqual(outputs[0], outputs[1])
+        self.assertEqual(outputs[0], outputs[2])
+        self.assertEqual(outputs[0], outputs[3])
+        self.assertEqual(before, [snapshot(folder) for folder in (project, manual, self.pack)])
 
     def test_inventory_is_complete_and_paths_resolve_in_each_host(self):
         inventory = json.loads((self.pack / "references/INVENTORY.json").read_text())
