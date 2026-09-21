@@ -61,6 +61,28 @@ class Memo:
         self.store[json.dumps([kind, key])] = value
 
 
+class LLMLayer:
+    """Optional model-backed layer (llm_retrieval.py). One content-addressed store per repository, shared by every
+    commit of it: a file is summarized once per content, exactly as an incremental index would do it."""
+
+    def __init__(self, settings, store, generate, refresh):
+        import llm_retrieval
+        self.module, self.generate, self.settings = llm_retrieval, generate, llm_retrieval.load_settings(settings)
+        self.store = llm_retrieval.Store(store)
+        self.reranker = llm_retrieval.make_reranker(self.settings, self.store, refresh)
+        self.indexing = Counter()
+
+    def prepare(self, index):
+        if self.generate:
+            report = self.module.generate(index, self.settings, self.store)
+            self.indexing.update({key: report[key] for key in ("generated", "cached", "failed", "calls", "input_tokens", "output_tokens", "ms")})
+        attached = self.module.attach(index, self.store, self.settings)
+        eligible = [path for path in index.paths if not self.module.eligible(path, index)]
+        return {"represented": attached, "eligible": len(eligible),
+                "source_chars": sum(len(index.texts[path]) for path in index.representations),
+                "representation_chars": sum(len(self.module.render(rep)) for rep in index.representations.values())}
+
+
 def split_matches(task, wanted):
     return wanted == "all" or task["split"] == wanted or (wanted == "dev" and task["split"] in {"train", "validation"})
 
@@ -85,15 +107,16 @@ def _legacy(task, texts, hashes, scrub):
             "excerpt_bytes": dict(sizes), "ms": elapsed, "lists": {}}
 
 
-def _engine(task, index, config):
+def _engine(task, index, config, reranker=None):
     started = time.perf_counter()
-    outcome = retrieval.run(task, index, config)
+    outcome = retrieval.run(task, index, config, reranker=reranker)
     elapsed = (time.perf_counter() - started) * 1000
     sizes = {item["path"]: sum(len(e["content"].encode("utf-8")) for e in item["excerpts"]) for item in outcome["packet"]["files"]}
     return {"ranked": [row["path"] for row in outcome["ranked"]], "candidates": len(outcome["ranked"]),
             "files": list(sizes), "bytes": outcome["packet"]["bytes"], "excerpt_bytes": sizes, "ms": elapsed,
             "lists": {name: [row["file"] for row in rows] for name, rows in outcome["lists"].items()},
-            "overlap": outcome["trace"]["overlap"], "additions": (outcome["trace"]["graph_additions"], outcome["trace"]["git_additions"])}
+            "overlap": outcome["trace"]["overlap"], "additions": (outcome["trace"]["graph_additions"], outcome["trace"]["git_additions"]),
+            "llm": outcome.get("llm"), "confidence": outcome["trace"].get("confidence")}
 
 
 def _score(found, targets):
@@ -122,7 +145,7 @@ def parse_overrides(items):
     return overrides
 
 
-def evaluate(tasks, clone, strategies, overrides=None, variants=None, progress=True):
+def evaluate(tasks, clone, strategies, overrides=None, variants=None, progress=True, llm=None):
     scrub = context._scrubber(context.find_pack(str(ROOT)))
     memo = Memo(clone)
     configs = {name: retrieval.configure(name, overrides) for name in strategies if name != "current"}
@@ -139,7 +162,7 @@ def evaluate(tasks, clone, strategies, overrides=None, variants=None, progress=T
         texts, hashes, _, _ = context._scan_sources(clone, paths, (), [], memo, scrub, withheld, diagnostics, oversized)
         scan_ms = (time.perf_counter() - started) * 1000
         query = scrub(task["query"])[:context.MAX_TASK_CHARS]
-        stats, indexes = {}, {}
+        stats, indexes, coverage = {}, {}, {}
         history = context._git_history(clone, retrieval.DEFAULTS["git"]["max_commits"])
 
         def index_for(config):
@@ -148,6 +171,8 @@ def evaluate(tasks, clone, strategies, overrides=None, variants=None, progress=T
             if key not in indexes:
                 indexes[key] = retrieval.build_index(texts, hashes, context._kind, cache=memo, history=history,
                                                      config=config, stats=stats if not indexes else {}, path_only=oversized)
+                if llm:
+                    coverage.update(llm.prepare(indexes[key]))
             return indexes[key]
 
         index_for(retrieval.STRATEGIES["full"])
@@ -156,14 +181,27 @@ def evaluate(tasks, clone, strategies, overrides=None, variants=None, progress=T
                    name_only=[t for t in task["target_files"] if t in oversized],
                    universe=len(texts), scan_ms=scan_ms, index_ms=stats["index_ms"],
                    record_misses=stats["record_misses"], strategies={})
+        if llm:
+            row["llm"] = dict(coverage, targets_represented=[t for t in task["target_files"]
+                                                             if t in getattr(index_for(retrieval.STRATEGIES["full"]), "representations", {})])
         for name in strategies:
-            found = _legacy(query, texts, hashes, scrub) if name == "current" else _engine(query, index_for(configs[name]), configs[name])
+            found = (_legacy(query, texts, hashes, scrub) if name == "current" else
+                     _engine(query, index_for(configs[name]), configs[name], llm.reranker if llm else None))
             scored = _score(found, task["target_files"])
+            if found.get("llm"):  # Candidate recall apart from reranking quality: where was each target before and after the model?
+                asked = found["llm"]
+                place = lambda paths: {t: paths.index(t) + 1 if t in paths else None for t in task["target_files"]}  # noqa: E731
+                scored["llm"] = {"error": asked.get("error"), "usage": asked.get("usage"), "ms": asked["ms"], "invalid": asked.get("invalid", 0),
+                                 "candidates": len(asked["candidates"]), "before": place(asked["candidates"]), "after": place(asked.get("order", []))}
+            scored["confidence"] = found.get("confidence")
+            scored["top"] = found["ranked"][:30]
             scored["source_ranks"] = {target: {source: files.index(target) + 1 for source, files in found["lists"].items() if target in files}
                                       for target in task["target_files"]}
             scored["overlap"], scored["additions"] = found.get("overlap", {}), found.get("additions", (0, 0))
             row["strategies"][name] = scored
         results.append(row)
+        if llm:
+            llm.store.save()  # Paid-for answers survive an interrupted run.
         if progress and (number % 10 == 0 or number == len(tasks)):
             print(f"  {task['repo']}: {number}/{len(tasks)}", file=sys.stderr, flush=True)
     return results
@@ -259,11 +297,17 @@ def main(argv=None):
     parser.add_argument("--split", default="dev", choices=("train", "validation", "test", "dev", "all"),
                         help="dev = train + validation. Tune on those; report 'test' only as held-out.")
     parser.add_argument("--limit", type=int, help="First N tasks per dataset (smoke runs)")
+    parser.add_argument("--recent", action="store_true", help="Order each dataset newest base commit first before --limit: a subset "
+                        "chosen by date alone, whose commits share most file contents (keeps model-backed indexing affordable)")
     parser.add_argument("--set", action="append", default=[], metavar="KEY=JSON", help="Override a config value, e.g. rrf_k=30 or graph.max_hops=2")
     parser.add_argument("--variant", action="append", default=[], metavar="NAME=BASE:KEY=JSON;KEY=JSON",
                         help="An extra named configuration for parameter sweeps, e.g. k20=full:rrf_k=20")
     parser.add_argument("--failures", type=int, default=0, help="Show this many failed tasks in detail")
     parser.add_argument("--analyze", default="full", help="Strategy used for overlap and failure analysis")
+    parser.add_argument("--llm-settings", help="llm_retrieval settings JSON; turns on role representations and the reranker for strategies that use them")
+    parser.add_argument("--llm-store-dir", default=str(ROOT / "dist/retrieval-llm"), help="One representation/rerank store per repository lives here")
+    parser.add_argument("--llm-index", action="store_true", help="Generate missing representations at each task's commit (model calls); otherwise use only what is stored")
+    parser.add_argument("--refresh-llm", action="store_true", help="Ignore stored reranker answers and ask the model again")
     parser.add_argument("--json", help="Write per-task results here")
     parser.add_argument("--report", action="append", default=[], help="Re-print tables from saved --json files instead of running")
     parser.add_argument("--check", help="Baseline JSON {strategy: {metric: value}}; exit 1 when the chosen split regresses beyond --tolerance")
@@ -282,13 +326,21 @@ def main(argv=None):
         results += [r for r in json.loads(Path(saved).read_text(encoding="utf-8")) if split_matches(r, args.split)]
     for dataset in args.dataset:
         tasks = [json.loads(line) for line in Path(dataset).read_text(encoding="utf-8").splitlines() if line.strip()]
-        tasks = [task for task in tasks if split_matches(task, args.split)][:args.limit]
+        tasks = [task for task in tasks if split_matches(task, args.split)]
+        if args.recent:
+            stamp = lambda task: int(subprocess.run(["git", "-C", str(Path(args.repos_dir) / task["repo"]), "log", "-1", "--format=%ct",  # noqa: E731
+                                                     task["base_commit"]], capture_output=True, text=True, check=True).stdout)
+            tasks.sort(key=lambda task: (-stamp(task), task["id"]))
+        tasks = tasks[:args.limit]
         for repo in sorted({task["repo"] for task in tasks}):
             clone = Path(args.repos_dir) / repo
             if not (clone / ".git").exists():
                 print(f"Missing clone {clone}; see evals/retrieval/README.md.", file=sys.stderr)
                 return 2
-            results += evaluate([task for task in tasks if task["repo"] == repo], clone.resolve(), strategies, overrides, variants)
+            layer = LLMLayer(args.llm_settings, Path(args.llm_store_dir) / f"{repo}.json", args.llm_index, args.refresh_llm) if args.llm_settings else None
+            results += evaluate([task for task in tasks if task["repo"] == repo], clone.resolve(), strategies, overrides, variants, llm=layer)
+            if layer and args.llm_index:
+                print(f"  {repo} indexing: " + json.dumps(dict(layer.indexing)), file=sys.stderr, flush=True)
     if args.json:
         Path(args.json).parent.mkdir(parents=True, exist_ok=True)
         Path(args.json).write_text(json.dumps(results), encoding="utf-8")

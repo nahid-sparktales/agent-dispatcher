@@ -58,6 +58,16 @@ DEFAULTS = {
                 "count": "packet"},  # "packet": the whole rendered section; "excerpts": excerpt text only.
     "explorer": {"enabled": False, "max_iterations": 2, "max_new_symbols": 10, "max_new_files": 5,
                  "stop_confidence": 0.8},
+    # Optional LLM layer (llm_retrieval.py), inert here: `role_summary` is in no default retriever list and is silent
+    # until representations are attached to the index; reranking happens only when a caller supplies a reranker,
+    # which only the user's own settings file creates. No model is ever called from this module.
+    "role_summary": {"k1": 1.2, "b": 0.75, "fields": {"path": 3.0, "symbols": 3.0, "role": 2.0, "responsibilities": 2.0,
+                                                       "concepts": 2.0, "interactions": 1.0, "likely_tasks": 1.0}},
+    "llm_rerank": {"enabled": False, "candidate_limit": 20, "placement": "pre_graph",  # or "post_graph": rerank the final order
+                   "integration": "rrf",  # "rrf": one more voter | "weighted" | "replace" | "seeds": graph seeds only
+                   "weight": 2.0, "when": "always",  # "ambiguous": skip the model when deterministic evidence is decisive
+                   "min_agreement": 3, "min_gap": 0.15, "shadow": False,
+                   "content": None, "order": None, "evidence": None},  # Prompt experiments; None keeps the user's settings.
 }
 
 _LADDER = [
@@ -99,6 +109,12 @@ def _strategies():
     out["full-rerank"] = _merge(full, {"kind_weights": None, "pin_named_paths": False})
     out["full-query-analysis"] = _merge(full, {"query_analysis": False})
     out["full-rrf"] = _merge(full, {"fusion": "combsum"})
+    # Representation experiments: raw source (`+query-analysis`) against role summaries, alone and fused.
+    out["role-only"] = _merge(out["+query-analysis"], {"retrievers": ["role_summary"]})
+    out["bm25+role"] = _merge(out["+query-analysis"], {"retrievers": ["bm25", "role_summary"], "fusion": "rrf"})
+    out["full+role"] = _merge(full, {"retrievers": DEFAULTS["retrievers"] + ["role_summary"]})
+    out["full+rerank"] = _merge(full, {"llm_rerank": {"enabled": True}})
+    out["full+role+rerank"] = _merge(out["full+role"], {"llm_rerank": {"enabled": True}})
     return out
 
 
@@ -397,9 +413,17 @@ def phrase_retriever(query, index, config):
     return _ranked(scores, reasons, config["candidate_limit"], "phrases")
 
 
+def role_summary_retriever(query, index, config):
+    """What does a model-written role summary say this file is responsible for? Silent until representations are attached."""
+    if not getattr(index, "representations", None):
+        return []
+    scores, reasons = _sibling("llm_retrieval")["summary_scores"](query, index, config["role_summary"])
+    return _ranked(scores, reasons, config["candidate_limit"], "role_summary")
+
+
 RETRIEVERS = {"path": path_retriever, "rare_terms": rare_term_retriever, "bm25": bm25_retriever,
               "symbol_definitions": symbol_definition_retriever, "symbol_references": symbol_reference_retriever,
-              "phrases": phrase_retriever}
+              "phrases": phrase_retriever, "role_summary": role_summary_retriever}
 
 
 # ---------------------------------------------------------------- fusion and expansion
@@ -500,12 +524,70 @@ def _rerank(scores, evidence, index, query, config, named, role):
     return [(row["path"], row["value"]) for row in ordered]
 
 
-def retrieve(task, index, config=None, *, named=(), role=None, extra=None, boost_only=(), fallback=None):
+def _confidence(first, lists, pinned):
+    """How decisive deterministic evidence already is: a named file, retrievers agreeing on the leader, its lead."""
+    leader = first[0][0] if first else None
+    return {"pinned": bool(pinned), "agreement": sum(1 for rows in lists.values() if rows[0]["file"] == leader),
+            "gap": round((first[0][1] - first[1][1]) / first[0][1], 4) if len(first) > 1 and first[0][1] else 1.0}
+
+
+def _llm_opinion(task, order, evidence, index, config, reranker):
+    """Ask the optional reranker to order the top candidates, and nothing else -> (record, evidence rows).
+
+    The reranker never raises for model trouble; it answers {"error": ...} and the ranking stays
+    deterministic. Whatever it answers is re-checked here: only supplied candidates can be ordered.
+    """
+    rows = [{"path": path, "rank": rank, "evidence": sorted(evidence[path], key=lambda e: (e["rank"], e["source"]))}
+            for rank, path in enumerate(order[:config["llm_rerank"]["candidate_limit"]], 1)]
+    started = time.perf_counter()
+    prompt = {key: config["llm_rerank"][key] for key in ("content", "order", "evidence") if config["llm_rerank"][key] is not None}
+    answer = reranker(task, rows, index, prompt) if rows else {"error": "no candidates"}
+    record = {"candidates": [row["path"] for row in rows], **{key: answer[key] for key in ("error", "usage", "invalid") if key in answer}}
+    record["ms"] = round((time.perf_counter() - started) * 1000, 1)
+    ordered = list(dict.fromkeys(path for path in answer.get("order", ()) if path in set(record["candidates"])))
+    if not ordered:
+        record.setdefault("error", "no usable ranking")
+        return record, []
+    record["order"] = ordered + [path for path in record["candidates"] if path not in ordered]  # Unranked keep their order, last.
+    reasons, labels = answer.get("reasons", {}), answer.get("labels", {})
+    return record, [{"file": path, "rank": rank, "score": round(1 / rank, 4), "source": "llm_rerank",
+                     "reason": "model reranker opinion, not a repository fact" + (": " + reasons[path] if reasons.get(path) else ""),
+                     "value": labels.get(path) or "ranked"} for rank, path in enumerate(record["order"], 1)]
+
+
+def _integrate(order, rows, lists, evidence, index, query, config, pinned, role):
+    """Where a model's ordering of the top candidates meets the deterministic ranking: evidence, never the only evidence."""
+    tuning = config["llm_rerank"]
+    for row in rows:
+        evidence[row["file"]].append(row)
+    if tuning["integration"] == "seeds":
+        return order
+    if tuning["integration"] == "rrf":
+        lists["llm_rerank"] = rows
+        scores = fuse(lists, _merge(config, {"rrf_weights": {"llm_rerank": tuning["weight"]}}))
+        for path in pinned:
+            scores.setdefault(path, 0.0)
+        return _rerank(scores, evidence, index, query, config, pinned, role)
+    position = {row["file"]: row["rank"] for row in rows}
+    fixed = pinned if config["pin_named_paths"] else set()  # A file the request names outright is not the model's to demote.
+    if tuning["integration"] == "replace":
+        value = dict(order)
+        return ([item for item in order if item[0] in fixed]
+                + [(path, value.get(path, 0.0)) for path in sorted(position, key=position.get) if path not in fixed]
+                + [item for item in order if item[0] not in fixed and item[0] not in position])
+    k = config["rrf_k"]  # "weighted": two voters, the deterministic final order and the model's.
+    blended = [(path, round(1 / (k + rank) + (tuning["weight"] / (k + position[path]) if path in position else 0.0), 9), rank)
+               for rank, (path, _) in enumerate(order, 1)]
+    return [(path, score) for path, score, _ in sorted(blended, key=lambda row: (row[0] not in fixed, -row[1], row[2]))]
+
+
+def retrieve(task, index, config=None, *, named=(), role=None, extra=None, boost_only=(), fallback=None, reranker=None):
     """Run the pipeline once.
 
     `extra` carries candidate lists from outside (worktree, explorer). Sources in `boost_only` may
     strengthen a file another retriever found but never introduce one. `fallback` rows join the
-    very end of the ranking when nothing else found them.
+    very end of the ranking when nothing else found them. `reranker` is the optional model-backed
+    callable from llm_retrieval.py; without it this function is exactly the deterministic pipeline.
     """
     config = config or STRATEGIES["full"]
     started = time.perf_counter()
@@ -519,7 +601,18 @@ def retrieve(task, index, config=None, *, named=(), role=None, extra=None, boost
     # A file the request names outright (a path, or a dotted name that resolves to it) is decisive evidence.
     resolved = [row["file"] for row in lists.get("path", ()) if row.get("decisive")] if config["pin_named_paths"] else []
     pinned = list(dict.fromkeys([path for path in named if path in index.kinds] + resolved))
-    seeds = list(dict.fromkeys(pinned + [path for path, _ in first]))[:config["seed_count"]]
+    tuning, llm, llm_rows = config["llm_rerank"], None, []
+    confidence = _confidence(first, lists, pinned)
+    decisive = confidence["pinned"] or (confidence["agreement"] >= tuning["min_agreement"] and confidence["gap"] >= tuning["min_gap"])
+    asking = reranker is not None and tuning["enabled"] and not (tuning["when"] == "ambiguous" and decisive)
+    if asking and tuning["placement"] == "pre_graph":
+        found_by = defaultdict(list)
+        for rows in lists.values():
+            for row in rows:
+                found_by[row["file"]].append(row)
+        llm, llm_rows = _llm_opinion(task, [path for path, _ in first], found_by, index, config, reranker)
+    semantic = [] if tuning["shadow"] else [row["file"] for row in llm_rows]  # Variant A: the model's order picks the graph seeds.
+    seeds = list(dict.fromkeys(pinned + semantic + [path for path, _ in first]))[:config["seed_count"]]
     before = {row["file"] for rows in lists.values() for row in rows}
     if config["graph"]["enabled"] and seeds:
         lists["graph"] = graph_candidates(seeds, index, config, before)
@@ -537,6 +630,10 @@ def retrieve(task, index, config=None, *, named=(), role=None, extra=None, boost
             evidence[path].append({"file": path, "rank": 1, "score": 0.0, "source": "named",
                                    "reason": "explicit project path", "value": path})
     order = _rerank(scores, evidence, index, query, config, set(pinned), role)
+    if asking and tuning["placement"] == "post_graph":
+        llm, llm_rows = _llm_opinion(task, [path for path, _ in order], evidence, index, config, reranker)
+    if llm_rows and not tuning["shadow"]:
+        order = _integrate(order, llm_rows, lists, evidence, index, query, config, set(pinned), role)
     for row in fallback or ():
         if row["file"] not in scores and row["file"] in index.records:
             order.append((row["file"], 0.0))
@@ -556,7 +653,17 @@ def retrieve(task, index, config=None, *, named=(), role=None, extra=None, boost
              "overlap": {f"{a}&{b}": len({r["file"] for r in lists[a]} & {r["file"] for r in lists[b]})
                          for i, a in enumerate(sources) for b in sources[i + 1:]},
              "final": len(ranked), "latency_ms": round((time.perf_counter() - started) * 1000, 2)}
-    return {"query": query, "lists": lists, "ranked": ranked, "trace": trace}
+    result = {"query": query, "lists": lists, "ranked": ranked, "trace": trace}
+    if reranker is not None and tuning["enabled"]:
+        trace["confidence"] = confidence
+        trace["llm"] = {"asked": asking, "placement": tuning["placement"], "integration": tuning["integration"],
+                        "shadow": tuning["shadow"], **{key: llm[key] for key in ("error", "ms", "invalid", "usage") if llm and key in llm},
+                        "candidates": len(llm["candidates"]) if llm else 0}
+        result["llm"] = llm
+    represented = getattr(index, "representations", None)
+    if represented:
+        result["roles"] = {row["path"]: represented[row["path"]]["role"] for row in ranked[:10] if row["path"] in represented}
+    return result
 
 
 # ---------------------------------------------------------------- explorer (optional, bounded)
@@ -742,6 +849,8 @@ def render_explain(result, verbose=False, top=10):
         state = "in context" if row["path"] in kept else "not in context: " + dropped.get(row["path"], "below file limit")
         lines.append(f"{row['rank']}. {row['path']}  [{row['kind']}; fused {row['score']}; {state}]")
         lines += [f"   + {e['source']} rank #{e['rank']}: {e['reason']} ({e['value']})" for e in row["evidence"]]
+        if verbose and row["path"] in result.get("roles", {}):
+            lines.append("   ~ role summary (model-written retrieval aid): " + result["roles"][row["path"]])
     for step in result.get("exploration", []):
         lines += ["", f"EXPLORER iteration {step.get('iteration', 1)}: confidence {step['confidence']}, "
                       f"{'stop' if step['stop'] else 'expand'} - {step['reason']}"]
@@ -751,7 +860,15 @@ def render_explain(result, verbose=False, top=10):
         lines += ["", "PIPELINE", f"QUERY              {trace['raw_tokens']} raw tokens",
                   f"FILTER             {trace['concepts']} concepts, {trace['identifiers']} identifiers, {trace['ignored']} ignored"]
         lines += [f"{name.upper():<19}{count} candidates" for name, count in trace["candidates"].items()
-                  if name not in {"graph", "git"}]
+                  if name not in {"graph", "git", "llm_rerank"}]
+        model = trace.get("llm")
+        if model:
+            usage = model.get("usage") or {}
+            lines.append("LLM RERANK         " + (f"fell back to deterministic ranking: {model['error']}" if model.get("error") else
+                         "skipped: deterministic evidence was decisive" if not model["asked"] else
+                         f"{model['candidates']} candidates, {model['placement']}, {model['integration']}"
+                         f"{' (shadow: recorded, not applied)' if model['shadow'] else ''}, "
+                         f"{usage.get('input_tokens', 0)} in / {usage.get('output_tokens', 0)} out tokens, {model.get('ms', 0)} ms"))
         lines += [f"MERGED             {trace['union']} unique files", f"SEEDS              {len(trace['seeds'])}: {', '.join(trace['seeds'])}",
                   f"GRAPH EXPANSION    {trace['graph_additions']} additional candidates",
                   f"GIT CO-CHANGE      {trace['git_additions']} additional candidates",
@@ -777,6 +894,7 @@ def main(argv=None):
             command.add_argument("--exclude-path", action="append", default=[])
             command.add_argument("--pack")
             command.add_argument("--verbose", action="store_true")
+            command.add_argument("--no-llm", action="store_true", help="Ignore the user's LLM retrieval settings; deterministic only")
             command.add_argument("--json", action="store_true")
         if name == "expand":
             command.add_argument("--findings", required=True, help="Explorer findings as JSON (see docs/repository-intelligence.md)")
@@ -794,12 +912,12 @@ def main(argv=None):
             findings = json.loads(args.findings)
         result = context["explain_retrieval"](args.project, args.task, strategy=args.strategy, pack=args.pack,
                                               exclude_paths=args.exclude_path, findings=findings,
-                                              iteration=getattr(args, "iteration", 1))
+                                              iteration=getattr(args, "iteration", 1), llm=not args.no_llm)
     except (context["ContextError"], ValueError, OSError) as exc:
         print(str(exc) if isinstance(exc, context["ContextError"]) else "Retrieval input could not be used; values withheld.", file=sys.stderr)
         return 2
     if args.json:
-        result = {key: result[key] for key in ("query", "ranked", "trace", "packet", "exploration") if key in result}
+        result = {key: result[key] for key in ("query", "ranked", "trace", "packet", "exploration", "llm", "roles") if key in result}
         print(json.dumps(result, indent=2, ensure_ascii=False))
     else:
         print(render_explain(result, args.verbose))

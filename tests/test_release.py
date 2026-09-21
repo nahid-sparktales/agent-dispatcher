@@ -361,6 +361,7 @@ class RecoverableInstallerTests(unittest.TestCase):
             "repo_index.py": "# repository facts index\n",
             "retrieval.py": "# retrieval engine\n",
             "context_budget.py": "# context budget optimizer\n",
+            "llm_retrieval.py": "# optional LLM-assisted retrieval\n",
             "project_map.py": "# explicit map builder and read-only inspector\n",
             "resources.py": "# read-only package resource resolver\n",
             "verification.py": "# task-scoped check evidence\n",

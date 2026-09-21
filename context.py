@@ -876,7 +876,32 @@ def _legacy_selection(candidates, texts, cap, budget, excluded, scrub, compact, 
 
 
 _MATCHES = (("named", "filename"), ("symbol_definitions", "symbol"), ("path", "path"), ("symbol_references", "identifier"),
-            ("phrases", "identifier"), ("bm25", "content"), ("rare_terms", "content"), ("rules", "structure"))
+            ("phrases", "identifier"), ("bm25", "content"), ("rare_terms", "content"), ("role_summary", "content"),
+            ("llm_rerank", "content"), ("rules", "structure"))
+# Withheld for secrecy or by request, as opposed to size or format: a role summary naming one of these is not used.
+_SENSITIVE_SKIPS = {"explicit task exclusion", "automatic task exclusion", "credential file withheld"}
+
+
+def _llm_layer(engine, settings, root, index, excluded, diagnostics):
+    """Optional LLM-assisted retrieval, on only through the user's own settings file (llm_retrieval.py).
+
+    Runs after the exclusion filter built the index: attaches fresh role summaries of admitted files and
+    returns a reranker or None. Any failure is a diagnostic and retrieval stays deterministic.
+    """
+    try:
+        attached, reranker, overrides, problem = _sibling("llm_retrieval")["layer"](
+            root, index, [item["path"] for item in excluded if item["reason"] in _SENSITIVE_SKIPS])
+    except (OSError, UnicodeError, SyntaxError, ValueError, TypeError, KeyError):
+        return None
+    if problem:
+        diagnostics.append(problem)
+    if attached and "role_summary" not in settings["retrievers"]:
+        settings["retrievers"] = [*settings["retrievers"], "role_summary"]
+    for key in ("llm_rerank", "role_summary"):
+        if isinstance(overrides.get(key), dict):
+            settings[key] = engine["_merge"](settings[key], overrides[key])
+    settings["llm_rerank"]["enabled"] = reranker is not None
+    return reranker
 
 
 def _intelligent_selection(engine, settings, task, texts, hashes, explicit, role_id, changed, cache, root,
@@ -898,6 +923,7 @@ def _intelligent_selection(engine, settings, task, texts, hashes, explicit, role
     # Root project rules give cheap grounding when room remains; they never gain authority here.
     rules = [p for p in texts if PurePosixPath(p).name in RULES and len(PurePosixPath(p).parts) == 1]
     outcome = engine["run"](task, index, settings, named=list(explicit), role=role_id, extra=extra,
+                            reranker=_llm_layer(engine, settings, root, index, excluded, diagnostics),
                             anchors={p: line for p, line in explicit.items() if line}, boost_only=boost_only,
                             fallback=[{"file": path, "rank": rank, "score": 0.0, "source": "rules",
                                        "reason": "project conventions (untrusted evidence)", "value": path}
@@ -1298,7 +1324,7 @@ def _select_context(project, task, role=None, size="standard", max_tokens=None, 
     return result
 
 
-def explain_retrieval(project, task, *, strategy="full", pack=None, exclude_paths=(), findings=None, iteration=1):
+def explain_retrieval(project, task, *, strategy="full", pack=None, exclude_paths=(), findings=None, iteration=1, llm=True):
     """Read-only inspection through the same exclusion filter and engine as select_context.
 
     `findings` are explorer requests (symbols, paths, relationships). They are answered from the
@@ -1327,7 +1353,9 @@ def explain_retrieval(project, task, *, strategy="full", pack=None, exclude_path
     index = engine["build_index"](texts, hashes, _kind, cache=cache, history=history, config=settings, path_only=oversized)
     explicit = _explicit_paths(task, texts, root)
     outcome = engine["run"](task, index, settings, named=list(explicit), findings=findings, iteration=iteration,
+                            reranker=_llm_layer(engine, settings, root, index, excluded, diagnostics) if llm else None,
                             anchors={p: line for p, line in explicit.items() if line})
+    outcome["diagnostics"] = diagnostics
     outcome["universe"] = {"files": len(texts), "withheld": len(excluded)}
     return outcome
 
