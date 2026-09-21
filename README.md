@@ -24,7 +24,7 @@ for the current role. Small, known edits can take the direct path.
 - **Load context as needed.** Roles select a small set of skills, project files, and available
   tools. Full skill instructions are read only when selected.
 - **Reuse project knowledge.** Source-linked facts and a structural graph help locate relevant
-  code. A private incremental cache lets later preparation reuse unchanged sources and parses.
+  code. A private incremental cache lets later preparation reuse unchanged sources and the resolved graph.
 - **Make verification explicit.** The role defines the evidence needed and reports which checks
   actually ran, what passed, and what remains unverified.
 - **Respect the task's edit scope.** Cache maintenance checks its write boundary. Read-only
@@ -208,9 +208,9 @@ proof of completeness.
 
 During substantial source work, `--map-maintain` uses the same scan to maintain the source-linked
 project map and structural graph when safe writes are permitted. Excluded or incomplete scans defer persistence;
-unsafe destinations leave a read-only result with diagnostics. Use `--map-preview` for read-only
-work, protected caches, or limited edits; preview always wins over maintenance. Both writers also
-veto recognized task restrictions. Repeat `--writable-path` to enforce literal permitted files or
+unsafe destinations leave a read-only result with diagnostics. Both writers veto recognized task
+restrictions and roles whose tool posture is read-only. Use `--map-preview` for edit limits the
+helper may miss, such as unusual wording or plan mode; preview always wins. Repeat `--writable-path` to enforce literal permitted files or
 subtrees (trailing `/`), independently of source-reading exclusions. Deferred maintenance still
 returns fresh evidence and explains its write decision. Map facts never authorize execution.
 
@@ -399,7 +399,7 @@ purposes; none stores a conversation or replaces the host's instructions.
 | --- | --- | --- |
 | Fact map | `.agent-dispatcher/project-map.json` | Feature locations, declared dependencies, test commands, and documented architecture decisions, with source locations and fingerprints. |
 | Structural graph | `.agent-dispatcher/project-graph.json` | Files, Python symbols, imports, supported direct calls, and candidate test relationships, with evidence and confidence labels. |
-| Incremental parser cache | `~/.cache/agent-dispatcher/parser-v1/` | Authenticated records of redacted source text, Python syntax trees, extracted facts, and resolved graphs for reuse. |
+| Incremental parser cache | `~/.cache/agent-dispatcher/parser-v1/` | Authenticated records of redacted source text, extracted facts, and resolved graphs for reuse. |
 
 During substantial guided work, `context.py --compact --map-maintain` requests automatic
 maintenance. A complete, unrestricted scan can create or refresh both project indexes and
@@ -422,14 +422,14 @@ On later preparations:
 Python definitions, imports, and a conservative subset of direct calls use the standard AST
 parser. JavaScript/TypeScript support covers inferred relative-import candidates. Possible
 call paths are static hints; test links do not prove coverage, and documented decisions do
-not prove that the code follows them. The graph is bounded to 80 source files, 240 nodes, and
-400 edges; omitted evidence and parse failures are reported.
+not prove that the code follows them. The graph is bounded to 1,000 source files, 30,000 nodes,
+36,000 edges and 16 MiB; omitted evidence and parse failures are reported.
 
 #### Control mapping and cache writes
 
 | Control | Effect |
 | --- | --- |
-| `--map-maintain` | Request index maintenance when the task, write scope, scan, and destination permit it. |
+| `--map-maintain` | Request index maintenance when the task, role, write scope, scan, and destination permit it. |
 | `--map-preview` | Derive or reuse current evidence without saving indexes or the private parser cache. Takes precedence over maintenance. |
 | `--writable-path PATH` | Restrict optional project-cache writes to literal files or subtrees; repeat as needed and end directory paths with `/`. |
 | `--exclude-path PATH` | Omit a file or directory from source retrieval before reading or using its evidence. |

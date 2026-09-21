@@ -189,6 +189,7 @@ def parse_role(path):
             f"role reads before it can work, so a context plan starts from something better than "
             f"the words in the request.")
     fm["body"] = body
+    fm["read_only"] = bool(re.search(r"^## Tool posture\s+Read-only\.", body, re.M))
     fm["path"] = str(path.relative_to(ROOT))
     return fm
 
@@ -689,7 +690,7 @@ def write_registries(d):
                    "tags": r["tags"],
                    "capabilities": r["capabilities"], "skills": r["skills"], "mcps": r["mcps"],
                    "recipes": r["recipes"], "verification": r["verification"],
-                   "retrieval_hints": r["retrieval_hints"],
+                   "retrieval_hints": r["retrieval_hints"], "read_only": r["read_only"],
                    "conditions": sorted(r["skills"]["conditional"]),
                    "template": r["path"]} for r in d["roles"]],
     }, indent=2) + "\n")
@@ -812,7 +813,7 @@ def write_commands(d):
             "instruction discovery is exempt. PACK is the dispatcher directory; quote absolute paths "
             "and send the full unchanged request on stdin. Multi-file bugs, architecture and source-backed documentation "
             "qualify even in small projects. Skip controls, trivial work, one obvious known-file "
-            "change and no-workspace tasks. Use --map-preview when writes are disallowed. "
+            "change and no-workspace tasks. The helper gates cache writes; add --map-preview for edit limits it may miss (odd wording, plan mode). "
             "Use returned excerpts, exclusion_policy and supplied guidance bodies without duplicate reads. "
             "Use exact resources paths only for needed bodies not supplied. "
             "Read only the next needed guides, normally zero to two; preserve essential verification. "

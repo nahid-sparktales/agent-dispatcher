@@ -64,14 +64,13 @@ class IncrementalContextTests(unittest.TestCase):
         self.assertEqual(stats["source_hits"], 4)
         self.assertEqual(stats["source_bytes_read"], 0)
         self.assertEqual(stats["parsed_files"], 0)
-        self.assertEqual(stats["graph_hits"], 1)
-        self.assertEqual(stats["reused_parses"], 0)  # The resolved graph itself is reused.
+        self.assertEqual(stats["graph_hits"], 1)  # The resolved graph itself is reused.
         self.assertGreater(stats["fact_hits"], 0)
         self.assertEqual(stats["logical_source_bytes"], cold["parser_cache"]["logical_source_bytes"])
         self.assertEqual(initial, [self.state(name) for name in ("project-map.json", "project-graph.json")])
         self.assertEqual(warm["excerpts"], cold["excerpts"])
 
-    def test_one_edit_reparses_one_file_and_relinks_unchanged_importer(self):
+    def test_one_edit_rereads_one_file_and_relinks_unchanged_importer(self):
         self.select()
         self.assertIn(("login", "validate_token"), self.calls())
         source = self.project / "core.py"
@@ -82,8 +81,7 @@ class IncrementalContextTests(unittest.TestCase):
         os.utime(source, ns=(stamp, stamp))
         changed = self.select()["parser_cache"]
         self.assertEqual(changed["source_misses"], 1)
-        self.assertEqual(changed["parsed_files"], 1)
-        self.assertEqual(changed["reused_parses"], 2)
+        self.assertEqual(changed["parsed_files"], 3)  # A graph miss parses every Python file fresh.
         self.assertNotIn(("login", "validate_token"), self.calls())
         expected = [self.state(name) for name in ("project-map.json", "project-graph.json")]
         self.select(parser_cache=False)

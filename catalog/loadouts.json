@@ -88,6 +88,7 @@
         "memory and context stores",
         "runtime permission config"
       ],
+      "read_only": false,
       "conditions": [
         "anthropic_api",
         "authoring_skills",
@@ -176,6 +177,7 @@
         "contract and sandbox tests",
         "integration setup docs"
       ],
+      "read_only": false,
       "conditions": [
         "background_processing",
         "mcp_server",
@@ -258,6 +260,7 @@
         "deployment and runtime constraints",
         "product requirement notes"
       ],
+      "read_only": true,
       "conditions": [
         "llm_app",
         "postgres",
@@ -331,6 +334,7 @@
         "prior run logs",
         "recipient and record lists"
       ],
+      "read_only": false,
       "conditions": [
         "github_actions",
         "webhook_trigger"
@@ -390,6 +394,7 @@
         "product feature descriptions",
         "approved claims and proof points"
       ],
+      "read_only": false,
       "conditions": [
         "ui_copy"
       ],
@@ -452,6 +457,7 @@
         "metric definition docs",
         "prior analysis reports"
       ],
+      "read_only": false,
       "conditions": [
         "postgres"
       ],
@@ -519,6 +525,7 @@
         "downstream reports and consumers",
         "notebooks promoted to jobs"
       ],
+      "read_only": false,
       "conditions": [
         "postgres"
       ],
@@ -592,6 +599,7 @@
         "constraints and access rules",
         "fixtures and seed data"
       ],
+      "read_only": false,
       "conditions": [
         "postgres",
         "slow_query"
@@ -671,6 +679,7 @@
         "reproduction scripts",
         "related state or persistence"
       ],
+      "read_only": false,
       "conditions": [
         "browser_available",
         "llm_app",
@@ -751,6 +760,7 @@
         "release and rollback scripts",
         "health check definitions"
       ],
+      "read_only": false,
       "conditions": [
         "docker",
         "github_actions",
@@ -816,6 +826,7 @@
         "worktree or branch state",
         "returned subagent artifacts"
       ],
+      "read_only": false,
       "conditions": [
         "untrusted_content"
       ],
@@ -881,6 +892,7 @@
         "cli and api entry points",
         "docs navigation index"
       ],
+      "read_only": false,
       "conditions": [
         "coauthoring_with_user",
         "public_docs_site"
@@ -947,6 +959,7 @@
         "existing tests for the area",
         "directory structure listings"
       ],
+      "read_only": true,
       "conditions": [
         "postgres"
       ],
@@ -1028,6 +1041,7 @@
         "readily available context",
         "sources or commands to verify"
       ],
+      "read_only": false,
       "conditions": [
         "data_question",
         "research_question",
@@ -1096,6 +1110,7 @@
         "competitor notes",
         "product capability docs"
       ],
+      "read_only": false,
       "conditions": [
         "market_research"
       ],
@@ -1203,6 +1218,7 @@
         "similar existing patterns",
         "build and check commands"
       ],
+      "read_only": false,
       "conditions": [
         "async_workload",
         "cache_layer",
@@ -1288,6 +1304,7 @@
         "incident log files",
         "dependency version bumps"
       ],
+      "read_only": false,
       "conditions": [
         "recent_schema_change",
         "security_incident"
@@ -1364,6 +1381,7 @@
         "caching layers",
         "performance budgets"
       ],
+      "read_only": false,
       "conditions": [
         "frontend",
         "postgres",
@@ -1433,6 +1451,7 @@
         "migrations and permissions",
         "prior plans or specs"
       ],
+      "read_only": true,
       "conditions": [
         "api_change",
         "schema_change",
@@ -1502,6 +1521,7 @@
         "current feature behavior",
         "usage metrics or analytics"
       ],
+      "read_only": true,
       "conditions": [
         "ui_task"
       ],
@@ -1577,6 +1597,7 @@
         "compatibility shims",
         "generated artifacts"
       ],
+      "read_only": false,
       "conditions": [
         "frontend_stack",
         "schema_migration"
@@ -1640,6 +1661,7 @@
         "authorized connected records",
         "prior research notes"
       ],
+      "read_only": true,
       "conditions": [
         "claude_api"
       ],
@@ -1726,6 +1748,7 @@
         "existing verification evidence",
         "ci or test output"
       ],
+      "read_only": true,
       "conditions": [
         "ai_system",
         "api_change",
@@ -1803,6 +1826,7 @@
         "external entry points",
         "tool permission definitions"
       ],
+      "read_only": true,
       "conditions": [
         "agent_system",
         "architecture_review",
@@ -1886,6 +1910,7 @@
         "baseline failure logs",
         "test environment config"
       ],
+      "read_only": false,
       "conditions": [
         "ai_system",
         "browser_available",
@@ -1985,6 +2010,7 @@
         "keyboard and focus handling",
         "screenshots of the interface"
       ],
+      "read_only": false,
       "conditions": [
         "browser_available",
         "existing_ui",
@@ -2052,6 +2078,7 @@
         "remote tracking refs",
         "branch and tag refs"
       ],
+      "read_only": false,
       "conditions": [
         "github_actions"
       ],

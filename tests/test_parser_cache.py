@@ -44,20 +44,18 @@ class ParserCacheTests(unittest.TestCase):
         self.assertEqual(cache.stats["writes"], 1)
         return cache
 
-    def test_cold_then_warm_avoids_source_read_and_python_parse(self):
+    def test_cold_then_warm_avoids_source_read(self):
         cold = self.warm()
         warm = self.cache(writable=True)
         # Read cache records at construction, then prove the source hit needs no read.
-        with mock.patch.object(parser_cache.os, "read", side_effect=AssertionError("source reread")), \
-                mock.patch.object(parser_cache.ast, "parse", side_effect=AssertionError("source reparse")):
+        with mock.patch.object(parser_cache.os, "read", side_effect=AssertionError("source reread")):
             text, used, reason, sha = self.read(warm)
-            tree = warm.parse("main.py", text)
+        tree = warm.parse("main.py", text)
         self.assertEqual(used, len(text.encode()))
         self.assertEqual(sha, hashlib.sha256(text.encode()).hexdigest())
         self.assertIsNone(reason)
         self.assertEqual(ast.dump(tree), ast.dump(ast.parse(text)))
         self.assertEqual(warm.stats["source_hits"], 1)
-        self.assertEqual(warm.stats["reused_parses"], 1)
         self.assertEqual(warm.stats["source_bytes_read"], 0)
         stamp = (self.directory / cold.name).stat().st_mtime_ns
         warm.finish()
@@ -78,7 +76,7 @@ class ParserCacheTests(unittest.TestCase):
         self.assertEqual(cache.stats["source_hits"], 0)
         self.assertEqual(cache.stats["parsed_files"], 1)
 
-    def test_only_changed_source_is_read_and_reparsed(self):
+    def test_only_changed_source_is_read_again(self):
         self.write("other.py", "def other(): return 1\n")
         initial = self.cache(writable=True)
         for path in ("main.py", "other.py"):
@@ -90,8 +88,7 @@ class ParserCacheTests(unittest.TestCase):
             following.parse(path, self.read(following, path)[0])
         self.assertEqual(following.stats["source_hits"], 1)
         self.assertEqual(following.stats["source_misses"], 1)
-        self.assertEqual(following.stats["parsed_files"], 1)
-        self.assertEqual(following.stats["reused_parses"], 1)
+        self.assertEqual(following.stats["parsed_files"], 2)  # Trees are always parsed fresh.
 
     def test_readonly_cold_does_not_create_state_and_warm_does_not_touch_it(self):
         readonly = self.cache()
@@ -288,25 +285,6 @@ class ParserCacheTests(unittest.TestCase):
         raw = (self.directory / cache.name).read_text()
         self.assertNotIn("private-token-value", raw)
         self.assertIn("[redacted]", raw)
-
-    def test_ast_roundtrip_preserves_supported_constant_types_and_locations(self):
-        text = "value = (b'bytes', 2j, ..., 1e999, None, True)\nasync def f(x: int = 2):\n    return x\n"
-        cache = self.cache(writable=True)
-        first = cache.parse("constants.py", text)
-        cache.finish()
-        following = self.cache()
-        with mock.patch.object(parser_cache.ast, "parse", side_effect=AssertionError("reparsed")):
-            second = following.parse("constants.py", text)
-        self.assertEqual(ast.dump(first, include_attributes=True), ast.dump(second, include_attributes=True))
-
-    def test_malformed_ast_falls_back_without_executing_data(self):
-        cache = self.cache()
-        text = "def check(): pass\n"
-        key = ["main.py", hashlib.sha256(text.encode()).hexdigest()]
-        cache.put("ast", key, {"node": "__import__", "fields": {}, "attributes": {}})
-        tree = cache.parse("main.py", text)
-        self.assertIsInstance(tree, ast.Module)
-        self.assertEqual(cache.stats["parsed_files"], 1)
 
     def test_invalid_utf8_and_binary_sources_are_not_cached(self):
         for value in (b"invalid\xff", b"binary\0content"):

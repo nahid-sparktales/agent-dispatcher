@@ -47,7 +47,7 @@ select the role then run python3 -B PACK/context.py --project PROJECT --task-fil
 --compact --map-maintain --json as the first discretionary workspace action: before listings, searches,
 contract/source reads, tests or task-file writes. Mandatory host instructions are exempt.
 Pass the full unchanged task on quoted stdin. Preserve returned exclusion_policy in later reads.
-Use --map-preview when writes are disallowed. Consume supplied role/guide bodies and excerpts
+The helper gates cache writes; add --map-preview for edit limits it may miss. Consume supplied role/guide bodies and excerpts
 without rereading; use exact resources paths only for needed missing bodies. Multi-file bugs,
 architecture and source-backed documentation qualify even in small projects. Controls,
 trivial work, one obvious known-file change and no-workspace tasks bypass the helper.

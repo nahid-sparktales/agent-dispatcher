@@ -30,10 +30,10 @@ Scopes ship off; helpers cannot enable them.
    `python3 -B PACK/scripts/context.py --project PROJECT --task-file - --role ID --compact --map-maintain --json`
    No prior listing, search, contract/source read or git inspection; mandatory host instructions
    are exempt. Send the full unchanged request on quoted stdin. Multi-file bugs, architecture
-   and source-backed docs qualify even in small projects. Use `--map-preview` for read-only,
-   protected-cache or limited-edit tasks. Pass literal edit lists via `--writable-path`
-   (directories end in `/`); never add cache permissions. Scope deferral keeps fresh evidence;
-   never bypass it via build/refresh. On failure, continue targeted investigation.
+   and source-backed docs qualify even in small projects. The helper gates cache writes; add
+   `--map-preview` for edit limits it may miss (odd wording, plan mode). Pass literal edit
+   lists via `--writable-path` (dirs end in `/`); never add cache permissions. Deferral keeps
+   fresh evidence; never bypass it via build/refresh. On failure, continue targeted investigation.
    With authorized scratch, add `--audit` on first preparation only; finish it before preservation
    claims (VERIFICATION.md). Do not reset the baseline after edits.
 3. Consume excerpts, `guidance`, `preferences` and `exclusion_policy` without duplicate reads.

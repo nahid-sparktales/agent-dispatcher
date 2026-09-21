@@ -25,7 +25,7 @@ index = {'status': 'fresh', 'cache_status': 'fresh',
          'maintenance': {'action': 'built' if maintain else 'not_requested'}}
 stats = {'enabled': True, 'write_allowed': maintain, 'source_hits': 0 if maintain else 1,
          'source_misses': 1 if maintain else 0, 'source_bytes_read': 20 if maintain else 0,
-         'parsed_files': 1 if maintain else 0, 'reused_parses': 0 if maintain else 1,
+         'parsed_files': 1 if maintain else 0,
          'writes': 1 if maintain else 0, 'fact_hits': 0 if maintain else 1,
          'fact_misses': 1 if maintain else 0, 'graph_hits': 0 if maintain else 1,
          'graph_misses': 1 if maintain else 0, 'private_path': '/not-for-artifacts'}
@@ -66,7 +66,7 @@ class WarmIndexTests(unittest.TestCase):
         self.assertGreater(result['elapsed_seconds'], 0)
         self.assertEqual([s['mode'] for s in result['stages']], ['maintain', 'preview'])
         stats = result['stages'][1]['parser_cache']
-        self.assertEqual(stats['reused_parses'], 1)
+        self.assertEqual(stats['parsed_files'], 0)
         self.assertEqual(stats['source_bytes_read'], 0)
         self.assertNotIn('private_path', stats)
         before = rt.tree_files(self.workspace)

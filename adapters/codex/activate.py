@@ -153,7 +153,7 @@ def emit_hook(config):
                    "is its compact context helper with --map-maintain and the full unchanged task, before listings, searches or source/contract reads "
                    "(mandatory host instructions excepted); preserve its exclusion_policy, "
                    "consume supplied role/guide bodies without rereading; use exact paths for needed missing bodies. "
-                   "Use --map-preview when writes are disallowed. "
+                   "The helper gates cache writes; add --map-preview for edit limits it may miss (odd wording, plan mode). "
                    "Honor the user's current instructions and host permissions. "
                    "Use inline read-only validators; verify removal of any necessary owned scratch files. "
                    "Stop routing immediately when the user asks. "

@@ -47,9 +47,9 @@ existing fact-map format. Both consume the same bounded, redacted scan. The host
 maintenance during preparation; no background watcher or observer is installed.
 
 Automatic maintenance is subordinate to task scope. Both cache writers enforce a read-only
-preview, a literal `--writable-path` list when supplied, and a conservative guard for restricted
-edits, file preservation, and read-only requests. A scope veto occurs before directory creation
-or replacement and still returns fresh task evidence. Preview wins over maintenance; exclusions
+preview, a literal `--writable-path` list when supplied, a conservative guard for restricted
+edits, file preservation, and read-only requests, and the selected role's read-only tool posture.
+A scope veto occurs before directory creation or replacement and still returns fresh task evidence. Preview wins over maintenance; exclusions
 and write scope are independent. Only explicit caller paths provide an exact file boundary;
 the language guard is supplementary and can conservatively defer harmless optional writes.
 These checks constrain the two cache writers, not unrelated host tools or external reuse state.
@@ -70,8 +70,9 @@ retrieve a dependency or caller whose name does not appear in the task.
 | Test-to-code links | Candidate tests inferred from test naming and imports; no coverage claim or automatic test execution |
 | Evidence/confidence | Source fingerprints, line references, extraction method and resolved/inferred labels |
 
-The initial graph indexes at most 80 sources, 240 nodes and 400 edges. Its task view has at most
-12 nodes and 16 edges and an additional output budget. Omission and parse-failure counts expose
+The graph indexes at most 1,000 sources, 30,000 nodes, 36,000 edges and 16 MiB; the fact map at
+most 1,000 sources, 6,200 facts and 4 MiB. Both stop at their byte limit instead of failing to save. The graph's task view has at most 12 nodes and 16 edges and an
+additional output budget. Omission and parse-failure counts expose
 incomplete coverage. The whole context-packet budget can trim this view further. Broader repos
 still use ordinary source retrieval when a relationship is outside the structural index.
 

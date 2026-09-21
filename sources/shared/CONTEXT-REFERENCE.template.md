@@ -261,7 +261,7 @@ build artifact is a copy of a hit somewhere real — go find the real one.
 With --map-preview or --map-maintain, the helper separately adds a bounded graph projection:
 Python definitions and conservative direct calls, plus inferred JavaScript/TypeScript relative
 imports. Unrestricted maintenance can fill the private host parser cache; later permitted
-lookups reuse unchanged sources, syntax trees, and facts. Read-only and scoped tasks never
+lookups reuse unchanged sources, facts, and the resolved graph. Read-only and scoped tasks never
 write it. Unchanged graphs are reused; changed scoped inputs cause cross-file edges to be
 resolved again. Inspect `parser_cache` counters for actual
 reuse; --no-parser-cache forces source reads and extraction. Metadata reuse is not a fresh
