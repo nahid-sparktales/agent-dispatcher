@@ -5,7 +5,7 @@ stays unable to tell which engine produced them — that boundary is the point o
 
 One rule holds across every type in this file: **a decision expresses relevance, never
 authorization.** There is deliberately no field for a permission, a grant, a scope or an
-approval, and `test_decision.py` fails the build if one appears.
+approval, and `tests/test_decision.py` fails the build if one appears.
 """
 import dataclasses
 import typing

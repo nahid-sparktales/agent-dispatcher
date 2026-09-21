@@ -175,9 +175,9 @@ Enforced, not just asserted:
 - No type in `decision/types.py` has a field that could carry an authorization.
 - `assert_no_authorization()` walks a decision payload and raises on any permission-shaped key,
   matching on tokens so `permissionGranted` and `granted_permissions` both fail.
-- `test_decision.py` runs it against *"deploy to production"* and *"delete the production
+- `tests/test_decision.py` runs it against *"deploy to production"* and *"delete the production
   database"* with the relevant tool scored at 100%, and fails the build if anything appears.
-- `test_build.py` fails if a candidate's criteria text carries a `writes` or `risk` posture — a
+- `tests/test_build.py` fails if a candidate's criteria text carries a `writes` or `risk` posture — a
   relevance model is never shown them.
 
 Same rule the rest of the pack lives by: a skill teaches without authorizing, a detected stack

@@ -37,7 +37,7 @@ Skill and tool cases carry `required`, `acceptable` and `irrelevant`. The last o
 them measure **precision**: a system that selects every candidate has perfect recall and no
 value, and `irrelevant` is how that shows up as a number.
 
-Every id in every fixture is validated against the canonical registry by `test_decision.py`, so a
+Every id in every fixture is validated against the canonical registry by `tests/test_decision.py`, so a
 renamed role or a removed skill fails the build rather than quietly scoring zero.
 
 ## Engines
@@ -95,6 +95,6 @@ digest in every report is there so a stale number can be spotted rather than tru
 
 ## Adding cases
 
-Add to the relevant file and run `python3 test_decision.py`. A new role needs at least one
+Add to the relevant file and run `python3 -B -m tests.test_decision`. A new role needs at least one
 obvious case and one near-neighbour case against whichever role it is easiest to confuse with;
 the suite fails if any role has no gold label anywhere.

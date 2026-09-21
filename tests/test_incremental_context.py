@@ -12,7 +12,7 @@ import context
 import parser_cache
 
 
-ROOT = Path(__file__).resolve().parent
+ROOT = Path(__file__).resolve().parents[1]
 
 
 class IncrementalContextTests(unittest.TestCase):

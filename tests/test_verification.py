@@ -15,7 +15,7 @@ from unittest import mock
 
 import verification
 
-ROOT = Path(__file__).resolve().parent
+ROOT = Path(__file__).resolve().parents[1]
 
 
 class VerificationTests(unittest.TestCase):

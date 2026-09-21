@@ -15,7 +15,7 @@ from unittest import mock
 import context
 import project_map
 
-ROOT = Path(__file__).resolve().parent
+ROOT = Path(__file__).resolve().parents[1]
 
 
 class ProjectMapTests(unittest.TestCase):

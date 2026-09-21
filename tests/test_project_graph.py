@@ -12,7 +12,7 @@ import warnings
 import project_graph
 import project_map
 
-ROOT = Path(__file__).resolve().parent
+ROOT = Path(__file__).resolve().parents[1]
 
 
 class ProjectGraphTests(unittest.TestCase):

@@ -18,7 +18,7 @@ import tempfile
 
 import build
 
-ROOT = pathlib.Path(__file__).resolve().parent
+ROOT = pathlib.Path(__file__).resolve().parents[1]
 FAILURES = []
 
 

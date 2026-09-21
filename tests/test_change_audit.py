@@ -13,7 +13,7 @@ from unittest import mock
 import change_audit
 import context
 
-ROOT = Path(__file__).resolve().parent
+ROOT = Path(__file__).resolve().parents[1]
 
 
 class ChangeAuditTests(unittest.TestCase):

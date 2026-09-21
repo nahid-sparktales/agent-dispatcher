@@ -13,6 +13,8 @@ from unittest.mock import patch
 from evals.end_to_end import runtime as rt
 from evals.end_to_end import run as runner
 
+ROOT = Path(__file__).resolve().parents[1]
+
 
 class RuntimeTests(unittest.TestCase):
     def setUp(self):
@@ -94,7 +96,7 @@ result = execute([sys.executable,'-c',code],cwd=os.getcwd(),env=dict(os.environ)
 print(json.dumps(result))
 """
         import subprocess
-        completed = subprocess.run([sys.executable, "-c", worker], cwd=Path(__file__).parent,
+        completed = subprocess.run([sys.executable, "-c", worker], cwd=ROOT,
                                    capture_output=True, text=True, timeout=8)
         self.assertEqual(completed.returncode, 0, completed.stderr)
         result = json.loads(completed.stdout)
@@ -214,5 +216,5 @@ class SchedulingTests(unittest.TestCase):
 if __name__ == "__main__":
     loader = unittest.TestLoader()
     suite = loader.loadTestsFromModule(sys.modules[__name__])
-    suite.addTests(loader.discover(str(Path(__file__).parent), pattern="test_e2e_*.py"))
+    suite.addTests(loader.discover(str(Path(__file__).parent / "e2e"), pattern="test_*.py"))
     raise SystemExit(not unittest.TextTestRunner(verbosity=2).run(suite).wasSuccessful())

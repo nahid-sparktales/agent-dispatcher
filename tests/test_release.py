@@ -22,7 +22,7 @@ from decision.cli import main as decision_cli
 from decision.providers.mock import HTTPMock
 from decision.providers.typesafe import ProviderError, TypeSafeProvider, endpoint
 
-ROOT = Path(__file__).resolve().parent
+ROOT = Path(__file__).resolve().parents[1]
 
 
 def clean_env():
@@ -565,7 +565,7 @@ class GeneratedArtifactTests(unittest.TestCase):
             shutil.copytree(ROOT, repo, ignore=shutil.ignore_patterns(".git", "__pycache__", ".venv", "dist"))
             for rel in ("commands/agent-reviewer.md", "catalog/loadouts.json"):
                 (repo / rel).unlink()
-            result = subprocess.run([sys.executable, str(repo / "test_build.py")], cwd=repo,
+            result = subprocess.run([sys.executable, "-B", "-m", "tests.test_build"], cwd=repo,
                                     env=clean_env(), capture_output=True, text=True, timeout=60)
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("commands/agent-reviewer.md", result.stdout)

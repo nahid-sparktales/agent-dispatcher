@@ -258,8 +258,9 @@ def stage_pack(repo, destination):
 
 
 def build_and_validate(repo):
-    for script in ("build.py", "test_build.py", "test_decision.py"):
-        subprocess.run([sys.executable, str(repo / script)], cwd=repo, check=True)
+    subprocess.run([sys.executable, str(repo / "build.py")], cwd=repo, check=True)
+    for module in ("tests.test_build", "tests.test_decision"):
+        subprocess.run([sys.executable, "-B", "-m", module], cwd=repo, check=True)
 
 
 def install(config, repo=ROOT, uninstall=False):

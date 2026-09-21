@@ -254,7 +254,7 @@ class ContextReuseTests(unittest.TestCase):
         subprocess.run(["git", "init", "-q", str(self.project)], check=True)
         (self.project / "main.py").write_text("def important_function():\n    return 42\n")
         return ["--project", str(self.project), "--task", "Inspect important_function", "--compact",
-                "--pack", str(Path(__file__).resolve().parent),
+                "--pack", str(Path(__file__).resolve().parents[1]),
                 "--reuse-state", str(self.state), "--reuse-scope", "retained-cli-scope"]
 
     def test_cli_emits_source_when_ripgrep_is_unavailable(self):

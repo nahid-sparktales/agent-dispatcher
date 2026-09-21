@@ -36,36 +36,8 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
       # Do not build first: that would repair stale/missing committed artifacts before testing.
-      - name: Validate committed artifacts, catalog, and hook behavior
-        run: python3 test_build.py
-      - name: Test decision engine with offline providers
-        run: python3 test_decision.py
-      - name: Test installer lifecycle and release regressions
-        run: python3 test_release.py
-      - name: Test Codex packaging, installation, and activation
-        run: python3 test_codex.py
-      - name: Test doctor health checks and capability recommendations
-        run: python3 test_doctor.py
-      - name: Test bounded local context selection
-        run: |
-          python3 test_context.py
-          python3 test_context_packet.py
-          python3 test_context_reuse.py
-          python3 test_parser_cache.py
-          python3 test_incremental_context.py
-          python3 test_cache_scope.py
-      - name: Test source-linked project maps and freshness
-        run: |
-          python3 test_project_map.py
-          python3 test_project_graph.py
-      - name: Test native-client evaluation runner offline
-        run: python3 test_e2e.py
-      - name: Test verification evidence and saved preferences
-        run: |
-          python3 test_verification.py
-          python3 test_change_audit.py
-          python3 test_preferences.py
-          python3 test_reporting_package.py
+      - name: Run offline test suite
+        run: python3 -B -m tests
       - name: Verify regeneration leaves the checkout clean
         shell: bash
         run: |

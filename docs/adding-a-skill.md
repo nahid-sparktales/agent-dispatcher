@@ -51,7 +51,7 @@ seven phrases, lowercase, at most five words each.
 Write them in the vocabulary of the **request**, not of the skill — `"blank screen"`, not
 `"rendered-output verification"`. Make them *discriminate*: read the `not_for` line of every
 sibling in the same category and drop any phrase that would fire for one of them instead.
-`test_build.py` rejects a phrase shared by more than two skills, because a signal that fires
+`tests/test_build.py` rejects a phrase shared by more than two skills, because a signal that fires
 everywhere routes nothing.
 
 ## The body

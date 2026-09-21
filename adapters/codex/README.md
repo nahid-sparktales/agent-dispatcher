@@ -131,7 +131,7 @@ state. Reinstalling can therefore restore previously enabled scopes.
 
 ```bash
 python3 build_codex.py
-python3 test_codex.py
+python3 -B -m tests.test_codex
 # Optional: requires an installed Codex CLI; no model call or hook execution.
 python3 verify_codex_runtime.py
 ```

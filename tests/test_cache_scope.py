@@ -13,7 +13,7 @@ import project_graph
 import project_map
 
 
-ROOT = Path(__file__).resolve().parent
+ROOT = Path(__file__).resolve().parents[1]
 FIXTURES = ROOT / "evals/end_to_end/fixtures"
 MAP = ".agent-dispatcher/project-map.json"
 GRAPH = ".agent-dispatcher/project-graph.json"

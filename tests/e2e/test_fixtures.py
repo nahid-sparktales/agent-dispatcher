@@ -12,6 +12,8 @@ from unittest.mock import patch
 
 from evals.end_to_end.grading import DIMENSIONS, _run_check, grade, load_suite, tree_digest
 
+ROOT = Path(__file__).resolve().parents[2]
+
 
 class FixtureTests(unittest.TestCase):
     @classmethod
@@ -125,7 +127,7 @@ class FixtureTests(unittest.TestCase):
             self.assertEqual(result['checks'][0]['name'], 'artifact_validation')
 
     def test_manifest_rejects_traversal_symlinks_and_malformed_contract(self):
-        original_path = Path(__file__).parent / 'evals' / 'end_to_end' / 'fixtures' / 'manifest.json'
+        original_path = ROOT / 'evals' / 'end_to_end' / 'fixtures' / 'manifest.json'
         raw = json.loads(original_path.read_text())
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -239,7 +241,7 @@ class ContextOutcomeFixtureTests(unittest.TestCase):
             native_which = shutil.which
             with patch.object(shutil, 'which', side_effect=lambda command:
                               None if command == 'rg' else native_which(command)):
-                report = project_map.inspect_map(project, pack=Path(__file__).parent)
+                report = project_map.inspect_map(project, pack=ROOT)
             self.assertEqual(report['status'], 'stale')
             self.assertEqual(report['counts']['fresh'], 1)
             self.assertEqual(report['counts']['withheld'], len(snapshot['entries']) - 1)

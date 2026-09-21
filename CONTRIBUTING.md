@@ -33,39 +33,29 @@ decision/                             the optional decision engine
 adapters/codex/                       Codex entrypoint template and activation/CLI helpers
 build_codex.py, install_codex.py       Codex export and installation
 evals/decision/                       decision fixtures and the comparison harness
+tests/                                offline validation suites and shared runner
 docs/*.md                             prose only — the tables inside markers are generated
 ```
 
 Everything under `skills/agent-dispatcher/`, `commands/`, `hooks/`, `catalog/skills.json`,
 `catalog/loadouts.json`, and every region between `<!-- name:start -->` markers is generated.
-`test_build.py` fails if a generated file has been hand-edited, because the next build would
+`tests/test_build.py` fails if a generated file has been hand-edited, because the next build would
 silently discard the change.
 
 ## Before opening a PR
 
 ```bash
-python3 build.py          # regenerate
-python3 test_build.py     # validate
-python3 test_decision.py  # the decision engine — deterministic, offline, no credential
-python3 test_release.py   # full installer lifecycle and public-release regressions
-python3 test_codex.py     # Codex package, installer, activation, and offline routing
-python3 test_doctor.py    # health checks, full inventory, evidence, and recommendations
-python3 test_context.py   # bounded local retrieval, excerpts, ranking, and exclusions
-python3 test_context_packet.py # serialized budget, supplied guidance, and evidence trimming
-python3 test_context_reuse.py # retained evidence fingerprints, invalidation, and safe state
-python3 test_cache_scope.py # task edit boundaries, read-only precedence, and cache-write regression fixtures
-python3 test_project_map.py # source-backed maps, staleness, safe writes, and context integration
-python3 test_project_graph.py # structural extraction, bounded ranking, and cache safety
-python3 test_e2e.py       # native-client evaluation runner, offline fixtures only
-python3 test_verification.py # executed checks, freshness, failures, and evidence limits
-python3 test_change_audit.py # observed changes including caches, scope checks, and owned cleanup
-python3 test_preferences.py # external saved preferences, isolation, and safe writes
-python3 test_reporting_package.py # check/report helpers across host layouts
+python3 build.py       # regenerate committed artifacts
+python3 -B -m tests    # run every offline test group
 ```
+
+Tests live under `tests/`. Run one group with `python3 -B -m tests.test_project_map`,
+substituting the module name. End-to-end support tests live under `tests/e2e/` and are collected
+by `tests.test_e2e`.
 
 CI runs the validation suites before any separate build step, so regeneration cannot hide
 missing or stale committed files. It checks Python 3.10–3.14 on Linux and Python 3.14 on macOS,
-then requires a clean checkout. `test_release.py` installs into temporary directories and is
+then requires a clean checkout. `tests/test_release.py` installs into temporary directories and is
 deliberately not called by `install.sh`, which would recursively invoke installation tests.
 
 Workflow and shell checks use actionlint and ShellCheck. The security workflow runs Gitleaks
@@ -86,7 +76,7 @@ route around them with a bare `str.replace`: a replace that matches nothing leav
 as it was, and the drift check then compares stale content against an equally stale rebuild and
 passes.
 
-All validation commands must pass. `test_decision.py` needs no network and no key: every external answer comes
+All validation commands must pass. `tests/test_decision.py` needs no network and no key: every external answer comes
 from a mock provider, so CI stays free and deterministic. The build is a validator as much as a generator — it rejects an unknown category, a
 loadout pointing at a skill that does not exist, a capability no skill provides, an unknown tool id,
 a missing referenced file, a verification skill that does not declare itself, more than five or more
@@ -116,7 +106,7 @@ second registry would be a bug. Write `not_for` precisely: it is the line that d
 near-neighbour routing for the model as well as for a reader.
 
 Then add fixtures to `evals/decision/agents.json` — at least one obvious case and one
-near-neighbour case against whichever role yours is easiest to confuse with. `test_decision.py`
+near-neighbour case against whichever role yours is easiest to confuse with. `tests/test_decision.py`
 fails if a role has no gold label anywhere, and validates every id against the registry.
 
 ## Adding a skill

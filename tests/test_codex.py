@@ -19,7 +19,7 @@ from build_codex import adapt, export_package
 from install_codex import activation_module, install
 from install_claude import stage_pack
 
-ROOT = Path(__file__).resolve().parent
+ROOT = Path(__file__).resolve().parents[1]
 
 
 class CodexPackageTests(unittest.TestCase):

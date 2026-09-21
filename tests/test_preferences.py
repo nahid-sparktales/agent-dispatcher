@@ -13,7 +13,7 @@ from unittest import mock
 import preferences
 
 
-ROOT = Path(__file__).resolve().parent
+ROOT = Path(__file__).resolve().parents[1]
 
 
 class PreferencesTests(unittest.TestCase):

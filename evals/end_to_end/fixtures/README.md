@@ -114,5 +114,5 @@ Avoid shipping secrets, personal configuration, or third-party account access.
 
 Run `python3 -m unittest test_e2e_fixtures -v` for the shipped suite's offline checks.
 These include deliberately weakened parser fixes, fabricated or stale citations, duplicate
-facts/edges, false claims with valid source hashes, and out-of-scope edits. `test_e2e.py`
+facts/edges, false claims with valid source hashes, and out-of-scope edits. `tests/test_e2e.py`
 also discovers this suite, so the full offline CI command includes these checks.

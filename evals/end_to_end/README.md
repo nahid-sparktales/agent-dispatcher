@@ -311,7 +311,7 @@ They do not establish runtime cache behavior, which the project-map tests cover,
 results for UI/browser work, live integrations, hooks or long conversations.
 
 ```sh
-python3 test_e2e.py
+python3 -B -m tests.test_e2e
 ```
 
 Offline tests exercise real subprocess lifecycle with fake CLI programs, fixture

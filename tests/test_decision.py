@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Checks for the Decision Engine. Deterministic, offline, and free.
 
-    python3 test_decision.py
+    python3 -B -m tests.test_decision
 
 Not one assertion here needs a credential or a network call: every external answer comes from
 `decision/providers/mock.py`. That is deliberate — a paid API in CI is a suite that stops being
@@ -14,7 +14,7 @@ import pathlib
 import sys
 import urllib.error
 
-ROOT = pathlib.Path(__file__).parent
+ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 # Config lookups point here, not at ROOT: a `.agent-dispatcher-decision.json` sitting in the
 # pack (a developer's own, or one that arrived with a clone) must not steer the suite.
@@ -34,7 +34,7 @@ from decision.types import (AgentDecisionInput, DecisionError,  # noqa: E402
 
 FAILURES = []
 # Built at runtime: the suite must not commit a string shaped like a credential,
-# and test_build.py's scanner is right to fail the build if one appears.
+# and tests/test_build.py's scanner is right to fail the build if one appears.
 FAKE_KEY = "sk-" + ("testonly" * 3) + "000000"
 
 

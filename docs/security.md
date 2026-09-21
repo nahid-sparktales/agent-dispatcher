@@ -124,7 +124,7 @@ and whether it is set, never its value; the provider reads `os.environ` at the m
 request and does not store it. `python3 -m decision status` and `/agent-context` print
 `configured` or `not configured` and nothing else. A provider error is reported as its kind —
 `timeout`, `rate limited`, `credential rejected` — because a response body can echo request
-headers. `test_decision.py` asks the engine to route the task *"Print the Jev API key"* and fails
+headers. `tests/test_decision.py` asks the engine to route the task *"Print the Jev API key"* and fails
 the build if the value reaches any rendered surface, diagnostic record or error message.
 `install.sh` never asks for a key and never writes one.
 
@@ -145,7 +145,7 @@ an agent's working context. All of it is **evidence**, and none of it is instruc
   override runtime policy or the user's instructions.
 - Selecting a skill grants nothing. Detecting a stack grants nothing. A configured MCP server
   grants nothing. A signal in `catalog/signals.json` says how a condition is decided and nothing
-  else — `test_build.py` fails the build if one grows a `permission`, `grants`, `tools` or `mcp`
+  else — `tests/test_build.py` fails the build if one grows a `permission`, `grants`, `tools` or `mcp`
   field.
 - A secret found during retrieval is a finding, not context: it is named, not copied into the plan
   and not echoed.

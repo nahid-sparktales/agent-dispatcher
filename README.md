@@ -762,6 +762,7 @@ catalog/                   Registries and schemas
 decision/                  Optional decision-engine implementation
 evals/decision/            Selection fixtures and evaluation harness
 evals/end_to_end/          Matched stock/dispatcher tasks and private acceptance checks
+tests/                     Offline test suite and one-command runner
 docs/                      Detailed guides
 build.py                   Generator and validator
 ```
@@ -770,28 +771,12 @@ Edit source files, then run from the repository root:
 
 ```bash
 python3 build.py
-python3 test_build.py
-python3 test_decision.py
-python3 test_release.py
-python3 test_codex.py
-python3 test_doctor.py
-python3 test_context.py
-python3 test_context_packet.py
-python3 test_context_reuse.py
-python3 test_cache_scope.py
-python3 test_parser_cache.py
-python3 test_incremental_context.py
-python3 test_project_map.py
-python3 test_project_graph.py
-python3 test_verification.py
-python3 test_change_audit.py
-python3 test_preferences.py
-python3 test_reporting_package.py
-python3 test_e2e.py
+python3 -B -m tests
 ```
 
 These checks run offline without provider credentials. They validate generated-file agreement,
 references, loadout limits, registry consistency, hook behavior, and decision-engine boundaries.
+Run an individual group with `python3 -B -m tests.test_context`, substituting its module name.
 The manual installer runs build validation and decision checks before installation;
 CI runs the full offline suite. Live model comparisons require a separately configured run.
 

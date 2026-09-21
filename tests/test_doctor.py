@@ -14,7 +14,7 @@ from unittest import mock
 
 import doctor
 
-ROOT = Path(__file__).resolve().parent
+ROOT = Path(__file__).resolve().parents[1]
 
 
 def write(path, data):

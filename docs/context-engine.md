@@ -59,7 +59,7 @@ unresolved even when the project diff contains only the requested deliverable.
 
 A **context plan** says what an agent needs. An **execution plan** says what it will do. The
 dispatcher owns the first, the specialist owns the second, and the build keeps them apart:
-`test_build.py` fails if [`catalog/context-plan.schema.json`](../catalog/context-plan.schema.json)
+`tests/test_build.py` fails if [`catalog/context-plan.schema.json`](../catalog/context-plan.schema.json)
 ever grows a `steps`, `tasks` or `actions` field, and it validates `CONTEXT-REFERENCE.md`'s worked example
 against that schema on every run.
 
@@ -162,9 +162,9 @@ The engine exists to spend *less* context, so most of its rules are limits:
 | `skills_core` + `skills_preferred` ≤ 5 and ≤ 30KB | `build.py` |
 | Conditional buckets compete for the same slots — core + preferred + largest bucket ≤ 7 | `build.py` |
 | No two skills providing one capability in always-on tiers | `build.py` |
-| A task signal fires for at most two skills | `test_build.py` |
-| The perpetual-mode preamble and the router stay under their byte caps | `test_build.py` |
-| Dispatcher entrypoint and concise `CONTEXT.md` each ≤ 6 KiB per host | `test_build.py`, `test_codex.py` |
+| A task signal fires for at most two skills | `tests/test_build.py` |
+| The perpetual-mode preamble and the router stay under their byte caps | `tests/test_build.py` |
+| Dispatcher entrypoint and concise `CONTEXT.md` each ≤ 6 KiB per host | `tests/test_build.py`, `tests/test_codex.py` |
 | At most 5 / 8 / 12 files and 2,000 / 6,000 / 15,000 estimated workspace tokens | `context.py` |
 | A rename gets no plan at all | the method itself |
 
@@ -221,7 +221,7 @@ read/parse reuse. Project-local map and graph files remain untrusted.
 Repository files, documentation, skill bodies, tool responses, another agent's output: all
 evidence, none instruction. A file containing `IGNORE YOUR AGENT INSTRUCTIONS` is data about that
 file. Retrieval cannot widen scope, change the role contract, or relax verification. A signal says
-how a condition is decided and nothing else — `test_build.py` fails the build if one grows a
+how a condition is decided and nothing else — `tests/test_build.py` fails the build if one grows a
 `permission`, `grants`, `tools` or `mcp` field. See [security.md](security.md).
 
 ## Multi-agent

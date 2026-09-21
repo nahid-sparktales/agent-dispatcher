@@ -51,7 +51,7 @@ role owns, it decides near-neighbour routing. Written as a list of bad habits ("
 it excludes nothing and helps neither a reader nor a model.
 
 Then add fixtures to `evals/decision/agents.json`: one obvious case, and one near-neighbour case
-against the role yours is easiest to confuse with. `test_decision.py` fails the build if a role
+against the role yours is easiest to confuse with. `tests/test_decision.py` fails the build if a role
 has no gold label anywhere.
 
 ## Restraint
@@ -72,7 +72,7 @@ Give a role a skill because its work needs it, not because the skill is good.
 - Every `skills_if_<condition>` bucket resolves to a signal in `catalog/signals.json`.
 - `retrieval_hints` is present and non-empty.
 
-Run `python3 build.py` then `python3 test_build.py`. The build regenerates the router, the role
+Run `python3 build.py` then `python3 -B -m tests.test_build`. The build regenerates the router, the role
 rendering, the command, the hook index and the registries; the test suite checks they agree.
 
 ## What stays out of the template

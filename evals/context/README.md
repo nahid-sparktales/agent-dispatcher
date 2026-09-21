@@ -4,7 +4,7 @@
 in the file. Claude files came from its generated package; Codex files came from
 exporting that revision with its own generator in a temporary checkout.
 
-`test_codex.py` checks both hosts against these four reading paths:
+`tests/test_codex.py` checks both hosts against these four reading paths:
 
 | Scenario | Previous references | Current references |
 | --- | --- | --- |
@@ -23,5 +23,5 @@ methods, selected skill guides, workspace evidence, host instructions, hook outp
 and conversation history are not included. They demonstrate smaller instruction
 files, not measured model token usage, task quality, or superiority to either host.
 
-The separate `test_context.py` suite exercises bounded retrieval. Live comparisons
+The separate `tests/test_context.py` suite exercises bounded retrieval. Live comparisons
 with stock Claude Code and Codex remain future work.
