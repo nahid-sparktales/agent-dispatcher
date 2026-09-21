@@ -161,12 +161,14 @@ How the opinion meets the deterministic ranking is configuration (`retrieval.llm
 
 | Key | Values |
 | --- | --- |
-| `placement` | `pre_graph` (the model's order also picks the graph seeds) or `post_graph` (rerank the final order) |
-| `integration` | `rrf` (one more voter, weight `weight`), `weighted` (deterministic order + model order), `replace`, `seeds` (seed selection only) |
+| `placement` | `pre_graph` (default: the model's order also picks the graph seeds) or `post_graph` (rerank the final order) |
+| `integration` | `replace` (default: the model's order leads the candidates, behind files the request names), `weighted` (deterministic order + model order, weight `weight`), `rrf` (one more voter), `seeds` (seed selection only) |
 | `when` | `always` or `ambiguous` (skip when the request names a file, or `min_agreement` retrievers agree on a leader ahead by `min_gap`) |
 | `candidate_limit` | how many fused candidates the model may order (default 20) |
 
-A file the request names outright stays pinned in every mode.
+A file the request names outright stays pinned in every mode. Placement and integration defaults were
+chosen on the benchmark's validation split, where `replace` beat the more conservative modes; the
+deterministic evidence of every file is kept and shown either way.
 
 ## Untrusted content
 
