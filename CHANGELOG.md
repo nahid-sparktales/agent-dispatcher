@@ -7,6 +7,9 @@
   body contains braces (a denial in `dontAsk`, an approval prompt interactively), so requests
   quoting code or JSON lost the helper; both dispatcher trials of a sqlglot smoke run hit it. The
   eval activity parser now attributes multi-line quoted arguments to one helper call.
+- Let the doctor helper take the evidence snapshot inline: `--evidence='{...}'` parses the JSON
+  from the argument, so DOCTOR.md no longer documents a heredoc for either host. A file path and
+  `-` for standard input still work.
 - Scale the project map and structural graph to repositories of about 1,000 source files
   (graph: 1,000 sources, 30,000 nodes, 36,000 edges, 16 MiB; map: 1,000 sources, 6,200 facts,
   4 MiB). Both stop at their byte limit instead of failing to save. The previous 80-source cap
