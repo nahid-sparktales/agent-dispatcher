@@ -67,7 +67,8 @@ DEFAULTS = {
                    "integration": "rrf",  # "rrf": one more voter | "weighted" | "replace" | "seeds": graph seeds only
                    "weight": 2.0, "when": "always",  # "ambiguous": skip the model when deterministic evidence is decisive
                    "min_agreement": 3, "min_gap": 0.15, "shadow": False,
-                   "content": None, "order": None, "evidence": None},  # Prompt experiments; None keeps the user's settings.
+                   # Prompt experiments; None keeps the user's settings.
+                   "content": None, "order": None, "evidence": None, "max_prompt_chars": None},
 }
 
 _LADDER = [
@@ -540,7 +541,8 @@ def _llm_opinion(task, order, evidence, index, config, reranker):
     rows = [{"path": path, "rank": rank, "evidence": sorted(evidence[path], key=lambda e: (e["rank"], e["source"]))}
             for rank, path in enumerate(order[:config["llm_rerank"]["candidate_limit"]], 1)]
     started = time.perf_counter()
-    prompt = {key: config["llm_rerank"][key] for key in ("content", "order", "evidence") if config["llm_rerank"][key] is not None}
+    prompt = {key: config["llm_rerank"][key] for key in ("content", "order", "evidence", "max_prompt_chars")
+              if config["llm_rerank"][key] is not None}
     answer = reranker(task, rows, index, prompt) if rows else {"error": "no candidates"}
     record = {"candidates": [row["path"] for row in rows], **{key: answer[key] for key in ("error", "usage", "invalid") if key in answer}}
     record["ms"] = round((time.perf_counter() - started) * 1000, 1)
