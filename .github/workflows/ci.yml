@@ -54,10 +54,10 @@ jobs:
           persist-credentials: false
       - name: Validate shell scripts
         run: |
-          for script in install.sh HOOK.template.sh hooks/agent-dispatcher-activate.sh; do
+          for script in install.sh sources/shared/HOOK.template.sh hooks/agent-dispatcher-activate.sh; do
             bash -n "$script"
           done
-          shellcheck install.sh HOOK.template.sh hooks/agent-dispatcher-activate.sh
+          shellcheck install.sh sources/shared/HOOK.template.sh hooks/agent-dispatcher-activate.sh
       - name: Validate workflows with actionlint
         env:
           ACTIONLINT_VERSION: '1.7.12'
