@@ -80,7 +80,13 @@ class LLMLayer:
             self.indexing.update({key: report[key] for key in ("generated", "cached", "failed", "calls", "input_tokens", "output_tokens", "ms")})
         attached = self.module.attach(index, self.store, self.settings)
         eligible = [path for path in index.paths if not self.module.eligible(path, index)]
+        describe = lambda model: {key: model.get(key) for key in ("provider", "model", "temperature", "max_output_tokens", "extra_body")}  # noqa: E731
         return {"represented": attached, "eligible": len(eligible),
+                "config": {"representation": dict(describe(self.settings["representation"]), max_source_chars=self.settings["representation"]["max_source_chars"],
+                                                  max_chars=self.settings["representation"]["max_chars"]),
+                           "reranking": describe(self.settings["reranking"]),
+                           "versions": {"schema": self.module.SCHEMA_VERSION, "representation_prompt": self.module.REPRESENTATION_PROMPT,
+                                        "rerank_prompt": self.module.RERANK_PROMPT}},
                 "source_chars": sum(len(index.texts[path]) for path in index.representations),
                 "representation_chars": sum(len(self.module.render(rep)) for rep in index.representations.values())}
 
