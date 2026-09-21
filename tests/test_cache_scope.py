@@ -7,6 +7,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 import context
 import project_graph
@@ -117,6 +118,12 @@ class CacheScopeTests(unittest.TestCase):
             "Inspect validate_token. Only README.md may be modified.",
             "Inspect validate_token. Change no files except README.md.",
             "Inspect validate_token. All files except README.md are off limits.",
+            "Find why validate_token fails. Do not alter any files.",
+            "Investigate validate_token; don't fix anything yet.",
+            "Diagnose validate_token but do not implement a fix.",
+            "Look at validate_token, hands off the repo for now.",
+            "Fix validate_token. Don't add new files.",
+            "Fix validate_token in core.py; nothing else should change.",
         )
         for task in restrictions:
             with self.subTest(task=task):
@@ -124,6 +131,12 @@ class CacheScopeTests(unittest.TestCase):
                 packet = self.select(task, map_maintain=True, auto_exclude=False)
                 self.assert_packet_deferred(packet, "task_scope_restricted")
                 self.assertEqual(self.tree(), before)
+
+    def test_ordinary_edit_requests_are_not_mistaken_for_restrictions(self):
+        for task in ("Fix validate_token and add a regression test.", "Implement token expiry and update the docs.",
+                     "Refactor core.py and apply the new lint rules.", "Fix the failing test and implement caching."):
+            with self.subTest(task=task):
+                self.assertEqual(context._cache_write_scope(task, MAP)["reason"], "automatic_maintenance")
 
     def test_ordinary_task_still_builds_then_reuses_and_refreshes_both_caches(self):
         built = self.select(map_maintain=True)
@@ -144,6 +157,64 @@ class CacheScopeTests(unittest.TestCase):
         for key in ("project_map", "project_graph"):
             self.assertEqual(refreshed[key]["maintenance"]["action"], "refreshed")
             self.assertTrue(refreshed[key]["maintenance"]["persisted"])
+
+    def test_read_only_roles_defer_automatic_writes_and_editing_roles_build(self):
+        roles = json.loads((ROOT / "catalog/loadouts.json").read_text())["roles"]
+        read_only = sorted(role["id"] for role in roles if role["read_only"])
+        self.assertEqual(read_only, ["architect", "explorer", "planner", "product-manager",
+                                     "researcher", "reviewer", "security-auditor"])
+        before = self.tree()
+        for role in read_only:
+            with self.subTest(role=role):
+                packet = self.select(role=role, map_maintain=True, compact=True, packet_tokens=10000)
+                self.assert_packet_deferred(packet, "read_only_role")
+                self.assertEqual(self.tree(), before)
+        # A task restriction is reported ahead of the role, and an editing role still maintains.
+        packet = self.select(TASK + " Do not edit files.", role="reviewer", map_maintain=True)
+        self.assert_packet_deferred(packet, "task_scope_restricted")
+        built = self.select(role="implementer", map_maintain=True)
+        self.assertEqual(built["project_graph"]["maintenance"]["action"], "built")
+        self.assertTrue((self.project / MAP).exists() and (self.project / GRAPH).exists())
+
+    def test_indexes_cover_repositories_beyond_the_old_eighty_source_cap(self):
+        for number in range(150):
+            following = f"from module_{number + 1:03d} import step_{number + 1:03d}\n" if number < 149 else ""
+            call = f"    return step_{number + 1:03d}()\n" if number < 149 else "    return 0\n"
+            self.write(f"services/module_{number:03d}.py", following + f"def step_{number:03d}():\n" + call)
+        packet = self.select("Trace step_000 through its dependencies.", role="debugger", map_maintain=True)
+        self.assertEqual(packet["project_graph"]["maintenance"]["action"], "built")
+        graph = json.loads((self.project / GRAPH).read_text())
+        self.assertEqual(len(graph["sources"]), 154)  # 150 generated + 4 from setUp
+        self.assertEqual(graph["omitted"]["sources"], 0)
+        self.assertEqual(graph["omitted"]["nodes"], 0)
+        self.assertGreater(len(json.loads((self.project / MAP).read_text())["sources"]), 80)
+
+    def test_oversized_text_file_is_skipped_without_blocking_persistence(self):
+        self.write("pydoc_data/topics.py", "TOPICS = " + repr("x" * (300 * 1024)) + "\n")
+        packet = self.select(role="debugger", map_maintain=True)
+        for key in ("project_map", "project_graph"):
+            self.assertIs(packet[key]["coverage"]["scan_complete"], True)
+            self.assertEqual(packet[key]["maintenance"]["action"], "built")
+        self.assertIn({"path": "pydoc_data/topics.py", "reason": "file exceeds 256 KiB limit"}, packet["excluded"])
+        graph = json.loads((self.project / GRAPH).read_text())
+        self.assertNotIn("pydoc_data/topics.py", {source["path"] for source in graph["sources"]})
+        self.assertIs(project_map.build_map(self.project, pack=ROOT, refresh=True)["status"], "fresh")
+
+    def test_graph_stops_at_its_byte_limit_instead_of_failing_to_save(self):
+        import parser_cache
+        # The persisted graph must also fit one parser-cache item, or warm runs re-derive it.
+        self.assertLessEqual(project_graph.MAX_BYTES, parser_cache.MAX_ITEM_BYTES)
+        for number in range(40):
+            self.write(f"services/module_{number:02d}.py",
+                       "".join(f"def handler_{number:02d}_{index}():\n    return {index}\n" for index in range(20)))
+        limit = 48 * 1024
+        # Call the helper directly: context.py loads its own fresh copy, which a patch cannot reach.
+        with mock.patch.object(project_graph, "MAX_BYTES", limit):
+            graph = project_graph.query_graph(self.project, "Trace handler_00_0.", role="debugger",
+                                              pack=ROOT, snapshot=self.snapshot(), maintain=True)
+            self.assertEqual(graph["maintenance"]["action"], "built")
+            self.assertGreater(graph["omitted"]["nodes"], 0)
+            self.assertLessEqual((self.project / GRAPH).stat().st_size, limit)
 
     def test_preview_takes_precedence_over_maintenance_without_losing_evidence(self):
         before = self.tree()

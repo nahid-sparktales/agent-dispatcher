@@ -420,12 +420,13 @@ class ContextTests(unittest.TestCase):
 
     def test_graph_relationships_admit_nonlexical_dependencies_and_callers_into_context(self):
         self.graph_fixture()
-        ordinary = self.select("Inspect validateLogin", role="reviewer", compact=True)
+        # debugger: test-oriented ranking like reviewer, but not a read-only role, so maintenance may write.
+        ordinary = self.select("Inspect validateLogin", role="debugger", compact=True)
         self.assertNotIn("storage.py", self.paths(ordinary))
         self.assertNotIn("web.py", self.paths(ordinary))
         for mode in ("map_preview", "map_maintain"):
             with self.subTest(mode=mode):
-                packet = self.select("Inspect validateLogin", role="reviewer", compact=True,
+                packet = self.select("Inspect validateLogin", role="debugger", compact=True,
                                      packet_tokens=10000, **{mode: True})
                 for related in ("storage.py", "web.py"):
                     self.assertIn(related, self.paths(packet))

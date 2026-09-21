@@ -37,14 +37,19 @@ New, changed, removed, and newly ignored sources are reflected in the next compl
 Identical map content causes no write. No task text or exclusion policy is saved.
 
 Maintenance reports its action (`built`, `refreshed`, `unchanged`, `deferred`, or
-`unavailable`) and whether this call persisted a map. A partial or task-filtered scan
+`unavailable`) and whether this call persisted a map. Binary and oversized (over 256 KiB) text
+files are skipped by rule and listed as excluded; they never enter an index and do not make a scan
+partial. A partial or task-filtered scan
 returns evidence only from allowed sources and defers persistence, preserving the existing
 global cache. It never labels that subset as verified whole-project freshness. Unsafe,
 foreign, or malformed state is left untouched; write failures report that saving failed.
 Use current permitted evidence and targeted investigation when maintenance cannot finish.
 
-Use --map-preview for read-only work, protected caches, and limited file-edit scopes. It derives
-fresh evidence when the cache is absent or stale without saving anything. With neither flag, context selection
+Maintenance already defers for recognized task restrictions and for roles whose tool posture is
+read-only (planner, reviewer, explorer, researcher, architect, security-auditor, product-manager).
+Add --map-preview for edit limits the helper may miss, such as unusual wording, plan mode or an
+earlier turn. It
+derives fresh evidence when the cache is absent or stale without saving anything. With neither flag, context selection
 only reads and verifies an existing cache; a missing map leaves ordinary context selection
 available. The standalone `show` command always stays read-only, and explicit `build` and
 `refresh` remain available for authorized cache operations, never to bypass task restrictions.
@@ -89,7 +94,7 @@ and worktree isolation; the map does not launch or supervise workers.
 
 Unrestricted --map-maintain calls automatically populate a private authenticated host cache
 at `~/.cache/agent-dispatcher/parser-v1`. It stores redacted source text, source fingerprints,
-Python syntax trees, extracted map facts, and derived graphs. Later preview or maintenance calls can reuse
+extracted map facts, and derived graphs; syntax trees are parsed fresh. Later preview or maintenance calls can reuse
 permitted unchanged entries. Ignore rules, task exclusions, and source safety checks still
 apply before a lookup. Cache entries bind the project, file metadata, and extraction policy;
 parser or policy changes invalidate reuse. Project-local map or graph edits cannot supply
@@ -102,7 +107,7 @@ again whenever the scoped source inputs change, so a changed import or target ca
 an old call edge in place. Cold and warm calls have the same file and logical byte limits.
 
 The `parser_cache` output reports `source_hits`, `source_misses`, `source_bytes_read`,
-`logical_source_bytes`, `parsed_files`, `reused_parses`, `graph_hits`, and `graph_misses`. `writes` records
+`logical_source_bytes`, `parsed_files`, `graph_hits`, and `graph_misses`. `writes` records
 any host-cache mutation; `records_saved` and `write_failures` distinguish persistence outcomes.
 Host-cache writes make `read_only` false; `project_read_only` reports
 project writes separately. A metadata match is an incremental filesystem
@@ -124,7 +129,7 @@ relationships are candidates, not coverage. Task-seeded ranking and role prefere
 promote related source excerpts. Upstream/downstream impact and possible call paths require
 retained resolved edges; they do not prove runtime behavior.
 
-Limits: 80 sources, 240 nodes, 400 edges stored; about 1,500 estimated tokens, 12 nodes,
+Limits: 1,000 sources, 30,000 nodes, 36,000 edges and 16 MiB stored; about 1,500 estimated tokens, 12 nodes,
 16 edges, and eight source hints per task view. Report omissions and parse failures.
 Trimming removes unsupported paths and impact claims. No embeddings, architecture rules,
 extra source scan, provider calls, or worker supervision are added.

@@ -7,7 +7,6 @@ must disable this optimization. Cache failures always fall back to fresh work.
 from __future__ import annotations
 
 import ast
-import base64
 from contextlib import contextmanager
 import copy
 import hashlib
@@ -23,9 +22,8 @@ import warnings
 SCHEMA = 1
 MAX_FILE_BYTES = 256 * 1024
 MAX_BYTES = 64 * 1024 * 1024
-MAX_ITEM_BYTES = 8 * 1024 * 1024
+MAX_ITEM_BYTES = 16 * 1024 * 1024
 MAX_ENTRIES = 12000
-MAX_AST_NODES = 50000
 FAILURES = (OSError, ValueError, TypeError, KeyError, OverflowError, RecursionError, MemoryError)
 
 
@@ -99,74 +97,6 @@ def _policy(extra=None):
     return _digest({"schema": SCHEMA, "python": list(sys.version_info[:3]), "files": files, "extra": extra})
 
 
-def _ast_encode(value, budget=None, depth=0):
-    budget = [MAX_AST_NODES] if budget is None else budget
-    budget[0] -= 1
-    if budget[0] < 0 or depth > 200:
-        raise ValueError()
-    if isinstance(value, ast.AST):
-        return {"node": type(value).__name__,
-                "fields": {name: _ast_encode(getattr(value, name), budget, depth + 1)
-                           for name in value._fields if hasattr(value, name)},
-                "attributes": {name: _ast_encode(getattr(value, name), budget, depth + 1)
-                               for name in value._attributes if hasattr(value, name)}}
-    if isinstance(value, list):
-        return [_ast_encode(item, budget, depth + 1) for item in value]
-    if type(value) is bytes:
-        return {"constant": "bytes", "value": base64.b64encode(value).decode("ascii")}
-    if type(value) is complex:
-        return {"constant": "complex", "value": [repr(value.real), repr(value.imag)]}
-    if type(value) is float:
-        return {"constant": "float", "value": repr(value)}
-    if value is Ellipsis:
-        return {"constant": "ellipsis"}
-    if value is None or type(value) in (str, int, bool):
-        return value
-    raise ValueError()
-
-
-def _ast_decode(value, budget=None, depth=0):
-    budget = [MAX_AST_NODES] if budget is None else budget
-    budget[0] -= 1
-    if budget[0] < 0 or depth > 200:
-        raise ValueError()
-    if isinstance(value, list):
-        return [_ast_decode(item, budget, depth + 1) for item in value]
-    if value is None or type(value) in (str, int, bool):
-        return value
-    if not isinstance(value, dict):
-        raise ValueError()
-    if "constant" in value:
-        tag = value["constant"]
-        if tag == "ellipsis" and set(value) == {"constant"}:
-            return Ellipsis
-        if set(value) != {"constant", "value"}:
-            raise ValueError()
-        if tag == "bytes" and isinstance(value["value"], str):
-            return base64.b64decode(value["value"], validate=True)
-        if tag == "float" and isinstance(value["value"], str):
-            return float(value["value"])
-        if (tag == "complex" and isinstance(value["value"], list) and len(value["value"]) == 2
-                and all(isinstance(item, str) for item in value["value"])):
-            return complex(*map(float, value["value"]))
-        raise ValueError()
-    if set(value) != {"node", "fields", "attributes"} or not isinstance(value["node"], str):
-        raise ValueError()
-    kind = getattr(ast, value["node"], None)
-    if not isinstance(kind, type) or not issubclass(kind, ast.AST) or kind is ast.AST:
-        raise ValueError()
-    fields, attributes = value["fields"], value["attributes"]
-    if (not isinstance(fields, dict) or not isinstance(attributes, dict)
-            or set(fields) != set(kind._fields) or not set(attributes) <= set(kind._attributes)):
-        raise ValueError()
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        result = kind(**{name: _ast_decode(item, budget, depth + 1) for name, item in fields.items()})
-    for name, item in attributes.items():
-        setattr(result, name, _ast_decode(item, budget, depth + 1))
-    return result
-
-
 class Cache:
     """One bounded project cache; writes occur only at explicitly writable finish()."""
 
@@ -177,7 +107,7 @@ class Cache:
         self.directory = Path(directory).expanduser().absolute() if directory is not None else (
             Path.home().resolve() / ".cache" / "agent-dispatcher" / "parser-v1")
         self.stats = {name: 0 for name in ("source_hits", "source_misses", "source_bytes_read",
-                                          "parsed_files", "reused_parses", "writes", "records_saved", "write_failures")}
+                                          "parsed_files", "writes", "records_saved", "write_failures")}
         self.entries, self.touched, self.sizes = {}, set(), {}
         self.dirty = False
         self.key = None
@@ -300,18 +230,6 @@ class Cache:
         except FAILURES:
             return None
 
-    def touch(self, kind, key):
-        if not self.usable:
-            return False
-        try:
-            identity = _digest([kind, key])
-            if identity in self.entries:
-                self.touched.add(identity)
-                return True
-        except FAILURES:
-            pass
-        return False
-
     def put(self, kind, key, value):
         if not self.usable:
             return
@@ -375,26 +293,12 @@ class Cache:
             return None, consumed, "unreadable or unsafe source withheld", None
 
     def parse(self, path, text):
-        key = [path, hashlib.sha256(text.encode("utf-8")).hexdigest()]
-        cached = self.get("ast", key)
-        if cached is not None:
-            try:
-                tree = _ast_decode(cached)
-                if not isinstance(tree, ast.Module):
-                    raise ValueError()
-                self.stats["reused_parses"] += 1
-                return tree
-            except FAILURES:
-                pass
+        """Always parse: trees are not cached. On a 585-file corpus ast.parse took 1.3 s while
+        loading and decoding cached trees took 7.5 s. Warm reuse comes from the cached graph."""
         self.stats["parsed_files"] += 1
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            tree = ast.parse(text)
-        try:
-            self.put("ast", key, _ast_encode(tree))
-        except FAILURES:
-            pass
-        return tree
+            return ast.parse(text)
 
     def _write_private(self, parent, name, raw):
         temporary = ".parser-" + secrets.token_hex(16)

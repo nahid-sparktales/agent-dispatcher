@@ -28,6 +28,9 @@ MAX_FILE_BYTES = 256 * 1024
 MAX_SCAN_BYTES = 32 * 1024 * 1024
 MAX_LIST_BYTES = 4 * 1024 * 1024
 MAX_TASK_CHARS = 16000
+# Files skipped by a fixed rule, not a failed read. They stay out of every index, like before,
+# but no longer make a scan partial: one large generated file blocked all index persistence.
+RULE_SKIPS = {"binary file withheld", "file exceeds 256 KiB limit"}
 MAX_EXCLUDED = 100
 MAX_EXCLUDE_PATHS = 64
 MAX_AUTO_CLAUSES = 128
@@ -63,7 +66,7 @@ class ContextArgumentParser(argparse.ArgumentParser):
         self.exit(2, "context.py: invalid arguments; use --help for supported options. Input values withheld.\n")
 
 
-def _cache_write_scope(task, target, *, preview=False, writable_paths=None, snapshot=None):
+def _cache_write_scope(task, target, *, preview=False, writable_paths=None, snapshot=None, read_only_role=False):
     """Only narrow optional cache writes; task text can veto, never grant permission.
 
     Literal caller paths are the exact boundary. The conservative language guard
@@ -93,7 +96,7 @@ def _cache_write_scope(task, target, *, preview=False, writable_paths=None, snap
         decision.update(allowed=False, reason="read_only_preview")
     else:
         request = re.sub(r"\s+", " ", task or "").casefold().replace("\u2019", "'")
-        write = r"(?:modif(?:y|ying|ied|ications?)|edit(?:s|ed|ing)?|chang(?:e(?:s|d)?|ing)|writ(?:e|es|ing|ten)|updat(?:e(?:s|d)?|ing)|touch(?:ed|ing)?|replac(?:e(?:d)?|ing)|patch(?:ed|ing)?|creat(?:e(?:d)?|ing)|generat(?:e(?:d)?|ing)|save(?:d)?|persist(?:ed)?)"
+        write = r"(?:modif(?:y|ying|ied|ications?)|edit(?:s|ed|ing)?|alter(?:s|ed|ing)?|fix(?:es|ed|ing)?|implement(?:s|ed|ing)?|appl(?:y|ies|ied|ying)|chang(?:e(?:s|d)?|ing)|writ(?:e|es|ing|ten)|updat(?:e(?:s|d)?|ing)|touch(?:ed|ing)?|replac(?:e(?:d)?|ing)|patch(?:ed|ing)?|creat(?:e(?:d)?|ing)|generat(?:e(?:d)?|ing)|save(?:d)?|persist(?:ed)?)"
         restrictions = (
             r"\bread[ -]?only\b",
             rf"\b(?:do not|don't|never|must not|cannot|can't|no|without|avoid)\s+(?:\w+\s+){{0,4}}{write}\b",
@@ -109,9 +112,14 @@ def _cache_write_scope(task, target, *, preview=False, writable_paths=None, snap
             r"\b(?:preserve|keep|leave)\s+(?:(?:all|every|any|the|other|existing|remaining|unrelated)\s+){0,5}(?:files?|sources?|code|caches?|snapshots?|metadata|state)\b",
             r"\b(?:files?|caches?|snapshots?|metadata)\b.{0,80}?\b(?:must|should)\s+(?:remain|stay|be left)\s+(?:unchanged|untouched|unmodified|intact)\b",
             r"\b(?:files?|caches?|snapshots?|metadata)\b.{0,100}?\boff[ -]limits\b",
+            r"\bhands[ -]off\b",
+            r"\bnothing else\s+(?:should|may|can|must|will)\s+(?:be\s+)?(?:chang|modif|edit|touch|alter)",
+            r"\b(?:do not|don't|never|must not|no)\s+(?:add|creat)\w*\s+(?:any\s+|new\s+)*files?\b",
         )
         if any(re.search(pattern, request) for pattern in restrictions):
             decision.update(allowed=False, reason="task_scope_restricted")
+        elif read_only_role:
+            decision.update(allowed=False, reason="read_only_role")
         elif writable_paths is not None:
             allowed = any(target == path or (path.endswith("/") and target.startswith(path))
                           for path in writable_paths)
@@ -123,7 +131,7 @@ def _cache_write_scope(task, target, *, preview=False, writable_paths=None, snap
                 or inherited.get("target") != target):
             decision.update(allowed=False, reason="invalid_snapshot_scope")
         elif not inherited["allowed"] and decision["allowed"]:
-            reasons = {"read_only_preview", "task_scope_restricted", "outside_writable_paths", "invalid_snapshot_scope"}
+            reasons = {"read_only_preview", "task_scope_restricted", "read_only_role", "outside_writable_paths", "invalid_snapshot_scope"}
             reason = inherited.get("reason")
             decision.update(allowed=False, reason=reason if reason in reasons else "invalid_snapshot_scope")
     return decision
@@ -158,8 +166,9 @@ def _scrubber(pack):
 
 
 def _role(pack, role):
+    """Return the role id, its retrieval hints, and whether its tool posture is read-only."""
     if role is None:
-        return None, []
+        return None, [], False
     if not isinstance(role, str) or not re.fullmatch(r"[a-z][a-z0-9-]{0,79}", role):
         raise ContextError("Role must be a registered role id or alias.")
     for path in (pack / "catalog/loadouts.json", pack / "scripts/runtime/catalog/loadouts.json"):
@@ -176,7 +185,10 @@ def _role(pack, role):
                 hints = match.get("retrieval_hints", [])
                 if not isinstance(hints, list) or any(not isinstance(h, str) for h in hints):
                     raise ValueError()
-                return match["id"], hints[:30]
+                read_only = match.get("read_only", False)
+                if type(read_only) is not bool:
+                    raise ValueError()
+                return match["id"], hints[:30], read_only
             except (OSError, ValueError, TypeError, KeyError, RecursionError) as exc:
                 if isinstance(exc, ContextError):
                     raise
@@ -841,17 +853,18 @@ def _select_context(project, task, role=None, size="standard", max_tokens=None, 
         raise ContextError("Packet budget must be an integer between 256 and 100000.")
     if not compact and (packet_tokens is not None or guide_ids or reuse_state is not None or reuse_scope is not None):
         raise ContextError("Packet budgets, supplied guides and evidence reuse require --compact.")
-    # Decide on the original request before redaction and before any source scan.
-    # Only these decisions, never task text or caller path lists, enter the snapshot.
-    cache_scope = {target: _cache_write_scope(task, target, preview=map_preview, writable_paths=writable_paths)
-                   for target in (".agent-dispatcher/project-map.json", ".agent-dispatcher/project-graph.json")}
     root = Path(project).expanduser().resolve()
     if not root.is_dir():
         raise ContextError("Project must be an existing readable directory.")
     manual_exclusions = _exclusions(root, exclude_paths)
     base = find_pack(pack)
     scrub = _scrubber(base)
-    role_id, hint_phrases = _role(base, role)
+    role_id, hint_phrases, read_only_role = _role(base, role)
+    # Decide on the original request before redaction and before any source scan.
+    # Only these decisions, never task text or caller path lists, enter the snapshot.
+    cache_scope = {target: _cache_write_scope(task, target, preview=map_preview, writable_paths=writable_paths,
+                                              read_only_role=read_only_role)
+                   for target in (".agent-dispatcher/project-map.json", ".agent-dispatcher/project-graph.json")}
     task = scrub(task)
     terms, identifiers, phrases, _ = _terms(task)
     hints = {w.lower() for h in hint_phrases for w in WORD.findall(h) if w.lower() not in STOP}
@@ -901,7 +914,7 @@ def _select_context(project, task, role=None, size="standard", max_tokens=None, 
         scanned += used
         if reason:
             excluded.append({"path": scrub(path), "reason": reason})
-            if reason != "binary file withheld":
+            if reason not in RULE_SKIPS:
                 scan_complete = False
             if reason == "scan byte budget exhausted":
                 diagnostics.append("Text scanning reached the 32 MiB limit; results are partial.")

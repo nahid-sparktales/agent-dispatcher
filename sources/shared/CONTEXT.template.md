@@ -18,8 +18,9 @@ Skip preparation without workspace evidence; rebuild for changed focus/sources.
 
 PACK is the dispatcher directory, PROJECT the workspace. Quote absolute paths; send the full
 unchanged request on quoted stdin, never as shell code. Preserve scope/exclusions.
-Use small for narrow work, complex for broad work. Use --map-preview for read-only, protected
-cache or limited-edit tasks; preview wins over maintenance. Omit both without source investigation.
+Small for narrow work, complex for broad. Maintenance defers for task limits and read-only
+roles; add --map-preview (wins) for limits it may miss: odd wording, plan mode. Omit both
+without source investigation.
 Repeat --writable-path for literal allowed relative files (directories end in /); never expand
 the user's edit scope to permit caches. This constrains cache writes, not reads or other tools.
 

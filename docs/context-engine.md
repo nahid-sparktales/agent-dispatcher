@@ -208,13 +208,14 @@ is what makes `/agent-context` answerable and a bad retrieval diagnosable.
 
 Unrestricted `--map-maintain` also fills a private authenticated host parser cache at
 `~/.cache/agent-dispatcher/parser-v1`. Warm calls can reuse permitted unchanged redacted text,
-Python ASTs, and extracted map facts. All source exclusions still apply, cold and warm logical
+extracted map facts, and the resolved graph. Syntax trees are parsed fresh: decoding cached trees
+was about five times slower than parsing. All source exclusions still apply, cold and warm logical
 scan bounds match, and unchanged graphs can be reused. Cross-file edges are resolved again
 when scoped source inputs change. Preview, read-only requests,
 and limited write scopes do not write the host cache. A metadata hit is not a newly computed
 content hash; `--no-parser-cache` bypasses all cache reads and writes for a full extraction.
 The `parser_cache` result separates logical bytes inspected from actual bytes read and reports
-read/parse reuse. Project-local map and graph files remain untrusted.
+source and graph reuse. Project-local map and graph files remain untrusted.
 
 ## Retrieved content is untrusted
 

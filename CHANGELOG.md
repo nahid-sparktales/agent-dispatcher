@@ -2,11 +2,27 @@
 
 ## Unreleased
 
-- Reuse unchanged redacted sources, Python ASTs, and map facts through a private authenticated
+- Scale the project map and structural graph to repositories of about 1,000 source files
+  (graph: 1,000 sources, 30,000 nodes, 36,000 edges, 16 MiB; map: 1,000 sources, 6,200 facts,
+  4 MiB). Both stop at their byte limit instead of failing to save. The previous 80-source cap
+  kept 240 of about 17,000 nodes on a 604-file repository. `project_map.py show`, `build` and
+  `refresh` print at most 50 facts without `--task`, with diagnostics first.
+- Stop caching per-file syntax trees. Decoding them took 7.5 s where parsing took 1.3 s on a
+  585-file corpus, and they crowded the resolved graph out of the 64 MiB host cache. Warm
+  preparation on that corpus: 19.1 s with tree caching, 3.3 s without.
+- Skip text files over 256 KiB the way binary files are skipped: listed as excluded, never
+  indexed, and no longer marking the scan partial. One large generated file used to block map,
+  graph and parser-cache persistence for the whole repository.
+- Let the context helper decide cache writes: maintenance also defers for roles whose tool
+  posture is read-only (`read_only` in the role catalog), and the no-edit guard recognizes more
+  wording (alter, fix, implement, apply, hands off, nothing else should change, no new files).
+  Agents add `--map-preview` only for edit limits the helper may miss.
+
+- Reuse unchanged redacted sources and map facts through a private authenticated
   host cache populated by unrestricted map maintenance. Preserve exclusions, scan limits,
   read-only and write-scope restrictions; reuse unchanged graphs and resolve cross-file edges
   when scoped source inputs change. Report actual
-  read/parse reuse and provide `--no-parser-cache` for a full source reread and extraction.
+  source and graph reuse and provide `--no-parser-cache` for a full source reread and extraction.
 - Add an explicitly built local project map with source fingerprints, stale-fact exclusion,
   read-only context enrichment, and matching Claude/Codex commands.
 - Expand stock-versus-dispatcher evaluation fixtures for multi-file retrieval, stale project

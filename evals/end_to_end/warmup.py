@@ -31,8 +31,8 @@ def warm_project_indexes(config, client, workspace):
         for mode in ("maintain", "preview"):
             execution = rt.execute(
                 [sys.executable, "-B", str(helper), "--project", str(workspace),
-                 "--task", "Prepare project index", "--role", "architect",
-                 "--map-" + mode, "--json"],
+                 # No role: index setup is not role work, and read-only roles defer cache writes.
+                 "--task", "Prepare project index", "--map-" + mode, "--json"],
                 cwd=workspace, env=env, prompt="", timeout=120, output_limit=256_000)
             elapsed = execution["elapsed_seconds"]
             report["elapsed_seconds"] += elapsed
@@ -65,10 +65,10 @@ def warm_project_indexes(config, client, workspace):
             # text, source contents, or arbitrary nested values.
             stage["parser_cache"] = {key: stats[key] for key in (
                 "enabled", "write_allowed", "source_hits", "source_misses", "source_bytes_read",
-                "parsed_files", "reused_parses", "writes", "fact_hits", "fact_misses",
+                "parsed_files", "writes", "fact_hits", "fact_misses",
                 "graph_hits", "graph_misses", "logical_source_bytes", "records_saved", "write_failures")
                 if key in stats}
-            counters = ("source_hits", "source_misses", "source_bytes_read", "parsed_files", "reused_parses", "writes")
+            counters = ("source_hits", "source_misses", "source_bytes_read", "parsed_files", "writes")
             if any(type(stats.get(key)) is not int or stats[key] < 0 for key in counters):
                 raise ValueError("Index setup returned invalid parser-cache counters.")
             if stats.get("write_allowed") is not (mode == "maintain"):

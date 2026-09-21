@@ -255,15 +255,40 @@ class ProjectMapTests(unittest.TestCase):
     def test_map_fact_count_and_serialized_size_remain_compact(self):
         for index in range(150):
             self.write(f"feature{index}.py", f"import package{index}\ndef operation{index}(): pass\n")
-        self.build()
-        persisted = json.loads(self.state.read_text())
-        self.assertLessEqual(len(persisted["entries"]), project_map.MAX_FACTS)
-        self.assertLessEqual(len(persisted["sources"]), project_map.MAX_SOURCES)
-        self.assertLessEqual(self.state.stat().st_size, project_map.MAX_MAP_BYTES)
-        self.assertGreater(persisted["scan"]["omitted_facts"], 0)
-        shown = self.show()
+        # Small limits so 150 files overflow them; the real ceilings cover ~1,000-file repos.
+        quotas = {"feature": 40, "dependency": 40, "test_command": 25, "decision": 15}
+        with mock.patch.multiple(project_map, QUOTAS=quotas, MAX_FACTS=120, MAX_SOURCES=80):
+            self.build()
+            persisted = json.loads(self.state.read_text())
+            self.assertLessEqual(len(persisted["entries"]), project_map.MAX_FACTS)
+            self.assertLessEqual(len(persisted["sources"]), project_map.MAX_SOURCES)
+            self.assertLessEqual(self.state.stat().st_size, project_map.MAX_MAP_BYTES)
+            self.assertGreater(persisted["scan"]["omitted_facts"], 0)
+            shown = self.show()
         self.assertEqual(shown["counts"]["omitted"], persisted["scan"]["omitted_facts"])
         self.assertTrue(any("compact map limits" in d for d in shown["diagnostics"]))
+
+    def test_map_stops_at_its_byte_limit_instead_of_failing_to_save(self):
+        for index in range(150):
+            self.write(f"feature{index}.py", f"import package{index}\ndef operation{index}(): pass\n")
+        with mock.patch.object(project_map, "MAX_MAP_BYTES", 96 * 1024):
+            result = self.build()
+            self.assertEqual(result["action"], "built")
+            self.assertLessEqual(self.state.stat().st_size, project_map.MAX_MAP_BYTES)
+            self.assertGreater(json.loads(self.state.read_text())["scan"]["omitted_facts"], 0)
+
+    def test_cli_lists_at_most_fifty_facts_after_its_diagnostics(self):
+        for index in range(40):
+            self.write(f"feature{index}.py", f"import package{index}\ndef operation{index}(): pass\n")
+        self.build()
+        command = [sys.executable, "-B", str(ROOT / "project_map.py"), "show", "--project", str(self.project)]
+        shown = json.loads(subprocess.run(command + ["--json"], capture_output=True, text=True, check=True).stdout)
+        self.assertEqual(len(shown["entries"]), project_map.SHOW_LIMIT)
+        self.assertEqual(shown["counts"]["shown"], project_map.SHOW_LIMIT)
+        self.assertGreater(shown["counts"]["fresh"], project_map.SHOW_LIMIT)
+        text = subprocess.run(command, capture_output=True, text=True, check=True).stdout.splitlines()
+        first_fact = next(number for number, line in enumerate(text) if line.startswith("- "))
+        self.assertTrue(any(line.startswith("Diagnostic: Showing 50") for line in text[:first_fact]))
 
     def test_state_cannot_reenter_as_source_or_lexical_context(self):
         self.write("auth.py", "def validate_login(): pass\n")

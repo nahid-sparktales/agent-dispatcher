@@ -18,10 +18,14 @@ import warnings
 OWNER = "agent-dispatcher-project-graph"
 SCHEMA_VERSION = 1
 STATE_FILE = "project-graph.json"
-MAX_BYTES = 256 * 1024
-MAX_SOURCES = 80
-MAX_NODES = 240
-MAX_EDGES = 400
+# Ceilings sized for repos of about 1,000 source files; smaller repos never reach them.
+# A 604-file Python corpus needs ~17k nodes and ~21k edges (~9 MB indented on disk).
+# Extraction also stops at MAX_BYTES, so long paths truncate the graph instead of failing to save.
+# ponytail: fixed ceilings, filled in path order; derive them from the scan size if monorepos matter.
+MAX_BYTES = 16 * 1024 * 1024
+MAX_SOURCES = 1000
+MAX_NODES = 30000
+MAX_EDGES = 36000
 MAX_VIEW_CHARS = 5900  # Reserve space for the final token-estimate field.
 NODE_KINDS = {"file", "function", "class"}
 EDGE_METHODS = {"contains": {"file-membership", "python-ast-definition"},
@@ -126,15 +130,25 @@ def derive_graph(snapshot, helper, scrub):
     nodes, edges, node_ids, edge_keys = [], [], set(), set()
     omitted = {"sources": max(0, len(snapshot["texts"]) - len(paths)), "nodes": 0, "edges": 0,
                "unresolved_calls": 0, "parse_failures": 0}
+    # Bytes this graph will take in `_write`'s indented output; 64 KiB covers scan/omitted metadata.
+    size = [64 * 1024 + sum(helper._indented_size(source) for source in sources)]
+
+    def fits(item):
+        cost = helper._indented_size(item)
+        if size[0] + cost > MAX_BYTES:
+            return False
+        size[0] += cost
+        return True
 
     def node(kind, label, path, line=1, qualifier=""):
         identity = _id(kind, path, qualifier, line)
         if identity in node_ids:
             return identity
-        if len(nodes) >= MAX_NODES:
+        item = {"id": identity, "kind": kind, "label": label[:120], "source": _source(path, line)}
+        if len(nodes) >= MAX_NODES or not fits(item):
             omitted["nodes"] += 1
             return None
-        nodes.append({"id": identity, "kind": kind, "label": label[:120], "source": _source(path, line)})
+        nodes.append(item)
         node_ids.add(identity)
         return identity
 
@@ -144,11 +158,12 @@ def derive_graph(snapshot, helper, scrub):
         key = (start, end, kind, path, line)
         if key in edge_keys:
             return
-        if len(edges) >= MAX_EDGES:
+        item = {"from": start, "to": end, "kind": kind, "confidence": confidence,
+                "method": method, "evidence": _source(path, line)}
+        if len(edges) >= MAX_EDGES or not fits(item):
             omitted["edges"] += 1
             return
-        edges.append({"from": start, "to": end, "kind": kind, "confidence": confidence,
-                      "method": method, "evidence": _source(path, line)})
+        edges.append(item)
         edge_keys.add(key)
 
     files = {p: node("file", PurePosixPath(p).name, p) for p in paths}
@@ -504,11 +519,6 @@ def _current_graph(snapshot, helper, scrub):
         try:
             data = _valid_graph(cached)
             cache.stats["graph_hits"] = cache.stats.get("graph_hits", 0) + 1
-            # Retain per-file parses for a later changed-file update, without
-            # deserializing ASTs just to use an unchanged resolved graph.
-            for path, text in snapshot["texts"].items():
-                if path.endswith(".py"):
-                    cache.touch("ast", [path, hashlib.sha256(text.encode("utf-8")).hexdigest()])
             return data
         except (ValueError, TypeError, KeyError):
             pass
