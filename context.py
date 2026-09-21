@@ -897,6 +897,7 @@ def _llm_layer(engine, settings, root, index, excluded, diagnostics):
         diagnostics.append(problem)
     if attached and "role_summary" not in settings["retrievers"]:
         settings["retrievers"] = [*settings["retrievers"], "role_summary"]
+        settings["rrf_weights"] = {**engine["STRATEGIES"]["full+role"]["rrf_weights"], **settings["rrf_weights"]}
     for key in ("llm_rerank", "role_summary"):
         if isinstance(overrides.get(key), dict):
             settings[key] = engine["_merge"](settings[key], overrides[key])

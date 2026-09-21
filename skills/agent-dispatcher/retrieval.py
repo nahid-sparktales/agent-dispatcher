@@ -113,7 +113,8 @@ def _strategies():
     # Representation experiments: raw source (`+query-analysis`) against role summaries, alone and fused.
     out["role-only"] = _merge(out["+query-analysis"], {"retrievers": ["role_summary"]})
     out["bm25+role"] = _merge(out["+query-analysis"], {"retrievers": ["bm25", "role_summary"], "fusion": "rrf"})
-    out["full+role"] = _merge(full, {"retrievers": DEFAULTS["retrievers"] + ["role_summary"]})
+    # The role voter's weight was chosen on the benchmark's validation split (0.5, 1 and 2 tried; see docs/retrieval-benchmark.md).
+    out["full+role"] = _merge(full, {"retrievers": DEFAULTS["retrievers"] + ["role_summary"], "rrf_weights": {"role_summary": 2.0}})
     out["full+rerank"] = _merge(full, {"llm_rerank": {"enabled": True}})
     out["full+role+rerank"] = _merge(out["full+role"], {"llm_rerank": {"enabled": True}})
     return out
