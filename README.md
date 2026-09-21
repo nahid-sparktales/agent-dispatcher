@@ -7,11 +7,14 @@
 
 Agent Dispatcher routes your request to a focused role, loads relevant guidance, and defines
 what evidence will count as done. Ask it to debug a failure, design an interface, review a
-change, or research a decision. It adapts to the work and keeps small tasks small.
+change, or research a decision. For substantial code tasks, it maintains local project facts
+and code relationships, reuses valid parsing results, and selects a bounded context packet
+for the current role. Small, known edits can take the direct path.
 
 <!-- counts:start -->**27 roles · 79 local skills · 31 external skills · 8 recipes · 19 MCP servers · 50 detection signals**<!-- counts:end -->
 
-[Quick start](#quick-start) · [Usage](#usage) · [Catalog](#catalog) ·
+[How it works](#how-it-works) · [Quick start](#quick-start) · [Usage](#usage) ·
+[Project mapping](#keep-a-project-map-current) · [Catalog](#catalog) ·
 [Documentation](#documentation) · [Contributing](#contributing)
 
 ## Why use it?
@@ -20,14 +23,43 @@ change, or research a decision. It adapts to the work and keeps small tasks smal
   change; a designer works through the interface and interaction.
 - **Load context as needed.** Roles select a small set of skills, project files, and available
   tools. Full skill instructions are read only when selected.
+- **Reuse project knowledge.** Source-linked facts and a structural graph help locate relevant
+  code. A private incremental cache lets later preparation reuse unchanged sources and parses.
 - **Make verification explicit.** The role defines the evidence needed and reports which checks
   actually ran, what passed, and what remains unverified.
+- **Respect the task's edit scope.** Cache maintenance checks its write boundary. Read-only
+  previews and optional change audits support work that must preserve other files.
 - **Keep control of routing.** Let the dispatcher choose, force a role yourself, or opt into
   automatic activation for future sessions.
 
 Roles are working instructions the coding agent adopts within a session. It can chain roles or
 assign roles to subagents when authorized and useful. Installing the pack does not start a team of
 agents or connect external services.
+
+## How it works
+
+```mermaid
+flowchart TD
+    Request[Your request] --> Route{Choose the work profile}
+    Route -->|Small, known edit| Direct[Use native tools directly]
+    Route -->|Substantial work| Prepare[Select a role and prepare context]
+    Files[Permitted project files] --> Index[Source-linked facts and code graph]
+    Cache[Private parser cache] <--> Index
+    Index --> Prepare
+    Prepare --> Packet[Bounded context packet]
+    Packet --> Work[Work with host tools and selected guidance]
+    Direct --> Check[Verify the result and report evidence]
+    Work --> Check
+```
+
+Preparation searches permitted files, reuses valid cached evidence, and ranks relevant facts,
+symbols, relationships, and excerpts for the task. The agent receives that selected context;
+the full repository index stays local. When useful independent subtasks exist, the host's
+subagent tools can handle them with separate scopes.
+
+The local indexing helpers make no model or network calls and run during preparation, without
+a background service. Claude Code or Codex still provides the model, tools, permissions, and
+execution environment. Dispatcher does not silently switch the host's model or effort.
 
 ## Quick start
 
@@ -278,9 +310,10 @@ The verification helper wraps authorized commands and fingerprints workspace fil
 receipts are temporary: evidence is returned and owned files are removed with a cleanup result.
 Explicit retained receipts can be inspected after edits and removed with `show --cleanup`.
 Failed checks, zero tests, unknown counts and checks not run remain distinct. Optional preparation
-with `--audit` captures a task baseline before helper writes; finishing the audit reports actual
-file changes, including untracked/ignored caches, then cleans its state. Partial scans cannot
-prove preservation. No observer, behavioral-coverage claim or permission bypass is enabled. See the
+with `--audit` captures a task baseline before helper writes; start it before any task edits.
+Finishing the audit reports actual file changes, including untracked/ignored caches, then cleans
+its state. Partial scans cannot prove preservation. No observer, behavioral-coverage claim or
+permission bypass is enabled. See the
 [verification guide](skills/agent-dispatcher/VERIFICATION.md) for commands and coverage limits.
 
 ### List what is usable and what needs setup
@@ -331,8 +364,9 @@ file locations, line numbers, selection reasons, exclusions and an estimated siz
 not perform the requested change. Existing `context`, `context explain`, and `context verbose`
 commands still inspect the context plan.
 
-The selector searches local files, favors definitions and related tests, and follows at most one
-hop of simple relative imports. It respects ignore rules, skips generated and sensitive files,
+The selector searches local files, favors definitions and related tests, and expands lexical
+matches by at most one hop of simple relative imports. Map modes can also add graph-selected
+related sources. It respects ignore rules, skips generated and recognized credential files,
 and reports when scan limits or unavailable search tools leave gaps. It uses no model requests,
 network services or background process. Optional maps and the private incremental cache retain
 bounded local evidence. A limited result is a starting point:
@@ -343,14 +377,78 @@ catalogs, configuration controls, delegation and advanced examples live in refer
 when needed. These are limits on dispatcher instructions and retrieved passages, not the host's
 whole context window or a claim of improved model performance.
 
-From the source checkout, run `python3 -B context.py --project /path/to/project --task "Check login"`.
-Use `--task-file -` for standard input, `--role debugger`, `--size small|standard|complex`,
-`--max-tokens N`, and `--json` as needed. See [context selection](docs/context-engine.md) for limits.
+For a read-only preview from the source checkout, pass the task directly on quoted standard input:
+
+```bash
+python3 -B context.py --project /path/to/project --role debugger \
+  --task-file - --compact --map-preview <<'TASK'
+Investigate why validate_login rejects valid sessions. Do not change any files.
+TASK
+```
+
+Use `--size small|standard|complex` for retrieval scope, `--max-tokens N` for excerpts, or
+`--packet-tokens N` for the whole compact packet. See [context selection](docs/context-engine.md)
+for controls and limits.
 
 ### Keep a project map current
 
-Build a compact map of feature locations, declared dependencies, test commands, and
-architecture decisions. Each fact links to its source and stores a content fingerprint.
+Dispatcher maintains two project indexes and a separate private cache. These serve different
+purposes; none stores a conversation or replaces the host's instructions.
+
+| Stored data | Location | Purpose |
+| --- | --- | --- |
+| Fact map | `.agent-dispatcher/project-map.json` | Feature locations, declared dependencies, test commands, and documented architecture decisions, with source locations and fingerprints. |
+| Structural graph | `.agent-dispatcher/project-graph.json` | Files, Python symbols, imports, supported direct calls, and candidate test relationships, with evidence and confidence labels. |
+| Incremental parser cache | `~/.cache/agent-dispatcher/parser-v1/` | Authenticated records of redacted source text, Python syntax trees, extracted facts, and resolved graphs for reuse. |
+
+During substantial guided work, `context.py --compact --map-maintain` requests automatic
+maintenance. A complete, unrestricted scan can create or refresh both project indexes and
+populate the private cache. No discovered test command or project module is executed to build
+them. Maintenance happens during context preparation; there is no background watcher.
+
+On later preparations:
+
+1. **Check the current inventory.** Apply ignore rules, task exclusions, and file safety checks
+   before using a source. New, deleted, renamed, and newly ignored paths affect the current view.
+2. **Reuse unchanged evidence.** Valid cached entries can avoid repeated source reads, parsing,
+   and fact extraction. Changed sources are read again; missing or invalid entries fall back
+   to fresh extraction. File identity, timestamps, permissions, and parser/redaction policy
+   are part of the reuse checks.
+3. **Update relationships.** Reuse a graph when its scoped inputs match. When those inputs
+   change, resolve relationships again using current cached and newly parsed evidence.
+4. **Select a task view.** Rank a bounded set of facts, symbols, candidate tests, and source
+   excerpts for the request and role. The complete indexes are not dumped into model context.
+
+Python definitions, imports, and a conservative subset of direct calls use the standard AST
+parser. JavaScript/TypeScript support covers inferred relative-import candidates. Possible
+call paths are static hints; test links do not prove coverage, and documented decisions do
+not prove that the code follows them. The graph is bounded to 80 source files, 240 nodes, and
+400 edges; omitted evidence and parse failures are reported.
+
+#### Control mapping and cache writes
+
+| Control | Effect |
+| --- | --- |
+| `--map-maintain` | Request index maintenance when the task, write scope, scan, and destination permit it. |
+| `--map-preview` | Derive or reuse current evidence without saving indexes or the private parser cache. Takes precedence over maintenance. |
+| `--writable-path PATH` | Restrict optional project-cache writes to literal files or subtrees; repeat as needed and end directory paths with `/`. |
+| `--exclude-path PATH` | Omit a file or directory from source retrieval before reading or using its evidence. |
+| `--no-parser-cache` | Bypass private cache reads and writes and perform fresh source extraction. Does not itself make project-map maintenance read-only. |
+
+Read-only tasks and recognized edit restrictions veto automatic cache writes. Explicit limited
+write scopes also prevent private host-cache writes. Partial or task-excluded scans return
+permitted evidence and defer persistence, preserving the existing global indexes. Unsafe or
+unrecognized cache destinations are left untouched. These controls govern the helpers; host
+permissions still govern the agent's other tools.
+
+File metadata checks are a reuse shortcut, not a newly computed content hash on every call.
+Use `--no-parser-cache` when fresh reads are required. Redaction is best-effort. Project-local
+map and graph files remain untrusted: matching fingerprints alone do not authenticate their
+claims. The `parser_cache` result reports actual source bytes read, logical scan bytes,
+parses, reuse, graph hits, and write outcomes. Read-only and warm calls retain the same scan
+limits as fresh extraction.
+
+To manage just the fact map explicitly:
 
 ```text
 $agent-dispatcher map build
@@ -359,32 +457,9 @@ $agent-dispatcher map refresh
 ```
 
 In Claude Code use `/agent-map build`, `/agent-map show authentication`, and
-`/agent-map refresh`. Build and refresh write `.agent-dispatcher/project-map.json`
-inside the project. Inspection stays read-only. Substantial guided work requests automatic
-maintenance with `context.py --compact --map-maintain`; neither mode changes host settings
-or runs discovered commands. Use `--map-preview` if writes are disallowed.
-
-The context selector includes a small set of relevant facts whose sources still match.
-Changed, deleted, newly ignored, or unsupported facts are withheld. New files and scan
-limits are reported as coverage gaps; complete scans can refresh the snapshot automatically.
-The map describes recognized source patterns and documented decisions, not a complete
-architecture model or proof that a test command succeeds.
-
-An optional `.agent-dispatcher/project-graph.json` preserves a bounded structural index alongside
-the fact map. Task-seeded graph ranking selects symbols, relationships and candidate tests for
-the current role, and related sources influence excerpt retrieval. Python definitions and a
-conservative subset of direct calls use the standard AST parser; JavaScript/TypeScript imports
-are labeled inferred candidates. Possible paths are static hints, not runtime traces or coverage.
-
-Unrestricted `--map-maintain` calls also populate a private authenticated parser cache under
-`~/.cache/agent-dispatcher/parser-v1`. Subsequent context map modes can reuse permitted unchanged redacted
-sources, Python syntax trees, map facts, and the graph. Cross-file relationships are resolved
-again when the scoped source inputs change.
-Preview, read-only requests, and limited write scopes never write this cache. The `parser_cache`
-result reports reads, reuse, parsing, and actual versus logical source bytes. File metadata
-matches avoid repeated reads but are not fresh content hashes; `--no-parser-cache` disables
-cache reads and writes for full extraction. Task exclusions and scan limits apply in both modes.
-The project-local map and graph remain untrusted and cannot replace validated extraction.
+`/agent-map refresh`. Build and refresh write the fact-map file; show stays read-only. These
+standalone commands scan sources independently. The incremental parser cache and structural
+graph are used through the context selector's map modes.
 
 The standalone helper supports `build`, `show`, and `refresh`, `--project`, optional
 `--task`, `--pack`, and `--json`:
@@ -393,6 +468,9 @@ The standalone helper supports `build`, `show`, and `refresh`, `--project`, opti
 python3 -B project_map.py build --project /path/to/project
 python3 -B project_map.py show --project /path/to/project --task authentication
 ```
+
+See the [project-map reference](skills/agent-dispatcher/PROJECT-MAP.md) for freshness checks,
+coverage limits, and write-scope diagnostics.
 
 ### Check health and get setup recommendations
 
@@ -473,15 +551,7 @@ For a Claude manual install, run from your clone:
 The manual uninstaller removes the installed pack, its recorded commands, and its hook
 registration. It leaves activation flags in place.
 
-## How it works
-
-```text
-Your request
-  → specialist role
-  → context plan: relevant skills, project files, available tools, verification
-  → execution
-  → evidence and result
-```
+## Roles, skills, and permissions
 
 A **role** owns the outcome. A **skill** supplies a reusable method. An **MCP server or tool**
 provides a capability. A **recipe** suggests a workflow across roles. The context plan assembles
@@ -652,17 +722,13 @@ scripts before enabling them; see the [security guide](docs/security.md).
 
 ## Optional decision engine
 
-Claude handles routing by default. The pack also includes an opt-in Jev integration for selecting
+Your coding agent handles routing by default. The pack also includes an opt-in Jev integration for selecting
 roles, skills, and tools from the catalog. **All Jev scopes ship disabled.** Normal use requires
 no Jev account, key, or configuration.
 
 Enabling Jev sends task text, candidate metadata, and relevant routing context to TypeSafe's API
 using your own credential and billed usage. Task redaction is best-effort. See the
-[Jev guide](docs/jev.md) for setup, payload details, modes, fallback behavior, and evaluation results.
-
-The recorded comparison favors keeping the default path for routing and skill selection.
-These are selection benchmarks, not evidence of better completed work: the Claude results
-reconstruct the routing step in isolated cases, and end-to-end task evaluations are still missing.
+[Jev guide](docs/jev.md) for setup, payload details, modes, and fallback behavior.
 
 ## Documentation
 
@@ -670,6 +736,7 @@ reconstruct the routing step in isolated cases, and end-to-end task evaluations 
 | --- | --- |
 | [Architecture](docs/architecture.md) | Roles, skills, tools, recipes, and their boundaries. |
 | [Context engine](docs/context-engine.md) | Context selection, budgets, provenance, and inspection. |
+| [Project maps](skills/agent-dispatcher/PROJECT-MAP.md) | Fact maps, structural graphs, incremental parsing, freshness, and cache write scope. |
 | [Skills](docs/skills.md) | Local and external skills, triggers, and loadouts. |
 | [MCPs](docs/mcps.md) | Tool registry, availability, risks, and fallbacks. |
 | [Recipes](docs/recipes.md) | Workflows and role handoffs. |
@@ -711,10 +778,15 @@ python3 test_doctor.py
 python3 test_context.py
 python3 test_context_packet.py
 python3 test_context_reuse.py
+python3 test_cache_scope.py
 python3 test_parser_cache.py
 python3 test_incremental_context.py
 python3 test_project_map.py
 python3 test_project_graph.py
+python3 test_verification.py
+python3 test_change_audit.py
+python3 test_preferences.py
+python3 test_reporting_package.py
 python3 test_e2e.py
 ```
 
