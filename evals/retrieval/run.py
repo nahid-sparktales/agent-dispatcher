@@ -116,7 +116,7 @@ def _engine(task, index, config, reranker=None):
             "files": list(sizes), "bytes": outcome["packet"]["bytes"], "excerpt_bytes": sizes, "ms": elapsed,
             "lists": {name: [row["file"] for row in rows] for name, rows in outcome["lists"].items()},
             "overlap": outcome["trace"]["overlap"], "additions": (outcome["trace"]["graph_additions"], outcome["trace"]["git_additions"]),
-            "llm": outcome.get("llm"), "confidence": outcome["trace"].get("confidence")}
+            "llm": outcome.get("llm"), "confidence": outcome["trace"].get("confidence"), "first": outcome["first"]}
 
 
 def _score(found, targets):
@@ -188,11 +188,13 @@ def evaluate(tasks, clone, strategies, overrides=None, variants=None, progress=T
             found = (_legacy(query, texts, hashes, scrub) if name == "current" else
                      _engine(query, index_for(configs[name]), configs[name], llm.reranker if llm else None))
             scored = _score(found, task["target_files"])
+            place = lambda paths: {t: paths.index(t) + 1 if t in paths else None for t in task["target_files"]}  # noqa: E731
+            scored["first_ranks"] = place(found.get("first", []))
             if found.get("llm"):  # Candidate recall apart from reranking quality: where was each target before and after the model?
                 asked = found["llm"]
-                place = lambda paths: {t: paths.index(t) + 1 if t in paths else None for t in task["target_files"]}  # noqa: E731
                 scored["llm"] = {"error": asked.get("error"), "usage": asked.get("usage"), "ms": asked["ms"], "invalid": asked.get("invalid", 0),
-                                 "candidates": len(asked["candidates"]), "before": place(asked["candidates"]), "after": place(asked.get("order", []))}
+                                 "candidates": len(asked["candidates"]), "before": place(asked["candidates"]), "after": place(asked.get("order", [])),
+                                 "reasons": asked.get("reasons", {})}
             scored["confidence"] = found.get("confidence")
             scored["top"] = found["ranked"][:30]
             scored["source_ranks"] = {target: {source: files.index(target) + 1 for source, files in found["lists"].items() if target in files}

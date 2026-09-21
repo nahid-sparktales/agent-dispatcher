@@ -98,3 +98,23 @@ in `retrieval.DEFAULTS`, for example `--set rrf_k=30 --set graph.max_hops=2`.
 - **Regression guard** (`--check`): fails when a recorded metric drops by more than `--tolerance`
   (default 0.03, about two tasks of the held-out split). Rankings are deterministic, so any
   difference is a code or configuration change, not noise.
+
+## Optional: LLM-assisted retrieval
+
+`run.py` stays offline unless `--llm-settings FILE` is given (same format as the user settings file
+in [docs/llm-assisted-retrieval.md](../../docs/llm-assisted-retrieval.md)). Then each repository gets
+one content-addressed store under `--llm-store-dir` (default `dist/retrieval-llm/`), shared by all of
+its commits, so a file is summarized once per content, as an incremental index would do it.
+
+| Option | Effect |
+| --- | --- |
+| `--llm-index` | generate missing role representations at each task's commit (model calls); without it only stored ones are used |
+| `--strategy ""` | index only, evaluate nothing |
+| `--recent --limit N` | the N newest tasks of the split, chosen by commit date alone; their commits share most file contents, which keeps model-backed indexing affordable |
+| `--refresh-llm` | ignore cached reranker answers |
+
+Strategies: `+query-analysis` (raw-source BM25), `role-only` (BM25 over role representations),
+`bm25+role` (both, fused), `full+role`, `full+rerank`, `full+role+rerank`; everything else is a
+`--variant` override of `role_summary.*` or `llm_rerank.*`. Reranker answers are cached by prompt, so
+integration, weight and conditional variants cost nothing after the first run. `llm_report.py`
+turns the saved JSON into the cost/effectiveness report; it never calls a model.

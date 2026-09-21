@@ -58,7 +58,9 @@ symbols, relationships, and excerpts for the task. Ranking is
 symbols are weighed above its prose, several independent retrievers vote through rank fusion,
 strong results pull in structurally and historically related files, and every selected file
 says why it is there (`python3 -B retrieval.py explain "<request>"`). It is measured on real
-changes by an [offline benchmark](docs/retrieval-benchmark.md). The agent receives that selected
+changes by an [offline benchmark](docs/retrieval-benchmark.md). An opt-in layer can add model-written
+file role summaries and a bounded candidate reranker ([LLM-assisted retrieval](docs/llm-assisted-retrieval.md));
+it is off, and nothing is sent anywhere, unless your own settings file enables it. The agent receives that selected
 context; the full repository index stays local. When useful independent subtasks exist, the host's
 subagent tools can handle them with separate scopes.
 

@@ -25,6 +25,7 @@ project_graph.py                     deterministic structural index and task/rol
 repo_index.py                        repository facts: per-file records, symbols, edges, git co-change (no scores)
 retrieval.py                         query analysis, candidate retrievers, rank fusion, expansion, explorer, explain CLI
 context_budget.py                    context optimizer: files, reasons and excerpts within a byte/token/file budget
+llm_retrieval.py                     optional, opt-in: role representations, role_summary scoring, bounded LLM reranker, providers
 evals/retrieval/                     offline file-localization benchmark (mine.py builds datasets, run.py evaluates)
 sources/shared/VERIFICATION.template.md, verification.py task-scoped check receipts and completion evidence
 change_audit.py                       task baseline, actual file changes, scope and cleanup

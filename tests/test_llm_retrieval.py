@@ -136,7 +136,7 @@ class Representations(unittest.TestCase):
                                            "concepts": [f"{n}" + "c" * 200 for n in range(40)], "likely_tasks": [f"{n}" + "t" * 300 for n in range(9)]})
         index = build()
         rep, meta = llm.generate_representation("app/executor.py", index, settings(model(representation=bloated))["representation"])
-        self.assertLessEqual(len(llm.render(rep)), 1400)
+        self.assertLessEqual(len(llm.render(rep)), 1000)
         self.assertLessEqual(len(rep["role"]), 300)
         self.assertTrue(meta["validation"]["trimmed"])
 

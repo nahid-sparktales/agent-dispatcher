@@ -40,6 +40,21 @@
   and a regression check. Held-out Recall@8 rose from .368 to .783 and MRR from .206 to .604,
   with retrieval taking about 70 ms instead of 4.8 s per task; graph expansion, git history and
   the model-free explorer did not measurably improve ranking. See `docs/retrieval-benchmark.md`.
+- Add optional, opt-in LLM-assisted retrieval (`llm_retrieval.py`, `docs/llm-assisted-retrieval.md`):
+  model-written role representations of source files, generated once per file content from static
+  evidence plus bounded source, validated against the index (unsupported symbols and interaction
+  targets are dropped), stored privately outside the project and searched locally by a new
+  `role_summary` retriever that votes in rank fusion; and a bounded candidate reranker over opaque
+  ids with `rrf`, `weighted`, `replace` and seed-only integration, pre- or post-graph placement,
+  conditional (`ambiguous`) and shadow modes. Providers are configuration (`openai`-compatible,
+  `anthropic`, local `command`); keys come from environment variables. It is enabled only by the
+  user's own settings file, never by a project; excluded files never reach a model, a store, a
+  candidate list or debug output; every model failure falls back to the deterministic ranking,
+  which is bit-identical on the held-out benchmark when the layer is off. `retrieval.py explain`
+  shows `role_summary` and `llm_rerank` evidence (`--no-llm` to compare); the benchmark gains
+  `--llm-settings`, `--llm-index`, `--refresh-llm`, `--recent` and `evals/retrieval/llm_report.py`
+  (candidate recall versus reranking quality, rank movement, task categories, conditional-policy
+  replay, bootstrap intervals, index- and query-time cost).
 - Project-map task views no longer record `from __future__` imports and list definitions before
   import declarations.
 - Pass the request to the context helper as a single-quoted `--task='...'` argument, and inline

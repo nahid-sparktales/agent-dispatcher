@@ -550,6 +550,7 @@ def _llm_opinion(task, order, evidence, index, config, reranker):
         return record, []
     record["order"] = ordered + [path for path in record["candidates"] if path not in ordered]  # Unranked keep their order, last.
     reasons, labels = answer.get("reasons", {}), answer.get("labels", {})
+    record["reasons"] = {path: reasons[path] for path in record["order"][:5] if reasons.get(path)}
     return record, [{"file": path, "rank": rank, "score": round(1 / rank, 4), "source": "llm_rerank",
                      "reason": "model reranker opinion, not a repository fact" + (": " + reasons[path] if reasons.get(path) else ""),
                      "value": labels.get(path) or "ranked"} for rank, path in enumerate(record["order"], 1)]
@@ -653,7 +654,8 @@ def retrieve(task, index, config=None, *, named=(), role=None, extra=None, boost
              "overlap": {f"{a}&{b}": len({r["file"] for r in lists[a]} & {r["file"] for r in lists[b]})
                          for i, a in enumerate(sources) for b in sources[i + 1:]},
              "final": len(ranked), "latency_ms": round((time.perf_counter() - started) * 1000, 2)}
-    result = {"query": query, "lists": lists, "ranked": ranked, "trace": trace}
+    result = {"query": query, "lists": lists, "ranked": ranked, "trace": trace,
+              "first": [path for path, _ in first[:50]]}  # Fused candidates before expansion: what a reranker can choose from.
     if reranker is not None and tuning["enabled"]:
         trace["confidence"] = confidence
         trace["llm"] = {"asked": asking, "placement": tuning["placement"], "integration": tuning["integration"],
