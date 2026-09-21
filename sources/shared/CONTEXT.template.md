@@ -13,11 +13,11 @@ Multi-file bugs, architecture and source-backed documentation qualify in small p
 Skip preparation without workspace evidence; rebuild for changed focus/sources.
 
 ```text
-{{CONTEXT_COMMAND}} --project PROJECT --task-file - --role ID --size standard --compact --map-maintain --json
+{{CONTEXT_COMMAND}} --project PROJECT --task='REQUEST' --role ID --size standard --compact --map-maintain --json
 ```
 
-PACK is the dispatcher directory, PROJECT the workspace. Quote absolute paths; send the full
-unchanged request on quoted stdin, never as shell code. Preserve scope/exclusions.
+PACK is the dispatcher directory, PROJECT the workspace. Quote absolute paths; single-quote the
+exact REQUEST (' as '\''); python3 first, no cd/pipe/heredoc. Preserve scope/exclusions.
 Small for narrow work, complex for broad. Maintenance defers for task limits and read-only
 roles; add --map-preview (wins) for limits it may miss: odd wording, plan mode. Omit both
 without source investigation.
@@ -78,7 +78,7 @@ retained receipts need inspection/cleanup. Direct work uses native results. Old 
 edits are stale. With authorized scratch, --audit on first preparation captures helper writes;
 finish its returned state before preservation claims. Never reset the baseline after edits.
 
-Prefer existing checks or inline `python3 -B -` validators with quoted stdin. No validator/task
+Prefer existing checks or inline `python3 -B -c` validators. No validator/task
 files in the project, its parent or shared /tmp. Avoid bytecode/caches; use in-memory comparisons
 when feasible. Authorized scratch needs an owned temporary directory, cleanup in finally and
 verified removal. Report unresolved cleanup with its path; a clean diff is not cleanup proof.

@@ -14,7 +14,7 @@ the checks appropriate to the document's claims.
 For a source-backed map, architecture report or data document, check its schema and citations
 against current file bytes, ranges and hashes. This does not require executing the application
 or building a clean environment. Use existing checks or a read-only inline validator, such as
-`python3 -B -` with a quoted heredoc; do not write `check_*.py` beside the project or in shared
+`python3 -B -c 'CODE'` (not a heredoc); do not write `check_*.py` beside the project or in shared
 /tmp. Do not import project modules merely to validate source facts. Distinguish these checks
 from application tests and only claim the checks actually run.
 If inline execution is denied, use permitted read-only checks or report the limitation;

@@ -350,6 +350,19 @@ class DoctorTests(unittest.TestCase):
         with self.assertRaises(doctor.DoctorError):
             self.inspect(evidence=self.evidence(mcps=[{"id": "extra", "catalog_id": "not-catalog", "status": "exposed"}]))
 
+    def test_evidence_accepts_inline_json_argument_without_stdin_or_file(self):
+        inline = json.dumps({"schema_version": 1, "mcps": [{"id": "github", "catalog_id": "github", "status": "verified"}]})
+        self.assertEqual(doctor.read_evidence(inline)["mcps"][0]["status"], "verified")
+        self.assertEqual(doctor.read_evidence("  " + inline), doctor.read_evidence(inline))
+        stdout = io.StringIO()
+        with contextlib.redirect_stdout(stdout):
+            code = doctor.main(["--pack", str(self.pack), "--project", str(self.project), "--host", "codex",
+                                "--config-dir", str(self.config), "--evidence=" + inline, "--json"])
+        self.assertEqual(code, 0)
+        self.assertEqual(self.row(json.loads(stdout.getvalue()), "github")["evidence"], "verified")
+        with self.assertRaises(doctor.DoctorError):
+            doctor.read_evidence('{"schema_version": 1, "mcps": [')
+
     def test_cli_error_redacts_malformed_json_even_when_it_contains_secret(self):
         secret = "sk-" + "neverprint" * 5
         file = self.root / "bad.json"

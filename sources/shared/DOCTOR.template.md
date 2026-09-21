@@ -33,12 +33,14 @@ activation state, output preference, and disabled-skill preferences.
 5. Run the bundled helper with that evidence. `PACK` is the installed skill directory;
    `PROJECT` is the user's project, not PACK. Quote each resolved path as a separate argument.
 
-Claude helper: `python3 -B PACK/doctor.py all --pack PACK --project PROJECT --host claude --evidence - --json`
+Claude helper: `python3 -B PACK/doctor.py all --pack PACK --project PROJECT --host claude --evidence='EVIDENCE' --json`
 
-Codex helper: `python3 -B PACK/scripts/doctor.py all --pack PACK --project PROJECT --host codex --evidence - --json`
+Codex helper: `python3 -B PACK/scripts/doctor.py all --pack PACK --project PROJECT --host codex --evidence='EVIDENCE' --json`
 
-Pass the evidence as JSON on standard input. Use the host's structured process input or a
-quoted heredoc; never interpolate raw tool descriptions or task text into shell code. Change
+EVIDENCE is the JSON object as one single-quoted argument (`'` as `'\''`); no heredoc or
+pipe, since Claude Code refuses heredocs whose body contains braces. A host with structured
+process input may instead pass `--evidence -` and send the JSON on standard input. Never
+interpolate raw tool descriptions or task text into shell code. Change
 `all` to the requested category and add `--role reviewer` (or the resolved role) if requested.
 Use `--config-dir PATH` only for a known custom host config directory. Outside a host session,
 the helper still checks files and metadata but cannot discover live connections itself.
@@ -46,7 +48,8 @@ If the helper cannot run, use the inventory procedure and state which health che
 
 ## Evidence format
 
-`--evidence FILE` reads a sanitized snapshot; `--evidence -` reads standard input. The snapshot
+`--evidence` takes the sanitized snapshot inline (a value starting with `{`), as a file path, or
+as `-` for standard input. The snapshot
 describes observations from this session, not a server configuration or authorization grant.
 Collect a fresh snapshot for each report; do not reuse connection results from another session.
 Do not pass raw configuration, environment variables, headers, tokens, accounts, or tool results.

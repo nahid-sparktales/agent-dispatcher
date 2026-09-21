@@ -430,7 +430,7 @@ def main():
     hook = (build.HOOKS / "agent-dispatcher-activate.sh").read_text()
     check("hook index == templates", set(re.findall(r"^- `([a-z0-9-]+)`", hook, re.M)) == ids)
     check("activation invokes the non-executable helper through Python",
-          "python3 -B PACK/context.py --project PROJECT --task-file - --role ID" in hook)
+          "python3 -B PACK/context.py --project PROJECT --task='REQUEST' --role ID" in hook)
     rendered = sorted((build.ADAPTER / "roles").glob("*.md"))
     check("one rendered role per template", len(rendered) == len(roles))
 

@@ -43,10 +43,11 @@ Read PACK/SKILL.md for direct/guided/coordinated profiles and controls. Simple u
 low-risk tasks use the direct path with native checks and no extra role/helper/preference reads.
 Forced roles and explicitly requested workflows retain their required guidance. Honor forced-role persistence,
 user instructions, host permissions and disabled skills. For substantial workspace tasks,
-select the role then run python3 -B PACK/context.py --project PROJECT --task-file - --role ID
+select the role then run python3 -B PACK/context.py --project PROJECT --task='REQUEST' --role ID
 --compact --map-maintain --json as the first discretionary workspace action: before listings, searches,
 contract/source reads, tests or task-file writes. Mandatory host instructions are exempt.
-Pass the full unchanged task on quoted stdin. Preserve returned exclusion_policy in later reads.
+REQUEST is the full unchanged task, single-quoted with each ' written '\''; start with python3,
+no cd, pipe, stdin or heredoc. Preserve returned exclusion_policy in later reads.
 The helper gates cache writes; add --map-preview for edit limits it may miss. Consume supplied role/guide bodies and excerpts
 without rereading; use exact resources paths only for needed missing bodies. Multi-file bugs,
 architecture and source-backed documentation qualify even in small projects. Controls,
@@ -60,7 +61,7 @@ Guided/coordinated activity names role, guides actually read and tools/MCPs sele
 ACTIVITY.md owns style controls; DELEGATION.md owns chaining and independent subagent work.
 Never route or chain out of a forced role; a plan request ends with a plan. Same-session
 review is a self-check. Missing capabilities do not authorize installation or invented checks.
-Run read-only validators inline using python3 -B - with quoted stdin. Do not save temporary
+Run read-only validators inline as python3 -B -c 'CODE', not heredocs. Do not save temporary
 scripts or task text beside the project or in shared /tmp. Necessary permitted scratch copies
 use owned temporary-directory contexts; verify removal and report failed/unknown cleanup.
 

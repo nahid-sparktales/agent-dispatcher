@@ -37,7 +37,7 @@ a test pinning a symptom you cannot explain pins the wrong thing.
    returns nothing useful. Assert the value, the message, the count, the order — whatever the bug
    got wrong.
 6. **Run it against the old code and watch it fail.** Prefer an isolated in-memory old
-   implementation or inline `python3 -B -` check with quoted stdin. Do not stash/revert the
+   implementation or inline `python3 -B -c 'CODE'` check. Do not stash/revert the
    user's working tree merely to demonstrate failure. If a scratch copy is necessary and
    permitted, use a uniquely owned temporary-directory context with cleanup in `finally`,
    and verify its absence afterward. Never use a shared fixed /tmp name or a project sibling.

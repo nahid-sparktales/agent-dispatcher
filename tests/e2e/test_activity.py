@@ -191,6 +191,15 @@ class ActivityTests(unittest.TestCase):
             self.assertEqual(report["summary"]["helper_successes"], 0)
             self.assertEqual(report["availability"], "partial")
 
+    def test_multiline_single_quoted_task_argument_is_one_helper_call(self):
+        request = "Fix execute(tables={\"x\": [1]}) so it'\\''s right.\nKeep `GROUP_CONCAT` and '\\''$.a'\\''."
+        command = f"python3 -B '{self.skill}/context.py' --project . --task='{request}' --json"
+        report = self.analyze(call("h", "Bash", {"command": command}), result("h", "{}"))
+        self.assertEqual(report["summary"]["helper_successes"], 1)
+        for unsafe in (command + "\necho done", command.replace("--task='Fix", "--task=Fix")):
+            report = self.analyze(call("h", "Bash", {"command": unsafe}), result("h", "{}"))
+            self.assertEqual(report["summary"]["helper_successes"], 0, unsafe)
+
     def test_malformed_events_and_unknown_codex_exit_remain_unknown(self):
         for event in ({"type": "user", "message": {"content": [{"type": "tool_result", "tool_use_id": []}]}},
                       {"type": "assistant", "message": {"content": None}},

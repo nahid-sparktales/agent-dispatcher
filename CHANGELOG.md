@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Pass the request to the context helper as a single-quoted `--task='...'` argument, and inline
+  validators as `python3 -B -c`, instead of stdin heredocs. Claude Code refuses heredocs whose
+  body contains braces (a denial in `dontAsk`, an approval prompt interactively), so requests
+  quoting code or JSON lost the helper; both dispatcher trials of a sqlglot smoke run hit it. The
+  eval activity parser now attributes multi-line quoted arguments to one helper call.
 - Scale the project map and structural graph to repositories of about 1,000 source files
   (graph: 1,000 sources, 30,000 nodes, 36,000 edges, 16 MiB; map: 1,000 sources, 6,200 facts,
   4 MiB). Both stop at their byte limit instead of failing to save. The previous 80-source cap
