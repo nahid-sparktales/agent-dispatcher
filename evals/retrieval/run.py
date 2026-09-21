@@ -69,7 +69,9 @@ class LLMLayer:
         import llm_retrieval
         self.module, self.generate, self.settings = llm_retrieval, generate, llm_retrieval.load_settings(settings)
         self.store = llm_retrieval.Store(store)
-        self.reranker = llm_retrieval.make_reranker(self.settings, self.store, refresh)
+        # Reranker answers live apart from representations, so an evaluation never rewrites the file an indexing run is growing.
+        self.answers = llm_retrieval.Store(Path(store).with_suffix(".rerank.json"))
+        self.reranker = llm_retrieval.make_reranker(self.settings, self.answers, refresh)
         self.indexing = Counter()
 
     def prepare(self, index):
@@ -203,7 +205,7 @@ def evaluate(tasks, clone, strategies, overrides=None, variants=None, progress=T
             row["strategies"][name] = scored
         results.append(row)
         if llm:
-            llm.store.save()  # Paid-for answers survive an interrupted run.
+            llm.answers.save()  # Paid-for answers survive an interrupted run.
         if progress and (number % 10 == 0 or number == len(tasks)):
             print(f"  {task['repo']}: {number}/{len(tasks)}", file=sys.stderr, flush=True)
     return results
