@@ -380,19 +380,24 @@ def _shell_calls(command, binding, depth=0, cwd=None):
     composed = _literal_helper_pipeline(command, binding, cwd)
     if composed is not None:
         return composed
-    try:
-        lexer = shlex.shlex(command, posix=True, punctuation_chars=";&|<>")
-        lexer.whitespace_split = True
-        tokens = list(lexer)
-    except ValueError:
-        return [], False
+    if "\n" in command:
+        # The literal lexer refuses unquoted newlines, so these sit inside quoted words,
+        # such as a multi-line --task='...' request: one operator-free command.
+        tokens = [value for _, value in literal]
+    else:
+        try:
+            lexer = shlex.shlex(command, posix=True, punctuation_chars=";&|<>")
+            lexer.whitespace_split = True
+            tokens = list(lexer)
+        except ValueError:
+            return [], False
     if not tokens:
         return [], True
     if Path(tokens[0]).name in {"sh", "bash", "zsh"}:
         for index, token in enumerate(tokens[:-1]):
             if token in {"-c", "-lc"}:
                 return _shell_calls(tokens[index + 1], binding, depth + 1, cwd)
-    if "\n" in command or any(token in {"<<", "<<<"} for token in tokens):
+    if any(token in {"<<", "<<<"} for token in tokens):
         return [], False
     if any(token in {";", "&&", "||", "|", "&", ">", ">>"} for token in tokens):
         return [], False

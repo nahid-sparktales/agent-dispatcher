@@ -57,9 +57,10 @@ def read_json(path):
 def read_evidence(source=None):
     if not source:
         return {"skills": [], "mcps": [], "tools": [], "disabled": [], "host": {}}
-    if source == "-":
+    if source == "-" or source.lstrip().startswith("{"):
+        # Inline JSON: Claude Code refuses heredocs whose body contains braces.
         try:
-            raw = sys.stdin.read(MAX_BYTES + 1)
+            raw = sys.stdin.read(MAX_BYTES + 1) if source == "-" else source
             if len(raw.encode("utf-8")) > MAX_BYTES:
                 raise ValueError()
             data = json.loads(raw)
@@ -759,7 +760,7 @@ def main(argv=None):
     parser.add_argument("--host", choices=("codex", "claude"), help="Host configuration to inspect; Codex packages auto-detect Codex")
     parser.add_argument("--config-dir", type=Path, help="Host configuration directory override")
     parser.add_argument("--role", help="Role id, command alias, or display name for targeted recommendations")
-    parser.add_argument("--evidence", help="Sanitized current-session evidence JSON file, or - for stdin")
+    parser.add_argument("--evidence", help="Sanitized current-session evidence: inline JSON object, JSON file, or - for stdin")
     parser.add_argument("--json", action="store_true", help="Machine-readable report, including every row in scope")
     args = parser.parse_args(argv)
     try:

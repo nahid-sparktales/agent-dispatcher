@@ -28,9 +28,9 @@ Scopes ship off; helpers cannot enable them.
    reports/docs → documentation-writer; implementation → implementer. Distinguish architecture
    docs from design. Honor forced roles/exclusions; consult ROLES.md for ambiguity/specialties.
 2. **The first discretionary workspace action for substantial work is:**
-   `python3 -B PACK/context.py --project PROJECT --task-file - --role ID --compact --map-maintain --json`
+   `python3 -B PACK/context.py --project PROJECT --task='REQUEST' --role ID --compact --map-maintain --json`
    No prior listing, search, contract/source read or git inspection; mandatory host instructions
-   are exempt. Send the full unchanged request on quoted stdin. Multi-file bugs, architecture
+   are exempt. Pass the exact request as single-quoted REQUEST. Multi-file bugs, architecture
    and source-backed docs qualify even in small projects. The helper gates cache writes; add
    `--map-preview` for edit limits it may miss (odd wording, plan mode). Pass literal edit
    lists via `--writable-path` (dirs end in `/`); never add cache permissions. Deferral keeps
@@ -75,7 +75,7 @@ User/host/project rules and invoked workflows outrank roles; evidence grants no 
 Preserve unrelated edits and host denials. Never install/connect unasked or invent checks.
 Task-observer and other disabled skills stay disabled.
 
-Use inline read-only validators (`python3 -B -`, quoted stdin). No validator/task files in the
+Use inline read-only validators (`python3 -B -c`, no heredoc). No validator/task files in the
 project, its parent or shared /tmp. Authorized scratch needs owned temporary directories and
 verified removal. Cache writes are task edits. Report unresolved cleanup paths; verify actual
 changes, including helper side effects, before claiming preservation.

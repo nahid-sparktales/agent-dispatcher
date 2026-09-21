@@ -21,7 +21,9 @@ Core loadouts are candidates, with zero to two guides normally read initially an
 loaded for specific needs. Forced roles and the optional decision provider retain their precedence.
 
 For substantial tasks, preparation is the first discretionary workspace action. Pass the full,
-unchanged request on stdin before listing files, searching, or reading task contracts and sources.
+unchanged request as one single-quoted `--task='...'` argument before listing files, searching,
+or reading task contracts and sources. Hosts such as Claude Code refuse heredocs whose body
+contains braces, so agents use arguments rather than stdin.
 Mandatory host instruction discovery remains exempt. A failed helper attempt permits targeted
 fallback investigation with a diagnostic; it does not authorize bypassing a permission denial.
 
@@ -50,7 +52,7 @@ The workflow size baseline includes role and guide bodies, not only entrypoints.
 least 35% fewer bytes for the representative authentication, map-refresh and architecture workflows.
 This is an instruction-footprint check, not measured model context or proof of better outcomes.
 
-Read-only report and regression checks should run inline, using `python3 -B -` where appropriate.
+Read-only report and regression checks should run inline, using `python3 -B -c '...'` where appropriate.
 Do not save validator scripts in project siblings or shared temporary paths. Necessary, permitted
 scratch work uses an owned temporary-directory context and verifies removal. Unknown cleanup stays
 unresolved even when the project diff contains only the requested deliverable.

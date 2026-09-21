@@ -807,11 +807,13 @@ def write_commands(d):
     for r in d["roles"]:
         loadout = (
             "For substantial workspace work, first run `python3 -B PACK/context.py --project PROJECT "
-            "--task-file - --role " + r["id"] + " --compact --map-maintain --json` before reading guides or "
+            "--task='REQUEST' --role " + r["id"] + " --compact --map-maintain --json` before reading guides or "
             "manual investigation. This is the first discretionary workspace action: no preliminary "
             "listings, searches, contract/source reads, tests or task-file writes. Mandatory host "
-            "instruction discovery is exempt. PACK is the dispatcher directory; quote absolute paths "
-            "and send the full unchanged request on stdin. Multi-file bugs, architecture and source-backed documentation "
+            "instruction discovery is exempt. PACK is the dispatcher directory; quote absolute paths. "
+            "REQUEST is the full unchanged request, single-quoted with each ' written '\\''; start the command "
+            "with python3 (no cd, pipe, stdin or heredoc: hosts refuse heredocs containing braces). "
+            "Multi-file bugs, architecture and source-backed documentation "
             "qualify even in small projects. Skip controls, trivial work, one obvious known-file "
             "change and no-workspace tasks. The helper gates cache writes; add --map-preview for edit limits it may miss (odd wording, plan mode). "
             "Use returned excerpts, exclusion_policy and supplied guidance bodies without duplicate reads. "
@@ -819,7 +821,7 @@ def write_commands(d):
             "Read only the next needed guides, normally zero to two; preserve essential verification. "
             "If unavailable, continue targeted reads with the role's method. CONTEXT.md holds limits "
             "and explicit evidence exclusions; retain them during later reads. No-edit is not no-read. "
-            "Run validators inline with python3 -B - and quoted stdin; do not save temporary scripts "
+            "Run validators inline as python3 -B -c 'CODE', not heredocs; do not save temporary scripts "
             "or task text beside the project or in shared /tmp. Necessary authorized scratch work "
             "uses an owned temporary-directory context; verify removal and disclose failed cleanup.\n\n")
         loadout += (
