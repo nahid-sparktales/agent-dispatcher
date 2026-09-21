@@ -64,7 +64,9 @@ DEFAULTS = {
     "role_summary": {"k1": 1.2, "b": 0.75, "fields": {"path": 3.0, "symbols": 3.0, "role": 2.0, "responsibilities": 2.0,
                                                        "concepts": 2.0, "interactions": 1.0, "likely_tasks": 1.0}},
     "llm_rerank": {"enabled": False, "candidate_limit": 20, "placement": "pre_graph",  # or "post_graph": rerank the final order
-                   "integration": "rrf",  # "rrf": one more voter | "weighted" | "replace" | "seeds": graph seeds only
+                   # "replace": the model's order leads, behind files the request names | "weighted" | "rrf": one more voter |
+                   # "seeds": graph seeds only. Placement and integration were chosen on the benchmark's validation split.
+                   "integration": "replace",
                    "weight": 2.0, "when": "always",  # "ambiguous": skip the model when deterministic evidence is decisive
                    "min_agreement": 3, "min_gap": 0.15, "shadow": False,
                    # Prompt experiments; None keeps the user's settings.
