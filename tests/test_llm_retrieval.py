@@ -277,6 +277,19 @@ class Reranker(unittest.TestCase):
         self.assertEqual(outcome["trace"]["llm"]["invalid"], 4)
         self.assertNotIn("app/ghost.py", json.dumps(outcome["ranked"]))
 
+    def test_a_reply_cut_off_mid_list_keeps_the_ids_it_named_instead_of_paying_again(self):
+        prompts = []
+
+        def provider(system, prompt):
+            prompts.append(prompt)
+            ids = [line.split('"')[1] for line in prompt.split("\n") if line.startswith("<candidate id=")]
+            return '{"ranking": [{"id": "%s", "label": "primary", "reason": "owns it"}, "%s", "%s", {"id": "C9' % tuple(ids[::-1][:3])
+        outcome = retrieval.run(self.TASK, build(), retrieval.configure("full+rerank", {"llm_rerank": {"integration": "replace", "order": "rank"}}),
+                                reranker=llm.make_reranker(settings(provider)))
+        self.assertEqual(len(prompts), 1)
+        self.assertIsNone(outcome["trace"]["llm"].get("error"))
+        self.assertEqual(outcome["llm"]["order"][:3], outcome["llm"]["candidates"][::-1][:3])
+
     def test_every_model_failure_falls_back_to_the_deterministic_ranking(self):
         def timeout(system, prompt):
             raise llm.LLMUnavailable("Provider could not be reached or timed out.")
