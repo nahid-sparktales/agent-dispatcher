@@ -12,9 +12,9 @@ Canonical, hand-edited, never written by this script:
     catalog/external-skills.json                 skills maintained outside this repo
     catalog/signals.json                SIGNAL  — what makes a conditional skill applicable
     catalog/context-plan.schema.json             the shape of a context plan
-    SKILL.template.md                            the router body, rendered into the adapter
-    CONTEXT.template.md                          the context engine, rendered into the adapter
-    HOOK.template.sh                             the perpetual-mode hook, role index substituted
+    sources/shared/SKILL.template.md             the router body, rendered into the adapter
+    sources/shared/CONTEXT.template.md           the context engine, rendered into the adapter
+    sources/shared/HOOK.template.sh              the perpetual-mode hook, role index substituted
 
 Generated (Claude Code adapter + registries):
 
@@ -28,6 +28,7 @@ import pathlib
 import re
 
 ROOT = pathlib.Path(__file__).resolve().parent
+SHARED_SOURCES = ROOT / "sources" / "shared"
 TEMPLATES = ROOT / "templates"
 SKILLS = ROOT / "skills"
 RECIPES = ROOT / "recipes"
@@ -49,7 +50,7 @@ TEMPLATED_REFERENCES = ("CONTROLS.md", "DELEGATION.md", "CONTEXT.md", "CONTEXT-R
 
 def reference_text(name, d, host="claude"):
     """Render source references with explicit host paths, without prose substitutions."""
-    source = ROOT / name.replace(".md", ".template.md")
+    source = SHARED_SOURCES / name.replace(".md", ".template.md")
     if name == "CONTROLS.md" and host == "codex":
         source = ROOT / "adapters/codex/CONTROLS.template.md"
     codex = host == "codex"
@@ -569,8 +570,8 @@ def write_router(d):
                  f"Use when: {r['use_when']}", f"Not for: {r['not_for']}",
                  f"[Working method](roles/{r['id']}.md)", ""]
     (ADAPTER / "ROLES.md").write_text("\n".join(rows))
-    (ADAPTER / "ACTIVITY.md").write_text((ROOT / "ACTIVITY.template.md").read_text())
-    tmpl = (ROOT / "SKILL.template.md").read_text()
+    (ADAPTER / "ACTIVITY.md").write_text((SHARED_SOURCES / "ACTIVITY.template.md").read_text())
+    tmpl = (SHARED_SOURCES / "SKILL.template.md").read_text()
     (ADAPTER / "SKILL.md").write_text(
         render(tmpl, {"{{COUNT}}": len(d["roles"])}))
 
@@ -639,8 +640,8 @@ def write_index(d):
 
 def write_inventory(d):
     """Ship setup metadata with the pack; session availability is never generated."""
-    (ADAPTER / "INVENTORY.md").write_text((ROOT / "INVENTORY.template.md").read_text())
-    (ADAPTER / "DOCTOR.md").write_text((ROOT / "DOCTOR.template.md").read_text())
+    (ADAPTER / "INVENTORY.md").write_text((SHARED_SOURCES / "INVENTORY.template.md").read_text())
+    (ADAPTER / "DOCTOR.md").write_text((SHARED_SOURCES / "DOCTOR.template.md").read_text())
     (ADAPTER / "doctor.py").write_bytes((ROOT / "doctor.py").read_bytes())
     data = {
         "local_skills": [{
@@ -905,7 +906,7 @@ def write_hook(d):
     index = "\n".join(f"- `{r['id']}` — {r['use_when']}\n    not for: {r['not_for']}"
                       for r in d["roles"])
     hook = HOOKS / "agent-dispatcher-activate.sh"
-    hook.write_text(sub((ROOT / "HOOK.template.sh").read_text(), "{{ROLES}}", index))
+    hook.write_text(sub((SHARED_SOURCES / "HOOK.template.sh").read_text(), "{{ROLES}}", index))
     hook.chmod(0o755)
     (HOOKS / "hooks.json").write_text(json.dumps({
         "hooks": {"SessionStart": [{

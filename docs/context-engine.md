@@ -4,7 +4,7 @@ Routing answers *who does this work*. The context engine answers *what are they 
 as importantly, what they are not.
 
 The procedure is [`CONTEXT.md`](../skills/agent-dispatcher/CONTEXT.md), generated from
-`CONTEXT.template.md` and shipped inside the skill so one install carries it. Read that to *use*
+`sources/shared/CONTEXT.template.md` and shipped inside the skill so one install carries it. Read that to *use*
 the engine. Read this to *change* it: why the pieces exist, what each one is allowed to claim, and
 where to put a new one.
 

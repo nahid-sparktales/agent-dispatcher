@@ -31,7 +31,7 @@ class ReportingPackageTests(unittest.TestCase):
         cls.source = cls.root / "source"
         cls.source.mkdir()
         # Copy only package/build inputs, without private evaluation runs or user state.
-        for name in ("skills", "templates", "recipes", "catalog", "adapters", "commands",
+        for name in ("skills", "templates", "recipes", "catalog", "adapters", "commands", "sources",
                      "hooks", "docs", "decision", ".claude-plugin"):
             shutil.copytree(ROOT / name, cls.source / name,
                             ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))

@@ -28,7 +28,7 @@ and the 24 derived roles need their permission or a rewrite.
 ELI5 succinct output guidance
 ============================
 
-The completion-report style in VERIFICATION.template.md is adapted from
+The completion-report style in sources/shared/VERIFICATION.template.md is adapted from
 https://github.com/isas1/skills/blob/c47c4e637ffbbca8b81c35a8eb16d34bece04de1/skills/eli5-succinct/SKILL.md.
 The upstream MIT license follows; this attribution ships in both host packages.
 

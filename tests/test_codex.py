@@ -292,7 +292,7 @@ print(json.dumps([module.resolve_resources(sys.argv[2], role) for role in json.l
             self.assertTrue(any((ROOT / "skills/agent-dispatcher" / path).is_file()
                                 for path in item["paths"]), item["id"])
         self.assertEqual((self.pack / "references/INVENTORY.md").read_text(),
-                         (ROOT / "INVENTORY.template.md").read_text())
+                         (build.SHARED_SOURCES / "INVENTORY.template.md").read_text())
         # Editing metadata must flow into the shipped inventory rather than a second catalog.
         for row in inventory["tools_and_mcps"]:
             self.assertEqual(row["source"], self.data["mcp"][row["id"]].get("source"))
@@ -366,7 +366,7 @@ print(json.dumps([module.resolve_resources(sys.argv[2], role) for role in json.l
         self.assertEqual((self.pack / "scripts/doctor.py").read_bytes(),
                          (ROOT / "doctor.py").read_bytes())
         self.assertEqual((self.pack / "references/DOCTOR.md").read_bytes(),
-                         (ROOT / "DOCTOR.template.md").read_bytes())
+                         (build.SHARED_SOURCES / "DOCTOR.template.md").read_bytes())
         self.assertEqual((ROOT / "skills/agent-dispatcher/doctor.py").read_bytes(),
                          (ROOT / "doctor.py").read_bytes())
         self.assertIn("references/DOCTOR.md", (self.pack / "SKILL.md").read_text())

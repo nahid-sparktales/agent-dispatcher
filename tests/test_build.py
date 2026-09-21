@@ -244,7 +244,7 @@ def hook_behaviour(roles):
         hostile = ("- `evil` \u2014 $(touch " + str(root / "PWNED") + ") `id` \"q\u2019 "
                    "{{ROLES}} ${HOME} " + chr(92) + " tail")
         probe = root / "hostile.sh"
-        probe.write_text((ROOT / "HOOK.template.sh").read_text().replace("{{ROLES}}", hostile))
+        probe.write_text((build.SHARED_SOURCES / "HOOK.template.sh").read_text().replace("{{ROLES}}", hostile))
         (cfg / ".agent-dispatcher-active").touch()          # arm, so there is output to inspect
         out = subprocess.run(["bash", str(probe)], input='{"session_id":"s","cwd":"/tmp"}',
                              capture_output=True, text=True, cwd=str(root),
@@ -514,7 +514,7 @@ def main():
     except SystemExit as e:
         check("a generated region with no markers is fatal", "roles:start" in str(e), str(e))
 
-    tmpl = (ROOT / "HOOK.template.sh").read_text()
+    tmpl = (build.SHARED_SOURCES / "HOOK.template.sh").read_text()
 
     # Grepping build.py for a quote style, and comparing the hook to the template, both pass when
     # the generator has stopped reading the template and ships its own byte-identical copy: the
@@ -524,16 +524,18 @@ def main():
     # changed on purpose is the only check that fails while the copy is still identical.
     with tempfile.TemporaryDirectory() as tmp:
         sandbox = pathlib.Path(tmp)
-        (sandbox / "HOOK.template.sh").write_text(tmpl + "# edit-reaches-the-hook\n")
-        saved = build.ROOT, build.HOOKS
-        build.ROOT, build.HOOKS = sandbox, sandbox / "hooks"
+        shared = sandbox / "sources" / "shared"
+        shared.mkdir(parents=True)
+        (shared / "HOOK.template.sh").write_text(tmpl + "# edit-reaches-the-hook\n")
+        saved = build.ROOT, build.SHARED_SOURCES, build.HOOKS
+        build.ROOT, build.SHARED_SOURCES, build.HOOKS = sandbox, shared, sandbox / "hooks"
         try:
             build.write_hook(d)
             rebuilt = (sandbox / "hooks" / "agent-dispatcher-activate.sh").read_text()
         except (SystemExit, OSError) as exc:  # no longer reading a template at that path
             rebuilt = f"write_hook failed: {exc}"
         finally:
-            build.ROOT, build.HOOKS = saved
+            build.ROOT, build.SHARED_SOURCES, build.HOOKS = saved
     check("an edit to HOOK.template.sh reaches the generated hook",
           "# edit-reaches-the-hook" in rebuilt,
           f"build.py is not rendering the template — editing it does nothing ({rebuilt[:80]!r})")
@@ -558,7 +560,8 @@ def main():
     ls = subprocess.run(["git", "ls-files", "-z"], cwd=ROOT, capture_output=True, text=True)
     if ls.returncode == 0:
         known = set(ls.stdout.split("\0"))
-        loose = [f.name for f in sorted(ROOT.glob("*.template.*")) if f.name not in known]
+        loose = [str(f.relative_to(ROOT)) for f in sorted(build.SHARED_SOURCES.glob("*.template.*"))
+                 if str(f.relative_to(ROOT)) not in known]
         check("every template the build reads is committed, not just present locally",
               not loose, f"{loose} would be missing from a fresh clone")
 

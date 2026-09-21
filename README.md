@@ -507,8 +507,8 @@ python3 -B doctor.py mcps --project /path/to/project --json
 ```
 
 The standalone command cannot see a running agent's connections by itself. In-session commands
-supply a sanitized observation snapshot using `--evidence`; see
-[doctor procedure and evidence format](DOCTOR.template.md). JSON output is available for tooling.
+supply a sanitized observation snapshot using `--evidence`; see the
+[doctor procedure and evidence format](sources/shared/DOCTOR.template.md). JSON output is available for tooling.
 
 ### Activate automatically in future sessions
 
@@ -755,10 +755,10 @@ separate from generated artifacts.
 
 ```text
 templates/                 Role definitions
+sources/shared/            Shared router, context, reporting, and hook templates
 skills/<category>/<id>/    Local skills and manifests
 recipes/                   Workflow definitions
 catalog/                   Registries and schemas
-*.template.*               Dispatcher, context, and hook sources
 decision/                  Optional decision-engine implementation
 evals/decision/            Selection fixtures and evaluation harness
 evals/end_to_end/          Matched stock/dispatcher tasks and private acceptance checks

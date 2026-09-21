@@ -60,7 +60,7 @@ Hand-edited, and the only things worth editing:
 
     templates/<category>/<id>.md          the role: mission, method, deliverable, boundaries,
                                           plus flat loadout metadata in frontmatter
-    SKILL.template.md                     the router's body, rendered into the adapter's SKILL.md
+    sources/shared/SKILL.template.md      the router's body, rendered into the adapter's SKILL.md
     skills/<category>/<id>/SKILL.md       standard Agent Skills frontmatter (name, description)
     skills/<category>/<id>/manifest.json  pack metadata kept out of SKILL.md so the skill stays
                                           a portable Agent Skill
@@ -69,8 +69,8 @@ Hand-edited, and the only things worth editing:
     catalog/external-skills.json          skills maintained elsewhere, with provenance
     catalog/signals.json                  how each skills_if_<condition> bucket is decided
     catalog/context-plan.schema.json      the shape of a context plan
-    CONTEXT.template.md                   the context engine, rendered into the adapter
-    HOOK.template.sh                      the perpetual-mode SessionStart hook, with the role
+    sources/shared/CONTEXT.template.md    the context engine, rendered into the adapter
+    sources/shared/HOOK.template.sh       the perpetual-mode SessionStart hook, with the role
                                           index substituted in. A shell file rather than a
                                           string inside build.py, so it carries no second
                                           escaping layer and can be parsed by bash -n. It is

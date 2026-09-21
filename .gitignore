@@ -1,4 +1,4 @@
-locus-agent-templates.json
+/output/exports/locus-agent-templates.json
 __pycache__/
 .agent-dispatcher-decision.json
 .env

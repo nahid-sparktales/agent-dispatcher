@@ -13,22 +13,22 @@ catalog/mcp.json                      the MCP registry
 catalog/external-skills.json          externally maintained skills
 catalog/signals.json                  how each conditional skill bucket is decided
 catalog/context-plan.schema.json      the shape of a context plan
-SKILL.template.md                     the router body
-ACTIVITY.template.md                  compact/verbose activity reporting shared by both hosts
-INVENTORY.template.md                 availability and setup inspection shared by both hosts
-DOCTOR.template.md, doctor.py          read-only health checks and setup recommendations
+sources/shared/SKILL.template.md      the router body
+sources/shared/ACTIVITY.template.md   compact/verbose activity reporting shared by both hosts
+sources/shared/INVENTORY.template.md  availability and setup inspection shared by both hosts
+sources/shared/DOCTOR.template.md, doctor.py read-only health checks and setup recommendations
 install_claude.py                     staged manual Claude installation and rollback
-CONTEXT.template.md, context.py       concise context procedure and local excerpt selector
+sources/shared/CONTEXT.template.md, context.py concise context procedure and local excerpt selector
 context_packet.py, context_reuse.py   complete packet budget and retained-context evidence reuse
-PROJECT-MAP.template.md, project_map.py source-linked facts, automatic maintenance, and freshness
+sources/shared/PROJECT-MAP.template.md, project_map.py source-linked facts, automatic maintenance, and freshness
 project_graph.py                     deterministic structural index and task/role projection
-VERIFICATION.template.md, verification.py task-scoped check receipts and completion evidence
+sources/shared/VERIFICATION.template.md, verification.py task-scoped check receipts and completion evidence
 change_audit.py                       task baseline, actual file changes, scope and cleanup
 preferences.py                       saved output and requested-effort settings
-CONTEXT-REFERENCE.template.md         advanced context reference and worked plan example
-CONTROLS.template.md                  Claude activation and configuration details
-DELEGATION.template.md                on-demand chaining and delegation guidance
-HOOK.template.sh                      the perpetual-mode SessionStart hook
+sources/shared/CONTEXT-REFERENCE.template.md advanced context reference and worked plan example
+sources/shared/CONTROLS.template.md   Claude activation and configuration details
+sources/shared/DELEGATION.template.md on-demand chaining and delegation guidance
+sources/shared/HOOK.template.sh       the perpetual-mode SessionStart hook
 decision/                             the optional decision engine
 adapters/codex/                       Codex entrypoint template and activation/CLI helpers
 build_codex.py, install_codex.py       Codex export and installation
@@ -64,9 +64,10 @@ repository is public. No API key or live model call is part of CI. Actions are p
 SHAs and updated by Dependabot. The actionlint and Gitleaks binary versions and SHA-256 checksums
 are pinned in the workflows; update those together after verifying upstream release checksums.
 
-Editing the perpetual-mode hook means editing `HOOK.template.sh`, not
+Editing the perpetual-mode hook means editing `sources/shared/HOOK.template.sh`, not
 `hooks/agent-dispatcher-activate.sh` — the second is generated from the first with the role
-index substituted in. The template is an ordinary shell file, so `bash -n HOOK.template.sh`
+index substituted in. The template is an ordinary shell file, so
+`bash -n sources/shared/HOOK.template.sh`
 parses it — which catches a syntax error and nothing else. What catches behaviour is the suite
 running the rendered hook against a temporary config dir instead of only reading it.
 
