@@ -369,7 +369,6 @@ class RecoverableInstallerTests(unittest.TestCase):
             "repository_intelligence.py": "# deep index cli\n",
             "repository_memory.py": "# optional repository memory\n",
             "repo_history.py": "# eligible history\n",
-            "memory_experience.py": "# memory task experience\n",
             "skills/agent-dispatcher/MEMORY.md": "repository memory",
             "project_map.py": "# explicit map builder and read-only inspector\n",
             "resources.py": "# read-only package resource resolver\n",

@@ -173,10 +173,28 @@ def arm_settings(config, client, condition):
     return path
 
 
+def memory_settings(config, client, condition):
+    """The unified experience switch lives in the repository-memory settings: retrieval on for the warm arm only."""
+    home = arm_home(config, client, condition)
+    home.mkdir(parents=True, exist_ok=True, mode=0o700)
+    path = home / "repository-memory.json"
+    warm = condition == "warm_experience"
+    # The warm arm is the maximal treatment: every memory layer on (a fixture without commit history leaves the
+    # episodic layer unavailable; module records come from the memory build in deep_index_setup).
+    settings = {"enabled": True, "git": {"retrieval": "on" if warm else "off"}, "semantic": {"retrieval": "on" if warm else "off"},
+                "experience": {"recording": True, "retrieval": "on" if warm else "off",
+                               "eligible_outcomes": list(config.get("warm_experience_eligible") or ["grader_passed"])}}
+    text = json.dumps(settings, indent=2, sort_keys=True) + "\n"
+    if not path.is_file() or path.read_text(encoding="utf-8") != text:
+        path.write_text(text, encoding="utf-8")
+    return path
+
+
 def arm_env(config, client, condition, row, fixture):
     home = arm_home(config, client, condition)
     return {"XDG_CACHE_HOME": str(home / "cache"), "AGENT_DISPATCHER_INDEX_ID": arm_identity(client, condition, row, fixture),
-            "AGENT_DISPATCHER_INDEX_CONFIG": str(arm_settings(config, client, condition))}
+            "AGENT_DISPATCHER_INDEX_CONFIG": str(arm_settings(config, client, condition)),
+            "AGENT_DISPATCHER_MEMORY_CONFIG": str(memory_settings(config, client, condition))}
 
 
 def _helper(config, client, name):
@@ -224,6 +242,19 @@ def deep_index_setup(config, client, workspace, condition, row, fixture):
             raise ValueError("Deep index setup did not cover every admitted file.")
         if rt.tree_files(workspace, rt.EXCLUDED) != before:
             raise ValueError("Deep index setup changed project files; state must stay outside the workspace.")
+        # Repository memory stores for the same arm (module records; episodic events only when the workspace has history).
+        memory_mode = "refresh" if mode == "refresh" else "build"
+        execution = rt.execute([sys.executable, "-B", str(_helper(config, client, "repository_memory.py")), memory_mode, "--project", str(workspace),
+                                "--config", index_env["AGENT_DISPATCHER_MEMORY_CONFIG"], "--json"],
+                               cwd=workspace, env=env, prompt="", timeout=600, output_limit=1_000_000)
+        report["elapsed_seconds"] += execution["elapsed_seconds"]
+        if execution["returncode"] or execution["timed_out"] or execution.get("cancelled") or execution["output_overflow"]:
+            raise ValueError("Repository memory setup helper failed or exceeded its execution limit: " + rt.scrub_text(execution["stderr"][-300:], env).strip())
+        memory_report = json.loads(execution["stdout"])
+        report["memory"] = {"action": memory_report.get("action"), "events": memory_report.get("events"),
+                            "semantic_records": (memory_report.get("semantic") or {}).get("records"), "stages": memory_report.get("stages")}
+        if rt.tree_files(workspace, rt.EXCLUDED) != before:
+            raise ValueError("Repository memory setup changed project files; state must stay outside the workspace.")
         built.add(index_env["AGENT_DISPATCHER_INDEX_ID"])
         marker.write_text(json.dumps(sorted(built)), encoding="utf-8")
         report["ok"] = True

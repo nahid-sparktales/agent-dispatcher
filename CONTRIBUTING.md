@@ -29,7 +29,7 @@ llm_retrieval.py                     optional, opt-in: role representations, rol
 repo_store.py                        private SQLite stores: deep index generations, records, symbols, edges, history, inferences; experience events
 repo_builder.py                      deep deterministic builder: complete inventory, batches, checkpoints, fast/strict refresh, history horizon
 exploration.py                       optional onboarding Explorer: registered read-only operations, validated claims, budgets
-experience.py                        explicit task experience: events, outcomes, corrections, forgetting, memory retriever
+experience.py                        task experience shared by the deep index and repository memory: events, outcomes, receipts, corrections, forgetting, scoring
 repository_intelligence.py           the coordinator CLI: build, refresh, status, explain, explore, inferences, experience, prune, export
 repository_memory.py                 optional, opt-in: episodic/semantic/experience memory stores, lifecycle, gated retrieval, CLI
 repo_history.py                      hardened Git wrapper, eligible commit events, symbol history, rename lineage, hotspots

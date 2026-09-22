@@ -639,7 +639,7 @@ def inspect(pack=None, project=None, host=None, config_dir=None, role=None, evid
     required += [pack / "scripts" / name if ref_base != pack else pack / name
                  for name in ("doctor.py", "context.py", "context_packet.py", "context_reuse.py", "parser_cache.py", "project_map.py", "project_graph.py",
                  "repo_index.py", "retrieval.py", "context_budget.py", "llm_retrieval.py", "repo_store.py", "repo_builder.py", "exploration.py", "experience.py", "repository_intelligence.py",
-                 "repository_memory.py", "repo_history.py", "memory_experience.py",
+                 "repository_memory.py", "repo_history.py",
                               "resources.py", "verification.py", "preferences.py", "change_audit.py")]
     runtime = catalog.parent if catalog else (pack / "scripts/runtime" if ref_base != pack else pack)
     required += [runtime / "catalog/loadouts.json", runtime / "catalog/resource-paths.json", runtime / "decision/redact.py"]

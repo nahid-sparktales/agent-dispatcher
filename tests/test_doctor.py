@@ -59,7 +59,7 @@ class DoctorTests(unittest.TestCase):
                      "context_packet.py", "context_reuse.py", "parser_cache.py", "project_graph.py", "change_audit.py",
                      "repo_index.py", "retrieval.py", "context_budget.py", "llm_retrieval.py",
                      "repo_store.py", "repo_builder.py", "exploration.py", "experience.py", "repository_intelligence.py",
-                     "repository_memory.py", "repo_history.py", "memory_experience.py"):
+                     "repository_memory.py", "repo_history.py"):
             write(self.pack / file, "fixture")
 
     def inspect(self, **kwargs):

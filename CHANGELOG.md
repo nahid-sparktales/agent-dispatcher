@@ -2,6 +2,23 @@
 
 ## Unreleased
 
+- Retrieval reads stack-trace frames (`File "...", line N, in f`, `at f (path:line:col)`) as frames:
+  the longest suffix of the frame path that exists in the index votes in the path retriever (the
+  innermost frame counts double, never pinned), the frame's line anchors the excerpt and its
+  function name is a symbol (`frames`, `full-frames`). Admitted files over the 256 KiB read limit
+  now get a structural record (definitions, imports, calls, no text or terms retained), so a
+  central module is matched by the symbol it defines instead of by its name alone; it is still
+  never excerpted (`structural_records`, `full-structure`).
+- Unify task experience: the repository memory layer and the deep index share one SQLite experience
+  store, one event shape and one `experience` voter. `repository_memory.py record|correct|forget|prune`
+  and `repository_intelligence.py experience ...` write the same records; the memory vocabulary
+  (`partial`, `failed_verification`, ...) maps onto the shared outcome categories, which gain
+  `reverted_or_invalidated`; corrections are either a path verdict or a superseding outcome. The
+  deep index no longer attaches experience on its own (`experience.use` in
+  `repository-intelligence.json` is superseded by `experience.retrieval`). Experience recording and
+  retrieval are on by default; episodic and semantic retrieval stay in shadow mode; with nothing
+  built or recorded a packet is unchanged. `evals/retrieval/chronology.py` replays several
+  repositories with pooled, repository-block bootstrap intervals.
 - Add optional, opt-in repository memory (`repository_memory.py`, `repo_history.py`, `memory_experience.py`,
   `docs/repository-memory.md`, `MEMORY.md`, `/agent-memory`, `$agent-dispatcher memory`): an episodic
   layer (eligible commits from HEAD's bounded ancestry through one hardened Git wrapper, admitted

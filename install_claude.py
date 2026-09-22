@@ -240,7 +240,7 @@ def stage_pack(repo, destination):
         copy_tree(repo / name, destination / name)
     for name in ("doctor.py", "context.py", "context_packet.py", "context_reuse.py", "parser_cache.py", "project_map.py", "project_graph.py",
                  "repo_index.py", "retrieval.py", "context_budget.py", "llm_retrieval.py", "repo_store.py", "repo_builder.py", "exploration.py", "experience.py", "repository_intelligence.py",
-                 "repository_memory.py", "repo_history.py", "memory_experience.py",
+                 "repository_memory.py", "repo_history.py",
                  "resources.py", "verification.py", "preferences.py", "change_audit.py"):
         copy_file(repo / name, destination / name)
     for name in ("LICENSE", "NOTICE"):
@@ -256,7 +256,7 @@ def stage_pack(repo, destination):
                 "decision/__main__.py", "decision/redact.py", "catalog/loadouts.json", "doctor.py", "context.py", "project_map.py",
                 "context_packet.py", "context_reuse.py", "parser_cache.py", "project_graph.py", "change_audit.py",
                 "repo_index.py", "retrieval.py", "context_budget.py", "llm_retrieval.py", "repo_store.py", "repo_builder.py", "exploration.py", "experience.py", "repository_intelligence.py",
-                "repository_memory.py", "repo_history.py", "memory_experience.py", "MEMORY.md")
+                "repository_memory.py", "repo_history.py", "MEMORY.md")
     if any(not (destination / name).exists() for name in required):
         raise ValueError("staged dispatcher pack is incomplete")
 

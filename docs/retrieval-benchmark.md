@@ -507,6 +507,32 @@ Re-run everything with `dist/retrieval-llm/index_rounds.sh` (indexing, resumable
 `dist/retrieval-llm/settings.json` at a provider; `evals/retrieval/llm_report.py` renders the
 tables above from the saved JSON.
 
+## Traceback frames and structural records for oversized files (2026-09-22)
+
+Two deterministic additions from the failure analysis above, measured with `full-frames` and
+`full-structure` (each removes exactly one from `full`; positive differences mean the feature helps).
+
+| Split | Feature | R@1 | R@5 | R@8 | All@8 | MRR | Tasks whose target ranks changed |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| train (357) | frames | +.002 | .000 | .000 | .000 | +.001 | 3 of 474 dev tasks |
+| train (357) | structural records | -.002 | -.001 | +.004 | +.006 | -.001 | 32 of 474 dev tasks |
+| validation (117) | frames | .000 | .000 | .000 | .000 | .000 | |
+| validation (117) | structural records | -.002 | .000 | .000 | .000 | -.004 | |
+| **held-out (126)** | frames | .000 | .000 | +.004 | .000 | .000 | 1 task |
+| **held-out (126)** | structural records | -.003 | -.002 | +.003 | +.008 | -.004 | |
+
+- **Frames** fire only when a request carries a traceback, which almost none of these issue and
+  PR texts do (3 development tasks, 1 held-out task); where they fire they help and they never
+  cost anything, so the feature stays on. Its value has to be measured on issue reports with
+  tracebacks, which this benchmark does not contain in numbers.
+- **Structural records** matter where the oversized files are: sqlglot's `parser.py` and
+  `generator.py` (17 name-only targets on train). On train sqlglot R@8 .761 -> .776 and All@8
+  .718 -> .741; two `parser.py` targets move from rank 36 to 12 and 35 to 7; held-out sqlglot
+  R@8 .805 -> .815 and All@8 .697 -> .727. The other three repositories have no oversized files
+  and are unchanged. The small negative R@1 and MRR movements are the price of definitions
+  from a 400 KB file competing at the top rank; net positive at R@8 and All@8 on every split
+  where it applies, so the feature stays on (`structural_records: false` restores name-only).
+
 ## Repository memory
 
 Measured on 2026-09-22 with `evals/retrieval/run.py --memory` (see
@@ -558,25 +584,40 @@ on held-out, which is the size of the per-repository noise. Where memory hurts s
 held-out, the losses are three-target tasks where a big historical commit outvotes the second
 and third target.
 
-### Chronological replay (sqlglot development split, 117 tasks in commit order, 4 blocks)
+### Chronological replay (four repositories, development and held-out splits)
 
-`evals/retrieval/chronology.py`: memory pinned before each task, 24 held-out probes (every fifth
-task) never recorded, experience arms fed **oracle** records (gold target files as a `partial`
-observation asserted by the harness, never verified success) from earlier non-probe tasks.
+`evals/retrieval/chronology.py` over sqlglot, pip, networkx and zod: memory pinned before each task
+(boundary excluded), experience arms fed **oracle** records through the shipped `experience` module
+and memory layer (gold target files recorded as a harness-graded task, `grader_passed`, never
+verified success) from earlier non-probe tasks of the same repository; every fifth task is a
+held-out probe that is never recorded. Pooled intervals are paired bootstraps over tasks; the
+second interval resamples repositories (the dependence unit), so one repository, and a fortiori
+one task, cannot decide the verdict.
 
-| Arm | R@8 | All@8 | MRR | paired 95% interval of the R@8 / MRR difference from `full` |
-| --- | --- | --- | --- | --- |
-| `full` | .724 | .660 | .519 | |
-| `full+memory` | .737 | .676 | .540 | +.017 [-.026, +.062] / +.021 [-.002, +.045] |
-| `+ experience, frozen after block 0` | .734 | .676 | .573 | +.014 [-.028, +.060] / +.054 [+.019, +.094] |
-| `+ experience, accumulated` | .752 | .694 | .590 | +.031 [-.016, +.083] / +.071 [+.037, +.112] |
+| Split | Arm | R@5 | R@8 | All@8 | MRR | R@8 vs `full` [tasks] (repositories) | MRR vs `full` [tasks] |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| dev (474) | `full` | .645 | .726 | .667 | .553 | | |
+| dev | `full+memory` | .664 | .729 | .675 | .568 | +.003 [-.013, +.019] (-.017, +.016) | +.016 [+.005, +.027] |
+| dev | `+ experience, frozen after block 0` | .673 | .732 | .677 | .577 | +.005 [-.011, +.022] (-.018, +.024) | +.025 [+.011, +.039] |
+| dev | `+ experience, accumulated` | .676 | .739 | .684 | .584 | +.013 [-.005, +.031] (-.013, +.037) | +.031 [+.016, +.047] |
+| test (126) | `full` | .700 | .785 | .722 | .614 | | |
+| test | `full+memory` | .740 | .798 | .738 | .642 | +.013 [-.022, +.052] (-.023, +.045) | +.028 [-.003, +.062] |
+| test | `+ experience, frozen after block 0` | .744 | .802 | .738 | .647 | +.017 [-.019, +.056] (-.019, +.045) | +.033 [+.000, +.067] |
+| test | `+ experience, accumulated` | .748 | .802 | .738 | .653 | +.017 [-.019, +.056] (-.019, +.045) | +.040 [+.006, +.076] |
 
-On the 24 probes every arm scores R@8 .736 / All@8 .667: accumulated oracle experience raised
-MRR on the recorded tasks' neighbours but did not move the held-out probes, so this is an upper
-bound on what recorded experience could add to retrieval, not evidence that an agent acquires
-it. Blocks show no monotonic curve (R@8 by block, `full` .636/.694/.764/.793 versus
-`full+memory` .712/.761/.719/.756): later tasks are easier for the baseline, which is exactly
-why a rising line alone would prove nothing. Leakage checks: none violated.
+Per repository (development, all blocks, R@8 / MRR difference from `full`): sqlglot memory
++.017 / +.021 and accumulated experience +.031 / +.070; zod +.016 / +.025 and +.042 / +.035;
+networkx +.004 / +.010 (both); pip -.029 / +.007 (both). pip is the one repository where
+memory costs R@8, and it does so in every arm, so the pooled R@8 interval straddles zero while
+MRR is clear of zero on both splits. Held-out probes (dev: 96 tasks never recorded) move with
+memory (R@8 .727 -> .732, MRR .544 -> .580) and a little more with accumulated experience (.740,
+.596); on the 27 test probes nothing moves. Blocks show no monotonic curve on any repository.
+Leakage checks: none violated on 600 tasks. The memory gate opened on 96% of tasks; oracle
+experience matched 27% (frozen) to 53% (accumulated) of tasks.
+
+Reading: recorded experience of the right kind improves the rank of the first target (MRR) and
+does not hurt R@8 anywhere except pip; how much of that an agent can earn with its own records is
+not measured here. Raw results: `dist/retrieval-results/chronology-{dev,test}-<repo>.json`.
 
 ### Cost
 
@@ -592,8 +633,9 @@ runs; their retrieval paths are exercised by the offline tests only.
 
 `git.retrieval` stays `shadow` by default: the held-out gain is real at R@3 to R@5 and MRR, small
 at R@8, and comes with about 150 ms per query on a 2,000-commit store. Turn it `on` per project
-after looking at a few `shadow` packets or `retrieval.py explain` traces. The experience layer
-stays `off` until an experiment with agent-acquired (not oracle) records exists; the semantic
-layer stays `shadow` until its module records are measured against the file role summaries
-above. Raw results: `dist/retrieval-results/memory-{train-*,validation-default-*,test}-<repo>.json`
-and `dist/retrieval-results/chronology-sqlglot-dev.json` in the checkout that ran them.
+after looking at a few `shadow` packets or `retrieval.py explain` traces. The experience layer is
+`on` by default (a product decision: nothing is recorded until a host hands in an observation, and
+the pooled replay shows an MRR gain clear of zero with no R@8 cost outside pip); an experiment with
+agent-acquired rather than oracle records is still the missing measurement. The semantic layer
+stays `shadow` until its module records are measured against the file role summaries above. Raw results: `dist/retrieval-results/memory-{train-*,validation-default-*,test}-<repo>.json`
+and `dist/retrieval-results/chronology-{dev,test}-<repo>.json` in the checkout that ran them.

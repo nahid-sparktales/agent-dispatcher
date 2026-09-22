@@ -66,6 +66,7 @@ class ArmSetupTests(unittest.TestCase):
         package = self.output / "packages/claude"
         package.mkdir(parents=True)
         for name in ("repository_intelligence.py", "repo_store.py", "repo_builder.py", "exploration.py", "experience.py", "context.py",
+                     "repository_memory.py", "repo_history.py",
                      "repo_index.py", "retrieval.py", "context_budget.py", "llm_retrieval.py", "parser_cache.py", "project_map.py",
                      "project_graph.py", "verification.py", "change_audit.py", "resources.py", "context_packet.py", "context_reuse.py", "preferences.py"):
             (package / name).write_bytes((ROOT / name).read_bytes())
@@ -98,7 +99,8 @@ class ArmSetupTests(unittest.TestCase):
         self.assertTrue(setup["coverage"]["complete_within_policy"])
         self.assertEqual(rt.tree_files(first, rt.EXCLUDED), before)
         env = setup["_env"]
-        self.assertEqual(set(env), {"XDG_CACHE_HOME", "AGENT_DISPATCHER_INDEX_ID", "AGENT_DISPATCHER_INDEX_CONFIG"})
+        self.assertEqual(set(env), {"XDG_CACHE_HOME", "AGENT_DISPATCHER_INDEX_ID", "AGENT_DISPATCHER_INDEX_CONFIG", "AGENT_DISPATCHER_MEMORY_CONFIG"})
+        self.assertEqual(json.loads(Path(env["AGENT_DISPATCHER_MEMORY_CONFIG"]).read_text())["experience"]["retrieval"], "off")
         self.assertTrue(env["XDG_CACHE_HOME"].startswith(str(self.output / "state/claude-indexed")))
         self.assertFalse(json.loads(Path(env["AGENT_DISPATCHER_INDEX_CONFIG"]).read_text())["experience"]["use"])
         # A later step of the same sequence lives in a new temporary workspace; the identity maps it to the same store.
@@ -114,6 +116,7 @@ class ArmSetupTests(unittest.TestCase):
         self.assertTrue(warm["ok"], warm)
         self.assertNotEqual(warm["_env"]["XDG_CACHE_HOME"], env["XDG_CACHE_HOME"])
         self.assertTrue(json.loads(Path(warm["_env"]["AGENT_DISPATCHER_INDEX_CONFIG"]).read_text())["experience"]["use"])
+        self.assertEqual(json.loads(Path(warm["_env"]["AGENT_DISPATCHER_MEMORY_CONFIG"]).read_text())["experience"]["retrieval"], "on")
         initial = rt.tree_files(first, rt.EXCLUDED)
         (first / "app.py").write_text("def validate_token(token):\n    return bool(token) and token.strip() != ''\n")
         final = rt.tree_files(first, rt.EXCLUDED)
@@ -130,9 +133,13 @@ class ArmSetupTests(unittest.TestCase):
             done = subprocess.run([sys.executable, "-B", str(helper), "--project", str(first), "--task", "validate_token should reject empty tokens", "--json"],
                                   capture_output=True, text=True, env={**os.environ, **arm_env, "HOME": str(self.root)})
             self.assertEqual(done.returncode, 0, done.stderr)
-            seen[condition] = json.loads(done.stdout)["repository_intelligence"]["index"]
-        self.assertEqual(seen["warm_experience"]["experience"]["attached"], 1)
-        self.assertEqual(seen["indexed"]["experience"], {"enabled": False, "attached": 0, "candidates": 0})
+            packet = json.loads(done.stdout)
+            seen[condition] = dict(packet["repository_intelligence"]["index"], memory=packet.get("memory"))
+        # The unified experience layer: the warm arm's own record votes; the indexed arm has retrieval off.
+        self.assertEqual(seen["warm_experience"]["memory"]["layers"]["experience"]["mode"], "on")
+        self.assertEqual(seen["warm_experience"]["memory"]["layers"]["experience"]["matches"], 1)
+        self.assertTrue(seen["warm_experience"]["memory"]["layers"]["experience"]["applied"])
+        self.assertIsNone(seen["indexed"]["memory"])
         self.assertEqual((seen["indexed"]["status"], seen["warm_experience"]["status"]), ("used", "used"))
         stale = warmup.deep_index_setup({**self.config, "output_dir": str(self.root / "missing-package")}, "claude", first, "indexed", row, self.fixture)
         self.assertFalse(stale["ok"])

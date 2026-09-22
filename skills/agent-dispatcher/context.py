@@ -25,6 +25,7 @@ from urllib.parse import quote
 
 MAX_FILES = 10000
 MAX_FILE_BYTES = 256 * 1024
+MAX_STRUCTURAL_BYTES = 4 * 1024 * 1024  # An admitted file over the read limit is parsed for its definitions up to this size.
 MAX_SCAN_BYTES = 32 * 1024 * 1024
 MAX_LIST_BYTES = 4 * 1024 * 1024
 MAX_TASK_CHARS = 16000
@@ -306,7 +307,7 @@ def _skip(path):
     return None
 
 
-def _read(project, relative, remaining):
+def _read(project, relative, remaining, limit=MAX_FILE_BYTES):
     path = project / relative
     consumed = 0
     try:
@@ -323,11 +324,11 @@ def _read(project, relative, remaining):
             meta = os.fstat(handle.fileno())
             if not stat.S_ISREG(meta.st_mode):
                 return None, 0, "not a regular file"
-            if meta.st_size > MAX_FILE_BYTES:
+            if meta.st_size > limit:
                 return None, 0, "file exceeds 256 KiB limit"
             if meta.st_size > remaining:
                 return None, 0, "scan byte budget exhausted"
-            read_limit = min(MAX_FILE_BYTES, remaining)
+            read_limit = min(limit, remaining)
             data = handle.read(read_limit)
             consumed = len(data)
             if os.fstat(handle.fileno()).st_size > read_limit:
@@ -339,11 +340,44 @@ def _read(project, relative, remaining):
         return None, consumed, "unreadable or non-UTF-8 file"
 
 
-def _scan_sources(root, paths, manual_exclusions, automatic, incremental, scrub, excluded, diagnostics, oversized=None):
+def _structural_record(root, relative, scrub, cache=None):
+    """Definitions, imports and calls of an admitted file over the read limit; its text and terms are not retained.
+
+    The file is read once, bounded by MAX_STRUCTURAL_BYTES, redacted like any other source, parsed with
+    the same extractor, and only the facts survive: a central module can then be found by the symbol it
+    defines instead of by its name alone, while it is still never excerpted.
+    """
+    try:
+        info = (root / relative).lstat()
+        if not stat.S_ISREG(info.st_mode):
+            return None
+        key = [relative, info.st_size, info.st_mtime_ns]
+    except OSError:
+        return None
+    cached = cache.get("structural-record", key) if cache is not None else None
+    if (isinstance(cached, dict) and isinstance(cached.get("record"), dict) and cached["record"].get("structural")
+            and isinstance(cached.get("sha256"), str)):
+        return cached
+    text, _, reason = _read(root, relative, MAX_STRUCTURAL_BYTES, limit=MAX_STRUCTURAL_BYTES)
+    if reason:
+        return None
+    try:
+        record = _sibling("repo_index")["file_record"](relative, _redact_source(text, scrub))
+    except (ValueError, RecursionError, MemoryError):
+        return None
+    record = {**{k: v for k, v in record.items() if k != "terms"}, "terms": {}, "len": 0, "structural": True}
+    result = {"record": record, "sha256": hashlib.sha256(text.encode("utf-8")).hexdigest()}
+    if cache is not None:
+        cache.put("structural-record", key, result)
+    return result
+
+
+def _scan_sources(root, paths, manual_exclusions, automatic, incremental, scrub, excluded, diagnostics, oversized=None, structural=None):
     """The retrieval universe: exclusion, credential and size rules run before any file is opened.
 
     Everything downstream (legacy scoring, the repository index, symbols, graph, history,
-    explorer requests, excerpts, explain output) sees only the texts admitted here.
+    explorer requests, excerpts, explain output) sees only the texts admitted here. `structural`
+    collects definition-only records of admitted files over the read limit (never their text).
     """
     texts, hashes = {}, {}
     scanned = 0
@@ -372,6 +406,10 @@ def _scan_sources(root, paths, manual_exclusions, automatic, incremental, scrub,
             # still be ranked (path, imports, history), its content is never opened.
             if oversized is not None and reason == "file exceeds 256 KiB limit" and scrub(path) == path:
                 oversized.append(path)
+                if structural is not None:
+                    facts = _structural_record(root, path, scrub, incremental)
+                    if facts is not None:
+                        structural[path] = facts
             continue
         hashes[path] = raw_sha or hashlib.sha256(text.encode("utf-8")).hexdigest()
         if incremental is None:
@@ -990,20 +1028,13 @@ def _repository_index(root, scrub, paths, texts, excluded, exclusions, increment
             else:
                 omitted += 1
         stale_inferences = len(deep.store.inferences(status="stale"))
-        experience = {"enabled": bool(settings["experience"]["use"]), "attached": 0}
-        if settings["experience"]["use"]:
-            try:
-                with store_module["ExperienceStore"](directory, readonly=True) as events:
-                    deep.events, deep.corrections = events.events(), events.corrections()
-            except (OSError, ValueError) as exc:
-                experience["detail"] = str(exc) if isinstance(exc, ValueError) else "unavailable"
         coverage = generation.get("coverage") or {}
         deep.report = {"status": "used", "generation": generation["id"], "identity": identity,
                        "coverage": {key: coverage.get(key) for key in ("discovered", "indexed", "pending", "failed", "complete_within_policy")},
                        "head_match": bool(history.get("head")) and head == history.get("head"),
                        "extended": {"candidates": len(candidates), "verified": len(deep.extended), "stale": stale, "pending": pending},
                        "inferences": {"attached": len(deep.inferences), "omitted": omitted, "stale": stale_inferences},
-                       "experience": experience, "maintenance": {"allowed": deep.maintain}}
+                       "experience": "unified: see the packet's memory.layers.experience", "maintenance": {"allowed": deep.maintain}}
     except (OSError, ValueError, TypeError, KeyError) as exc:
         deep.report = {"status": "unavailable", "detail": str(exc) if isinstance(exc, ValueError) else type(exc).__name__}
         deep.close()
@@ -1079,12 +1110,12 @@ def _memory_layer(engine, settings, root, index, task, exclusions, scrub, diagno
     if stats is not None:  # Timing is diagnostics: shown only with --explain, like every other _ms.
         stats["memory_ms"] = outcome["ms"]
         stats.update({f"memory_{name}_ms": value for name, value in outcome.get("timings", {}).items()})
-    return outcome["extra"], tuple(outcome["boost_only"]), report if report["status"] != "off" else None
+    return outcome["extra"], tuple(outcome["boost_only"]), report if report["status"] not in ("off", "no_stores") else None
 
 
 def _intelligent_selection(engine, settings, task, texts, hashes, explicit, role_id, changed, cache, root,
                            excluded, scrub, compact, diagnostics, explain, oversized=(), rerank_answer=None, deep=None,
-                           exclusions=(), pack=None):
+                           exclusions=(), pack=None, structural=None):
     """Repository-intelligence selection over the already-filtered universe; same row/excerpt contract."""
     stats = {}
     deep = deep or _DeepIndex()
@@ -1093,13 +1124,8 @@ def _intelligent_selection(engine, settings, task, texts, hashes, explicit, role
                if settings["git"]["enabled"] and partners is None else None)
     index = engine["build_index"](texts, hashes, _kind, cache=cache, history=history, config=settings, stats=stats,
                                   path_only=oversized, store=deep.store, extended=deep.extended or None, partners=partners,
-                                  loader=deep.loader)
+                                  loader=deep.loader, structural=structural)
     hashes = index.hashes
-    if deep.events:
-        attached = _sibling("experience")["attach"](index, deep.events, deep.corrections, tuple(deep.settings["experience"]["eligible_outcomes"]))
-        deep.report["experience"]["attached"] = attached
-        if attached and "experience" not in settings["retrievers"]:
-            settings["retrievers"] = [*settings["retrievers"], "experience"]
     if deep.inferences:
         index.inferences = deep.inferences
         if "inference" not in settings["retrievers"]:
@@ -1126,20 +1152,16 @@ def _intelligent_selection(engine, settings, task, texts, hashes, explicit, role
                                       for rank, path in enumerate(sorted(rules), 1)])
     packet = outcome["packet"]
     if deep.store is not None:
-        deep.report["experience"]["candidates"] = len(outcome["lists"].get("experience", ()))
         deep.report["inferences"]["candidates"] = len(outcome["lists"].get("inference", ()))
         deep.report["counters"] = dict(deep.counters)
-        if deep.events and deep.settings["experience"].get("exposure_log"):
-            _sibling("experience")["log_exposure"](deep.settings["experience"]["exposure_log"],
-                                                  hashlib.sha256(task.encode("utf-8")).hexdigest(),
-                                                  outcome["lists"].get("experience", []), [item["path"] for item in packet["files"]])
         if deep.maintain:
             _maintain_index(deep, index, stats, texts, hashes, root)
     selected, excerpts = [], []
     stale = getattr(index.texts, "failed", set())
     unread = [item["path"] for item in packet["files"] if not item["excerpts"] and item["path"] not in stale]
     if unread:
-        diagnostics.append("Ranked as relevant but over the 256 KiB read limit, so not excerpted: " + ", ".join(scrub(p) for p in unread[:3]))
+        diagnostics.append("Ranked as relevant but over the 256 KiB read limit, so not excerpted (definitions still indexed): "
+                           + ", ".join(scrub(p) for p in unread[:3]))
     if stale:
         diagnostics.append("Indexed evidence no longer matches the current source and was withheld: " + ", ".join(scrub(p) for p in sorted(stale)[:3]))
     for item in packet["files"]:
@@ -1426,9 +1448,9 @@ def _select_context(project, task, role=None, size="standard", max_tokens=None, 
     if parser_cache and (map_preview or map_maintain):
         incremental = _parser_cache(root, writable=cache_writable,
                                     policy_extra=getattr(scrub, "_dispatcher_policy", None))
-    oversized = []
+    oversized, structural = [], {}
     texts, hashes, scanned, scan_complete = _scan_sources(
-        root, paths, manual_exclusions, automatic, incremental, scrub, excluded, diagnostics, oversized)
+        root, paths, manual_exclusions, automatic, incremental, scrub, excluded, diagnostics, oversized, structural)
     engine, settings = _retrieval_engine(retrieval, cap, budget, max_files, max_bytes, diagnostics)
     deep = None
     if engine is not None:
@@ -1500,7 +1522,7 @@ def _select_context(project, task, role=None, size="standard", max_tokens=None, 
             selected, excerpts, spent, intelligence, order = _intelligent_selection(
                 engine, settings, task, texts, hashes, explicit, role_id, changed, incremental, root,
                 excluded, scrub, compact, diagnostics, explain, oversized, rerank_answer, deep,
-                exclusions=excluded_paths, pack=base)
+                exclusions=excluded_paths, pack=base, structural=structural)
         except (OSError, UnicodeError, SyntaxError, ValueError, TypeError, KeyError, AttributeError,
                 IndexError, RecursionError, ZeroDivisionError):
             diagnostics.append("Repository intelligence failed; legacy retrieval used.")
@@ -1584,8 +1606,8 @@ def explain_retrieval(project, task, *, strategy="full", pack=None, exclude_path
     paths = _enumerate(root, diagnostics)
     automatic, _ = _automatic_exclusions(task, paths, root)
     cache = _parser_cache(root, writable=False, policy_extra=getattr(scrub, "_dispatcher_policy", None))
-    oversized = []
-    texts, hashes, _, _ = _scan_sources(root, paths, manual, automatic, cache, scrub, excluded, diagnostics, oversized)
+    oversized, structural = [], {}
+    texts, hashes, _, _ = _scan_sources(root, paths, manual, automatic, cache, scrub, excluded, diagnostics, oversized, structural)
     engine = _sibling("retrieval")
     try:
         settings = engine["configure"](strategy)
@@ -1597,12 +1619,8 @@ def explain_retrieval(project, task, *, strategy="full", pack=None, exclude_path
         history = (_git_history(root, settings["git"]["max_commits"], cache)
                    if settings["git"]["enabled"] and deep.partners is None else None)
         index = engine["build_index"](texts, hashes, _kind, cache=cache, history=history, config=settings, path_only=oversized,
-                                      store=deep.store, extended=deep.extended or None, partners=deep.partners, loader=deep.loader)
-        if deep.events:
-            deep.report["experience"]["attached"] = _sibling("experience")["attach"](
-                index, deep.events, deep.corrections, tuple(deep.settings["experience"]["eligible_outcomes"]))
-            if deep.report["experience"]["attached"] and "experience" not in settings["retrievers"]:
-                settings["retrievers"] = [*settings["retrievers"], "experience"]
+                                      store=deep.store, extended=deep.extended or None, partners=deep.partners, loader=deep.loader,
+                                      structural=structural)
         if deep.inferences:
             index.inferences = deep.inferences
             if "inference" not in settings["retrievers"]:

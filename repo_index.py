@@ -243,7 +243,8 @@ class RepoIndex:
 
     def __init__(self, records, kind_of, partners=None, path_only=()):
         self.records = records
-        self.path_only = set(path_only) - set(records)  # Known files whose content was not indexed.
+        # Known files whose content was not indexed: named only, or structural (definitions without retained text).
+        self.path_only = set(path_only) - {p for p, r in records.items() if not r.get("structural")}
         self.paths = sorted(set(records) | self.path_only)
         self.kinds = {path: ("test" if is_test(path) else kind_of(path)) for path in self.paths}
         self.size = max(1, len(records))

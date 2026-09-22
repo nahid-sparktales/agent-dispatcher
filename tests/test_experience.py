@@ -169,8 +169,10 @@ class RuntimeTests(unittest.TestCase):
         self.settings = self.root / "ri.json"
 
     def configure(self, **experience_settings):
-        self.settings.write_text(json.dumps({"experience": experience_settings}))
-        return mock.patch.dict(os.environ, {"AGENT_DISPATCHER_INDEX_CONFIG": str(self.settings)})
+        """The unified switch: experience retrieval lives in the repository-memory settings (on by default)."""
+        memory = self.root / "memory.json"
+        memory.write_text(json.dumps({"experience": {"retrieval": "on" if experience_settings.get("use") else "off"}}))
+        return mock.patch.dict(os.environ, {"AGENT_DISPATCHER_MEMORY_CONFIG": str(memory)})
 
     def cli(self, *arguments, env=None):
         return subprocess.run([sys.executable, "-B", str(CLI), *arguments, "--project", str(self.project), "--pack", str(ROOT)],
@@ -187,11 +189,12 @@ class RuntimeTests(unittest.TestCase):
         self.assertEqual(done.returncode, 0, done.stderr)
         recorded = json.loads(done.stdout)
         self.assertEqual((recorded["outcome"], recorded["eligible"], recorded["stored"]), ("checked_success", True, True))
-        plain = context.select_context(self.project, task, pack=ROOT)
-        self.assertEqual(plain["repository_intelligence"]["index"]["experience"], {"enabled": False, "attached": 0, "candidates": 0})
-        with self.configure(use=True):
-            used = context.select_context(self.project, task, pack=ROOT, explain=True)
-        self.assertEqual(used["repository_intelligence"]["index"]["experience"]["attached"], 1)
+        with self.configure(use=False):
+            plain = context.select_context(self.project, task, pack=ROOT)
+        self.assertNotIn("memory", plain)  # Retrieval off and nothing else built: the packet is the baseline packet.
+        used = context.select_context(self.project, task, pack=ROOT, explain=True)  # Defaults: experience on.
+        self.assertEqual(used["memory"]["layers"]["experience"]["matches"], 1)
+        self.assertTrue(used["memory"]["layers"]["experience"]["applied"])
         self.assertIn("experience rank #1", used["repository_intelligence"]["explain"])
         self.assertEqual(used["context"][0]["path"], "app/tokens.py")
         with self.configure(use=False):
@@ -207,9 +210,8 @@ class RuntimeTests(unittest.TestCase):
         first = next(row for row in rows if row["task_id"] == "task-1")
         done = self.cli("experience", "correct", first["id"], "--path", "app/tokens.py", "--verdict", "irrelevant", "--note", "wrong file", "--json")
         self.assertEqual(done.returncode, 0, done.stderr)
-        with self.configure(use=True):
-            corrected = context.select_context(self.project, task, pack=ROOT)
-        self.assertEqual(corrected["repository_intelligence"]["index"]["experience"]["attached"], 0)
+        corrected = context.select_context(self.project, task, pack=ROOT)
+        self.assertEqual(corrected["memory"]["layers"]["experience"]["candidates"], 0)
         done = self.cli("experience", "forget", "--task", "task-1", "--json")
         self.assertEqual(json.loads(done.stdout)["removed"], 1)
         done = self.cli("experience", "show", first["id"])

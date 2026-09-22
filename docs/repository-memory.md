@@ -8,12 +8,14 @@ recording controls:
 | --- | --- | --- | --- |
 | **Episodic** (`repo_history.py`) | eligible commits with admitted changed paths, old/new blob ids, rename evidence, changed symbols, issue/PR references, hotspots, co-change support | explicit `build` / `refresh` | `git.retrieval`: `off`, `shadow` (default), `on` |
 | **Semantic** (`repository_memory.py`) | deterministic module and repository records with evidence manifests; optional model summaries keyed to their evidence | `build`; `summaries generate` for model prose | `semantic.retrieval`: `off`, `shadow` (default), `on` |
-| **Experience** (`memory_experience.py`) | bounded task observations, verification receipts, corrections, forgetting | explicit `record` per task | `experience.recording` (off) and `experience.retrieval` (`off` default) |
+| **Experience** (`experience.py`, shared with the deep index) | bounded task events in the SQLite experience store, verification receipts, corrections, forgetting | explicit `record` per task | `experience.recording` **on** and `experience.retrieval` **on** by default |
 
-Everything ships **off**. Nothing is read, written or influenced until the user's own settings
-file exists outside every project, and `"enabled": false` (the default) suppresses every memory
-influence while leaving baseline retrieval, including the pre-existing Git co-change signal,
-untouched. With memory off, packets are byte-for-byte what they were before this feature.
+Defaults: experience recording and retrieval are **on**; episodic and semantic retrieval ship in
+`shadow` mode (they report what they would add and change nothing) until a project turns them
+`on`. A layer only has anything to say once a store was built (`build`) or a record was handed in
+(`record`): with nothing built and nothing recorded, a packet is byte-for-byte what it was before
+this feature, no file is created, and the master switch `"enabled": false` suppresses every memory
+influence while leaving baseline retrieval, including the pre-existing Git co-change signal, untouched.
 
 The design takes RepoMem (*Improving Code Localization with Repository Memory*, Wang et al.,
 ICLR 2026, [arXiv:2510.01003](https://arxiv.org/abs/2510.01003)) as motivation for commit memory
@@ -43,7 +45,7 @@ an absolute `XDG_CONFIG_HOME` moves the default). A file inside the inspected pr
   "git": {"retrieval": "on", "max_commits": 2000, "fields": ["message", "paths", "identifiers", "symbols"],
           "symbols": {"enabled": true, "max_commits": 300}},
   "semantic": {"retrieval": "shadow", "generation": {"enabled": false}},
-  "experience": {"recording": true, "retrieval": "off"},
+  "experience": {"recording": true, "retrieval": "on", "eligible_outcomes": ["checked_success", "accepted"]},
   "retrieval": {"rrf_weights": {"memory_git": 0.5, "memory_semantic": 0.5, "memory_experience": 0.5},
                 "max_events": 10, "max_files_per_event": 8, "file_affinity": 1.0,
                 "gate": {"min_concept_matches": 2, "min_relative_score": 0.25,
@@ -196,25 +198,42 @@ is one vote, not two.
 
 ## Experience memory
 
-An observation is what a host or user hands to `record` after a task: request text, category,
-retrieved/delivered/read/modified paths (`read` may be `null` when the host cannot observe reads;
-it is never invented), hypotheses, assertions with their author, limitations, an asserted
-outcome, and optionally a `--receipt`. Paths are admitted through the same policy and withheld
-ones are counted, not named. Outcomes are `unknown`, `in_progress`, `abandoned`, `partial`,
-`failed_verification`, `verified_scoped_success`, `reverted_or_invalidated`;
-`verified_scoped_success` is reachable only from a [verification receipt](verification.md) whose
-observed run reported passing tests and is still current for the snapshot; a stale receipt is
-`partial`, a failed run is `failed_verification`, and "42 tests passed" in an assertion stays an
-assertion. Modified test files set `tests_changed`, which is recorded as not independent
-evidence. Fingerprints of modified files bind a record to its snapshot; at retrieval a record whose
-files changed is `changed` and can only strengthen, never introduce.
+One store, one record shape, one voter. Experience lives in the SQLite `experience.sqlite` of the
+private state directory (`repo_store.ExperienceStore`), the same store that
+`repository_intelligence.py experience record|list|show|correct|forget` and the evaluation
+harnesses write, and every reader goes through the memory layer described here. The deep index
+no longer attaches experience on its own; `experience.use` in `repository-intelligence.json` is
+superseded by `experience.retrieval` in `repository-memory.json`.
 
-Corrections are new records that supersede the old one (which keeps its original outcome and a
-`superseded_by` pointer); a reverted or failed record is listed as caution and never votes for a
-file. Duplicate tasks are one provenance group with one vote. `forget` removes a record and the
-corrections that superseded it; `prune` applies age and count limits; `reset` never touches
-experience unless asked. All of this is logical deletion in a local file, not secure erasure.
-Experience is per project; nothing distills it into skills, instructions or other repositories.
+An observation is what a host or user hands to `record` after a task: request text, optional
+`task_id`, retrieved/read/modified paths (`read` may be `null` when the host cannot observe
+reads; it is never invented), hypotheses, assertions with their author, limitations, an asserted
+outcome, and optionally a `--receipt`. Paths are admitted through the same policy and withheld
+ones are counted, not named. The request is kept as weighted terms plus a bounded summary, never
+as the whole prose. Outcome categories are the shared vocabulary (`checked_success`, `accepted`,
+`grader_passed`, `exit_code_only`, `zero_tests`, `stale_checks`, `unresolved`, `failed_checks`,
+`infrastructure_error`, `cancelled`, `insufficient_evidence`, `reverted_or_invalidated`); the
+memory vocabulary is accepted and mapped (`partial` and `in_progress` -> `unresolved`,
+`failed_verification` -> `failed_checks`, `abandoned` -> `cancelled`, `unknown` ->
+`insufficient_evidence`). A verified success (`checked_success`) is reachable only from a
+[verification receipt](verification.md) whose observed run reported passing tests and is still
+current for the snapshot; a stale receipt is `stale_checks`, a failed run `failed_checks`, and
+"42 tests passed" in an assertion stays an assertion. Only `eligible_outcomes` (default
+`checked_success` and `accepted`) may vote; a harness may add `grader_passed` for its own
+oracle-labeled arms. Modified test files set `tests_changed`, recorded as not independent
+evidence. Fingerprints of edited files bind a record to its snapshot; at retrieval a file that
+changed since counts at half weight and a record whose files all changed can only strengthen,
+never introduce.
+
+Corrections come in two forms: a path verdict (`correct <id> --path P --verdict irrelevant|relevant`)
+that removes or adds one file from the record's vote, and a record-level outcome
+(`correct <id> --outcome reverted_or_invalidated --note ...`) that writes a superseding event while
+the original keeps its text and gains a `superseded_by` pointer. Superseded records never vote;
+`forget <id>` removes a record together with the corrections that superseded it; `prune
+--max-age-days N` removes old events, and the store retires the oldest beyond its cap; `reset`
+never touches experience unless asked. All of this is logical deletion in a local file, not
+secure erasure. Experience is per project (or per harness identity through
+`AGENT_DISPATCHER_INDEX_ID`); nothing distills it into skills, instructions or other repositories.
 
 ## Packet contract
 
@@ -264,9 +283,11 @@ keeps file-level history only.
 (boundary excluded, so the fix never leaks) and evaluates `full+memory` (gated), `full+memory-forced`
 (gate open) and `full+memory-messages` (commit-message field only) beside `full`, reporting
 Recall@k, Hit@k, AllTargets@k (RepoMem's Accuracy@k), MRR, strata by target count, and memory
-hit/use rates. `evals/retrieval/chronology.py` replays one repository's tasks in commit order with
-memory pinned before each task and an oracle-labeled experience arm, reporting per block with
-paired-bootstrap intervals and leakage checks. Results and their limits are in
+hit/use rates. `evals/retrieval/chronology.py` replays every given repository's tasks in commit order with
+memory pinned before each task and oracle-labeled experience arms through the shipped experience
+module and memory layer, pooling the repositories and reporting per repository and per block with
+paired-bootstrap intervals (task-level and repository-block) and leakage checks, so that one task
+on one repository never decides a verdict. Results and their limits are in
 [retrieval-benchmark.md](retrieval-benchmark.md#repository-memory). End-to-end runs with a host
 model are separate, paid experiments (`evals/end_to_end`, `memory_settings`).
 
@@ -278,6 +299,6 @@ model are separate, paid experiments (`evals/end_to_end`, `memory_settings`).
 - Symbol history covers Python precisely; other languages use declaration heuristics.
 - Issue and PR bodies are never fetched; only references found in commit messages are stored.
 - Subsystems are directories; there is no inferred architecture beyond module aggregates.
-- Experience records are only as good as the observations handed in; hosts that cannot observe reads leave `read` null.
+- Experience records are only as good as the observations handed in; hosts that cannot observe reads leave `read` null. Experience is on by default, but nothing is recorded until a host or user hands an observation to `record`.
 - Deletion and reset are local logical deletions.
 - Memory does not guarantee better localization, lower cost or improvement on any future task; the benchmark makes that measurable per layer.

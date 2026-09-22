@@ -554,7 +554,7 @@ def write_context(d):
         (ADAPTER / name).write_text(reference_text(name, d))
     for name in ("context.py", "context_packet.py", "context_reuse.py", "parser_cache.py", "project_map.py", "project_graph.py",
                  "repo_index.py", "retrieval.py", "context_budget.py", "llm_retrieval.py", "repo_store.py", "repo_builder.py", "exploration.py", "experience.py", "repository_intelligence.py",
-                 "repository_memory.py", "repo_history.py", "memory_experience.py",
+                 "repository_memory.py", "repo_history.py",
                  "resources.py", "verification.py", "preferences.py", "change_audit.py"):
         (ADAPTER / name).write_bytes((ROOT / name).read_bytes())
     (ADAPTER / "jev.md").write_text(decision_guide())
@@ -836,6 +836,10 @@ def write_commands(d):
             "Saved effort requests do not prove the host changed effort. "
             "Before checks, read VERIFICATION.md beside the dispatcher SKILL.md; record authorized "
             "checks and inspect their freshness before reporting. Never wrap a denied command to bypass it. "
+            "After substantial guided work, hand the outcome to repository memory once: python3 -B PACK/repository_memory.py "
+            "record --project PROJECT --observation-file - with JSON on stdin (task, modified, read when observed, "
+            "outcome; --receipt RECEIPT when checks ran). MEMORY.md beside SKILL.md has the contract; a claimed success "
+            "is never recorded as verified. "
             "Default final output is ELI5 succinct: answer first, plain language, usually under 150 words; "
             "include actual results and unresolved limits.\n\n")
         (CMDS / f"agent-{r['slug']}.md").write_text(

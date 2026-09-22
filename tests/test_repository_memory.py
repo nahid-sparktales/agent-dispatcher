@@ -15,7 +15,7 @@ import unittest
 from unittest import mock
 
 import context
-import memory_experience as experience
+import experience
 import repo_history
 import repository_memory as memory
 import retrieval
@@ -159,10 +159,11 @@ class MemoryCase(unittest.TestCase):
 
 
 class BaselineAndPermissionInvariants(MemoryCase):
-    def test_without_settings_nothing_is_read_written_or_changed(self):
+    def test_without_stores_nothing_is_read_written_or_changed_even_with_defaults_on(self):
         before = self.state_files()
+        self.assertTrue(memory.DEFAULTS["enabled"] and memory.DEFAULTS["experience"]["retrieval"] == "on")
         plain = context.select_context(self.project, TASK, pack=ROOT)
-        self.assertNotIn("memory", plain)
+        self.assertNotIn("memory", plain)  # Nothing built, nothing recorded: no section, no files, no influence.
         self.assertEqual(self.state_files(), before)
         disabled = self.enable(enabled=False, git={"retrieval": "on"}, experience={"retrieval": "on", "recording": True})
         self.assertFalse(disabled["enabled"])
@@ -202,17 +203,17 @@ class BaselineAndPermissionInvariants(MemoryCase):
     def test_recording_and_retrieval_controls_are_independent(self):
         self.build()
         self.enable(experience={"recording": False, "retrieval": "on"})
-        observation = {"task": TASK, "category": "bug", "modified": ["app/db.py"], "outcome": "partial"}
+        observation = {"task": TASK, "modified": ["app/db.py"], "outcome": "accepted"}
         self.assertEqual(memory.record_experience(self.project, observation, pack=ROOT)["status"], "recording_disabled")
-        self.assertIsNone(self.store("experience"))
+        self.assertIsNone(memory.experience_store(self.project.resolve()))
         self.assertEqual(memory.layer(self.project.resolve(), self.scan()[1], TASK, pack=ROOT)["report"]["layers"]["experience"]["state"], "unavailable")
         self.enable(experience={"recording": True, "retrieval": "off"})
         self.assertEqual(memory.record_experience(self.project, observation, pack=ROOT)["status"], "recorded")
-        self.assertEqual(len(self.store("experience")["records"]), 1)
+        self.assertEqual(memory.status(self.project, settings(), pack=ROOT)["experience"]["records"], 1)
         report = memory.layer(self.project.resolve(), self.scan()[1], TASK, pack=ROOT)["report"]
         self.assertEqual(report["layers"]["experience"]["mode"], "off")
         self.enable(experience={"recording": False, "retrieval": "on"})
-        self.assertEqual(len(self.store("experience")["records"]), 1)  # Disabling recording deletes nothing.
+        self.assertEqual(memory.status(self.project, settings(), pack=ROOT)["experience"]["records"], 1)  # Disabling recording deletes nothing.
 
     def test_read_only_operations_create_no_state(self):
         self.enable(git={"retrieval": "on"})
@@ -545,87 +546,102 @@ class SemanticRecords(MemoryCase):
 
 
 class ExperienceCorrectness(MemoryCase):
+    """The unified experience layer: one SQLite store shared with repository_intelligence.py and the harnesses."""
+
     def setUp(self):
         super().setUp()
-        self.build(experience={"recording": True, "retrieval": "on"})
+        self.build()  # defaults: recording on, retrieval on
         self.receipts = Path(self.cache.name).resolve() / "receipts"
         self.receipts.mkdir()
 
     def test_claimed_success_is_never_verified_and_a_passing_receipt_is(self):
-        with self.assertRaises(memory.RepositoryMemoryError):
-            memory.record_experience(self.project, {"task": TASK, "outcome": "verified_scoped_success", "modified": ["app/db.py"]}, pack=ROOT)
-        asserted = memory.record_experience(self.project, {"task": TASK, "category": "bug", "modified": ["app/db.py"], "outcome": "partial",
+        for claimed in ("verified_scoped_success", "checked_success", "grader_passed"):
+            with self.subTest(claimed=claimed), self.assertRaises(memory.RepositoryMemoryError):
+                memory.record_experience(self.project, {"task": TASK, "outcome": claimed, "modified": ["app/db.py"]}, pack=ROOT)
+        asserted = memory.record_experience(self.project, {"task": TASK, "modified": ["app/db.py"], "outcome": "partial",
                                                            "assertions": [{"by": "agent", "claim": "42 tests passed"}]}, pack=ROOT)
-        self.assertEqual((asserted["outcome"], asserted["verification"]), ("partial", "asserted"))
+        self.assertEqual((asserted["outcome"], asserted["eligible"], asserted["verification"]), ("unresolved", False, "explicit"))
         receipt = self.receipts / "receipt.json"
         verification.run_check(self.project, receipt, [sys.executable, "-B", "-m", "unittest", "discover", "-s", "tests", "-t", "."],
                                kind="tests", pack=ROOT)
-        verified = memory.record_experience(self.project, {"task": TASK + " again", "category": "bug", "modified": ["app/db.py"], "read": ["app/db.py"]},
+        verified = memory.record_experience(self.project, {"task": TASK + " again", "modified": ["app/db.py"], "read": ["app/db.py"]},
                                             pack=ROOT, receipt=str(receipt))
-        self.assertEqual((verified["outcome"], verified["verification"]), ("verified_scoped_success", "receipt"))
+        self.assertEqual((verified["outcome"], verified["eligible"], verified["verification"]), ("checked_success", True, "receipt"))
         record = memory.view_experience(self.project, verified["record_id"])
-        self.assertEqual(record["verification"]["observed"]["outcome"], "tests_passed")
-        self.assertEqual(record["modified_fingerprints"]["app/db.py"], self.scan()[1].hashes["app/db.py"])
+        self.assertEqual(record["checks"]["observations"][-1]["outcome"], "tests_passed")
+        self.assertEqual(record["edited"][0]["sha256"], self.scan()[1].hashes["app/db.py"])
+        self.assertEqual(record["inspected"], ["app/db.py"])
+        self.assertLessEqual(len(record["task"]["summary"]), experience.MAX_SUMMARY)  # Terms plus a bounded summary, never the whole request.
         self.assertFalse(record["tests_changed"])
         changed_tests = memory.record_experience(self.project, {"task": "loosen the db test", "modified": ["tests/test_db.py"]}, pack=ROOT, receipt=str(receipt))
         self.assertTrue(memory.view_experience(self.project, changed_tests["record_id"])["tests_changed"])
         self.assertTrue(any("not independent evidence" in l for l in changed_tests["limitations"]))
         with self.assertRaises(memory.RepositoryMemoryError):
             memory.record_experience(self.project, {"task": "x", "modified": ["app/db.py"]}, pack=ROOT, receipt=str(self.receipts / "missing.json"))
+        # The same store is what repository_intelligence.py reads and writes.
+        done = subprocess.run([sys.executable, "-B", str(ROOT / "repository_intelligence.py"), "experience", "list", "--project", str(self.project),
+                               "--pack", str(ROOT), "--json"], capture_output=True, text=True, env=dict(os.environ))
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertEqual({row["outcome"] for row in json.loads(done.stdout)["events"]}, {"unresolved", "checked_success"})
 
     def test_unobservable_reads_are_not_invented_and_withheld_paths_are_counted(self):
         done = memory.record_experience(self.project, {"task": TASK, "modified": ["app/db.py", ".env", "../outside.py"], "read": None}, pack=ROOT)
         record = memory.view_experience(self.project, done["record_id"])
-        self.assertIsNone(record["read"])
-        self.assertEqual(record["modified"], ["app/db.py"])
-        self.assertEqual(record["withheld_paths"], {"modified": 2})
-        self.assertNotIn(".env", json.dumps(record))
+        self.assertEqual(record["inspected"], [])
+        self.assertEqual([row["path"] for row in record["edited"] if row["sha256"]], ["app/db.py"])
+        self.assertEqual(done["withheld_paths"], {"modified": 1})
+        self.assertNotIn("hunter2", json.dumps(record))
 
     def test_duplicates_corrections_forgetting_and_freshness(self):
-        first = memory.record_experience(self.project, {"task": TASK, "modified": ["app/db.py"], "outcome": "partial"}, pack=ROOT)
-        again = memory.record_experience(self.project, {"task": TASK, "modified": ["app/db.py"], "outcome": "partial"}, pack=ROOT)
+        first = memory.record_experience(self.project, {"task": TASK, "modified": ["app/db.py"], "outcome": "accepted"}, pack=ROOT)
+        again = memory.record_experience(self.project, {"task": TASK, "modified": ["app/db.py"], "outcome": "accepted"}, pack=ROOT)
         self.assertEqual((again["status"], again["record_id"]), ("duplicate", first["record_id"]))
-        later = memory.record_experience(self.project, {"task": TASK + " once more", "modified": ["app/db.py"], "outcome": "partial",
+        later = memory.record_experience(self.project, {"task": TASK + " once more", "modified": ["app/db.py"], "outcome": "accepted",
                                                         "hypotheses": ["the Pool is never released"]}, pack=ROOT)
         index = self.scan()[1]
         found = memory.search_experience(self.project, TASK, pack=ROOT)["items"]
-        rows = experience.candidates(found)
+        self.assertEqual({item["id"] for item in found}, {first["record_id"], later["record_id"]})
+        self.assertEqual(found[0]["files"], ["app/db.py"])
+        rows = memory.layer(self.project.resolve(), index, TASK, pack=ROOT)["extra"]["experience"]
         self.assertEqual([r["file"] for r in rows], ["app/db.py"])
-        one = experience.candidates([found[0], dict(found[0])])  # A repeated narrative is one provenance group: no double vote.
-        self.assertEqual(one[0]["score"], experience.candidates([found[0]])[0]["score"])
+        self.assertIn("experience, not a repository fact", rows[0]["reason"])
         fixed = memory.correct_experience(self.project, first["record_id"], outcome="reverted_or_invalidated", note="the leak came back", pack=ROOT)
-        records = self.store("experience")["records"]
-        original = next(r for r in records if r["record_id"] == first["record_id"])
-        self.assertEqual(original["superseded_by"], fixed["record_id"])
-        self.assertEqual(original["outcome"], "partial")  # The historical observation is not rewritten.
+        original = memory.view_experience(self.project, first["record_id"])
+        self.assertEqual((original["status"], original["superseded_by"], original["outcome"]), ("superseded", fixed["id"], "accepted"))
         items = memory.search_experience(self.project, TASK, pack=ROOT)["items"]
-        self.assertNotIn(first["record_id"], [i["record_id"] for i in items])
-        correction = next(i for i in items if i["record_id"] == fixed["record_id"])
-        self.assertTrue(correction["caution"])
-        report = memory.layer(self.project.resolve(), index, TASK, pack=ROOT)["report"]
-        self.assertTrue(all(not h["applied"] for h in report["hits"] if h["kind"] == "experience" and h["id"] == fixed["record_id"]))
+        self.assertNotIn(first["record_id"], [i["id"] for i in items])  # Superseded and the correction is not eligible: neither votes.
+        self.assertNotIn(fixed["id"], [i["id"] for i in items])
+        path_fix = memory.correct_experience(self.project, later["record_id"], path="app/db.py", verdict="irrelevant", note="wrong file", pack=ROOT)
+        self.assertEqual(path_fix["verdict"], "irrelevant")
+        self.assertEqual(memory.layer(self.project.resolve(), index, TASK, pack=ROOT)["report"]["layers"]["experience"]["candidates"], 0)
         gone = memory.forget_experience(self.project, first["record_id"])
-        self.assertEqual(set(gone["removed"]), {first["record_id"], fixed["record_id"]})
-        self.assertEqual([r["record_id"] for r in self.store("experience")["records"]], [later["record_id"]])
+        self.assertEqual(gone["removed"], 2)  # The record and the correction that superseded it.
+        self.assertIsNone(memory.experience_store(self.project.resolve()).__enter__().get_event(fixed["id"]))
         write(self.project, "app/db.py", DB_FIXED + "\n# moved on\n")
         try:
+            memory.correct_experience(self.project, later["record_id"], path="app/db.py", verdict="relevant", note="it was right", pack=ROOT)
             item = memory.search_experience(self.project, TASK, pack=ROOT)["items"][0]
-            self.assertEqual(item["freshness"], "changed")
-            state = memory.layer(self.project.resolve(), self.scan()[1], TASK, pack=ROOT)["report"]["layers"]["experience"]["state"]
-            self.assertEqual(state, "use_limited")
+            self.assertEqual(item["freshness"], "unknown")  # A user-asserted path carries no fingerprint to compare.
+            memory.record_experience(self.project, {"task": TASK + " third time", "modified": ["app/db.py"], "outcome": "accepted"}, pack=ROOT)
         finally:
             git(self.project, "checkout", "-q", "--", "app/db.py")
-        self.assertEqual(memory.prune_experience(self.project, max_age_days=1)["remaining"], 1)
-        self.assertEqual(memory.prune_experience(self.project, max_age_days=-1)["remaining"], 0)
+        item = next(i for i in memory.search_experience(self.project, TASK + " third time", pack=ROOT)["items"] if i["summary"].endswith("third time"))
+        self.assertEqual(item["freshness"], "changed")  # Recorded against the edited file, compared with the checked-out one.
+        state = memory.layer(self.project.resolve(), self.scan()[1], TASK + " third time", pack=ROOT)["report"]["layers"]["experience"]["state"]
+        self.assertIn(state, {"use", "use_limited"})
+        self.assertEqual(memory.prune_experience(self.project, max_age_days=1)["removed"], 0)
+        self.assertGreaterEqual(memory.prune_experience(self.project, max_age_days=-1)["removed"], 1)
 
     def test_failures_stay_scoped_and_never_vote(self):
         memory.record_experience(self.project, {"task": TASK, "modified": ["app/db.py"], "outcome": "failed_verification",
                                                 "hypotheses": ["closing in serve() fixes it"]}, pack=ROOT)
-        items = memory.search_experience(self.project, TASK, pack=ROOT)["items"]
-        self.assertTrue(items[0]["caution"])
-        self.assertEqual(experience.candidates(items), [])
+        record = memory.view_experience(self.project, memory.status(self.project, settings(), pack=ROOT)["experience"] and
+                                        next(iter(memory.experience_store(self.project.resolve()).__enter__().events()))["id"])
+        self.assertEqual(record["outcome"], "failed_checks")
+        self.assertEqual(record["notes"]["hypotheses"], ["closing in serve() fixes it"])
+        self.assertEqual(memory.search_experience(self.project, TASK, pack=ROOT)["items"], [])  # Not eligible: never a candidate.
         report = memory.layer(self.project.resolve(), self.scan()[1], TASK, pack=ROOT)["report"]["layers"]["experience"]
-        self.assertEqual(report["state"], "ignore_unresolved")
+        self.assertEqual((report["state"], report["candidates"]), ("ignore_weak", 0))
 
 
 class RetrievalAndBudgets(MemoryCase):
@@ -717,7 +733,7 @@ class RetrievalAndBudgets(MemoryCase):
 
 class CommandLineAndDistribution(MemoryCase):
     def test_cli_round_trip(self):
-        self.enable(git={"retrieval": "on"}, experience={"recording": True, "retrieval": "on"})
+        self.enable(git={"retrieval": "on"})
         plan = self.cli("dry-run")
         self.assertEqual(plan["writes"], "none (dry run)")
         built = self.cli("build")
@@ -732,17 +748,17 @@ class CommandLineAndDistribution(MemoryCase):
         self.assertEqual(self.cli("search-summary", "connect pool", "--level", "module")["items"][0]["id"], "module:app")
         self.assertEqual(self.cli("view-summary", "module:app")["level"], "module")
         observation = Path(self.cache.name) / "observation.json"
-        observation.write_text(json.dumps({"task": TASK, "category": "bug", "modified": ["app/db.py"], "outcome": "partial"}))
+        observation.write_text(json.dumps({"task": TASK, "modified": ["app/db.py"], "outcome": "accepted"}))
         recorded = self.cli("record", "--observation-file", str(observation))
-        self.assertEqual(recorded["status"], "recorded")
-        self.assertEqual(self.cli("search-experience", TASK)["items"][0]["record_id"], recorded["record_id"])
+        self.assertEqual((recorded["status"], recorded["outcome"]), ("recorded", "accepted"))
+        self.assertEqual(self.cli("search-experience", TASK)["items"][0]["id"], recorded["record_id"])
         corrected = self.cli("correct", recorded["record_id"], "--outcome", "abandoned", "--note", "gave up")
-        self.assertEqual(self.cli("view-experience", corrected["record_id"])["outcome"], "abandoned")
+        self.assertEqual(self.cli("view-experience", corrected["id"])["outcome"], "cancelled")
         explained = self.cli("explain", TASK)
         self.assertEqual(explained["layers"]["git"]["state"], "use")
-        self.assertEqual(self.cli("forget", recorded["record_id"])["removed"], sorted([recorded["record_id"], corrected["record_id"]]))
+        self.assertEqual(self.cli("forget", recorded["record_id"])["removed"], 2)
         self.assertEqual(self.cli("reset")["removed"], ["episodic", "semantic"])
-        self.assertIsNotNone(self.store("experience"))
+        self.assertIsNotNone(memory.experience_store(self.project.resolve()))
         self.assertEqual(self.cli("reset", "--forget-experience")["removed"], ["experience"])
         self.cli("examine-commit", "nope", code=2)
 

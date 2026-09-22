@@ -592,21 +592,24 @@ Two optional layers sit on top, each switched separately in your own
 ask bounded, validated questions of the index and stores evidence-backed architectural notes
 labeled as inferences (`explore`, off by default, zero model calls when off), and task experience
 that a host records explicitly from real receipts (`experience record|list|correct|forget`) and
-that later similar requests may use as one labeled, half-weight vote (`experience.use`, off by
-default). A zero-test run, an exit code alone or a stale receipt never counts as success. See
+that later similar requests may use as one labeled, half-weight vote through the unified memory
+layer (`experience.retrieval` in `repository-memory.json`, on by default). A zero-test run, an exit
+code alone or a stale receipt never counts as success. See
 [docs/repository-index.md](docs/repository-index.md).
 
 ### Optional repository memory
 
-Also **off by default**, and separately switched: `~/.config/agent-dispatcher/repository-memory.json`
-(or `AGENT_DISPATCHER_MEMORY_CONFIG`) enables three layers of reusable repository knowledge kept in
-private state outside the project and used only through the current admitted source index.
+Three separately switched layers of reusable repository knowledge kept in private state outside
+the project and used only through the current admitted source index, configured in
+`~/.config/agent-dispatcher/repository-memory.json` (or `AGENT_DISPATCHER_MEMORY_CONFIG`).
+Experience is on by default; episodic and semantic retrieval ship in `shadow` mode. Nothing has any
+effect until a store is built or an observation is recorded.
 
 | Layer | Holds | Built by |
 | --- | --- | --- |
 | Episodic | eligible commits reachable from HEAD, admitted changed paths, rename lineage, changed symbols, issue/PR references, hotspots | `repository_memory.py build` / `refresh` |
 | Semantic | deterministic module records with evidence manifests; optional model summaries keyed to their evidence | `build`; `summaries generate` |
-| Experience | bounded task observations, verification receipts, corrections, forgetting | `record` after a task, if recording is enabled |
+| Experience | bounded task events in the shared SQLite store (also written by `repository_intelligence.py experience`), verification receipts, corrections, forgetting | `record` after a task |
 
 Each layer's retrieval is `off`, `shadow` (reports what it would add, changes nothing) or `on`. At
 query time a deterministic gate labels every layer `use`, `use_limited` (may strengthen files source

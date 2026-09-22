@@ -509,11 +509,15 @@ def state_path(project, state_file=STATE_FILE):
     return _private().state_directory(_root(project)) / state_file
 
 
-def _state_fd(root, create=False):
-    """Open the private state directory. Nothing under the project is ever created or written."""
+def _state_fd(root, create=False, directory=None):
+    """Open the private state directory. Nothing under the project is ever created or written.
+
+    `directory` lets a caller that keys state by an explicit identity (a benchmark sequence) reuse the
+    same hardened walk; it must still be a private directory outside the project.
+    """
     try:
         helper = _private()
-        directory = helper.state_directory(root)
+        directory = Path(directory) if directory is not None else helper.state_directory(root)
         if directory == root or root in directory.parents:
             raise ProjectMapError("Project map state must live outside the project; set XDG_CACHE_HOME elsewhere.")
         with helper.private_directory(directory, create) as fd:
@@ -575,9 +579,9 @@ def _read_state(fd, *, state_file=STATE_FILE, validator=_valid_map, max_bytes=MA
         os.close(source)
 
 
-def _load(root, *, state_file=STATE_FILE, validator=_valid_map, max_bytes=MAX_MAP_BYTES):
+def _load(root, *, state_file=STATE_FILE, validator=_valid_map, max_bytes=MAX_MAP_BYTES, directory=None):
     """Private state wins; an in-project file from before the relocation is only ever read."""
-    for opener in (_state_fd, _legacy_fd):
+    for opener in ((lambda r: _state_fd(r, directory=directory)), _legacy_fd):
         fd = opener(root)
         if fd is None:
             continue
@@ -591,7 +595,7 @@ def _load(root, *, state_file=STATE_FILE, validator=_valid_map, max_bytes=MAX_MA
 
 
 def _write(root, data, refresh, *, expected=_EXPECTED_UNSET, state_file=STATE_FILE,
-           validator=_valid_map, max_bytes=MAX_MAP_BYTES):
+           validator=_valid_map, max_bytes=MAX_MAP_BYTES, directory=None):
     if not isinstance(state_file, str) or not re.fullmatch(r"[a-z][a-z0-9-]{0,63}\.json", state_file):
         raise ProjectMapError("Cache target must be a bounded local JSON filename.")
     raw = (json.dumps(data, indent=2, ensure_ascii=False) + "\n").encode("utf-8")
@@ -605,7 +609,7 @@ def _write(root, data, refresh, *, expected=_EXPECTED_UNSET, state_file=STATE_FI
             inherited = _read_state(legacy, state_file=state_file, validator=validator, max_bytes=max_bytes)[0]
         finally:
             os.close(legacy)
-    fd = _state_fd(root, create=True)
+    fd = _state_fd(root, create=True, directory=directory)
     temporary = "." + Path(state_file).stem + "-" + secrets.token_hex(8) + ".tmp"
     created = False
     try:

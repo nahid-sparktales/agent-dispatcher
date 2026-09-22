@@ -78,6 +78,14 @@ as `MAX_RETRIES`, and backticked code. Identifiers weigh three to four times a p
 word; their subtokens (`execute_table` also contributes `execute`, `table`) weigh half. Generic
 words (fix, change, keep, update, handles ...) weigh nothing and are shown so you can see that.
 
+Stack-trace frames are read as frames, not as prose: `File "/venv/.../sqlglot/planner.py", line 6,
+in run` and `at run (/home/me/app/src/x.ts:12:5)` each yield a path, a line and a function name.
+The path is matched by its longest suffix that exists in the index (a bare file name only when it
+is unique), votes in the path retriever with the explicit-path weight (the innermost frame, last
+in Python and first in JavaScript, counts double), anchors that file's excerpt on the frame's line,
+and the function name becomes a symbol. Frames are never pinned: a traceback lists the call path,
+not only the bug (`frames.enabled`, `full-frames` ablation).
+
 ## Candidate retrievers
 
 Each retriever is a function `(query, index, config) -> ranked candidates` registered in
@@ -122,6 +130,12 @@ Other languages use declaration patterns (functions, classes, interfaces, types,
 constants) and relative JS/TS imports; they have no call or inheritance edges, and a file that
 fails to parse is still indexed lexically. Nothing is guessed: an unknown relationship stays
 unknown.
+
+An admitted file over the 256 KiB read limit gets a *structural* record: it is read once (up to
+4 MiB), redacted, parsed with the same extractor, and only its definitions, imports, calls and base
+classes are kept, never its text or terms. Such a file can be found by the symbol it defines and
+takes part in edges, but it is never excerpted; the packet marks it "over the file read limit"
+(`structural_records`, `full-structure` ablation).
 
 From the records the index resolves edges: `imports`, `calls`, `references` (a distinctive name
 defined in at most three files), `inherits`, and `tested_by` (test naming such as
