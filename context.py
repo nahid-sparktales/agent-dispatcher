@@ -47,8 +47,10 @@ STOP = set("a an the and or of in on at for to from with this that it its is are
            "code project repo repository task source target existing current config tests test "
            "src lib app py js ts tsx jsx json md yaml yml toml css html txt".split())
 WORD = re.compile(r"[A-Za-z_][A-Za-z0-9_]{1,79}")
-DEFINITION = re.compile(r"^\s*(?:(?:export|default|async|public|private|static|abstract)\s+)*"
-                        r"(?:def|class|function|interface|type|const|let|var|enum|struct|func)\s+(\w+)")
+# The same keywords, modifiers and Go receiver as repo_index.GENERIC_DEF; one group, the name.
+DEFINITION = re.compile(r"^\s*(?:(?:export|default|declare|async|public|private|protected|static|abstract|final|unsafe|extern|pub(?:\([a-z]+\))?)\s+)*"
+                        r"(?:function\*?|class|interface|type|enum|struct|trait|impl|fn|func|def|module|namespace|const|let|var)\s+"
+                        r"(?:\([^)\n]*\)\s*)?([A-Za-z_$][\w$]*)")
 MANIFESTS = {"package.json", "pyproject.toml", "requirements.txt", "go.mod", "Cargo.toml",
              "Gemfile", "composer.json", "Makefile", "CMakeLists.txt"}
 RULES = {"AGENTS.md", "CLAUDE.md", "CONTRIBUTING.md"}

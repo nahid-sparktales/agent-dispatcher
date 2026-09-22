@@ -13,6 +13,7 @@ from unittest import mock
 
 import context
 import project_map
+import repo_index
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -48,6 +49,20 @@ class ContextTests(unittest.TestCase):
         self.assertTrue({"config/auth.json", "tests/test_auth.py"} <= set(self.paths(result)))
         self.assertNotIn("docs/distractor.md", self.paths(result))
         self.assertTrue(any("paired test" in c["reason"] for c in result["context"]))
+
+    def test_definition_regex_agrees_with_the_index_regex(self):
+        lines = ["def name(", "class name:", "function name(", "function* name(", "export default async function name(",
+                 "interface name {", "type name =", "enum name {", "struct name {", "trait name {", "impl name {",
+                 "pub(crate) fn name(", "fn name(", "func name(", "module name", "namespace name {",
+                 "declare const name", "let name", "var name", "    protected static final class name {"]
+        for line in lines:
+            self.assertEqual(context.DEFINITION.match(line).group(1), "name", line)
+            self.assertEqual(repo_index.GENERIC_DEF.match(line).group(3), "name", line)
+        self.assertEqual(context.DEFINITION.match("func (s *Server) Start() {").group(1), "Start")
+        self.assertEqual(context.DEFINITION.match("const $el = 1").group(1), "$el")
+        for line in ("protected static name", "name = 1", "return value"):
+            self.assertIsNone(context.DEFINITION.match(line), line)
+            self.assertIsNone(repo_index.GENERIC_DEF.match(line), line)
 
     def test_definition_outranks_equally_relevant_references(self):
         self.write("a-reference.py", "print(validateLogin())\n")
