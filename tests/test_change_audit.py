@@ -315,7 +315,7 @@ class ChangeAuditTests(unittest.TestCase):
         self.assertEqual(result["changes"]["added"], ["report.md"])
         self.assertFalse(Path(start["state"]).exists())
 
-    def test_context_audit_baseline_includes_first_helper_writes(self):
+    def test_context_audit_sees_no_project_change_from_index_maintenance(self):
         subprocess.run(["git", "init", "-q", str(self.project)], check=True)
         self.write("core.py", "def value():\n    return 1\n")
         result = context.select_context(self.project, "Inspect value and dependencies", pack=ROOT,
@@ -323,8 +323,13 @@ class ChangeAuditTests(unittest.TestCase):
         audit = result["change_audit"]
         self.states.append(Path(audit["state"]))
         final = self.finish(audit, writable_paths=[])
-        self.assertEqual(final["changes"]["added"], [".agent-dispatcher/project-graph.json", ".agent-dispatcher/project-map.json"])
+        # Both indexes were persisted, but to private state: the working tree is exactly as the task found it.
+        self.assertTrue(result["project_map"]["maintenance"]["persisted"] and result["project_graph"]["maintenance"]["persisted"])
+        self.assertEqual(final["changes"]["added"], [])
+        self.assertEqual(final["scope_status"], "within_scope")
+        self.assertFalse((self.project / ".agent-dispatcher").exists())
         self.assertFalse(result["read_only"])
+        self.assertTrue(result["project_read_only"])
 
     def test_context_audit_propagates_read_exclusions(self):
         subprocess.run(["git", "init", "-q", str(self.project)], check=True)

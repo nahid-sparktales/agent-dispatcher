@@ -286,11 +286,16 @@ class InstallerTests(unittest.TestCase):
                                       capture_output=True, text=True, timeout=10)
             self.assertEqual(selected.returncode, 0, selected.stderr)
             self.assertIn("session.py", [row["path"] for row in json.loads(selected.stdout)["context"]])
-            action = "refresh" if (project / ".agent-dispatcher/project-map.json").exists() else "build"
+            # The map is private state outside the project, so ask the helper whether one exists.
+            shown = subprocess.run([sys.executable, "-B", str(pack / "project_map.py"), "show",
+                                    "--project", str(project), "--json"], cwd=self.root, env=self.env,
+                                   capture_output=True, text=True, timeout=10)
+            action = "build" if json.loads(shown.stdout)["status"] == "missing" else "refresh"
             mapped = subprocess.run([sys.executable, "-B", str(pack / "project_map.py"), action,
                                      "--project", str(project), "--json"], cwd=self.root, env=self.env,
                                     capture_output=True, text=True, timeout=10)
             self.assertEqual(mapped.returncode, 0, mapped.stderr)
+            self.assertFalse((project / ".agent-dispatcher").exists())
             inspected = subprocess.run([sys.executable, "-B", str(pack / "project_map.py"), "show",
                                         "--project", str(project), "--json"], cwd=self.root, env=self.env,
                                        capture_output=True, text=True, timeout=10)
@@ -353,6 +358,10 @@ class RecoverableInstallerTests(unittest.TestCase):
             "context_reuse.py": "# optional retained evidence ledger\n",
             "parser_cache.py": "# private incremental source and parser cache\n",
             "project_graph.py": "# source-backed structural graph\n",
+            "repo_index.py": "# repository facts index\n",
+            "retrieval.py": "# retrieval engine\n",
+            "context_budget.py": "# context budget optimizer\n",
+            "llm_retrieval.py": "# optional LLM-assisted retrieval\n",
             "project_map.py": "# explicit map builder and read-only inspector\n",
             "resources.py": "# read-only package resource resolver\n",
             "verification.py": "# task-scoped check evidence\n",

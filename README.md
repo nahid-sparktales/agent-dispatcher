@@ -53,8 +53,15 @@ flowchart TD
 ```
 
 Preparation searches permitted files, reuses valid cached evidence, and ranks relevant facts,
-symbols, relationships, and excerpts for the task. The agent receives that selected context;
-the full repository index stays local. When useful independent subtasks exist, the host's
+symbols, relationships, and excerpts for the task. Ranking is
+[repository intelligence](docs/repository-intelligence.md): the request's paths, modules and
+symbols are weighed above its prose, several independent retrievers vote through rank fusion,
+strong results pull in structurally and historically related files, and every selected file
+says why it is there (`python3 -B retrieval.py explain "<request>"`). It is measured on real
+changes by an [offline benchmark](docs/retrieval-benchmark.md). An opt-in layer can add model-written
+file role summaries and a bounded candidate reranker ([LLM-assisted retrieval](docs/llm-assisted-retrieval.md));
+it is off, and nothing is sent anywhere, unless your own settings file enables it. The agent receives that selected
+context; the full repository index stays local. When useful independent subtasks exist, the host's
 subagent tools can handle them with separate scopes.
 
 The local indexing helpers make no model or network calls and run during preparation, without
@@ -397,8 +404,8 @@ purposes; none stores a conversation or replaces the host's instructions.
 
 | Stored data | Location | Purpose |
 | --- | --- | --- |
-| Fact map | `.agent-dispatcher/project-map.json` | Feature locations, declared dependencies, test commands, and documented architecture decisions, with source locations and fingerprints. |
-| Structural graph | `.agent-dispatcher/project-graph.json` | Files, Python symbols, imports, supported direct calls, and candidate test relationships, with evidence and confidence labels. |
+| Fact map | `~/.cache/agent-dispatcher/state-v1/<project id>/project-map.json` | Feature locations, declared dependencies, test commands, and documented architecture decisions, with source locations and fingerprints. |
+| Structural graph | `~/.cache/agent-dispatcher/state-v1/<project id>/project-graph.json` | Files, Python symbols, imports, supported direct calls, and candidate test relationships, with evidence and confidence labels. |
 | Incremental parser cache | `~/.cache/agent-dispatcher/parser-v1/` | Authenticated records of redacted source text, extracted facts, and resolved graphs for reuse. |
 
 During substantial guided work, `context.py --compact --map-maintain` requests automatic

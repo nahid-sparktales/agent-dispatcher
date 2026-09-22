@@ -2,6 +2,61 @@
 
 ## Unreleased
 
+- Move the project map and structural graph out of the working tree. Both now persist to
+  owner-only private state at `~/.cache/agent-dispatcher/state-v1/<project id>/` (under an
+  absolute `XDG_CACHE_HOME` when set), keyed like the parser cache and refused if that
+  location would fall inside the project. Index maintenance therefore no longer creates
+  `.agent-dispatcher/`, appears in `git status`, or shows up as an out-of-scope change in a task
+  audit; packets report `project_read_only: true` even when an index was persisted. An
+  in-project `.agent-dispatcher/project-map.json` or `project-graph.json` from an older release
+  is still validated and read when no private copy exists, counts as the existing map for
+  `build`/`refresh`, and is never rewritten or deleted. Cache write scope is unchanged: the
+  logical targets keep their names, and a preview, a restricted or read-only task, or a
+  `--writable-path` list that omits them still defers persistence. The end-to-end warm-index
+  setup now requires a byte-identical workspace and proves persistence from packet evidence
+  (`index_evidence_digest`); warm results from before this change are not comparable. The
+  test suite redirects this state to a temporary `XDG_CACHE_HOME`.
+- Replace flat "request words -> files" scoring with a repository-intelligence retrieval layer
+  (`repo_index.py` facts, `retrieval.py` engine, `context_budget.py` packet). Requests are analyzed
+  into paths, dotted modules, symbols, identifiers, concepts and ignored generic words; path,
+  rare-term, BM25, symbol-definition, symbol-reference and quoted-literal retrievers vote through
+  reciprocal rank fusion (k = 20); the strongest files pull in import, call, test and git
+  co-change (Jaccard) neighbors under hop, neighbor, candidate and in-degree bounds; and a budget
+  step keeps per-file reasons, matched symbols, relationships and bounded excerpts. Every
+  candidate keeps its provenance. `--retrieval legacy` restores the old scorer, which is also the
+  automatic fallback; `--explain`, `retrieval.py explain|explain-query` show why each file was
+  chosen; `--max-files` and `--max-bytes` tighten the budget. Optional bounded explorer requests
+  (`retrieval.py expand`, or `--retrieval full+explorer`) are answered from the index only.
+- Exclusions stay ahead of retrieval: the index is built only from texts the scan admitted, so
+  symbols, edges, history, explorer requests, excerpts and explain output cannot reach an
+  excluded or credential file. `git log` paths outside the universe are dropped before anything
+  is counted. New per-file index records and the policy-filtered history live in the existing
+  private parser cache, never in the project, and only changed files are re-indexed. Files over
+  the 256 KiB read limit can now be ranked by name, imports and history without being read.
+- Add an offline file-localization benchmark (`evals/retrieval/`): 600 tasks mined from real
+  changes in sqlglot, pip, networkx and zod, committed as text-free manifests with a
+  deterministic train/validation/test split, Recall@1-10, MRR, MAP, context size, useful context
+  density, latency, cumulative and leave-one-out ablations, candidate overlap, a failure report
+  and a regression check. Held-out Recall@8 rose from .368 to .783 and MRR from .206 to .604,
+  with retrieval taking about 70 ms instead of 4.8 s per task; graph expansion, git history and
+  the model-free explorer did not measurably improve ranking. See `docs/retrieval-benchmark.md`.
+- Add optional, opt-in LLM-assisted retrieval (`llm_retrieval.py`, `docs/llm-assisted-retrieval.md`):
+  model-written role representations of source files, generated once per file content from static
+  evidence plus bounded source, validated against the index (unsupported symbols and interaction
+  targets are dropped), stored privately outside the project and searched locally by a new
+  `role_summary` retriever that votes in rank fusion; and a bounded candidate reranker over opaque
+  ids with `rrf`, `weighted`, `replace` and seed-only integration, pre- or post-graph placement,
+  conditional (`ambiguous`) and shadow modes. Providers are configuration (`openai`-compatible,
+  `anthropic`, local `command`); keys come from environment variables. It is enabled only by the
+  user's own settings file, never by a project; excluded files never reach a model, a store, a
+  candidate list or debug output; every model failure falls back to the deterministic ranking,
+  which is bit-identical on the held-out benchmark when the layer is off. `retrieval.py explain`
+  shows `role_summary` and `llm_rerank` evidence (`--no-llm` to compare); the benchmark gains
+  `--llm-settings`, `--llm-index`, `--refresh-llm`, `--recent` and `evals/retrieval/llm_report.py`
+  (candidate recall versus reranking quality, rank movement, task categories, conditional-policy
+  replay, bootstrap intervals, index- and query-time cost).
+- Project-map task views no longer record `from __future__` imports and list definitions before
+  import declarations.
 - Pass the request to the context helper as a single-quoted `--task='...'` argument, and inline
   validators as `python3 -B -c`, instead of stdin heredocs. Claude Code refuses heredocs whose
   body contains braces (a denial in `dontAsk`, an approval prompt interactively), so requests

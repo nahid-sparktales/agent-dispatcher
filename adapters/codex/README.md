@@ -66,8 +66,8 @@ are capped at 6 KiB each; additional references load only when their workflow is
 
 `$agent-dispatcher map build` records a local source-linked project map; `map show <request>`
 inspects relevant facts and `map refresh` updates it. The helper is `scripts/project_map.py`
-with instructions in `references/PROJECT-MAP.md`. Only build/refresh writes
-`.agent-dispatcher/project-map.json` in the project. Context selection validates existing map
+with instructions in `references/PROJECT-MAP.md`. Only build/refresh writes the map, to private
+state outside the project (`~/.cache/agent-dispatcher/state-v1/`). Context selection validates existing map
 facts, withholds stale claims, and reports incomplete coverage without changing the map.
 
 ## Activity output

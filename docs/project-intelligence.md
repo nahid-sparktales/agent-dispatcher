@@ -41,10 +41,15 @@ flowchart TD
 
 ## Persistent index, small task view
 
-Substantial tasks automatically maintain `.agent-dispatcher/project-map.json` and a separate
-optional `.agent-dispatcher/project-graph.json`. Keeping the graph separate preserves the
-existing fact-map format. Both consume the same bounded, redacted scan. The host requests
-maintenance during preparation; no background watcher or observer is installed.
+Substantial tasks automatically maintain a fact map and a separate optional structural graph.
+Both live in private state outside the project, in
+`~/.cache/agent-dispatcher/state-v1/<project id>/` (or under an absolute `XDG_CACHE_HOME`),
+owner-only and keyed by the project's resolved path, so maintaining an index never changes the
+working tree, shows up in `git status`, or counts as a task's file change. An in-project
+`.agent-dispatcher/project-map.json` or `project-graph.json` left by an older release is still
+read when no private copy exists; it is never rewritten or deleted. Keeping the graph separate
+preserves the existing fact-map format. Both consume the same bounded, redacted scan. The host
+requests maintenance during preparation; no background watcher or observer is installed.
 
 Automatic maintenance is subordinate to task scope. Both cache writers enforce a read-only
 preview, a literal `--writable-path` list when supplied, a conservative guard for restricted
@@ -102,9 +107,16 @@ and adds role-aware selection; implementation details and performance differ.
 and combines it with graph retrieval. Dispatcher does not train or modify a model. The relevant
 idea here is that structural relationships can complement text retrieval.
 
+## Retrieval is measured separately
+
+How files are ranked for a task (query analysis, candidate retrievers, rank fusion, graph and git
+co-change expansion, context budgeting, the optional explorer) is described in
+[repository-intelligence.md](repository-intelligence.md) and measured offline on real changes in
+[retrieval-benchmark.md](retrieval-benchmark.md).
+
 ## Further work needs evidence
 
-Broader Tree-sitter/LSP support, embeddings, git co-change history, coverage-derived test edges,
+Broader Tree-sitter/LSP support, embeddings, coverage-derived test edges,
 framework-specific route/data flows and declared architecture constraints are separate extensions.
 They need language/framework fixtures and an evaluation showing their benefit exceeds extraction
 and context cost. Inferred call chains are not runtime traces, static test references are not

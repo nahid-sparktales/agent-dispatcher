@@ -2,6 +2,7 @@
 import copy
 import json
 from pathlib import Path
+import shutil
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -15,11 +16,7 @@ import json, sys
 from pathlib import Path
 maintain = '--map-maintain' in sys.argv
 root = Path(sys.argv[sys.argv.index('--project') + 1])
-if maintain:
-    state = root / '.agent-dispatcher'
-    state.mkdir(exist_ok=True)
-    (state / 'project-map.json').write_text('{"facts": []}\n')
-    (state / 'project-graph.json').write_text('{"nodes": []}\n')
+# Like the real helper, persistence goes to private state: nothing is written under the project.
 index = {'status': 'fresh', 'cache_status': 'fresh',
          'coverage': {'scan_complete': True, 'task_filtered': False, 'excluded_files': 0},
          'maintenance': {'action': 'built' if maintain else 'not_requested'}}
@@ -75,7 +72,9 @@ class WarmIndexTests(unittest.TestCase):
         paired = warmup.warm_project_indexes(self.config, 'claude', second)
         self.assertTrue(paired['ok'], paired)
         self.assertEqual(rt.tree_files(second), before)
-        self.assertEqual(paired['index_files_digest'], result['index_files_digest'])
+        self.assertEqual(set(before), {'app.py'})  # setup leaves the workspace exactly as it found it
+        self.assertEqual(paired['index_evidence_digest'], result['index_evidence_digest'])
+        self.assertEqual(result['index_storage'], 'private_state')
 
     def test_partial_or_stale_indexes_fail_setup(self):
         for injection in ("index['coverage']['scan_complete'] = False",
@@ -104,12 +103,30 @@ class WarmIndexTests(unittest.TestCase):
                 self.assertIn('did not reuse', result['diagnostics'][0])
 
     def test_setup_cannot_change_other_sources_or_write_in_preview(self):
+        in_tree = "(root / '.agent-dispatcher').mkdir(exist_ok=True); (root / '.agent-dispatcher/project-map.json').write_text('{}')"
         for injection in ("(root / 'extra.txt').write_text('unexpected')",
-                          "if not maintain: (root / '.agent-dispatcher/project-map.json').write_text('changed')"):
+                          "if maintain: " + in_tree,  # an index saved into the tree is no longer permitted
+                          "if not maintain: " + in_tree):
             with self.subTest(injection=injection):
                 (self.workspace / 'extra.txt').unlink(missing_ok=True)
+                shutil.rmtree(self.workspace / '.agent-dispatcher', ignore_errors=True)
                 self.install_helper(injection)
-                self.assertFalse(self.warm()['ok'])
+                result = self.warm()
+                self.assertFalse(result['ok'])
+                self.assertIn('changed project files', result['diagnostics'][0])
+
+    def test_maintenance_that_did_not_persist_fails_setup(self):
+        self.install_helper("if maintain: index['maintenance']['action'] = 'deferred'")
+        result = self.warm()
+        self.assertFalse(result['ok'])
+        self.assertIn('did not save', result['diagnostics'][0])
+
+    def test_index_files_shipped_by_a_fixture_survive_setup_untouched(self):
+        shipped = self.workspace / '.agent-dispatcher/project-map.json'
+        shipped.parent.mkdir()
+        shipped.write_text('{"old": "snapshot"}\n')
+        self.assertTrue(self.warm()['ok'])
+        self.assertEqual(shipped.read_text(), '{"old": "snapshot"}\n')
 
     def test_warm_preview_requires_graph_reuse_evidence(self):
         self.install_helper("stats['graph_hits'] = 0")
@@ -134,9 +151,13 @@ class WarmIndexTests(unittest.TestCase):
         self.assertIsNone(result['elapsed_seconds'])
         self.assertEqual(result['index_setup'], failed)
 
-    def test_grade_uses_post_setup_baseline_and_protects_both_index_files(self):
+    def test_grade_uses_post_setup_baseline_and_protects_index_files_the_baseline_contains(self):
         self.assertTrue(self.warm()['ok'])
         (self.workspace / 'report.json').write_text('old report')
+        bare = warmup.fixture_after_warmup({'source_dir': 'x', 'checks': [{'kind': 'unchanged', 'name': 'scope', 'paths': ['app.py']}]},
+                                           self.workspace)
+        self.assertEqual(bare['checks'][0]['paths'], ['app.py'])  # nothing in the tree, nothing extra to protect
+        rt.copy_files({path: b'{"shipped": true}\n' for path in warmup.INDEX_PATHS}, self.workspace)
         initial = self.root / 'initial'
         final = self.root / 'final'
         rt.copy_files(rt.tree_files(self.workspace), initial)

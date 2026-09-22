@@ -288,7 +288,25 @@ content hash, and the saved project map and graph remain untrusted evidence.
 
 ### Ranking
 
-Additive, transparent, ordinal. It orders results — nothing more.
+The helper ranks with **repository intelligence**: the request is split into named things (paths,
+dotted modules, symbols, identifiers), concepts and ignored generic words; independent retrievers
+(path, rare terms, BM25, symbol definitions, symbol references, quoted literals) each rank files;
+reciprocal rank fusion combines the rankings; the strongest results pull in import, call, test and
+git co-change neighbors; and a budget step keeps reasons, matched symbols, relationships and bounded
+excerpts. Each row's `reason` and `relationships` say why it is there. Exclusions are applied before
+any of this, so no retriever, edge, history entry or explorer request can reach a withheld file.
+
+```
+python3 -B PACK/context.py --project PROJECT --task='REQUEST' --explain       # why these files, per retriever
+python3 -B PACK/retrieval.py explain 'REQUEST' --project PROJECT --verbose     # full pipeline trace, read-only
+python3 -B PACK/retrieval.py expand 'REQUEST' --project PROJECT --iteration 1 --findings '{"requests":[{"type":"callers","value":"SYMBOL"}]}'
+```
+
+`expand` is the optional explorer step: when the packet lacks a definition, caller, reference, path
+or neighbor you can name, ask for it (types `symbol`, `path`, `callers`, `references`, `neighbors`;
+two iterations at most). Answers come from the same filtered index and are inserted below the
+strongest results. `--retrieval legacy` restores the additive ranking below, which is also the
+manual method when no helper is available. It orders results — nothing more.
 
 | Signal | |
 | --- | --- |
