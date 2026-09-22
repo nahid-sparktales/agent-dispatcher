@@ -893,6 +893,12 @@ def render_explain(result, verbose=False, top=10):
         lines += ["", "RERANK REQUEST (host step: order these candidates for the request above, then run "
                       "`retrieval.py rerank` with --ranking '{\"ranking\": [{\"id\": \"C..\", \"label\": \"primary|supporting|weak\", "
                       "\"reason\": \"...\"}, ...]}'; only supplied ids count)", request]
+    memory = result.get("memory")
+    if memory:
+        lines += ["", f"MEMORY ({memory['status']})"]
+        lines += [f"   {name}: mode {entry['mode']}, {entry['state']} - {entry['reason']}" for name, entry in memory.get("layers", {}).items()]
+        lines += [f"   {'+' if hit.get('applied') else '~'} {hit['kind']} {hit['id'][:12]}: {hit['why']}; {hit['evidence'][:80]} [{hit['label'][:60]}]"
+                  for hit in memory.get("hits", [])]
     for step in result.get("exploration", []):
         lines += ["", f"EXPLORER iteration {step.get('iteration', 1)}: confidence {step['confidence']}, "
                       f"{'stop' if step['stop'] else 'expand'} - {step['reason']}"]
@@ -963,7 +969,7 @@ def main(argv=None):
         print(str(exc) if isinstance(exc, context["ContextError"]) else "Retrieval input could not be used; values withheld.", file=sys.stderr)
         return 2
     if args.json:
-        result = {key: result[key] for key in ("query", "ranked", "trace", "packet", "exploration", "llm", "roles") if key in result}
+        result = {key: result[key] for key in ("query", "ranked", "trace", "packet", "exploration", "llm", "roles", "memory") if key in result}
         print(json.dumps(result, indent=2, ensure_ascii=False))
     else:
         print(render_explain(result, args.verbose))

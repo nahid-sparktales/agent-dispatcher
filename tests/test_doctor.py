@@ -55,9 +55,10 @@ class DoctorTests(unittest.TestCase):
         write(self.pack / "SKILL.md", "# Dispatcher")
         write(self.pack / "roles/reviewer.md", "# Reviewer")
         for file in ("INDEX.md", "CONTEXT.md", "CONTEXT-REFERENCE.md", "ROLES.md", "CONTROLS.md",
-                     "DELEGATION.md", "PROJECT-MAP.md", "VERIFICATION.md", "jev.md", "DOCTOR.md", "doctor.py", "context.py", "project_map.py", "resources.py", "verification.py", "preferences.py",
+                     "DELEGATION.md", "PROJECT-MAP.md", "MEMORY.md", "VERIFICATION.md", "jev.md", "DOCTOR.md", "doctor.py", "context.py", "project_map.py", "resources.py", "verification.py", "preferences.py",
                      "context_packet.py", "context_reuse.py", "parser_cache.py", "project_graph.py", "change_audit.py",
-                     "repo_index.py", "retrieval.py", "context_budget.py", "llm_retrieval.py"):
+                     "repo_index.py", "retrieval.py", "context_budget.py", "llm_retrieval.py",
+                     "repository_memory.py", "repo_history.py", "experience.py"):
             write(self.pack / file, "fixture")
 
     def inspect(self, **kwargs):

@@ -105,6 +105,28 @@ in `retrieval.DEFAULTS`, for example `--set rrf_k=30 --set graph.max_hops=2`.
   (default 0.03, about two tasks of the held-out split). Rankings are deterministic, so any
   difference is a code or configuration change, not noise.
 
+## Optional: repository memory
+
+`--memory` builds the [episodic repository memory](../../docs/repository-memory.md) in memory at each
+task's base commit, with the boundary's own event excluded (the paper-style "prior to base commit"
+window) and a leakage check that the fix commit never entered the store. Nothing persists between
+tasks. Strategies: `full+memory` (gated), `full+memory-forced` (gate open), `full+memory-messages`
+(commit-message field only), `full+memory-limited` (memory may only strengthen files source retrieval
+found). `--memory-symbols` adds bounded symbol history per task (blob reads per commit; slower).
+`--memory-settings FILE` overrides the defaults (weights, gate thresholds, window). The report adds
+`Hit@k`, `All@k` (every target in the top k: RepoMem's Accuracy@k), strata by target count, and a
+memory line: gate states, targets introduced only by memory, candidates per task.
+
+`chronology.py` replays one repository's tasks in commit order with memory pinned before each task
+and two oracle-labeled experience arms (frozen after the first block, accumulated), held-out probes
+every fifth task, per-block tables and paired-bootstrap intervals against `full`. It measures whether
+recorded experience could help retrieval, not whether an agent acquires it; see the docstring.
+
+```bash
+python3 -B evals/retrieval/run.py --dataset $D --strategy full,full+memory,full+memory-forced,full+memory-messages --memory
+python3 -B evals/retrieval/chronology.py --dataset $D --split dev --blocks 4 --json out/chronology.json
+```
+
 ## Optional: LLM-assisted retrieval
 
 `run.py` stays offline unless `--llm-settings FILE` is given (same format as the user settings file

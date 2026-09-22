@@ -907,8 +907,31 @@ def _llm_layer(engine, settings, root, index, excluded, diagnostics, ranking=Non
     return reranker
 
 
+def _memory_layer(engine, settings, root, index, task, exclusions, scrub, diagnostics, pack=None, stats=None):
+    """Optional repository memory (repository_memory.py): gated candidates from eligible history, summaries and experience.
+
+    Inert without the user's own settings file. Candidates can only name files in the admitted index;
+    a `use_limited` layer may strengthen files source retrieval found but never introduce one. Any
+    failure is a diagnostic and retrieval stays exactly the deterministic pipeline.
+    """
+    try:
+        outcome = _sibling("repository_memory")["layer"](root, index, task, exclusions=exclusions, scrub=scrub, pack=pack)
+    except (OSError, UnicodeError, SyntaxError, ValueError, TypeError, KeyError, AttributeError, RecursionError):
+        diagnostics.append("Repository memory unavailable; source retrieval used alone.")
+        return {}, (), None
+    for source, weight in outcome["weights"].items():
+        settings["rrf_weights"] = {**settings["rrf_weights"], source: weight}
+    report = outcome["report"]
+    diagnostics.extend(report.get("diagnostics", []))
+    if stats is not None:  # Timing is diagnostics: shown only with --explain, like every other _ms.
+        stats["memory_ms"] = outcome["ms"]
+        stats.update({f"memory_{name}_ms": value for name, value in outcome.get("timings", {}).items()})
+    return outcome["extra"], tuple(outcome["boost_only"]), report if report["status"] != "off" else None
+
+
 def _intelligent_selection(engine, settings, task, texts, hashes, explicit, role_id, changed, cache, root,
-                           excluded, scrub, compact, diagnostics, explain, oversized=(), rerank_answer=None):
+                           excluded, scrub, compact, diagnostics, explain, oversized=(), rerank_answer=None,
+                           exclusions=(), pack=None):
     """Repository-intelligence selection over the already-filtered universe; same row/excerpt contract."""
     stats = {}
     history = _git_history(root, settings["git"]["max_commits"], cache) if settings["git"]["enabled"] else None
@@ -923,6 +946,9 @@ def _intelligent_selection(engine, settings, task, texts, hashes, explicit, role
                               "reason": "relevant uncommitted change" if not review else "uncommitted change for requested review",
                               "value": path} for rank, path in enumerate(changed[:20], 1)]
         boost_only = () if review else ("worktree",)
+    memory_extra, memory_boost, memory = _memory_layer(engine, settings, root, index, task, exclusions, scrub, diagnostics, pack, stats)
+    extra.update(memory_extra)
+    boost_only = (*boost_only, *memory_boost)
     # Root project rules give cheap grounding when room remains; they never gain authority here.
     rules = [p for p in texts if PurePosixPath(p).name in RULES and len(PurePosixPath(p).parts) == 1]
     outcome = engine["run"](task, index, settings, named=list(explicit), role=role_id, extra=extra,
@@ -972,6 +998,8 @@ def _intelligent_selection(engine, settings, task, texts, hashes, explicit, role
                  if explain or not (key.endswith("_ms") or key == "overlap")}
     report = {"strategy": settings["name"], "task_signals": {k: [scrub(v) for v in values] for k, values in packet["task_signals"].items()},
               "telemetry": dict(telemetry, seeds=[scrub(p) for p in trace["seeds"]])}
+    if memory is not None:
+        report["memory"] = memory
     if (outcome.get("llm") or {}).get("request"):  # Host reranking: one bounded round, answered with --rerank-answer.
         report["rerank_request"] = scrub(outcome["llm"]["request"])
         diagnostics.append("Rerank request pending: order the listed candidates and rerun with --rerank-answer; "
@@ -1276,7 +1304,8 @@ def _select_context(project, task, role=None, size="standard", max_tokens=None, 
         try:
             selected, excerpts, spent, intelligence, order = _intelligent_selection(
                 engine, settings, task, texts, hashes, explicit, role_id, changed, incremental, root,
-                excluded, scrub, compact, diagnostics, explain, oversized, rerank_answer)
+                excluded, scrub, compact, diagnostics, explain, oversized, rerank_answer,
+                exclusions=excluded_paths, pack=base)
         except (OSError, UnicodeError, SyntaxError, ValueError, TypeError, KeyError, AttributeError,
                 IndexError, RecursionError, ZeroDivisionError):
             diagnostics.append("Repository intelligence failed; legacy retrieval used.")
@@ -1320,7 +1349,10 @@ def _select_context(project, task, role=None, size="standard", max_tokens=None, 
         if incremental.stats.get("write_failures", 0):
             result["diagnostics"].append("Private parser-cache persistence failed; current evidence remains usable, but future calls may repeat extraction.")
     if intelligence is not None:
+        memory = intelligence.pop("memory", None)
         result["repository_intelligence"] = intelligence
+        if memory is not None:  # Present only when the user's memory settings enabled a layer: baseline packets are unchanged.
+            result["memory"] = memory
     if graph_evidence is not None:
         result["project_graph"] = graph_evidence
     if audit_report is not None:
@@ -1363,10 +1395,14 @@ def explain_retrieval(project, task, *, strategy="full", pack=None, exclude_path
     history = _git_history(root, settings["git"]["max_commits"], cache) if settings["git"]["enabled"] else None
     index = engine["build_index"](texts, hashes, _kind, cache=cache, history=history, config=settings, path_only=oversized)
     explicit = _explicit_paths(task, texts, root)
+    memory_extra, memory_boost, memory = _memory_layer(engine, settings, root, index, task, tuple(dict.fromkeys([*manual, *automatic])),
+                                                       scrub, diagnostics, find_pack(pack))
     outcome = engine["run"](task, index, settings, named=list(explicit), findings=findings, iteration=iteration,
                             reranker=_llm_layer(engine, settings, root, index, excluded, diagnostics, ranking) if llm else None,
-                            anchors={p: line for p, line in explicit.items() if line})
+                            anchors={p: line for p, line in explicit.items() if line}, extra=memory_extra, boost_only=memory_boost)
     outcome["diagnostics"] = diagnostics
+    if memory is not None:
+        outcome["memory"] = memory
     outcome["universe"] = {"files": len(texts), "withheld": len(excluded)}
     return outcome
 
@@ -1437,6 +1473,14 @@ def render(result):
             destination = quote(str(Path(result["project"]) / source["path"]), safe="/") + ":" + str(source["line"])
             lines.append(f"- {fact['kind']} ({fact['basis']}): {fact['label']} — {fact['detail']} ([source]({destination}))")
         lines.extend("Diagnostic: " + message for message in mapping.get("diagnostics", []))
+    memory = result.get("memory")
+    if memory:
+        lines += ["", f"Repository memory: {memory['status']} — "
+                      + "; ".join(f"{name} {entry['mode']}: {entry['state']}" for name, entry in memory.get("layers", {}).items())]
+        for hit in memory.get("hits", []):
+            lines.append(f"- {hit['kind']} {hit['id'][:12]} ({'applied' if hit.get('applied') else 'not applied'}): {hit['why']}; "
+                         f"{hit['evidence']} [{hit['label']}] -> {', '.join(hit['files'][:4])}")
+        lines.extend("Diagnostic: " + message for message in memory.get("diagnostics", []))
     lines.extend("Diagnostic: " + message for message in result["diagnostics"])
     explained = result.get("repository_intelligence", {}).get("explain")
     if explained:

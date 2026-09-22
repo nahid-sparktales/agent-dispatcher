@@ -23,6 +23,7 @@ MODULES = (
     "tests.test_retrieval",
     "tests.test_retrieval_security",
     "tests.test_llm_retrieval",
+    "tests.test_repository_memory",
     "tests.test_e2e",
     "tests.test_verification",
     "tests.test_change_audit",

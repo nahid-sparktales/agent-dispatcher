@@ -9,8 +9,10 @@ exclusion/credential/size filter, and asks each strategy to rank files. Git hist
 that parent, so the fix itself never leaks into co-change statistics.
 
 Metrics (means over tasks): Recall@k = share of a task's target files ranked in the top k;
-MRR = 1 / rank of the first target; MAP = mean precision at each target's rank (a missing
-target contributes 0). Context: files, bytes and estimated tokens (bytes / 4) of what the
+Hit@k = 1 when any target is in the top k; All@k = 1 when every target is in the top k (RepoMem's
+Accuracy@k; impossible when a task has more than k targets, so strata by target count are
+reported too); MRR = 1 / rank of the first target; MAP = mean precision at each target's rank
+(a missing target contributes 0). Context: files, bytes and estimated tokens (bytes / 4) of what the
 strategy would hand the agent. Useful Context Density = excerpt bytes that belong to target
 files / all excerpt bytes. CtxRecall = share of targets present in that context.
 Latency is ranking plus context selection over a built index; index time is reported apart.
@@ -19,6 +21,7 @@ from __future__ import annotations
 
 import argparse
 from collections import Counter, defaultdict
+import copy
 import hashlib
 import json
 import math
@@ -92,6 +95,65 @@ class LLMLayer:
                 "representation_chars": sum(len(self.module.render(rep)) for rep in index.representations.values())}
 
 
+class MemoryLayer:
+    """Episodic repository memory built in memory at each task's base commit (repository_memory.py).
+
+    The boundary is the task's base commit with its own event excluded (`exclusive`), so the fix and
+    everything after it never enter the store; nothing persists between tasks or repositories.
+    Strategy names: `<base>+memory` (gated), `<base>+memory-forced` (gate open), `<base>+memory-messages`
+    (commit-message field only), `<base>+memory-limited` (may only strengthen files source retrieval found).
+    """
+
+    VARIANTS = {"": {}, "-forced": {"retrieval": {"gate": {"forced": True}}}, "-messages": {"git": {"fields": ["message"]}},
+                "-limited": {"retrieval": {"gate": {"forced": False}}, "limited": True}}
+
+    def __init__(self, settings_path=None, boundary="exclusive", symbols=False):
+        import repository_memory
+        self.module = repository_memory
+        base = repository_memory.load_settings(settings_path) if settings_path else copy.deepcopy(repository_memory.DEFAULTS)
+        base["enabled"], base["git"]["retrieval"], base["git"]["boundary"] = True, "on", boundary
+        base["git"]["symbols"]["enabled"] = bool(symbols)
+        self.settings = repository_memory.validate_settings(base)
+        self.timing = Counter()
+
+    @classmethod
+    def split(cls, name):
+        """'full+memory-forced' -> ('full', '-forced'); a plain strategy -> (name, None)."""
+        if "+memory" not in name:
+            return name, None
+        base, _, suffix = name.partition("+memory")
+        if suffix not in cls.VARIANTS:
+            raise SystemExit(f"Unknown memory variant {suffix!r}; use " + ", ".join(repr(v) for v in cls.VARIANTS))
+        return base, suffix
+
+    def prepare(self, clone, index, scrub, base_commit):
+        started = time.perf_counter()
+        data, report = self.module.build_episodic(clone, index, scrub=scrub, exclusions=(), settings=self.settings, boundary=base_commit)
+        self.timing["build_ms"] += (time.perf_counter() - started) * 1000
+        self.timing["tasks"] += 1
+        return data, {"events": report["events"], "symbols": report.get("symbols", {}).get("commits", 0), "action": report["action"]}
+
+    def candidates(self, query, data, index, suffix):
+        """Gated fusion rows for one task -> what retrieval.run needs plus the gate decision for the report."""
+        variant = self.VARIANTS[suffix]
+        settings = self.module._merge(self.settings, {k: v for k, v in variant.items() if k != "limited"})
+        tuning = settings["retrieval"]
+        started = time.perf_counter()
+        episodic = self.module.Episodic(data, index, (), settings["git"]["fields"], settings["git"]["field_weights"])
+        items = episodic.search(query, top_k=tuning["max_events"], relative_floor=tuning["gate"]["min_relative_score"],
+                                support_fields=tuning["gate"]["support_fields"])
+        scores = episodic.resolve_files(items, max_files_per_event=tuning["max_files_per_event"], query=query, affinity=tuning["file_affinity"])
+        decision = self.module.gate(items, scores, settings=settings, freshness="current", layer="git")
+        rows = self.module.episodic_candidates(episodic, items, scores, max_candidates=tuning["max_candidates"])
+        self.timing["query_ms"] += (time.perf_counter() - started) * 1000
+        usable = decision["state"] in ("use", "use_limited") and bool(rows)
+        limited = decision["state"] == "use_limited" or variant.get("limited")
+        return {"extra": {"memory_git": rows} if usable else {}, "boost_only": ("memory_git",) if usable and limited else (),
+                "weights": {"memory_git": tuning["rrf_weights"]["memory_git"]},
+                "report": {"state": decision["state"], "matches": len(items), "candidates": len(rows),
+                           "files": [row["file"] for row in rows]}}
+
+
 def split_matches(task, wanted):
     return wanted == "all" or task["split"] == wanted or (wanted == "dev" and task["split"] in {"train", "validation"})
 
@@ -116,9 +178,13 @@ def _legacy(task, texts, hashes, scrub):
             "excerpt_bytes": dict(sizes), "ms": elapsed, "lists": {}}
 
 
-def _engine(task, index, config, reranker=None):
+def _engine(task, index, config, reranker=None, memory=None):
     started = time.perf_counter()
-    outcome = retrieval.run(task, index, config, reranker=reranker)
+    if memory:
+        config = retrieval._merge(config, {"rrf_weights": memory["weights"]})
+        outcome = retrieval.run(task, index, config, reranker=reranker, extra=memory["extra"], boost_only=memory["boost_only"])
+    else:
+        outcome = retrieval.run(task, index, config, reranker=reranker)
     elapsed = (time.perf_counter() - started) * 1000
     sizes = {item["path"]: sum(len(e["content"].encode("utf-8")) for e in item["excerpts"]) for item in outcome["packet"]["files"]}
     return {"ranked": [row["path"] for row in outcome["ranked"]], "candidates": len(outcome["ranked"]),
@@ -133,6 +199,8 @@ def _score(found, targets):
     hits = sorted(rank for rank in ranks.values() if rank)
     excerpt_total = sum(found["excerpt_bytes"].values())
     row = {f"R@{k}": sum(1 for rank in hits if rank <= k) / len(targets) for k in KS}
+    row.update({f"Hit@{k}": float(any(rank <= k for rank in hits)) for k in KS})
+    row.update({f"All@{k}": float(len(hits) == len(targets) and all(rank <= k for rank in hits)) for k in KS})
     row.update(MRR=1 / hits[0] if hits else 0.0,
                MAP=sum((position + 1) / rank for position, rank in enumerate(hits)) / len(targets),
                candidates=found["candidates"], files=len(found["files"]), bytes=found["bytes"],
@@ -187,10 +255,13 @@ def parse_overrides(items):
     return overrides
 
 
-def evaluate(tasks, clone, strategies, overrides=None, variants=None, progress=True, llm=None, map_view=False):
+def evaluate(tasks, clone, strategies, overrides=None, variants=None, progress=True, llm=None, map_view=False, memory=None):
     scrub = context._scrubber(context.find_pack(str(ROOT)))
     memo = Memo(clone)
-    configs = {name: retrieval.configure(name, overrides) for name in strategies if name != "current"}
+    memory_suffix = {name: MemoryLayer.split(name)[1] for name in strategies if name != "current"}
+    if any(suffix is not None for suffix in memory_suffix.values()) and memory is None:
+        raise SystemExit("Strategies with +memory need --memory.")
+    configs = {name: retrieval.configure(MemoryLayer.split(name)[0], overrides) for name in strategies if name != "current"}
     for name, (base, changes) in (variants or {}).items():
         configs[name] = retrieval.configure(base, retrieval._merge(overrides or {}, changes))
     strategies = [*strategies, *(variants or {})]
@@ -218,7 +289,14 @@ def evaluate(tasks, clone, strategies, overrides=None, variants=None, progress=T
             return indexes[key]
 
         index_for(retrieval.STRATEGIES["full"])
+        episodic = None
+        if memory is not None:
+            episodic, built = memory.prepare(clone, index_for(retrieval.STRATEGIES["full"]), scrub, task["base_commit"])
+            if task["fix_commit"] in {e["id"] for e in episodic["events"]}:
+                raise SystemExit(f"leak: the fix commit of {task['id']} entered the memory store")
         row = {key: task[key] for key in ("id", "repo", "split", "query_source", "names_target")}
+        if memory is not None:
+            row["memory_build"] = built
         row.update(targets=task["target_files"], unreachable=[t for t in task["target_files"] if t not in texts],
                    name_only=[t for t in task["target_files"] if t in oversized],
                    universe=len(texts), scan_ms=scan_ms, index_ms=stats["index_ms"],
@@ -228,11 +306,18 @@ def evaluate(tasks, clone, strategies, overrides=None, variants=None, progress=T
                                                              if t in getattr(index_for(retrieval.STRATEGIES["full"]), "representations", {})])
         found_full = None
         for name in strategies:
+            memory_rows = None
+            if memory_suffix.get(name) is not None:
+                memory_rows = memory.candidates(retrieval.analyze_query(query, configs[name]), episodic, index_for(configs[name]), memory_suffix[name])
             found = (_legacy(query, texts, hashes, scrub) if name == "current" else
-                     _engine(query, index_for(configs[name]), configs[name], llm.reranker if llm else None))
+                     _engine(query, index_for(configs[name]), configs[name], llm.reranker if llm else None, memory_rows))
             if name == "full":
                 found_full = found
             scored = _score(found, task["target_files"])
+            if memory_rows is not None:
+                others = {f for source, files in found["lists"].items() if source != "memory_git" for f in files}
+                scored["memory"] = dict(memory_rows["report"], introduced=[t for t in task["target_files"]
+                                                                          if t in memory_rows["report"]["files"] and t not in others])
             place = lambda paths: {t: paths.index(t) + 1 if t in paths else None for t in task["target_files"]}  # noqa: E731
             scored["first_ranks"] = place(found.get("first", []))
             if found.get("llm"):  # Candidate recall apart from reranking quality: where was each target before and after the model?
@@ -256,7 +341,7 @@ def evaluate(tasks, clone, strategies, overrides=None, variants=None, progress=T
     return results
 
 
-METRICS = [f"R@{k}" for k in KS] + ["MRR", "MAP"]
+METRICS = [f"R@{k}" for k in KS] + ["All@5", "All@8", "MRR", "MAP"]
 
 
 def table(results, strategies, title):
@@ -266,7 +351,7 @@ def table(results, strategies, title):
              f"{sum(len(r['unreachable']) for r in results)} with unread content, of which "
              f"{sum(len(r.get('name_only', ())) for r in results)} rankable by name only)",
              f"{'Strategy':<22}" + "".join(f"{m:>6}" for m in METRICS) + f"{'Cand':>6}{'Files':>6}{'KB':>7}{'Tok':>7}{'UCD':>6}{'CtxR':>6}{'ms':>8}",
-             "-" * 105]
+             "-" * 117]
     for name in strategies:
         rows = [r["strategies"][name] for r in results if name in r["strategies"]]
         if not rows:
@@ -276,6 +361,39 @@ def table(results, strategies, title):
                      + f"{mean('candidates'):>6.0f}{mean('files'):>6.1f}{mean('bytes') / 1000:>7.1f}{mean('tokens'):>7.0f}"
                      + f"{mean('density'):>6.2f}{mean('ctx_recall'):>6.2f}{mean('ms'):>8.1f}")
     return "\n".join(lines)
+
+
+def strata_report(results, strategies):
+    """All@8 and R@8 by number of target files: full coverage at k is impossible above k targets, so say so."""
+    groups = {"1 target": lambda n: n == 1, "2 targets": lambda n: n == 2, "3+ targets": lambda n: n >= 3}
+    lines = ["By target count (R@8 / All@8)"]
+    for name in strategies:
+        parts = []
+        for label, test in groups.items():
+            rows = [r["strategies"][name] for r in results if name in r["strategies"] and test(len(r["targets"]))]
+            if rows:
+                parts.append(f"{label} n={len(rows)}: {statistics.fmean(r['R@8'] for r in rows):.3f} / {statistics.fmean(r['All@8'] for r in rows):.3f}")
+        lines.append(f"  {name:<22}" + "   ".join(parts))
+    return "\n".join(lines)
+
+
+def memory_report(results, strategies):
+    """How often memory had something to say, was allowed to say it, and named a target nothing else found."""
+    lines = ["Repository memory (share of tasks): state, targets introduced only by memory"]
+    for name in strategies:
+        rows = [r["strategies"][name].get("memory") for r in results if name in r["strategies"]]
+        rows = [m for m in rows if m]
+        if not rows:
+            continue
+        states = Counter(m["state"] for m in rows)
+        introduced = sum(len(m["introduced"]) for m in rows)
+        lines.append(f"  {name:<22}" + ", ".join(f"{state} {count / len(rows):.2f}" for state, count in states.most_common())
+                     + f"; targets introduced only by memory: {introduced}; mean candidates {statistics.fmean(m['candidates'] for m in rows):.1f}")
+    builds = [r["memory_build"] for r in results if r.get("memory_build")]
+    if builds:
+        lines.append(f"  store: mean {statistics.fmean(b['events'] for b in builds):.0f} events per task, "
+                     f"symbol history for {statistics.fmean(b['symbols'] for b in builds):.0f} commits")
+    return "\n".join(lines) if len(lines) > 1 else ""
 
 
 def map_report(results, title):
@@ -375,6 +493,10 @@ def main(argv=None):
     parser.add_argument("--refresh-llm", action="store_true", help="Ignore stored reranker answers and ask the model again")
     parser.add_argument("--map", action="store_true", help="Also derive the project map at each commit and measure its 8-fact task view: "
                         "hit (targets among the view's files), gain (targets the excerpts of 'full' missed), packet (targets in excerpts or view)")
+    parser.add_argument("--memory", action="store_true", help="Build episodic repository memory at each task's base commit (boundary excluded) for "
+                        "strategies named <base>+memory, +memory-forced, +memory-messages, +memory-limited")
+    parser.add_argument("--memory-settings", help="repository_memory settings JSON overriding the defaults for --memory")
+    parser.add_argument("--memory-symbols", action="store_true", help="Also compute bounded symbol history per task (slower: blob reads per commit)")
     parser.add_argument("--json", help="Write per-task results here")
     parser.add_argument("--report", action="append", default=[], help="Re-print tables from saved --json files instead of running")
     parser.add_argument("--check", help="Baseline JSON {strategy: {metric: value}}; exit 1 when the chosen split regresses beyond --tolerance")
@@ -405,8 +527,12 @@ def main(argv=None):
                 print(f"Missing clone {clone}; see evals/retrieval/README.md.", file=sys.stderr)
                 return 2
             layer = LLMLayer(args.llm_settings, Path(args.llm_store_dir) / f"{repo}.json", args.llm_index, args.refresh_llm) if args.llm_settings else None
+            memory = MemoryLayer(args.memory_settings, symbols=args.memory_symbols) if args.memory else None
             results += evaluate([task for task in tasks if task["repo"] == repo], clone.resolve(), strategies, overrides, variants,
-                                llm=layer, map_view=args.map)
+                                llm=layer, map_view=args.map, memory=memory)
+            if memory:
+                print(f"  {repo} memory: {memory.timing['build_ms'] / max(1, memory.timing['tasks']):.0f} ms build, "
+                      f"{memory.timing['query_ms'] / max(1, memory.timing['tasks']):.1f} ms query per task", file=sys.stderr, flush=True)
             if layer and args.llm_index:
                 print(f"  {repo} indexing: " + json.dumps(dict(layer.indexing)), file=sys.stderr, flush=True)
     if args.json:
@@ -424,6 +550,10 @@ def main(argv=None):
         print(f"\nIndex: mean {statistics.fmean(r['index_ms'] for r in results):.0f} ms per task with unchanged records reused; "
               f"scan {statistics.fmean(r['scan_ms'] for r in results):.0f} ms; "
               f"cold first build {max(r['index_ms'] for r in results):.0f} ms (largest)")
+    print("\n" + strata_report(results, shown))
+    memory_lines = memory_report(results, shown)
+    if memory_lines:
+        print("\n" + memory_lines)
     if any(r.get("map") for r in results):
         print("\n" + map_report(results, "ALL REPOSITORIES"))
         for repo in sorted({r["repo"] for r in results if r.get("map")}):

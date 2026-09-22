@@ -171,7 +171,7 @@ def account_packet(out):
     """Account for the exact compact JSON serializer, including its own accounting fields."""
     _sync_evidence(out)
     categories = {"excerpts": "workspace_excerpts", "project_map": "project_map",
-                  "project_graph": "project_graph",
+                  "project_graph": "project_graph", "memory": "repository_memory",
                   "guidance": "guidance", "resources": "resource_metadata",
                   "exclusion_policy": "constraints_and_diagnostics", "diagnostics": "constraints_and_diagnostics",
                   "limits": "constraints_and_diagnostics"}
@@ -286,6 +286,10 @@ def fit_packet(result, target=None, reserve_chars=0):
         graph_drops = _trim_graph(out.get("project_graph"))
         if graph_drops:
             omitted["graph_items"] = omitted.get("graph_items", 0) + graph_drops
+            continue
+        hits = out.get("memory", {}).get("hits", [])
+        if hits:  # Memory hits leave before any current-source excerpt does.
+            hits.pop(); omitted["memory_hits"] = omitted.get("memory_hits", 0) + 1
             continue
         if out["excerpts"]:
             out["excerpts"].pop(); omitted["excerpts"] += 1

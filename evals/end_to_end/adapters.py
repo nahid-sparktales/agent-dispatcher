@@ -101,6 +101,10 @@ def _environment(client: str, spec: dict, profile: Path) -> dict[str, str]:
     # conditions so their environments stay identical; only the staged dispatcher reads it.
     if spec.get("llm_settings"):
         env["AGENT_DISPATCHER_LLM_CONFIG"] = spec["llm_settings"]
+    # Same for repository memory: a settings path, never a secret; memory stores must be built before the run
+    # (private state outside the workspace) because trials never build them.
+    if spec.get("memory_settings"):
+        env["AGENT_DISPATCHER_MEMORY_CONFIG"] = spec["memory_settings"]
     return env
 
 
@@ -322,6 +326,7 @@ def build_launch(client: str, spec: dict, workspace: Path,
         "isolation": "customization-discovery; not an OS security boundary",
         "llm_retrieval_settings": spec.get("llm_settings"),
         "llm_network": list(spec.get("llm_network") or []),
+        "memory_settings": spec.get("memory_settings"),
     }
     if client == "codex":
         disabled, proof = _codex_isolation(executable, spec, env, workspace, skill)

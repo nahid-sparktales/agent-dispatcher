@@ -77,6 +77,9 @@ def validate_config(config, live=False):
         settings = spec.get("llm_settings")
         if settings is not None and (not isinstance(settings, str) or not Path(settings).is_absolute() or not Path(settings).is_file()):
             raise ValueError(f"{client}: llm_settings must be an absolute path to an existing settings file")
+        memory = spec.get("memory_settings")
+        if memory is not None and (not isinstance(memory, str) or not Path(memory).is_absolute() or not Path(memory).is_file()):
+            raise ValueError(f"{client}: memory_settings must be an absolute path to an existing settings file")
         hosts = spec.get("llm_network")
         if hosts is not None and (settings is None or not isinstance(hosts, list) or not hosts
                                   or not all(isinstance(h, str) and re.fullmatch(r"[a-z0-9.-]+", h) for h in hosts)):

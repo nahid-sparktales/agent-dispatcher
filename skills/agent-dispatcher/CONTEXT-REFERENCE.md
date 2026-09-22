@@ -312,6 +312,13 @@ modify each file for the request, then rerun with `--rerank-answer '{"ranking": 
 the deterministic evidence stays, and there is no second round. `--retrieval legacy` restores the additive ranking below, which is also the
 manual method when no helper is available. It orders results — nothing more.
 
+A packet may also carry `memory` when the user enabled [repository memory](MEMORY.md): per layer
+(eligible Git history, module summaries, recorded experience) a mode, a gate state with its reason,
+and a few hits that name the current files a record maps to, with lineage and trust labels. A layer
+in `shadow` mode reports and changes nothing; `use_limited` may only strengthen files source
+retrieval found. Memory never introduces a withheld file, and a hit is a reason to look, not a fact:
+`python3 -B PACK/repository_memory.py examine-commit <id>` shows a bounded, re-authorized patch view for one hit.
+
 | Signal | |
 | --- | --- |
 | Exact identifier from the request appears in the file | +3 |

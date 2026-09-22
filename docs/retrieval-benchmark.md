@@ -497,3 +497,94 @@ Re-run everything with `dist/retrieval-llm/index_rounds.sh` (indexing, resumable
 `dist/retrieval-llm/experiments.sh SPLIT LIMIT rep|rerank|prompt REPO...` after pointing
 `dist/retrieval-llm/settings.json` at a provider; `evals/retrieval/llm_report.py` renders the
 tables above from the saved JSON.
+
+## Repository memory
+
+Measured on 2026-09-22 with `evals/retrieval/run.py --memory` (see
+[repository-memory.md](repository-memory.md)). At each task the episodic store is built in memory
+from the base commit's ancestry with the base commit's own event excluded (2,000-commit window,
+no symbol history, no experience), the leakage check confirms the fix commit never entered the
+store, and `full+memory` adds the gated `memory_git` voter (weight 0.5) to the unchanged `full`
+pipeline. Same datasets, splits and discipline as above: tuning on the train split, choice on
+validation, one held-out run.
+
+### Held-out (test split, 126 tasks, 204 targets, run once)
+
+| Strategy | R@1 | R@3 | R@5 | R@8 | R@10 | All@5 | All@8 | MRR | MAP | ms |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `full` | .376 | .600 | .700 | .785 | .808 | .619 | .722 | .614 | .567 | 80 |
+| `full+memory` | .399 | .637 | .740 | .798 | .832 | .659 | .738 | .642 | .598 | 76 (+ ~150 memory) |
+| `full+memory-messages` | .387 | .617 | .735 | .799 | .835 | .651 | .738 | .629 | .585 | 75 (+ ~150 memory) |
+
+`All@k` is the share of tasks whose every target is in the top k (RepoMem's Accuracy@k); it is
+impossible above k targets, so by target count: one target (84 tasks) R@8/All@8 .845 -> .857, two
+targets (19) .711/.632 -> .763/.684, three or more (23) .624/.348 -> .609/.348. Per repository
+(R@8, `full` -> `full+memory`): networkx .900 -> .950, pip .688 -> .728, sqlglot .805 -> .765, zod
+.763 -> .763. One held-out task is 0.8 points, so the R@8 change is within noise; the R@3, R@5,
+All@5 and MRR gains (3 to 4 points, consistent with the development splits) are the signal.
+
+### Development (train 357 tasks; validation 117 tasks)
+
+| Split | Strategy | R@3 | R@5 | R@8 | All@5 | All@8 | MRR |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| train | `full` | .571 | .655 | .730 | .591 | .672 | .557 |
+| train | `full+memory` | .588 | .666 | .732 | .602 | .683 | .577 |
+| train | `full+memory-messages` (commit message only) | .598 | .676 | .743 | .616 | .686 | .576 |
+| train | `full+memory-forced` (gate open) | .589 | .671 | .735 | .608 | .683 | .570 |
+| train | `full+memory-limited` (may only strengthen) | .589 | .671 | .734 | .608 | .683 | .573 |
+| validation | `full` | .540 | .617 | .714 | .538 | .650 | .538 |
+| validation | `full+memory` | .586 | .660 | .719 | .590 | .650 | .540 |
+| validation | `full+memory-messages` | .569 | .660 | .717 | .590 | .641 | .542 |
+
+Tried on train and left at the defaults because the difference was within noise: gate support
+restricted to message/identifier/symbol fields (no path tokens; identical), no file affinity
+(identical), three files per event with a 0.25 weight (worse: R@8 .724). The gate opens on 83%
+of tasks and marks 14% `use_limited`; `forced` and `limited` therefore equal the gated result to
+the third decimal, because these issue and PR texts almost always carry an identifier that some
+commit message also carries, and memory rarely names a file no source retriever found (7 to 10 of
+516 train targets, 5 of 204 held-out). Message-only versus all fields is a wash (train favors
+messages by one point of R@8, validation favors all fields at R@3); the default keeps all fields
+for the richer explanations. pip is the repository memory helps least on development and most
+on held-out, which is the size of the per-repository noise. Where memory hurts sqlglot at R@8
+held-out, the losses are three-target tasks where a big historical commit outvotes the second
+and third target.
+
+### Chronological replay (sqlglot development split, 117 tasks in commit order, 4 blocks)
+
+`evals/retrieval/chronology.py`: memory pinned before each task, 24 held-out probes (every fifth
+task) never recorded, experience arms fed **oracle** records (gold target files as a `partial`
+observation asserted by the harness, never verified success) from earlier non-probe tasks.
+
+| Arm | R@8 | All@8 | MRR | paired 95% interval of the R@8 / MRR difference from `full` |
+| --- | --- | --- | --- | --- |
+| `full` | .724 | .660 | .519 | |
+| `full+memory` | .737 | .676 | .540 | +.017 [-.026, +.062] / +.021 [-.002, +.045] |
+| `+ experience, frozen after block 0` | .734 | .676 | .573 | +.014 [-.028, +.060] / +.054 [+.019, +.094] |
+| `+ experience, accumulated` | .752 | .694 | .590 | +.031 [-.016, +.083] / +.071 [+.037, +.112] |
+
+On the 24 probes every arm scores R@8 .736 / All@8 .667: accumulated oracle experience raised
+MRR on the recorded tasks' neighbours but did not move the held-out probes, so this is an upper
+bound on what recorded experience could add to retrieval, not evidence that an agent acquires
+it. Blocks show no monotonic curve (R@8 by block, `full` .636/.694/.764/.793 versus
+`full+memory` .712/.761/.719/.756): later tasks are easier for the baseline, which is exactly
+why a rising line alone would prove nothing. Leakage checks: none violated.
+
+### Cost
+
+Per task in the benchmark: 390 to 580 ms to enumerate and parse a 2,000-commit window (one
+`git log --raw -z` call), 115 to 175 ms to score the events and resolve files at query time,
+against 75 ms for the rest of retrieval. In ordinary use the store is built once by
+`repository_memory.py build` (4 s on this repository with symbol history for 40 commits, 0.6 MB)
+and refreshed incrementally; the query-time cost is the BM25 pass plus one `merge-base` call.
+Symbol history (`--memory-symbols`) and the semantic and experience layers were not part of these
+runs; their retrieval paths are exercised by the offline tests only.
+
+### Recommendation
+
+`git.retrieval` stays `shadow` by default: the held-out gain is real at R@3 to R@5 and MRR, small
+at R@8, and comes with about 150 ms per query on a 2,000-commit store. Turn it `on` per project
+after looking at a few `shadow` packets or `retrieval.py explain` traces. The experience layer
+stays `off` until an experiment with agent-acquired (not oracle) records exists; the semantic
+layer stays `shadow` until its module records are measured against the file role summaries
+above. Raw results: `dist/retrieval-results/memory-{train-*,validation-default-*,test}-<repo>.json`
+and `dist/retrieval-results/chronology-sqlglot-dev.json` in the checkout that ran them.

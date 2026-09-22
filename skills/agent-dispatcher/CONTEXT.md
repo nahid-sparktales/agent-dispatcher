@@ -9,7 +9,7 @@ not native checks. Forced roles, invoked workflows, security, ambiguity and mult
 
 For substantial guided/coordinated work, select the role and prepare before listings, searches,
 contract/source reads, tests or task-file writes. Mandatory host/project instructions are exempt.
-Multi-file bugs, architecture and source-backed documentation qualify in small projects too.
+Multi-file bugs, architecture and source-backed docs qualify in small projects too.
 Skip preparation without workspace evidence; rebuild for changed focus/sources.
 
 ```text
@@ -22,7 +22,7 @@ Small for narrow work, complex for broad. Maintenance defers for task limits and
 roles; add --map-preview (wins) for limits it may miss: odd wording, plan mode. Omit both
 without source investigation.
 Repeat --writable-path for literal allowed relative files (directories end in /); never expand
-the user's edit scope to permit caches. This constrains cache writes, not reads or other tools.
+the user's edit scope to permit caches. It constrains cache writes only.
 
 `exclusion_policy` reports automatic/manual/applied/unresolved exclusions. Literal distractor
 and no-read clauses resolve before content reads; unclear/conflicting phrases stay readable
@@ -40,31 +40,32 @@ them, and explicit manual exclusions win over positive references.
 - `context` and `excerpts` give ranked paths/ranges and source evidence. Use passages directly;
   read further for concrete gaps or changed sources. Ranking and budgets do not prove completeness.
 - `preferences` gives saved output style and requested effort, not confirmed host settings.
-  User instructions win; invalid settings fall back without changing stored bytes.
+  User instructions win; invalid settings fall back unchanged.
 - `project_map` separates cache status from evidence origin. --map-maintain uses the same scan;
   partial/filtered scans, unsafe state or denied write scope defer persistence. Use fresh evidence.
   Both cache writers enforce preview, literal paths and a supplementary task-language veto.
   Other restriction phrasing needs explicit paths/preview. `maintenance.write_scope` explains
   scope; `persisted` records writes. Never bypass scope via build/refresh or claim preservation
   without checking changes. Declared commands are not checks. See [PROJECT-MAP.md](PROJECT-MAP.md).
-- `project_graph` supplies bounded structural hints for the task/role, not runtime traces.
-- Explain missing/partial helpers and continue. Never bypass denials or install/run tools just
-  to fill metadata.
+- `project_graph` gives bounded structural hints, not runtime traces.
+- `memory` (user-enabled): gated history, summary and experience hits with trust labels; see [MEMORY.md](MEMORY.md).
+- Explain missing/partial helpers and continue. Never bypass denials or install tools to fill
+  metadata.
 
 ## Packet budget and reuse
 
 --compact supplies normal execution output. --packet-tokens N bounds its whole serialized
 packet: inlined guidance, metadata, diagnostics, map facts and excerpts.
-Estimates do not measure/cap host instructions, history or other tool results.
-Full --json without --compact is inspection output, not the compact packet contract. Never
+Estimates exclude host instructions, history and other tool results.
+Full --json without --compact is inspection output, not the packet contract. Never
 claim that guidance omitted to fit a budget was read; retrieve missing required evidence.
 
 For retained evidence add `--reuse-state ABS --reuse-scope ID`: an authorized absolute state
 path outside the project and the context retaining earlier bodies. Reuse references require
 those bodies to remain available. Revalidate unchanged evidence; resend changed sources/guides.
 Use a fresh scope for new chats/workers, lost/compacted evidence or failed delivery. State does
-not prove another agent read it; no observer/cross-chat memory is enabled. Do not make an extra
-helper call solely to deduplicate one packet.
+not prove another agent read it; there is no cross-chat memory. Do not call the helper again
+only to deduplicate one packet.
 
 Workspace limits: small 5 files/2,000 estimated tokens, standard 8/6,000, complex 12/15,000.
 Maps allow eight facts/1,000 estimated tokens in retrieval order. Scans cap at 10,000 files,

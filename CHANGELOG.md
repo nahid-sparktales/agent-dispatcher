@@ -2,6 +2,26 @@
 
 ## Unreleased
 
+- Add optional, opt-in repository memory (`repository_memory.py`, `repo_history.py`, `experience.py`,
+  `docs/repository-memory.md`, `MEMORY.md`, `/agent-memory`, `$agent-dispatcher memory`): an episodic
+  layer (eligible commits from HEAD's bounded ancestry through one hardened Git wrapper, admitted
+  changed paths with both sides policy-checked, sanitized messages, issue/PR references, reverts,
+  merge commits as metadata only, bounded Python symbol history, conservative rename lineage,
+  explainable hotspots), a semantic layer (deterministic module records with evidence manifests and
+  optional model summaries keyed to their evidence, stale on change, never generated at query
+  time), and an experience layer (passive, bounded task observations; `verified_scoped_success`
+  only from a current verification receipt; corrections supersede, forgetting and pruning are
+  logical deletions). Every layer has separate build, retrieval (`off`/`shadow`/`on`) and
+  recording controls under one master switch in a settings file outside every project; with it
+  off, packets and rankings are unchanged. At query time a deterministic gate (`use`,
+  `use_limited`, `ignore_weak`, `ignore_stale`, `ignore_unresolved`, `unavailable`,
+  `budget_exhausted`) feeds bounded candidates into the existing fusion as `memory_*` voters,
+  only through current admitted files; the packet gains a `memory` section trimmed before any
+  excerpt, `retrieval.py explain` a `MEMORY` section, and `examine-commit` a re-authorized,
+  bounded patch view by indexed id only. `evals/retrieval/run.py --memory` adds `Hit@k`,
+  `All@k` (RepoMem's Accuracy@k), target-count strata and memory arms; `chronology.py` replays a
+  repository in commit order with leakage checks and oracle-labeled experience arms.
+
 - Order the project map's eight-fact task view by the retrieval engine's file ranking instead of
   counting request words in each fact. The context selector hands the map its ranking with
   excerpted files last; each unnamed file contributes one fact, a ranked file appears even when
