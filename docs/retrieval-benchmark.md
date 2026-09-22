@@ -256,9 +256,8 @@ Concrete patterns behind those numbers:
 
 Each follows from a measured failure above, not from the feature list.
 
-1. **De-correlate the lexical votes** (19 + 80 "fusion lost it" targets): fuse BM25, rare terms
-   and references into one lexical channel before RRF, or halve the symbol-reference weight,
-   which leave-one-out already suggests.
+1. ~~**De-correlate the lexical votes**~~ — measured 2026-09-22 (section below): grouping the
+   lexical voters or down-weighting references does not help; see the table.
 2. **Index oversized files by structure** (21 + 3 targets): read symbols and definitions of
    files over the limit without retaining their text, so central modules can be matched by
    symbol rather than by name only.
@@ -282,6 +281,32 @@ counted as concepts. Both are now ignored. Deterministic `full`, all 126 held-ou
 R@1 .363 -> .376, R@5 .698 -> .700, R@8 .783 -> .785, R@10 .791 -> .808, MRR .604 -> .614; development
 split R@8 .720 -> .726, MRR .549 -> .553; no repository regressed beyond noise. `baseline.json`
 records the new numbers. Every Phase 10 table above was measured before this change.
+
+## Retrieval follow-ups measured and declined (2026-09-22)
+
+Two ideas from the failure analysis above were implemented as switches (`fusion_groups`,
+`graph.multi_edge`, both off) and swept on the development split, 474 tasks, `full` = .345 / .645 /
+.726 / .553 (R@1 / R@5 / R@8 / MRR):
+
+| Variant | R@1 | R@5 | R@8 | MRR | Reading |
+| --- | --- | --- | --- | --- | --- |
+| lexical group (BM25 + rare terms + references vote once) | .316 | .608 | .684 | .518 | clearly worse on every repository but networkx: the correlated votes carry agreement, not just redundancy |
+| … group weight 2.0 | .328 | .655 | .708 | .540 | recovers part of it, still below `full` |
+| BM25 + rare terms grouped, references separate | .329 | .612 | .682 | .530 | worse |
+| BM25 .7, rare terms .7, references .5 | .331 | .645 | .704 | .537 | worse |
+| references weight .5 / .3 / .7 | .348 / .352 / .346 | .658 / .652 / .649 | .718 / .723 / .721 | .556 / .559 / .553 | within noise, R@8 slightly down |
+| graph: sum every edge kind between a pair | .338 | .637 | .715 | .546 | worse (sqlglot -.034 R@8); `soft` likewise |
+| path weight 1.5 / 2.0 | .328 / .327 | .652 / .658 | .729 / .734 | .541 / .535 | recall up, top ranks down |
+| definitions weight 1.5 | .338 | .641 | .698 | .544 | worse |
+| path 1.5 + references .5 (+ definitions 1.5) | .341 / .341 | .656 / .645 | .727 / .719 | .550 / .547 | noise |
+
+Nothing beats the current fusion on both recall and top-rank quality, so the defaults stand and
+the held-out split was not consulted. The lesson is that "correlated voters" was the wrong
+diagnosis: when BM25, rare terms and references agree, they are usually right, and taking away
+their combined vote costs more than it saves on the cases where a lone path match should have won.
+The switches remain for ablation. The OFFSET fixture from the end-to-end suite illustrates the
+limit: `sqlglot/planner.py` has no lexical trace of "offset", and summing its three edges from
+`executor/python.py` lifts it only from rank 57 to 32.
 
 ## LLM-assisted retrieval (Phase 10)
 

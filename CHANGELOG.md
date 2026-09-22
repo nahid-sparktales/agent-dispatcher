@@ -51,6 +51,10 @@
   and a regression check. Held-out Recall@8 rose from .368 to .783 and MRR from .206 to .604,
   with retrieval taking about 70 ms instead of 4.8 s per task; graph expansion, git history and
   the model-free explorer did not measurably improve ranking. See `docs/retrieval-benchmark.md`.
+- Two retrieval switches, both off: `fusion_groups` (correlated retrievers fused among themselves
+  and voting once) and `graph.multi_edge` (`sum` / `soft` over every edge kind between a seed and a
+  neighbor). Swept on the development split and declined as defaults; numbers in
+  `docs/retrieval-benchmark.md`.
 - Query analysis no longer reads a prose parenthetical as a function call (`checkout (see …)` had
   made `checkout` a weight-3 symbol that pulled CI workflows into the seeds) and ignores process
   words task prompts carry (`welcome`, `finish`, `summarize`, `verify`, `claim`, `offline`, …).

@@ -274,6 +274,7 @@ context limits, explorer limits). Named strategies are overlays on it:
 | `hybrid`, `hybrid+graph`, `full` | retrievers + RRF; plus graph; plus git, kind priors and the context optimizer |
 | `full+explorer` | `full` with the built-in explorer |
 | `full-<component>`, `+<component>` | ablations used by the benchmark |
+| `--set fusion_groups=…`, `--set graph.multi_edge=sum` | grouped voting and multi-edge neighbor scoring, measured and left off ([benchmark](retrieval-benchmark.md#retrieval-follow-ups-measured-and-declined-2026-09-22)) |
 | `full+role`, `role-only`, `bm25+role`, `full+rerank`, `full+role+rerank` | [LLM-assisted retrieval](llm-assisted-retrieval.md) experiments: inert without stored role representations and a user-enabled reranker |
 
 An optional, opt-in LLM layer (model-written role summaries as one more retriever, and a bounded

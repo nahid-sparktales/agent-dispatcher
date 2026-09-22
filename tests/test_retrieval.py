@@ -3,6 +3,7 @@ import hashlib
 import importlib.util
 from pathlib import Path
 import unittest
+from collections import Counter
 
 import context
 import context_budget
@@ -203,6 +204,30 @@ class RegressionTests(unittest.TestCase):
 class GraphTests(unittest.TestCase):
     def setUp(self):
         self.index = build(SQL)
+
+    def test_grouped_lexical_voters_cannot_outvote_one_decisive_source(self):
+        row = lambda path, rank: {"file": path, "rank": rank, "score": 1.0 / rank}  # noqa: E731
+        lists = {"bm25": [row("a.py", 1), row("c.py", 2)], "rare_terms": [row("a.py", 1), row("c.py", 2)],
+                 "symbol_references": [row("a.py", 1), row("c.py", 2)], "symbol_definitions": [row("b.py", 1)], "path": [row("b.py", 1)]}
+        plain = retrieval.fuse(lists, retrieval.configure("full"))
+        self.assertGreater(plain["a.py"], plain["b.py"])  # Three readings of the same tokens outvote two independent facts.
+        grouped = retrieval.configure("full", {"fusion_groups": {"lexical": {"sources": ["bm25", "rare_terms", "symbol_references"], "weight": 1.0}}})
+        fused = retrieval.fuse(lists, grouped)
+        self.assertGreater(fused["b.py"], fused["a.py"])
+        self.assertEqual(set(fused), {"a.py", "b.py", "c.py"})
+        self.assertEqual(lists.keys(), {"bm25", "rare_terms", "symbol_references", "symbol_definitions", "path"})  # Evidence lists untouched.
+
+    def test_multi_edge_neighbors_count_every_edge_only_when_asked(self):
+        class Index:
+            in_degree = Counter()
+            neighbors = staticmethod(lambda path: [("b.py", "imports", 3), ("b.py", "references", "Thing"), ("c.py", "calls", "helper")] if path == "a.py" else [])
+            same_directory = staticmethod(lambda path: [])
+        order = lambda policy: [r["file"] for r in retrieval.graph_candidates(["a.py"], Index(), retrieval.configure("full", {"graph": {"multi_edge": policy}}))]  # noqa: E731
+        self.assertEqual(order("max"), ["c.py", "b.py"])  # calls 1.0 beats references 0.8
+        self.assertEqual(order("sum"), ["b.py", "c.py"])  # references 0.8 + imports 0.5 beats calls 1.0
+        self.assertEqual(order("soft"), ["b.py", "c.py"])  # 0.8 + 0.25
+        best = next(r for r in retrieval.graph_candidates(["a.py"], Index(), retrieval.configure("full", {"graph": {"multi_edge": "sum"}})) if r["file"] == "b.py")
+        self.assertIn("referenced by", best["reason"])  # The strongest edge still explains the neighbor.
 
     def test_one_hop_expansion_reaches_a_file_the_request_never_mentions(self):
         rows = retrieval.graph_candidates(["sqlglot/executor/python.py"], self.index, retrieval.configure("full"))

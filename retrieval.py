@@ -31,6 +31,10 @@ DEFAULTS = {
     "fusion": "rrf",  # "rrf" | "combsum" (max-normalized score sum, kept for ablation).
     "rrf_k": 20,  # Tuned on the benchmark's train split: 10-20 beat the customary 60, which mostly counts lists.
     "rrf_weights": {"git": 0.5},  # Vote weight per source; unlisted sources vote 1.0.
+    # Correlated voters: sources in a group are fused among themselves first and then vote once, as the group.
+    # None keeps every retriever as its own voter. Example: {"lexical": {"sources": ["bm25", "rare_terms",
+    # "symbol_references"], "weight": 1.0}}.
+    "fusion_groups": None,
     "query_weights": {"path": 4.0, "symbol": 3.0, "identifier": 3.0, "concept": 1.0, "subtoken_factor": 0.5},
     "path": {"explicit": 10.0, "module": 6.0, "package": 1.5, "stem_exact": 3.0, "stem_token": 2.0,
              "directory": 1.0, "partial": 0.5, "partial_min_chars": 5},
@@ -39,6 +43,9 @@ DEFAULTS = {
     "seed_count": 5,
     "graph": {"enabled": True, "max_hops": 1, "hop_decay": [1.0, 0.5, 0.2], "max_neighbors_per_seed": 8,
               "max_candidates": 20, "include_seeds": True, "degree_damping": "log",  # or "sqrt"
+              # A neighbor tied to a seed by several kinds of edge (calls + imports + references): "max" counts the
+              # strongest edge only, "sum" every edge, "soft" the strongest plus half of the rest.
+              "multi_edge": "max",
               "edge_priors": {"calls": 1.0, "called_by": 1.0, "references": 0.8, "referenced_by": 0.8,
                               "inherits": 0.8, "inherited_by": 0.8, "tested_by": 0.7, "tests": 0.7,
                               "imports": 0.5, "imported_by": 0.5, "same_module": 0.3}},
@@ -438,7 +445,19 @@ RETRIEVERS = {"path": path_retriever, "rare_terms": rare_term_retriever, "bm25":
 
 
 def fuse(lists, config):
-    """Reciprocal rank fusion: sum of weight / (k + rank). Ranks, not raw scores, cross retrievers."""
+    """Reciprocal rank fusion: sum of weight / (k + rank). Ranks, not raw scores, cross retrievers.
+
+    With `fusion_groups`, the members of a group are fused among themselves first and the group's
+    ranking votes once: three retrievers reading the same tokens no longer outvote one path match.
+    """
+    lists = dict(lists)
+    for name, group in (config.get("fusion_groups") or {}).items():
+        members = {source: lists.pop(source) for source in group["sources"] if source in lists}
+        if members:
+            inner = fuse(members, dict(config, fusion_groups=None, rrf_weights={}))
+            ordered = sorted(inner.items(), key=lambda item: (-item[1], item[0]))
+            lists[name] = [{"file": path, "rank": rank, "score": round(score, 6)} for rank, (path, score) in enumerate(ordered, 1)]
+            config = dict(config, rrf_weights={**config["rrf_weights"], name: group.get("weight", 1.0)})
     scores = defaultdict(float)
     for source, rows in lists.items():
         weight = config["rrf_weights"].get(source, 1.0)
@@ -467,13 +486,20 @@ def graph_candidates(seeds, index, config, known=()):
         decay = tuning["hop_decay"][min(hop, len(tuning["hop_decay"]) - 1)]
         following = []
         for origin, strength in frontier:
-            found = {}
+            found, edges = {}, defaultdict(list)
             for other, kind, detail in index.neighbors(origin):
                 if other in seeds and not tuning["include_seeds"]:
                     continue
                 damping = math.sqrt(1 + index.in_degree[other]) if tuning["degree_damping"] == "sqrt" else math.log(2 + index.in_degree[other])
-                value = strength * decay * tuning["edge_priors"].get(kind, 0.0) / damping
-                if value > found.get(other, (0,))[0]:
+                edges[other].append((strength * decay * tuning["edge_priors"].get(kind, 0.0) / damping, kind, detail))
+            for other, rows in edges.items():
+                rows.sort(key=lambda row: -row[0])
+                value, kind, detail = rows[0]
+                if tuning.get("multi_edge", "max") == "sum":
+                    value = sum(row[0] for row in rows)
+                elif tuning.get("multi_edge") == "soft":
+                    value += 0.5 * sum(row[0] for row in rows[1:])
+                if value > 0:
                     found[other] = (value, kind, detail)
             # Sharing a directory is weak: it may reinforce a file something else found, never introduce one.
             siblings = ([other for other in index.same_directory(origin) if other in known and other not in seeds]
