@@ -67,7 +67,7 @@ not prove another agent read it; no observer/cross-chat memory is enabled. Do no
 helper call solely to deduplicate one packet.
 
 Workspace limits: small 5 files/2,000 estimated tokens, standard 8/6,000, complex 12/15,000.
-Maps allow eight facts/1,000 estimated tokens within packet limits. Scans cap at 10,000 files,
+Maps allow eight facts/1,000 estimated tokens in retrieval order. Scans cap at 10,000 files,
 256 KiB/file, 32 MiB text. Ignore, binary, credential, symlink, redaction and one-hop/two-file
 protections apply; credential detection is incomplete.
 

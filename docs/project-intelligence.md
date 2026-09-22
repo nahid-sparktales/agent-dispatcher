@@ -69,7 +69,8 @@ retrieve a dependency or caller whose name does not appear in the task.
 | --- | --- |
 | Symbol graph | Python AST definitions for files, classes and functions; literal JS/TS import candidates |
 | Task-personalized ranking | Bounded personalized PageRank over a nearby subgraph, with relevant changed-file seeds |
-| Role views | Test-oriented ranking for debugger, reviewer and tester; the same source-backed graph |
+| Role views | Test-oriented ranking for debugger, reviewer and tester; the same source-backed graph. The fact map pins up to two test commands for those roles and decisions for the architect |
+| Map view | The eight map facts follow the retrieval ranking, one per file, files without excerpts first; measured in [retrieval-benchmark.md](retrieval-benchmark.md#project-map-task-view) |
 | Execution paths | Short chains of statically resolved direct Python calls; no dynamic dispatch or framework flows |
 | Change impact | Upstream/downstream reachability through supported imports and calls, bounded to two hops |
 | Test-to-code links | Candidate tests inferred from test naming and imports; no coverage claim or automatic test execution |
