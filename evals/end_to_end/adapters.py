@@ -321,6 +321,7 @@ def build_launch(client: str, spec: dict, workspace: Path,
         "external_mcp": False, "personal_plugins": False,
         "isolation": "customization-discovery; not an OS security boundary",
         "llm_retrieval_settings": spec.get("llm_settings"),
+        "llm_network": list(spec.get("llm_network") or []),
     }
     if client == "codex":
         disabled, proof = _codex_isolation(executable, spec, env, workspace, skill)
@@ -337,7 +338,9 @@ def build_launch(client: str, spec: dict, workspace: Path,
             "sandbox": {"enabled": True, "failIfUnavailable": True,
                         "autoAllowBashIfSandboxed": True,
                         "allowUnsandboxedCommands": False,
-                        "network": {"allowedDomains": []}},
+                        # Bash subprocesses reach only the hosts an LLM-retrieval experiment names (the helper's
+                        # own model calls); both conditions get the same list, and it stays empty otherwise.
+                        "network": {"allowedDomains": list(spec.get("llm_network") or [])}},
         }
         argv = [executable, "--print", "--output-format", "stream-json", "--verbose",
                 "--input-format", "stream-json", "--replay-user-messages",

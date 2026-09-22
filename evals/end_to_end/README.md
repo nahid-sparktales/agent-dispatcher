@@ -52,6 +52,9 @@ directories; give it a `store` outside them too, and index the fixtures into tha
 the run so representations are cached rather than generated inside a timed trial. Both conditions
 receive the same environment; only the dispatcher reads the variable. The path is recorded in each
 trial's effective settings and changes the configuration fingerprint, so smoke runs again first.
+The shell sandbox blocks outbound network from Bash, which is where the helper's own model calls
+run, so also list the provider hosts the settings need as `"llm_network": ["api.anthropic.com"]`;
+only those hosts open, for both conditions, and the list is recorded with the settings path.
 
 ### Evaluate an already indexed project
 

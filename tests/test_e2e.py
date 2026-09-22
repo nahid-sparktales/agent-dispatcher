@@ -128,6 +128,11 @@ class LLMSettingsPassThrough(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "llm_settings"):
                 run.validate_config(config(dict(base, llm_settings="relative.json")))
             run.validate_config(config(dict(base, llm_settings=str(settings))))
+            with self.assertRaisesRegex(ValueError, "llm_network"):
+                run.validate_config(config(dict(base, llm_network=["api.anthropic.com"])))  # hosts without settings
+            with self.assertRaisesRegex(ValueError, "llm_network"):
+                run.validate_config(config(dict(base, llm_settings=str(settings), llm_network=["bad host"])))
+            run.validate_config(config(dict(base, llm_settings=str(settings), llm_network=["api.anthropic.com"])))
 
 
 class SchedulingTests(unittest.TestCase):

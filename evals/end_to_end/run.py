@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 import difflib
 import hashlib
 import json
+import re
 import os
 from pathlib import Path
 import random
@@ -76,6 +77,10 @@ def validate_config(config, live=False):
         settings = spec.get("llm_settings")
         if settings is not None and (not isinstance(settings, str) or not Path(settings).is_absolute() or not Path(settings).is_file()):
             raise ValueError(f"{client}: llm_settings must be an absolute path to an existing settings file")
+        hosts = spec.get("llm_network")
+        if hosts is not None and (settings is None or not isinstance(hosts, list) or not hosts
+                                  or not all(isinstance(h, str) and re.fullmatch(r"[a-z0-9.-]+", h) for h in hosts)):
+            raise ValueError(f"{client}: llm_network must be a nonempty list of hostnames and needs llm_settings")
         if profile.is_symlink():
             raise ValueError("evaluation profiles cannot be symlinks")
         profiles.append(profile.resolve())
