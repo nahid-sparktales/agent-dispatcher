@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Retrieval reads stack-trace frames (`File "...", line N, in f`, `at f (path:line:col)`) as frames:
+  the longest suffix of the frame path that exists in the index votes in the path retriever (the
+  innermost frame counts double, never pinned), the frame's line anchors the excerpt and its
+  function name is a symbol (`frames`, `full-frames`). Admitted files over the 256 KiB read limit
+  now get a structural record (definitions, imports, calls, no text or terms retained), so a
+  central module is matched by the symbol it defines instead of by its name alone; it is still
+  never excerpted (`structural_records`, `full-structure`).
 - Unify task experience: the repository memory layer and the deep index share one SQLite experience
   store, one event shape and one `experience` voter. `repository_memory.py record|correct|forget|prune`
   and `repository_intelligence.py experience ...` write the same records; the memory vocabulary

@@ -55,6 +55,13 @@ DEFAULTS = {
     "kind_weights": {"source": 1.0, "test": 0.5, "doc": 0.5, "config": 0.7, "manifest": 0.7, "schema": 0.8,
                      "migration": 0.8, "workflow": 0.5, "other": 0.5},
     "pin_named_paths": True,
+    # Stack-trace frames in the request (`File "x.py", line 12, in f`; `at f (src/x.ts:12:5)`): each frame's path is
+    # matched by its longest suffix that exists in the index and votes in the path retriever; the innermost frame
+    # counts double; its line anchors the excerpt; the frame's function name is a symbol. Never pinned.
+    "frames": {"enabled": True, "weight": 1.0, "innermost_bonus": 1.0, "max_frames": 12, "max_matches": 3},
+    # Admitted files over the read limit contribute their definitions, imports and calls (structural records
+    # computed without retaining the text) instead of their name alone.
+    "structural_records": True,
     # Fused scores within this relative distance of their group's leader count as a tie, settled by evidence
     # (definition, then named path, then identifier, then structure) instead of by a hair of lexical rank.
     # Benchmark-neutral at 0.05 (0.10 and 0.20 cost recall); 0 compares exact scores only.
@@ -128,6 +135,8 @@ def _strategies():
     out["full-rerank"] = _merge(full, {"kind_weights": None, "pin_named_paths": False})
     out["full-query-analysis"] = _merge(full, {"query_analysis": False})
     out["full-rrf"] = _merge(full, {"fusion": "combsum"})
+    out["full-frames"] = _merge(full, {"frames": {"enabled": False}})
+    out["full-structure"] = _merge(full, {"structural_records": False})
     # Representation experiments: raw source (`+query-analysis`) against role summaries, alone and fused.
     out["role-only"] = _merge(out["+query-analysis"], {"retrievers": ["role_summary"]})
     out["bm25+role"] = _merge(out["+query-analysis"], {"retrievers": ["bm25", "role_summary"], "fusion": "rrf"})
@@ -195,6 +204,61 @@ _CALL = re.compile(r"(?<![\w.])([A-Za-z_][\w.]*)\(")
 _CODE_SPAN = re.compile(r"`([^`\n]{2,120})`")
 _QUOTED = re.compile(r"[`\"']([^`\"'\n]{6,160})[`\"']")
 _WORD = re.compile(r"[A-Za-z_][A-Za-z0-9_]{1,79}")
+_PY_FRAME = re.compile(r"File \"([^\"\n]{1,400})\", line (\d{1,7})(?:, in ([A-Za-z_][\w.<>]*))?")
+_JS_FRAME = re.compile(r"\bat (?:([\w.$<>\[\] ]{1,120}?) \()?((?:[A-Za-z]:)?[^\s():]{1,400}\.(?:m?[jt]sx?|cjs|vue|svelte)):(\d{1,7})(?::\d+)?\)?")
+
+
+def _frames(text, limit):
+    """Traceback frames in order of appearance -> [{path (no drive or leading slash), line, function, innermost}]."""
+    found = []
+    for match in _PY_FRAME.finditer(text):
+        found.append({"path": match.group(1), "line": int(match.group(2)), "function": match.group(3), "kind": "python"})
+    for match in _JS_FRAME.finditer(text):
+        found.append({"path": match.group(2), "line": int(match.group(3)), "function": match.group(1), "kind": "js"})
+    frames = []
+    for frame in found[:limit]:
+        raw = frame["path"].replace("\\", "/")
+        raw = re.sub(r"^[A-Za-z]:", "", raw).lstrip("/")
+        if raw.startswith("./"):
+            raw = raw[2:]
+        parts = [part for part in raw.split("/") if part not in ("", ".", "..")]
+        if not parts or "<" in raw:
+            continue  # `<stdin>`, `<string>` and the like name no file.
+        function = frame["function"]
+        if function and (function in {"<module>", "<lambda>"} or "<" in function):
+            function = None
+        frames.append({"path": "/".join(parts), "line": frame["line"], "function": function.rsplit(".", 1)[-1] if function else None,
+                       "kind": frame["kind"], "innermost": False})
+    if frames:  # Python lists the innermost frame last; JavaScript first.
+        python = [f for f in frames if f["kind"] == "python"]
+        (python[-1] if python else frames[0])["innermost"] = True
+    return frames
+
+
+def frame_matches(frame, index, max_matches=3):
+    """Index paths that end with the longest suffix of a frame path; a bare file name counts only when unique."""
+    parts = frame["path"].split("/")
+    for size in range(len(parts), 0, -1):
+        suffix = "/".join(parts[-size:])
+        matches = [p for p in index.paths if p == suffix or p.endswith("/" + suffix)]
+        if matches and (size > 1 or len(matches) == 1) and len(matches) <= max_matches:
+            return matches, size
+        if len(matches) > max_matches:
+            return [], size
+    return [], 0
+
+
+def frame_anchors(query, index, config):
+    """{path: line} from frames that resolve to exactly one indexed file; the innermost frame wins a conflict."""
+    tuning = config["frames"]
+    anchors = {}
+    if not tuning["enabled"]:
+        return anchors
+    for frame in sorted(query.get("frames", []), key=lambda f: f["innermost"]):
+        matches, _ = frame_matches(frame, index, tuning["max_matches"])
+        if len(matches) == 1:
+            anchors[matches[0]] = frame["line"]
+    return anchors
 
 
 def analyze_query(task, config=None):
@@ -230,6 +294,11 @@ def analyze_query(task, config=None):
     for value in _CODE_SPAN.findall(text):
         if _WORD.fullmatch(value) and value.lower() not in GENERIC and value not in symbols:
             symbols.append(value)
+    frames = _frames(text, config.get("frames", DEFAULTS["frames"])["max_frames"]) if config.get("frames", DEFAULTS["frames"])["enabled"] else []
+    for frame in frames:
+        name = frame["function"]
+        if name and len(name) > 2 and name.lower() not in GENERIC and name not in symbols and _WORD.fullmatch(name):
+            symbols.append(name)
     for word in raw:
         camel = any(c.isupper() for c in word[1:]) and any(c.islower() for c in word)
         if ("_" in word.strip("_") or camel or (word.isupper() and any(c.isdigit() for c in word))) and word not in identifiers:
@@ -270,7 +339,7 @@ def analyze_query(task, config=None):
         terms[term] = max(terms.get(term, 0.0), weights["concept"])
         symbol_names.setdefault(word, weights["concept"])
     phrases = [p.strip() for p in _QUOTED.findall(text) if not _WORD.fullmatch(p.strip()) and p.strip() not in paths]
-    return {"raw_tokens": len(raw), "paths": paths[:12], "dotted": dotted[:12], "symbols": symbols[:24],
+    return {"raw_tokens": len(raw), "paths": paths[:12], "dotted": dotted[:12], "symbols": symbols[:24], "frames": frames,
             "qualified": qualified[:12], "identifiers": identifiers[:40], "concept_terms": concepts[:60],
             "generic_terms": generic, "phrases": phrases[:8], "terms": terms, "symbol_names": symbol_names,
             "wants": {"test": bool(re.search(r"\b(?:tests?|testing|pytest|unittest|spec|coverage)\b", text, re.I)),
@@ -283,7 +352,7 @@ def legacy_query(task):
     index = _sibling("repo_index")
     words = [w.lower() for w in dict.fromkeys(_WORD.findall(task))][:80]
     terms = {index["normalize"](w): 1.0 for w in words if w not in GENERIC}
-    return {"raw_tokens": len(words), "paths": [], "dotted": [], "symbols": [], "qualified": [], "identifiers": [],
+    return {"raw_tokens": len(words), "paths": [], "dotted": [], "symbols": [], "frames": [], "qualified": [], "identifiers": [],
             "concept_terms": sorted(terms), "generic_terms": [], "phrases": [], "terms": terms,
             "symbol_names": {}, "wants": {"test": False, "doc": False, "config": False}}
 
@@ -356,6 +425,17 @@ def path_retriever(query, index, config):
             gain = weights[kind] * rarity * weight
             scores[path] += gain
             _note(reasons, path, gain, label, term)
+    frames = config["frames"]
+    if frames["enabled"]:
+        for frame in query.get("frames", []):
+            matches, size = frame_matches(frame, index, frames["max_matches"])
+            if not matches:
+                continue
+            gain = weights["explicit"] * frames["weight"] * (1 + frames["innermost_bonus"] if frame["innermost"] else 1.0) / len(matches)
+            for path in matches:
+                scores[path] += gain
+                _note(reasons, path, gain, "traceback frame names this file" + (" (innermost)" if frame["innermost"] else ""),
+                      f"{'/'.join(frame['path'].split('/')[-size:])}:{frame['line']}")
     # The request named these outright (a path, or a dotted name that resolves to one).
     return [dict(row, decisive=True) if row["file"] in decisive else row
             for row in _ranked(scores, reasons, config["candidate_limit"], "path")]
@@ -919,12 +999,14 @@ class LazyTexts(dict):
 
 
 def build_index(texts, hashes, kind_of, *, cache=None, history=None, config=None, path_only=(), stats=None,
-                store=None, extended=None, partners=None, loader=None):
+                store=None, extended=None, partners=None, loader=None, structural=None):
     """Facts for the admitted universe. `history` is raw `git log` text, or None when unavailable.
 
     `store` (a deep repository index) supplies records whose fingerprint matches the scan, in place of the
     parser-cache shards; `extended` adds records for verified files the scan could not read (their text is
-    loaded on demand through `loader`); `partners` are precomputed co-change rows that replace `history`.
+    loaded on demand through `loader`); `partners` are precomputed co-change rows that replace `history`;
+    `structural` adds definition-only records ({path: {"record", "sha256"}}) for admitted files over the read
+    limit, so they can be matched by symbol and relationship although their text is never retained.
     """
     config = config or STRATEGIES["full"]
     facts = _sibling("repo_index")
@@ -951,6 +1033,12 @@ def build_index(texts, hashes, kind_of, *, cache=None, history=None, config=None
                 records[path] = item["record"]
                 hashes[path] = item["sha256"]
         stats["extended_files"] = len(extended)
+    if structural and config.get("structural_records", True):
+        for path, item in structural.items():
+            if path not in records and path not in texts:
+                records[path] = dict(item["record"], structural=True)
+                hashes[path] = item["sha256"]
+        stats["structural_files"] = sum(1 for r in records.values() if r.get("structural"))
     if partners is None and history and config["git"]["enabled"]:
         commits = facts["parse_git_log"](history, set(records) | set(path_only), config["git"]["max_commit_files"])
         partners = facts["cochange"](commits, min_support=config["git"]["min_support"],
@@ -970,7 +1058,8 @@ def run(task, index, config=None, *, anchors=None, explorer=None, findings=None,
     budget = _sibling("context_budget")
 
     def packet_of(result):
-        return budget["build_packet"](result["ranked"], index, result["query"], config, anchors=anchors or {})
+        return budget["build_packet"](result["ranked"], index, result["query"], config,
+                                      anchors={**frame_anchors(result["query"], index, config), **(anchors or {})})
 
     def view_of(result):
         return {"query": result["query"], "files": packet_of(result)["files"]}
@@ -994,6 +1083,9 @@ def run(task, index, config=None, *, anchors=None, explorer=None, findings=None,
 
 def render_query(query):
     lines = ["IDENTIFIERS"] + [f"  {v}" for v in query["paths"] + query["dotted"] + query["symbols"] + query["identifiers"]]
+    if query.get("frames"):
+        lines += ["", "TRACEBACK FRAMES"] + [f"  {f['path']}:{f['line']}" + (f" in {f['function']}" if f["function"] else "") + (" (innermost)" if f["innermost"] else "")
+                                             for f in query["frames"]]
     lines += ["", "CONCEPT TERMS"] + [f"  {v}" for v in query["concept_terms"]]
     lines += ["", "IGNORED/LOW-WEIGHT TERMS"] + [f"  {v}" for v in query["generic_terms"]]
     if query["phrases"]:

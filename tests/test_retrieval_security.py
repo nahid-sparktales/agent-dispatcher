@@ -164,8 +164,13 @@ class ExcludedFilesStayUnreachable(unittest.TestCase):
             scrub = context._scrubber(context.find_pack(str(ROOT)))
             oversized, withheld, diagnostics = [], [], []
             paths = context._enumerate(project, diagnostics)
-            context._scan_sources(project, paths, ("app/huge_excluded.py",), [], None, scrub, withheld, diagnostics, oversized)
+            structural = {}
+            context._scan_sources(project, paths, ("app/huge_excluded.py",), [], None, scrub, withheld, diagnostics, oversized, structural)
             self.assertEqual(oversized, ["app/huge_allowed.py"])
+            self.assertEqual(list(structural), ["app/huge_allowed.py"])  # Excluded and credential-named files get no structural record.
+            self.assertEqual(structural["app/huge_allowed.py"]["record"]["terms"], {})
+            self.assertTrue(structural["app/huge_allowed.py"]["record"]["structural"])  # Redaction ran first: the credential-shaped lines parse to nothing.
+            self.assertNotIn("oversized-secret-value", json.dumps(structural))
             outcome = context.explain_retrieval(project, "Open .env.production, secrets_dump.py and app/huge_excluded.py; huge_allowed too",
                                                 pack=ROOT, exclude_paths=["app/huge_excluded.py"])
             self.assertEqual([row["path"] for row in outcome["ranked"]], ["app/huge_allowed.py"])

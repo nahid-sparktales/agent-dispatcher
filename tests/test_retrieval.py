@@ -117,6 +117,50 @@ class RetrieverTests(unittest.TestCase):
         for expected in ("QUERY ANALYSIS", "TOP FILES", "symbol_definitions rank #1", "PIPELINE", "SEEDS", "CONTEXT"):
             self.assertIn(expected, text)
 
+    def test_traceback_frames_resolve_by_suffix_anchor_excerpts_and_name_symbols(self):
+        index = build(SQL)
+        task = ("The executor crashes:\n\nTraceback (most recent call last):\n"
+                "  File \"/opt/venv/lib/python3.12/site-packages/sqlglot/executor/__init__.py\", line 4, in execute\n"
+                "    return PythonExecutor().execute(sql)\n"
+                "  File \"/opt/venv/lib/python3.12/site-packages/sqlglot/planner.py\", line 6, in run\n"
+                "    return self.expression\nAttributeError: 'NoneType' object has no attribute 'expression'\n")
+        query = retrieval.analyze_query(task)
+        self.assertEqual([(f["path"].split("/")[-2:], f["line"], f["function"], f["innermost"]) for f in query["frames"]],
+                         [(["executor", "__init__.py"], 4, "execute", False), (["sqlglot", "planner.py"], 6, "run", True)])
+        self.assertEqual(query["paths"], [])  # An absolute frame path is never a pinned explicit path.
+        self.assertIn("run", query["symbols"])
+        rows = retrieval.path_retriever(query, index, retrieval.configure("full"))
+        by_file = {row["file"]: row for row in rows}
+        self.assertEqual(rows[0]["file"], "sqlglot/planner.py")  # The innermost frame counts double.
+        self.assertIn("traceback frame", by_file["sqlglot/executor/__init__.py"]["reason"])
+        self.assertFalse(any(row.get("decisive") for row in rows))
+        self.assertEqual(retrieval.frame_anchors(query, index, retrieval.configure("full")), {"sqlglot/planner.py": 6, "sqlglot/executor/__init__.py": 4})
+        outcome = retrieval.run(task, index, retrieval.configure("full"))
+        planner = next(item for item in outcome["packet"]["files"] if item["path"] == "sqlglot/planner.py")
+        self.assertTrue(any(e["start"] <= 6 <= e["end"] for e in planner["excerpts"]))
+        without = retrieval.path_retriever(query, index, retrieval.configure("full-frames"))
+        self.assertFalse(any("traceback" in row["reason"] for row in without))
+        # A bare file name resolves only when unique; a frame in an unrelated tree names nothing.
+        ambiguous = retrieval.analyze_query('File "/x/__init__.py", line 1, in f\nFile "/other/nowhere.py", line 2, in g')
+        self.assertEqual(retrieval.frame_anchors(ambiguous, index, retrieval.configure("full")), {})
+
+    def test_structural_records_make_oversized_files_findable_by_symbol_but_never_excerpted(self):
+        files = dict(SQL)
+        structural = {"sqlglot/generator.py": {"record": dict(repo_index.file_record("sqlglot/generator.py", "class Generator:\n    def generate_offset(self):\n        return 1\n"), terms={}, len=0, structural=True), "sha256": "a" * 64}}
+        hashes = {path: hashlib.sha256(text.encode()).hexdigest() for path, text in files.items()}
+        index = retrieval.build_index(files, hashes, context._kind, path_only=["sqlglot/generator.py"], structural=structural)
+        self.assertIn("sqlglot/generator.py", index.path_only)
+        self.assertEqual(index.symbols_in("sqlglot/generator.py"), ["Generator", "generate_offset"])
+        outcome = retrieval.run("generate_offset() drops the OFFSET clause", index, retrieval.configure("full"))
+        self.assertEqual(outcome["ranked"][0]["path"], "sqlglot/generator.py")
+        self.assertIn("symbol_definitions", {e["source"] for e in outcome["ranked"][0]["evidence"]})
+        item = next(item for item in outcome["packet"]["files"] if item["path"] == "sqlglot/generator.py")
+        self.assertEqual((item["excerpts"], item["symbols"]), ([], ["generate_offset"]))
+        self.assertIn("over the file read limit", item["note"])
+        plain = retrieval.build_index(files, hashes, context._kind, path_only=["sqlglot/generator.py"], structural=structural,
+                                      config=retrieval.configure("full-structure"))
+        self.assertEqual(plain.symbols_in("sqlglot/generator.py"), [])
+
     def test_file_over_the_read_limit_is_ranked_by_name_imports_and_history_but_never_read(self):
         files = {"pkg/lexer.py": "from pkg.parser import Parser\n\n\ndef tokens():\n    return Parser()\n", "pkg/other.py": "value = 1\n"}
         index = build(files, history=log(*[["pkg/lexer.py", "pkg/parser.py"]] * 3), path_only=["pkg/parser.py"])

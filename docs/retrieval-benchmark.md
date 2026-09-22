@@ -507,6 +507,32 @@ Re-run everything with `dist/retrieval-llm/index_rounds.sh` (indexing, resumable
 `dist/retrieval-llm/settings.json` at a provider; `evals/retrieval/llm_report.py` renders the
 tables above from the saved JSON.
 
+## Traceback frames and structural records for oversized files (2026-09-22)
+
+Two deterministic additions from the failure analysis above, measured with `full-frames` and
+`full-structure` (each removes exactly one from `full`; positive differences mean the feature helps).
+
+| Split | Feature | R@1 | R@5 | R@8 | All@8 | MRR | Tasks whose target ranks changed |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| train (357) | frames | +.002 | .000 | .000 | .000 | +.001 | 3 of 474 dev tasks |
+| train (357) | structural records | -.002 | -.001 | +.004 | +.006 | -.001 | 32 of 474 dev tasks |
+| validation (117) | frames | .000 | .000 | .000 | .000 | .000 | |
+| validation (117) | structural records | -.002 | .000 | .000 | .000 | -.004 | |
+| **held-out (126)** | frames | .000 | .000 | +.004 | .000 | .000 | 1 task |
+| **held-out (126)** | structural records | -.003 | -.002 | +.003 | +.008 | -.004 | |
+
+- **Frames** fire only when a request carries a traceback, which almost none of these issue and
+  PR texts do (3 development tasks, 1 held-out task); where they fire they help and they never
+  cost anything, so the feature stays on. Its value has to be measured on issue reports with
+  tracebacks, which this benchmark does not contain in numbers.
+- **Structural records** matter where the oversized files are: sqlglot's `parser.py` and
+  `generator.py` (17 name-only targets on train). On train sqlglot R@8 .761 -> .776 and All@8
+  .718 -> .741; two `parser.py` targets move from rank 36 to 12 and 35 to 7; held-out sqlglot
+  R@8 .805 -> .815 and All@8 .697 -> .727. The other three repositories have no oversized files
+  and are unchanged. The small negative R@1 and MRR movements are the price of definitions
+  from a 400 KB file competing at the top rank; net positive at R@8 and All@8 on every split
+  where it applies, so the feature stays on (`structural_records: false` restores name-only).
+
 ## Repository memory
 
 Measured on 2026-09-22 with `evals/retrieval/run.py --memory` (see

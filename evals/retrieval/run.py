@@ -271,19 +271,20 @@ def evaluate(tasks, clone, strategies, overrides=None, variants=None, progress=T
         started = time.perf_counter()
         diagnostics, withheld = [], []
         paths = context._enumerate(clone, diagnostics)
-        oversized = []
-        texts, hashes, _, _ = context._scan_sources(clone, paths, (), [], memo, scrub, withheld, diagnostics, oversized)
+        oversized, structural = [], {}
+        texts, hashes, _, _ = context._scan_sources(clone, paths, (), [], memo, scrub, withheld, diagnostics, oversized, structural)
         scan_ms = (time.perf_counter() - started) * 1000
         query = scrub(task["query"])[:context.MAX_TASK_CHARS]
         stats, indexes, coverage = {}, {}, {}
         history = context._git_history(clone, retrieval.DEFAULTS["git"]["max_commits"])
 
         def index_for(config):
-            """One index per distinct co-change setting; every other knob is applied at query time."""
-            key = json.dumps([config["git"][k] for k in ("max_commit_files", "min_support", "half_life_days")])
+            """One index per distinct co-change and structural setting; every other knob is applied at query time."""
+            key = json.dumps([config["git"][k] for k in ("max_commit_files", "min_support", "half_life_days")] + [config.get("structural_records", True)])
             if key not in indexes:
                 indexes[key] = retrieval.build_index(texts, hashes, context._kind, cache=memo, history=history,
-                                                     config=config, stats=stats if not indexes else {}, path_only=oversized)
+                                                     config=config, stats=stats if not indexes else {}, path_only=oversized,
+                                                     structural=structural)
                 if llm:
                     coverage.update(llm.prepare(indexes[key]))
             return indexes[key]

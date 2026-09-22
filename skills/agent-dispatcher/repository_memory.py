@@ -240,7 +240,7 @@ def load_store(root, kind):
     state_file, validator, max_bytes = _STORES[kind]
     helper = _map()
     try:
-        return helper["_load"](root, state_file=state_file, validator=validator, max_bytes=max_bytes)
+        return helper["_load"](root, state_file=state_file, validator=validator, max_bytes=max_bytes, directory=state_directory(root))
     except helper["ProjectMapError"] as exc:
         raise RepositoryMemoryError(f"Repository memory state ({kind}) is unsafe or malformed and was ignored.") from exc
 
@@ -250,7 +250,7 @@ def save_store(root, kind, data, expected):
     helper = _map()
     try:
         helper["_write"](root, data, refresh=expected is not None, expected=expected, state_file=state_file,
-                         validator=validator, max_bytes=max_bytes)
+                         validator=validator, max_bytes=max_bytes, directory=state_directory(root))
     except helper["ProjectMapError"] as exc:
         raise RepositoryMemoryError(f"Repository memory state ({kind}) could not be saved: {exc}") from None
 
