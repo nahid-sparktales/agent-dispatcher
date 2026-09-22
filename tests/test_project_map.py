@@ -334,7 +334,7 @@ class ProjectMapTests(unittest.TestCase):
 
     def test_cli_lists_at_most_fifty_facts_after_its_diagnostics(self):
         for index in range(40):
-            self.write(f"feature{index}.py", f"import package{index}\ndef operation{index}(): pass\n")
+            self.write(f"feature{index}.py", f"def operation{index}(): pass\ndef helper{index}(): pass\n")
         self.build()
         command = [sys.executable, "-B", str(ROOT / "project_map.py"), "show", "--project", str(self.project)]
         shown = json.loads(subprocess.run(command + ["--json"], capture_output=True, text=True, check=True).stdout)
@@ -344,6 +344,24 @@ class ProjectMapTests(unittest.TestCase):
         text = subprocess.run(command, capture_output=True, text=True, check=True).stdout.splitlines()
         first_fact = next(number for number, line in enumerate(text) if line.startswith("- "))
         self.assertTrue(any(line.startswith("Diagnostic: Showing 50") for line in text[:first_fact]))
+
+    def test_import_lines_are_facts_only_for_modules_without_definitions(self):
+        self.basic()
+        self.write("src/registry.py", "from __future__ import annotations\nimport sqlite3\nimport json\nTABLES = {}\n")
+        self.write("src/index.ts", 'export * from "./auth.js";\nexport * from "./registry.js";\n')
+        result = self.build()
+        imports = [(e["label"], e["source"]["path"]) for e in result["entries"] if e["detail"].startswith("Import declaration")]
+        self.assertEqual(imports, [("./auth.js", "src/index.ts"), ("sqlite3", "src/registry.py")])
+        self.assertEqual([e["label"] for e in result["entries"] if e["kind"] == "dependency"], ["react", "./auth.js", "sqlite3"])
+
+    def test_documented_test_command_is_recorded_once_from_the_makefile(self):
+        self.write("Makefile", "test:\n\t@echo tests\n")
+        self.write("README.md", "Run the checks:\n\n```sh\nmake test\n```\n")
+        self.write("docs/testing.md", "```\nmake test\n```\n")
+        result = self.build()
+        commands = [(e["label"], e["source"]["path"]) for e in result["entries"] if e["kind"] == "test_command"]
+        self.assertEqual(commands, [("make test", "Makefile")])
+        self.assertEqual(json.loads(self.state.read_text())["scan"]["omitted_facts"], 0)
 
     def test_state_cannot_reenter_as_source_or_lexical_context(self):
         self.write("auth.py", "def validate_login(): pass\n")
@@ -405,9 +423,9 @@ class ProjectMapTests(unittest.TestCase):
 
     def test_preview_reuses_selector_snapshot_without_scan_or_write(self):
         self.basic()
-        def enrich(project, task, pack, snapshot, preview=False, maintain=False, writable_paths=None):
+        def enrich(project, task, pack, snapshot, preview=False, maintain=False, writable_paths=None, order=None, role=None):
             return project_map.context_entries(project, task, pack=pack, snapshot=snapshot, preview=preview,
-                                               maintain=maintain, writable_paths=writable_paths)
+                                               maintain=maintain, writable_paths=writable_paths, order=order, role=role)
         with mock.patch.object(context, "_project_map", side_effect=enrich), \
                 mock.patch.object(context, "_enumerate", wraps=context._enumerate) as listing, \
                 mock.patch.object(context, "_read", wraps=context._read) as reading, \
@@ -418,6 +436,30 @@ class ProjectMapTests(unittest.TestCase):
         paths = [call.args[1] for call in reading.call_args_list]
         self.assertEqual(len(paths), len(set(paths)))
         self.assertEqual(result["project_map"]["evidence_origin"], "preview")
+
+    def test_engine_order_adds_one_fact_per_ranked_file(self):
+        self.write("a.py", "def alpha(): pass\ndef beta(): pass\n")
+        self.write("b.py", "def gamma(): pass\n")
+        self.build()
+        entries = self.show()["entries"]
+        helper = project_map._context()
+        self.assertEqual(project_map._matching(entries, "nomatch", helper, self.project), [])
+        ordered = project_map._matching(entries, "nomatch", helper, self.project, order=["b.py", "a.py"])
+        self.assertEqual([e["label"] for e in ordered], ["gamma", "alpha"])
+        # A term match picks the file's representative; a named file keeps every fact.
+        ordered = project_map._matching(entries, "fix beta", helper, self.project, order=["b.py", "a.py"])
+        self.assertEqual([e["label"] for e in ordered], ["gamma", "beta"])
+        ordered = project_map._matching(entries, "fix a.py", helper, self.project, order=["b.py", "a.py"])
+        self.assertEqual([e["label"] for e in ordered], ["alpha", "beta", "gamma"])
+
+    def test_role_pins_its_kind_ahead_of_ranked_facts(self):
+        self.basic()
+        self.build()
+        tester = project_map.context_entries(self.project, "unrelatedwords", pack=ROOT, role="tester")
+        self.assertEqual(tester["entries"][0]["label"], "npm run test")
+        architect = project_map.context_entries(self.project, "unrelatedwords", pack=ROOT, role="architect")
+        self.assertEqual(architect["entries"][0]["kind"], "decision")
+        self.assertEqual(project_map.context_entries(self.project, "unrelatedwords", pack=ROOT)["entries"], [])
 
     def test_stale_preview_uses_changed_renamed_and_new_sources_without_replacing_cache(self):
         self.write("old.py", "def validate_old(): pass\n")

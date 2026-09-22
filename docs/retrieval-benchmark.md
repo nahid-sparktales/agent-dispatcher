@@ -153,6 +153,62 @@ context density is low everywhere because a task has about 1.6 target files and 
 ten; five files double the density at a cost of nine points of context recall. Whether smaller
 excerpts are *sufficient* for an agent cannot be measured offline.
 
+## Project map task view
+
+Measured on 2026-09-22 with `run.py --strategy full --map` on the development split (474 tasks).
+The context packet carries an eight-fact view of the project map beside the excerpts. Before this
+change the view re-ranked the map's facts by counting request words as substrings of each fact; now
+the context selector hands it the retrieval ranking with excerpted files last, one fact per file.
+`hit` is the share of target files among the view's files, `gain` the share that the excerpts of
+`full` missed but the view names, `packet` the share in the excerpts or the view (the excerpts
+alone reach .74, the context recall above). The view exists to add files, so `gain` and `packet`
+are the numbers that matter; a high `hit` on already-excerpted files would only repeat them.
+
+| Repo (dev) | targets with a fact | `hit` before -> after | `gain` before -> after | `packet` before -> after | facts per map |
+| --- | --- | --- | --- | --- | --- |
+| all (474) | .87 | .27 -> .09 | .02 -> .05 | .76 -> .79 | 1,503 -> 774 |
+| networkx (120) | 1.00 | .39 -> .06 | .01 -> .01 | .90 -> .90 | 1,774 -> 877 |
+| pip (113) | .98 | .26 -> .08 | .04 -> .06 | .66 -> .69 | 1,985 -> 1,001 |
+| sqlglot (117) | .89 | .27 -> .16 | .02 -> .10 | .74 -> .82 | 973 -> 472 |
+| zod (124) | .62 | .15 -> .06 | .02 -> .04 | .75 -> .76 | 1,301 -> 753 |
+
+"Before" is the branch's first commit, the measurement alone (`d1d7921`); "after" is the tip with
+the ordering, one import fact per definition-less module, one fact per distinct test command and the
+widened definition regex. The term-ranked view is still computed at the tip (.27 hit, .02 gain, .77
+packet): the extraction changes did not move it. `--check` passed on both runs: file ranking is
+unchanged.
+
+- The old view's .27 hit was mostly files the agent already had: it added a target the excerpts
+  lacked for 2% of targets. The ordered view adds one for 5%, and for 10% on sqlglot, where the
+  files ranked just below the ten excerpted ones hold a target most often.
+- networkx gains nothing: its excerpts already reach .89 of targets and the next ranked files
+  rarely hold the rest. zod's ceiling is coverage: .62 of its targets have a fact, because
+  documentation and re-export files define nothing (a barrel keeps one stand-in import fact).
+- Dropping every import line first cost coverage (.87 -> .79): `sqlglot/typing/postgres.py`, a
+  data table touched by 17 of 117 sqlglot tasks, had only import facts. Keeping one import for a
+  module without definitions restored it; facts per map still halved and derivation fell from 43
+  to 31 ms per task.
+- With the default compact budget on this repository the packet trims all eight map facts before
+  any excerpt (`packet_omissions.map_facts`), so the view reaches the agent only when the budget
+  allows. Changing that trim order is a separate decision.
+
+### Held-out (test split, 126 tasks)
+
+Run once after the branch was frozen; `--check` passed on both runs.
+
+| Repo (held-out) | targets with a fact | `hit` before -> after | `gain` before -> after | `packet` before -> after |
+| --- | --- | --- | --- | --- |
+| all (126) | .91 | .24 -> .11 | .04 -> .09 | .83 -> .89 |
+| networkx (30) | 1.00 | .36 -> .07 | .00 -> .02 | .92 -> .93 |
+| pip (37) | .95 | .22 -> .15 | .06 -> .15 | .79 -> .88 |
+| sqlglot (33) | .96 | .25 -> .10 | .05 -> .07 | .85 -> .87 |
+| zod (26) | .66 | .10 -> .11 | .02 -> .11 | .79 -> .87 |
+
+The ordered view adds a target the excerpts missed for 9% of held-out targets against 4% before,
+lifting packet-level recall from .83 to .89 at the same eight facts (about 2,500 characters). One
+held-out task is 0.8 points, so the per-repository rows are indicative only; the pooled gain is
+consistent with development (.02 -> .05).
+
 ## Cost
 
 | | sqlglot (307 files) | networkx (942 files) |

@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- Order the project map's eight-fact task view by the retrieval engine's file ranking instead of
+  counting request words in each fact. The context selector hands the map its ranking with
+  excerpted files last; each unnamed file contributes one fact, a ranked file appears even when
+  no request word occurs in its facts, and `tester`, `debugger` and `reviewer` get up to two
+  test commands pinned first (`architect`: decisions). Import lines are facts only for a module
+  that defines nothing, one per module (manifest dependencies remain), a documented command is stored once from its first source in
+  priority order, and the definition regex recognizes the same keywords as the retrieval index
+  (`fn`, `trait`, `impl`, `module`, `namespace`, Go receivers). `evals/retrieval/run.py --map`
+  measures the view (`hit`, `gain`, `packet`); map views and import facts from before this change
+  are not comparable, and existing maps refresh their withdrawn import facts on the next
+  maintenance. Standalone `project_map.py show` still ranks by request words.
 - Move the project map and structural graph out of the working tree. Both now persist to
   owner-only private state at `~/.cache/agent-dispatcher/state-v1/<project id>/` (under an
   absolute `XDG_CACHE_HOME` when set), keyed like the parser cache and refused if that

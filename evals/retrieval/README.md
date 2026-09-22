@@ -29,6 +29,7 @@ python3 -B evals/retrieval/run.py --dataset $D --strategy current,bm25,hybrid,hy
 python3 -B evals/retrieval/run.py --dataset $D --strategy ladder           # cumulative ablation
 python3 -B evals/retrieval/run.py --dataset $D --strategy leave-one-out    # what each part is worth
 python3 -B evals/retrieval/run.py --dataset $D --strategy full --failures 10
+python3 -B evals/retrieval/run.py --dataset $D --strategy full --map           # the project map's 8-fact task view
 python3 -B evals/retrieval/run.py --dataset $D --split test --strategy current,full --check evals/retrieval/baseline.json
 python3 -B evals/retrieval/perf.py dist/retrieval-repos/sqlglot            # index build, incremental update, latency
 
@@ -74,6 +75,7 @@ table with the split it used; a development number is never a held-out number.
 | UCD (Useful Context Density) | excerpt bytes belonging to target files / all excerpt bytes |
 | CtxR | targets present in that context / targets |
 | ms | ranking plus context selection over a built index. Index and scan time are printed separately |
+| Map hit, gain, packet (`--map`) | of the project map's 8-fact task view derived at the same commit: targets among the view's files / targets; targets the `full` excerpts missed but the view names / targets; targets in the excerpts or the view / targets |
 
 Each table header counts targets whose content the scan could not read. Files over the 256 KiB
 read limit can still be ranked by name, imports and history (never excerpted); skipped or
@@ -95,6 +97,10 @@ in `retrieval.DEFAULTS`, for example `--set rrf_k=30 --set graph.max_hops=2`.
 - **Failure report** (`--failures N`): per missed target, its rank in every retriever and in the
   fused list, and a mechanical reading of the stage that lost it (unreachable, name only,
   candidate generation, rank fusion/rerank, expansion only, weak evidence). It never changes a weight.
+- **Project map view** (`--map`): builds the fact map from the same scan (`project_map._derive_map`,
+  facts cached by content across commits) and reports its packet view: `hit`, `gain`, `packet`
+  as defined above, files and characters per view, derivation time. `gain` and `packet` need the
+  `full` strategy, whose excerpted files are the comparison. Nothing here changes retrieval.
 - **Regression guard** (`--check`): fails when a recorded metric drops by more than `--tolerance`
   (default 0.03, about two tasks of the held-out split). Rankings are deterministic, so any
   difference is a code or configuration change, not noise.
