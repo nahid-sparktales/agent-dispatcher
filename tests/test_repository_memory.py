@@ -15,7 +15,7 @@ import unittest
 from unittest import mock
 
 import context
-import experience
+import memory_experience as experience
 import repo_history
 import repository_memory as memory
 import retrieval

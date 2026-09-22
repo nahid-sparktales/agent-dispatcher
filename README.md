@@ -439,6 +439,8 @@ or replaces the host's instructions.
 | Structural graph | `~/.cache/agent-dispatcher/state-v1/<project id>/project-graph.json` | Files, Python symbols, imports, supported direct calls, and candidate test relationships, with evidence and confidence labels. |
 | Incremental parser cache | `~/.cache/agent-dispatcher/parser-v1/` | Authenticated records of redacted source text, extracted facts, per-file retrieval records, filtered Git history, and resolved graphs. |
 | Optional file summaries | `~/.cache/agent-dispatcher/llm-retrieval-v1/` | Model-written retrieval aids keyed by source content, model, provider, and prompt/schema versions. |
+| Optional deep index | `~/.cache/agent-dispatcher/state-v1/<project id>/repository-index.sqlite` | Complete admitted inventory, per-file records, symbols, relationships, corpus statistics, bounded history and Explorer inferences; built only by `repository_intelligence.py build`. |
+| Optional task experience | `~/.cache/agent-dispatcher/state-v1/<project id>/experience.sqlite` | Explicitly recorded task events with outcomes, corrections and forgetting; used only when enabled. |
 
 The map, graph, and parser cache honor an absolute `XDG_CACHE_HOME`. Their locations must be
 outside the inspected project. Older `.agent-dispatcher/project-map.json` and
@@ -569,6 +571,30 @@ querying have separate call budgets. Exclusions apply before either operation; r
 best-effort. Provider access and usage costs are separate from normal dispatcher use.
 Usage records include model and prompt versions, tokens, and latency. Cost reporting uses
 provider-reported amounts when available, otherwise an estimate from your configured prices.
+
+### Deep onboarding, incremental maintenance, and task experience
+
+For a repository you will work in repeatedly, an explicit deep index covers every admitted file
+(not the scan's 10,000-path prefix), keeps stable symbol identities and labeled relationships,
+bounded `HEAD` history and corpus statistics, and is refreshed incrementally from the working
+tree. Ordinary context preparation uses it automatically once it exists and reports it under
+`repository_intelligence.index`; without one, nothing changes.
+
+```bash
+python3 -B repository_intelligence.py build --project /path/to/project --json      # explicit onboarding
+python3 -B repository_intelligence.py refresh --project /path/to/project --json    # fast metadata reconcile; --strict re-hashes
+python3 -B repository_intelligence.py status --project /path/to/project --json     # read-only; creates nothing
+python3 -B repository_intelligence.py explain 'Fix validate_login' --project /path/to/project
+```
+
+Two optional layers sit on top, each switched separately in your own
+`~/.config/agent-dispatcher/repository-intelligence.json`: an onboarding Explorer that lets a model
+ask bounded, validated questions of the index and stores evidence-backed architectural notes
+labeled as inferences (`explore`, off by default, zero model calls when off), and task experience
+that a host records explicitly from real receipts (`experience record|list|correct|forget`) and
+that later similar requests may use as one labeled, half-weight vote (`experience.use`, off by
+default). A zero-test run, an exit code alone or a stale receipt never counts as success. See
+[docs/repository-index.md](docs/repository-index.md).
 
 ### Optional repository memory
 
@@ -895,9 +921,12 @@ repo_index.py              Source facts, symbols, relationships, and filtered hi
 retrieval.py               Candidate retrieval, ranking, expansion, and explain CLI
 context_budget.py          Source excerpts within file, byte, and token limits
 llm_retrieval.py            Optional file summaries, model providers, and reranking
+repository_intelligence.py  Deep index onboarding, refresh, status, explain, explorer, experience, prune, export
+repo_store.py, repo_builder.py  Private SQLite stores and the deep deterministic builder
+exploration.py, experience.py   Optional onboarding Explorer; explicit task experience and its retriever
 repository_memory.py        Optional repository memory: stores, lifecycle, gated retrieval, CLI
 repo_history.py             Hardened Git access, eligible events, symbol history, lineage, hotspots
-experience.py               Task observations, scoped outcomes, corrections, forgetting
+memory_experience.py        Task observations, scoped outcomes, corrections, forgetting
 decision/                  Optional decision-engine implementation
 tests/                     Offline test suite and one-command runner
 docs/                      Detailed guides

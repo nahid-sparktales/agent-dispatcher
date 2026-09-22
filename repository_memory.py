@@ -225,7 +225,7 @@ def _valid_semantic(data):
 
 
 def _valid_experience(data):
-    experience = _sibling("experience")
+    experience = _sibling("memory_experience")
     if not isinstance(data, dict) or data.get("schema") != SCHEMA or not isinstance(data.get("records"), list) or len(data["records"]) > 100000:
         raise ValueError()
     if any(not experience["valid_record"](record) for record in data["records"]):
@@ -1098,7 +1098,7 @@ def layer(project, index, task, *, exclusions=(), scrub=None, settings=None, pac
             if stale and decision["state"].startswith("use"):
                 decision = {"state": "use_limited", "reason": "summaries predate the current admitted universe; they may strengthen, not introduce"}
         else:
-            experience = _sibling("experience")
+            experience = _sibling("memory_experience")
             items = experience["search"](query, data["records"], index, top_k=settings["experience"]["max_records"])
             for item in items:
                 item.setdefault("identifier_support", sum(1 for t in item["matched"] if query["terms"].get(t, 0) >= 3.0))
@@ -1296,7 +1296,7 @@ def record_experience(project, observation, *, settings=None, pack=None, receipt
         except verification["VerificationError"] as exc:
             raise RepositoryMemoryError(f"Receipt could not be used: {exc}") from None
     history = _sibling("repo_history")
-    experience = _sibling("experience")
+    experience = _sibling("memory_experience")
     info = history["repository"](root)
     try:
         record = experience["new_record"](observation, admit=admission(exclusions), scrub=scrub, hashes=index.hashes,
@@ -1320,7 +1320,7 @@ def correct_experience(project, record_id, *, outcome, note, pack=None):
     root = _root(project)
     context = _sibling("context")
     scrub = context["_scrubber"](context["find_pack"](pack))
-    experience = _sibling("experience")
+    experience = _sibling("memory_experience")
     store, previous = _experience_store(root)
     try:
         fixed = experience["correction"](store["records"], record_id, outcome=outcome, note=note, scrub=scrub)
@@ -1333,7 +1333,7 @@ def correct_experience(project, record_id, *, outcome, note, pack=None):
 
 def forget_experience(project, record_id):
     root = _root(project)
-    experience = _sibling("experience")
+    experience = _sibling("memory_experience")
     store, previous = _experience_store(root)
     try:
         store["records"], removed = experience["forget"](store["records"], record_id)
@@ -1346,7 +1346,7 @@ def forget_experience(project, record_id):
 def prune_experience(project, *, max_age_days=None, settings=None):
     root = _root(project)
     settings = settings or load_settings(project=root)
-    experience = _sibling("experience")
+    experience = _sibling("memory_experience")
     store, previous = _experience_store(root)
     store["records"], removed = experience["prune"](store["records"], max_events=settings["experience"]["max_events"], max_age_days=max_age_days)
     if removed:
@@ -1360,7 +1360,7 @@ def search_experience(project, task, *, top_k=5, settings=None, pack=None, exclu
     if data is None:
         return {"status": "unavailable", "items": [], "coverage": None, "truncated": False, "diagnostics": ["no experience records"]}
     query = _sibling("retrieval")["analyze_query"](scrub(_task(task)))
-    items = _sibling("experience")["search"](query, data["records"], index, top_k=_bound(top_k))
+    items = _sibling("memory_experience")["search"](query, data["records"], index, top_k=_bound(top_k))
     return {"status": "ok" if items else "no_matches", "items": items, "coverage": {"records": len(data["records"])},
             "truncated": len(items) >= top_k, "diagnostics": []}
 
@@ -1420,7 +1420,7 @@ def main(argv=None):
     record.add_argument("--receipt", help="A verification.py receipt whose observed run decides the outcome")
     correct = common(sub.add_parser("correct"))
     correct.add_argument("record")
-    correct.add_argument("--outcome", required=True, choices=_sibling("experience")["ASSERTABLE"])
+    correct.add_argument("--outcome", required=True, choices=_sibling("memory_experience")["ASSERTABLE"])
     correct.add_argument("--note", required=True)
     common(sub.add_parser("forget")).add_argument("record")
     common(sub.add_parser("explain"), task=True)

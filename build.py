@@ -63,6 +63,7 @@ def reference_text(name, d, host="claude"):
         "{{CONTEXT_INSPECT_COMMAND}}": "$agent-dispatcher context" if codex else "/agent-context",
         "{{RETRIEVAL_COMMAND}}": "python3 -B PACK/" + ("scripts/" if codex else "") + "retrieval.py",
         "{{MAP_COMMAND}}": "python3 -B PACK/" + ("scripts/" if codex else "") + "project_map.py",
+        "{{INDEX_COMMAND}}": "python3 -B PACK/" + ("scripts/" if codex else "") + "repository_intelligence.py",
         "{{MAP_INSPECT_COMMAND}}": "$agent-dispatcher map" if codex else "/agent-map",
         "{{MEMORY_COMMAND}}": "python3 -B PACK/" + ("scripts/" if codex else "") + "repository_memory.py",
         "{{MEMORY_INSPECT_COMMAND}}": "$agent-dispatcher memory" if codex else "/agent-memory",
@@ -552,8 +553,8 @@ def write_context(d):
     for name in TEMPLATED_REFERENCES:
         (ADAPTER / name).write_text(reference_text(name, d))
     for name in ("context.py", "context_packet.py", "context_reuse.py", "parser_cache.py", "project_map.py", "project_graph.py",
-                 "repo_index.py", "retrieval.py", "context_budget.py", "llm_retrieval.py",
-                 "repository_memory.py", "repo_history.py", "experience.py",
+                 "repo_index.py", "retrieval.py", "context_budget.py", "llm_retrieval.py", "repo_store.py", "repo_builder.py", "exploration.py", "experience.py", "repository_intelligence.py",
+                 "repository_memory.py", "repo_history.py", "memory_experience.py",
                  "resources.py", "verification.py", "preferences.py", "change_audit.py"):
         (ADAPTER / name).write_bytes((ROOT / name).read_bytes())
     (ADAPTER / "jev.md").write_text(decision_guide())

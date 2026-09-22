@@ -8,7 +8,7 @@ recording controls:
 | --- | --- | --- | --- |
 | **Episodic** (`repo_history.py`) | eligible commits with admitted changed paths, old/new blob ids, rename evidence, changed symbols, issue/PR references, hotspots, co-change support | explicit `build` / `refresh` | `git.retrieval`: `off`, `shadow` (default), `on` |
 | **Semantic** (`repository_memory.py`) | deterministic module and repository records with evidence manifests; optional model summaries keyed to their evidence | `build`; `summaries generate` for model prose | `semantic.retrieval`: `off`, `shadow` (default), `on` |
-| **Experience** (`experience.py`) | bounded task observations, verification receipts, corrections, forgetting | explicit `record` per task | `experience.recording` (off) and `experience.retrieval` (`off` default) |
+| **Experience** (`memory_experience.py`) | bounded task observations, verification receipts, corrections, forgetting | explicit `record` per task | `experience.recording` (off) and `experience.retrieval` (`off` default) |
 
 Everything ships **off**. Nothing is read, written or influenced until the user's own settings
 file exists outside every project, and `"enabled": false` (the default) suppresses every memory

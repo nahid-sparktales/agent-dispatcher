@@ -26,9 +26,14 @@ repo_index.py                        repository facts: per-file records, symbols
 retrieval.py                         query analysis, candidate retrievers, rank fusion, expansion, explorer, explain CLI
 context_budget.py                    context optimizer: files, reasons and excerpts within a byte/token/file budget
 llm_retrieval.py                     optional, opt-in: role representations, role_summary scoring, bounded LLM reranker, providers
+repo_store.py                        private SQLite stores: deep index generations, records, symbols, edges, history, inferences; experience events
+repo_builder.py                      deep deterministic builder: complete inventory, batches, checkpoints, fast/strict refresh, history horizon
+exploration.py                       optional onboarding Explorer: registered read-only operations, validated claims, budgets
+experience.py                        explicit task experience: events, outcomes, corrections, forgetting, memory retriever
+repository_intelligence.py           the coordinator CLI: build, refresh, status, explain, explore, inferences, experience, prune, export
 repository_memory.py                 optional, opt-in: episodic/semantic/experience memory stores, lifecycle, gated retrieval, CLI
 repo_history.py                      hardened Git wrapper, eligible commit events, symbol history, rename lineage, hotspots
-experience.py                        task observations, receipt-backed outcomes, corrections, forgetting, experience retrieval
+memory_experience.py                 task observations, receipt-backed outcomes, corrections, forgetting, experience retrieval
 sources/shared/MEMORY.template.md    the repository memory guide shared by both hosts
 evals/retrieval/                     offline file-localization benchmark (mine.py builds datasets, run.py evaluates)
 sources/shared/VERIFICATION.template.md, verification.py task-scoped check receipts and completion evidence

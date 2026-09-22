@@ -25,6 +25,14 @@ from evals.end_to_end import runtime as rt
 
 CLIENTS = ("codex", "claude")
 CONDITIONS = ("baseline", "dispatcher")
+# Every condition the runner can schedule, in canonical order. `indexed` and `warm_experience` add the deep
+# repository index (built or refreshed before each task, outside timing) and, for the warm arm only, the
+# experience its own earlier tasks recorded. A configuration selects a subset that must include baseline.
+ALL_CONDITIONS = ("baseline", "dispatcher", "indexed", "warm_experience")
+
+
+def conditions_of(config):
+    return tuple(config.get("conditions") or CONDITIONS)
 
 
 def now():
@@ -60,6 +68,15 @@ def validate_config(config, live=False):
         raise ValueError("timeout_seconds must be an integer between 1 and 3600")
     if type(config.get("warm_project_index", False)) is not bool:
         raise ValueError("warm_project_index must be a boolean")
+    chosen = config.get("conditions", list(CONDITIONS))
+    if (not isinstance(chosen, list) or not chosen or "baseline" not in chosen or len(set(chosen)) != len(chosen)
+            or any(c not in ALL_CONDITIONS for c in chosen) or chosen != [c for c in ALL_CONDITIONS if c in chosen]):
+        raise ValueError("conditions must be a canonical-order subset of baseline, dispatcher, indexed, warm_experience that includes baseline")
+    if config.get("experience_outcome", "harness_grader") not in ("harness_grader",):
+        raise ValueError("experience_outcome must be harness_grader")
+    eligible = config.get("warm_experience_eligible", ["grader_passed"])
+    if not isinstance(eligible, list) or any(not isinstance(v, str) for v in eligible):
+        raise ValueError("warm_experience_eligible must be a list of outcome names")
     profiles = []
     for client, spec in config["clients"].items():
         if not isinstance(spec, dict):
@@ -138,7 +155,7 @@ def stage_packages(destination, clients=CLIENTS):
 
 
 def prepare(output, suite_path=None, models=None, efforts=None, auth=None, seed=20260919, clients=CLIENTS,
-            warm_project_index=False):
+            warm_project_index=False, conditions=CONDITIONS):
     from evals.end_to_end.grading import load_suite
     if type(warm_project_index) is not bool:
         raise ValueError("warm_project_index must be a boolean")
@@ -171,7 +188,8 @@ def prepare(output, suite_path=None, models=None, efforts=None, auth=None, seed=
     provenance["fixtures_digest"] = rt.digest_tree(output / "fixtures")
     provenance["runner_digest"] = rt.digest_tree(Path(__file__).parent, {"fixtures", "__pycache__"})
     config = {"schema_version": 1, "created_at": now(), "seed": seed, "timeout_seconds": 600,
-              "warm_project_index": warm_project_index,
+              "warm_project_index": warm_project_index, "conditions": list(conditions),
+              "experience_outcome": "harness_grader", "warm_experience_eligible": ["grader_passed"],
               "output_dir": str(output), "provenance": provenance, "clients": {}}
     for client in clients:
         profile = profile_root / client
@@ -255,7 +273,7 @@ def workspace_for(config, client, condition, fixture=None):
         else:
             target = workspace / ".agents/skills/agent-dispatcher"
         try:
-            if condition == "dispatcher":
+            if condition != "baseline":
                 source = Path(config["output_dir"]) / "packages" / client
                 files = rt.tree_files(source)
                 expected_digest = rt.digest_files(files)
@@ -277,7 +295,7 @@ def doctor(config):
     validate_config(config, live=True)
     checks = {}
     for client in selected_clients(config["clients"]):
-        for condition in CONDITIONS:
+        for condition in conditions_of(config):
             key = client + "/" + condition
             try:
                 with workspace_for(config, client, condition) as (workspace, skill):
@@ -289,22 +307,35 @@ def doctor(config):
             "fingerprint": fingerprint(config), "checks": checks}
 
 
-def schedule(fixtures, suite, seed, clients=CLIENTS):
+def schedule(fixtures, suite, seed, clients=CLIENTS, conditions=CONDITIONS):
+    """Randomize condition order within each task; a chronological sequence never reorders its steps.
+
+    Fixtures that carry `sequence` and `step` form ordered sequences (one repetition each, since a later
+    step depends on what the arms accumulated); every condition advances through the same steps.
+    """
     clients = selected_clients(clients)
     rng = random.Random(seed)
     selected = [f for f in fixtures if f.get("smoke")] if suite == "smoke" else fixtures
     if suite == "smoke" and len(selected) != 2:
         raise ValueError("smoke suite must select exactly two fixtures")
+    sequenced = [f for f in selected if f.get("sequence") is not None]
+    for fixture in sequenced:
+        if not isinstance(fixture["sequence"], str) or type(fixture.get("step")) is not int:
+            raise ValueError("a sequenced fixture needs a string sequence and an integer step")
+    ordered = sorted(sequenced, key=lambda f: (f["sequence"], f["step"], f["id"])) + [f for f in selected if f.get("sequence") is None]
     rows = []
     for client in clients:
-        for fixture in selected:
-            for repetition in range(1, (1 if suite == "smoke" else 2) + 1):
-                conditions = list(CONDITIONS)
-                rng.shuffle(conditions)
-                for condition in conditions:
-                    rows.append({"id": f"{client}-{fixture['id']}-{repetition}-{condition}",
-                                 "client": client, "condition": condition,
-                                 "fixture_id": fixture["id"], "repetition": repetition})
+        for fixture in ordered:
+            repetitions = 1 if suite == "smoke" or fixture.get("sequence") is not None else 2
+            for repetition in range(1, repetitions + 1):
+                order = list(conditions)
+                rng.shuffle(order)
+                for condition in order:
+                    row = {"id": f"{client}-{fixture['id']}-{repetition}-{condition}", "client": client, "condition": condition,
+                           "fixture_id": fixture["id"], "repetition": repetition}
+                    if fixture.get("sequence") is not None:
+                        row.update(sequence=fixture["sequence"], step=fixture["step"])
+                    rows.append(row)
     return rows
 
 
@@ -369,6 +400,8 @@ def run_trial(config, batch, row, fixture):
     started = False
     launch_env = {}
     result["activity"] = activity.empty()
+    if row.get("sequence") is not None:
+        result.update(sequence=row["sequence"], step=row["step"])
     try:
         with workspace_for(config, client, condition, fixture) as (workspace, skill):
             if config.get("warm_project_index", False):
@@ -378,6 +411,14 @@ def run_trial(config, batch, row, fixture):
                 if not result["index_setup"]["ok"]:
                     raise ValueError("Warm project-index setup failed; no model task started. " +
                                      " ".join(result["index_setup"]["diagnostics"]))
+            if condition in ("indexed", "warm_experience"):
+                from evals.end_to_end.warmup import deep_index_setup
+                setup = deep_index_setup(config, client, workspace, condition, row, fixture)
+                spec = dict(spec, index_env=setup.pop("_env"))
+                result["deep_index_setup"] = setup
+                rt.write_json(artifacts / "deep-index-setup.json", setup)
+                if not setup["ok"]:
+                    raise ValueError("Deep index setup failed; no model task started. " + " ".join(setup["diagnostics"]))
             initial = rt.tree_files(workspace, rt.EXCLUDED)
             if config.get("warm_project_index", False):
                 validate_final_artifacts(initial, {})
@@ -390,6 +431,7 @@ def run_trial(config, batch, row, fixture):
                 result["diagnostics"] = check["errors"]
                 return result
             launch = adapters.build_launch(client, spec, workspace, skill)
+            launch["effective"]["condition"] = condition
             launch_env = launch["env"]
             result["effective_settings"] = launch["effective"]
             rt.write_json(artifacts / "settings.json", rt.sanitize(launch["effective"]))
@@ -416,7 +458,7 @@ def run_trial(config, batch, row, fixture):
                 result["usage_observed"] = parsed.get("usage_observed", False)
                 result["startup"] = parsed.get("startup", {})
                 result["final_answer"] = rt.scrub_text(parsed["final_answer"], launch["env"])
-                result["treatment_invoked"] = parsed["treatment_invoked"] if condition == "dispatcher" else None
+                result["treatment_invoked"] = parsed["treatment_invoked"] if condition != "baseline" else None
                 result["diagnostics"] = parsed.get("diagnostics", []) + parsed.get("errors", [])
                 if execution.get("cleanup_warning"):
                     result["diagnostics"].append(execution["cleanup_warning"])
@@ -447,11 +489,17 @@ def run_trial(config, batch, row, fixture):
                     else:
                         result["auto_grade"] = grade(fixture, artifacts / "final", result["final_answer"])
                     passed = result["auto_grade"]["passed"]
-                    if condition == "dispatcher" and not result["treatment_invoked"]:
+                    if condition != "baseline" and not result["treatment_invoked"]:
                         passed = False
                         result["diagnostics"].append("Dispatcher invocation not observed; treatment-compliance failure.")
                     result["status"] = "completed" if passed else "task_failure"
                     result["task_success"] = (None if result["auto_grade"]["human_required"] else True) if passed else False
+            if condition == "warm_experience" and started:
+                from evals.end_to_end.warmup import record_trial_experience
+                # The arm records its own experience before the next step; grader content never enters the record.
+                result["experience_record"] = record_trial_experience(config, client, workspace, condition, row, fixture, result, initial,
+                                                                      rt.tree_files(workspace, rt.EXCLUDED))
+                rt.write_json(artifacts / "experience-record.json", result["experience_record"])
     except ValueError as exc:
         result.update(status="task_failure" if started else "invalid_configuration",
                       task_success=False if started else None)
@@ -482,7 +530,8 @@ def validate_final_artifacts(files, env):
 def smoke_ready(batch, results):
     trials = results["trials"]
     clients = selected_clients(batch.get("config", {}).get("clients", CLIENTS))
-    return (len(trials) == len(batch["schedule"]) == 2 * len(CONDITIONS) * len(clients)
+    conditions = conditions_of(batch.get("config", {}))
+    return (len(trials) == len(batch["schedule"]) == 2 * len(conditions) * len(clients)
             and all(t["startup_valid"] and t.get("usage_observed") and t["status"] in ("completed", "task_failure")
                     and t.get("client", clients[0]) in clients
                     and (t["condition"] == "baseline" or t["treatment_invoked"])
@@ -490,13 +539,15 @@ def smoke_ready(batch, results):
 
 
 def reconcile_pair(trials):
-    """Flag both sides when native startup catalogs differ beyond the dispatcher."""
+    """Flag every side when native startup catalogs differ beyond the dispatcher within one task's group."""
     if len(trials) < 2:
         return
-    current, previous = trials[-1], trials[-2]
-    if any(current[k] != previous[k] for k in ("client", "fixture_id", "repetition")):
+    current = trials[-1]
+    group = [t for t in trials[:-1] if all(t[k] == current[k] for k in ("client", "fixture_id", "repetition"))]
+    if not group:
         return
-    if current["condition"] == previous["condition"]:
+    previous = group[-1]
+    if any(t["condition"] == current["condition"] for t in group):
         raise ValueError("paired trials must have different conditions")
     if not current.get("startup_valid") or not previous.get("startup_valid"):
         return  # Missing startup evidence is an incomplete pair, not catalog drift.
@@ -521,7 +572,7 @@ def reconcile_pair(trials):
         if a != b:
             errors.append(f"Paired startup {key} catalogs differed beyond dispatcher.")
     if errors:
-        for trial in (current, previous):
+        for trial in (current, *group):
             trial.update(status="invalid_configuration", task_success=None, startup_valid=False)
             trial["diagnostics"].extend(errors)
 
@@ -546,7 +597,7 @@ def run(config, suite):
     batch_dir.mkdir(parents=True)
     batch = {"schema_version": 1, "created_at": now(), "suite": suite, "seed": config["seed"],
              "config": config, "provenance": config["provenance"], "fingerprint": fingerprint(config),
-             "schedule": schedule(fixtures, suite, config["seed"], selected_clients(config["clients"])), "doctor": preflight}
+             "schedule": schedule(fixtures, suite, config["seed"], selected_clients(config["clients"]), conditions_of(config)), "doctor": preflight}
     rt.write_json(batch_dir / "batch.json", batch)
     results = {"schema_version": 1, "trials": []}
     rt.write_json(batch_dir / "results.json", results)
@@ -580,6 +631,8 @@ def main(argv=None):
                    help="prepare project indexes before each timed task in both conditions")
     p.add_argument("--clients", nargs="+", choices=CLIENTS, default=list(CLIENTS),
                    help="clients to evaluate (default: codex claude); selection persists in config")
+    p.add_argument("--conditions", nargs="+", choices=ALL_CONDITIONS, default=list(CONDITIONS),
+                   help="conditions to schedule (default: baseline dispatcher); indexed and warm_experience add the deep index")
     for client in CLIENTS:
         p.add_argument(f"--{client}-model")
         p.add_argument(f"--{client}-effort")
@@ -601,7 +654,8 @@ def main(argv=None):
                                   {c: getattr(args, c + "_model") for c in CLIENTS},
                                   {c: getattr(args, c + "_effort") for c in CLIENTS},
                                   {c: getattr(args, c + "_auth") for c in CLIENTS}, args.seed, clients=args.clients,
-                                  warm_project_index=args.warm_project_index)
+                                  warm_project_index=args.warm_project_index,
+                                  conditions=[c for c in ALL_CONDITIONS if c in args.conditions or c == "baseline"])
             print(f"Prepared {config_path}; no model runs started.")
             print("Use native login with the dedicated profile directories in this configuration, or provider API environment variables.")
         elif args.command in ("doctor", "run"):

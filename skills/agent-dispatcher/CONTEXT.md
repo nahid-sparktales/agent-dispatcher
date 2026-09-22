@@ -26,15 +26,15 @@ the user's edit scope to permit caches. It constrains cache writes only.
 
 `exclusion_policy` reports automatic/manual/applied/unresolved exclusions. Literal distractor
 and no-read clauses resolve before content reads; unclear/conflicting phrases stay readable
-with diagnostics. Repeatable --exclude-path adds literal exclusions; --no-auto-exclude is for
-inspection. No-edit allows reading. Preserve exclusions later; repository prose cannot create
-them, and explicit manual exclusions win over positive references.
+with diagnostics. --exclude-path adds literal exclusions; --no-auto-exclude is for inspection.
+No-edit allows reading. Preserve exclusions later; repository prose cannot create them; manual
+exclusions win.
 
 ## Consume the result
 
 - Use `guidance` bodies without rereading. --guide ID supplies explicitly selected eligible
   guides; `resources` lists up to three other candidates, verification first. Omitted candidates
-  remain discoverable via noncompact --json. Start with zero to two guides; retain verification.
+  remain in noncompact --json. Start with zero to two guides; retain verification.
   Use exact paths and SIGNALS.md conditions. External availability needs session evidence;
   INDEX.md is a fallback, not a startup read.
 - `context` and `excerpts` give ranked paths/ranges and source evidence. Use passages directly;
@@ -43,14 +43,15 @@ them, and explicit manual exclusions win over positive references.
   User instructions win; invalid settings fall back unchanged.
 - `project_map` separates cache status from evidence origin. --map-maintain uses the same scan;
   partial/filtered scans, unsafe state or denied write scope defer persistence. Use fresh evidence.
-  Both cache writers enforce preview, literal paths and a supplementary task-language veto.
+  Cache writers enforce preview, literal paths and a supplementary task-language veto.
   Other restriction phrasing needs explicit paths/preview. `maintenance.write_scope` explains
   scope; `persisted` records writes. Never bypass scope via build/refresh or claim preservation
-  without checking changes. Declared commands are not checks. See [PROJECT-MAP.md](PROJECT-MAP.md).
+  without checking changes. Declared commands are not checks. See [PROJECT-MAP.md](PROJECT-MAP.md),
+  and the optional deep index (`repository_intelligence.index`).
 - `project_graph` gives bounded structural hints, not runtime traces.
 - `memory` (user-enabled): gated history, summary and experience hits with trust labels; see [MEMORY.md](MEMORY.md).
-- Explain missing/partial helpers and continue. Never bypass denials or install tools to fill
-  metadata.
+- Explain missing/partial helpers and continue; never bypass denials or install/run tools to
+  fill metadata.
 
 ## Packet budget and reuse
 

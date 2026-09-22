@@ -77,7 +77,7 @@ def _cache_write_scope(task, target, *, preview=False, writable_paths=None, snap
     Targets are logical names: the indexes now persist to private state outside the
     project, and a restricted, read-only or path-scoped task still defers that write.
     """
-    targets = {".agent-dispatcher/project-map.json", ".agent-dispatcher/project-graph.json"}
+    targets = {".agent-dispatcher/project-map.json", ".agent-dispatcher/project-graph.json", ".agent-dispatcher/repository-index.sqlite"}
     if target not in targets or type(preview) is not bool:
         raise ContextError("Invalid cache write scope; input values withheld.")
     if task is not None and (not isinstance(task, str) or len(task) > MAX_TASK_CHARS):
@@ -200,7 +200,7 @@ def _role(pack, role):
     raise ContextError("Role catalog missing; repair the installed pack.")
 
 
-def _bounded_output(command, project):
+def _bounded_output(command, project, max_bytes=MAX_LIST_BYTES):
     """Run a read-only command with byte/time limits, including a bounded stalled child."""
     env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
     env["GIT_OPTIONAL_LOCKS"] = "0"
@@ -223,8 +223,8 @@ def _bounded_output(command, project):
                 if not chunk:
                     break
                 output.extend(chunk)
-                if len(output) > MAX_LIST_BYTES:
-                    output = output[:MAX_LIST_BYTES]
+                if len(output) > max_bytes:
+                    output = output[:max_bytes]
                     limited = True
                     break
         if limited:
@@ -239,9 +239,9 @@ def _bounded_output(command, project):
     return bytes(output), code, limited
 
 
-def _path_command(command, project):
+def _path_command(command, project, max_bytes=MAX_LIST_BYTES):
     """Read a NUL path stream with byte/time limits, including a bounded stalled child."""
-    output, code, limited = _bounded_output(command, project)
+    output, code, limited = _bounded_output(command, project, max_bytes)
     if output is None:
         return [], False, False
     # Never admit a truncated final path.
@@ -879,9 +879,162 @@ def _legacy_selection(candidates, texts, cap, budget, excluded, scrub, compact, 
 
 _MATCHES = (("named", "filename"), ("symbol_definitions", "symbol"), ("path", "path"), ("symbol_references", "identifier"),
             ("phrases", "identifier"), ("bm25", "content"), ("rare_terms", "content"), ("role_summary", "content"),
-            ("llm_rerank", "content"), ("rules", "structure"))
+            ("llm_rerank", "content"), ("experience", "content"), ("inference", "content"),
+            ("memory_git", "content"), ("memory_semantic", "content"), ("memory_experience", "content"), ("rules", "structure"))
 # Withheld for secrecy or by request, as opposed to size or format: a role summary naming one of these is not used.
 _SENSITIVE_SKIPS = {"explicit task exclusion", "automatic task exclusion", "credential file withheld"}
+
+
+class _DeepIndex:
+    """The deep repository index as one query sees it: fingerprint-verified records, files the scan could not read
+    (verified by metadata, read lazily), reusable co-change, eligible experience and current inferences."""
+
+    def __init__(self):
+        self.store = self.generation = self.partners = self.loader = self.settings = None
+        self.extended, self.events, self.corrections, self.inferences = {}, [], [], []
+        self.maintain = False
+        self.counters = Counter()
+        self.report = {"status": "off"}
+
+    def close(self):
+        if self.store is not None:
+            self.store.close()
+            self.store = None
+
+
+def _repository_index(root, scrub, paths, texts, excluded, exclusions, incremental, diagnostics, *, use, identity, maintain_allowed):
+    """Open the deep index (repository_intelligence.py) the user built, never create one, and verify what it adds.
+
+    A normal task therefore never starts a build or a model session. Records are used only when their stored
+    fingerprint equals the scan's; files beyond the scan's caps join the ranking universe only after their
+    metadata signature matches and are read on demand through the same admission and redaction rules.
+    """
+    deep = _DeepIndex()
+    if use == "off":
+        return deep
+    try:
+        builder, store_module = _sibling("repo_builder"), _sibling("repo_store")
+        settings = builder["load_settings"](None, root)
+    except (OSError, UnicodeError, SyntaxError, ValueError, TypeError, KeyError) as exc:
+        deep.report = {"status": "settings_invalid", "detail": str(exc) if isinstance(exc, ValueError) else "settings unavailable"}
+        return deep
+    deep.settings = settings
+    use = use or settings["index"]["use"]
+    if use == "off":
+        return deep
+    deep.maintain = bool(maintain_allowed and settings["index"]["maintain"]["enabled"])
+    try:
+        directory = store_module["state_directory"](root, identity)
+        deep.store = store_module["IndexStore"](directory, readonly=not deep.maintain)
+    except (OSError, ValueError) as exc:
+        detail = str(exc) if isinstance(exc, ValueError) else "state unavailable"
+        deep.report = {"status": "absent" if "No repository index" in detail else "unavailable", "detail": detail}
+        if use == "require":
+            diagnostics.append("Repository index required but " + deep.report["status"] + "; deterministic retrieval used.")
+        return deep
+    try:
+        generation = deep.store.published()
+        if generation is None:
+            deep.report = {"status": "unpublished", "detail": "no published generation (a build is incomplete or was interrupted)"}
+            deep.close()
+            return deep
+        config = builder["_merge"](builder["DEFAULTS"], settings["index"].get("build") or {})
+        if generation["policy"] != builder["policy_fingerprint"](scrub, config):
+            deep.report = {"status": "incompatible", "detail": "index built under another extractor or redaction policy; rebuild it"}
+            diagnostics.append("Repository index is incompatible with this package version; rebuild it. Deterministic retrieval used.")
+            deep.close()
+            return deep
+        deep.generation = generation
+        rows = deep.store.file_rows(generation=generation["id"])
+        scanned = set(texts)
+        blocked = {item["path"] for item in excluded if item["reason"] != "scan byte budget exhausted"}
+        candidates = [path for path, row in rows.items()
+                      if row["status"] == "indexed" and path not in scanned and path not in blocked and not _skip(path)
+                      and not _excluded(path, exclusions)]
+        deadline = time.perf_counter() + settings["index"]["maintain"]["max_seconds"]
+        verified, stale, pending = {}, 0, 0
+        for path in candidates:
+            if time.perf_counter() > deadline:
+                pending = len(candidates) - len(verified) - stale
+                break
+            if builder["stat_signature"](root, path) == rows[path]["signature"]:
+                verified[path] = rows[path]["sha256"]
+            else:
+                stale += 1
+        if verified:
+            for path, row in deep.store.file_rows(list(verified), with_record=True).items():
+                if row["record"] is not None:
+                    deep.extended[path] = {"record": row["record"], "sha256": row["sha256"]}
+        manual = tuple(p for p in exclusions)
+
+        def loader(path):
+            local_excluded, local_diagnostics = [], []
+            found, hashes, _, _ = _scan_sources(root, [path], manual, [], incremental, scrub, local_excluded, local_diagnostics)
+            deep.counters["lazy_reads"] += 1
+            if path in found and hashes[path] == deep.extended[path]["sha256"]:
+                return found[path]
+            deep.counters["stale_evidence_rejected"] += 1
+            return None
+        deep.loader = loader
+        history = deep.store.meta("history") or {}
+        head = builder["git_state"](root)["head"] if history.get("head") else None
+        if history.get("head") and head == history["head"]:
+            deep.partners = deep.store.partners_map()
+            deep.counters["history_reused"] = 1
+        omitted = 0
+        universe = scanned | set(deep.extended)
+        for item in deep.store.inferences(status="current"):
+            cited = [e.get("path") for e in item.get("evidence", []) if e.get("path")]
+            if cited and all(path in universe for path in cited):
+                deep.inferences.append(item)
+            else:
+                omitted += 1
+        stale_inferences = len(deep.store.inferences(status="stale"))
+        experience = {"enabled": bool(settings["experience"]["use"]), "attached": 0}
+        if settings["experience"]["use"]:
+            try:
+                with store_module["ExperienceStore"](directory, readonly=True) as events:
+                    deep.events, deep.corrections = events.events(), events.corrections()
+            except (OSError, ValueError) as exc:
+                experience["detail"] = str(exc) if isinstance(exc, ValueError) else "unavailable"
+        coverage = generation.get("coverage") or {}
+        deep.report = {"status": "used", "generation": generation["id"], "identity": identity,
+                       "coverage": {key: coverage.get(key) for key in ("discovered", "indexed", "pending", "failed", "complete_within_policy")},
+                       "head_match": bool(history.get("head")) and head == history.get("head"),
+                       "extended": {"candidates": len(candidates), "verified": len(deep.extended), "stale": stale, "pending": pending},
+                       "inferences": {"attached": len(deep.inferences), "omitted": omitted, "stale": stale_inferences},
+                       "experience": experience, "maintenance": {"allowed": deep.maintain}}
+    except (OSError, ValueError, TypeError, KeyError) as exc:
+        deep.report = {"status": "unavailable", "detail": str(exc) if isinstance(exc, ValueError) else type(exc).__name__}
+        deep.close()
+    return deep
+
+
+def _maintain_index(deep, index, stats, texts, hashes, root):
+    """Bounded authorized maintenance after a task: upsert records the scan just computed. Never sweeps or publishes."""
+    tuning = deep.settings["index"]["maintain"]
+    missing = [p for p in stats.get("missing_paths", []) if p in texts][:tuning["max_files"]]
+    started = time.perf_counter()
+    builder, rows = _sibling("repo_builder"), []
+    for path in missing:
+        if time.perf_counter() - started > tuning["max_seconds"]:
+            break
+        signature = builder["stat_signature"](root, path)
+        if signature is None:
+            continue
+        record = index.records[path]
+        rows.append({"path": path, "sha256": hashes[path], "signature": signature, "size": len(texts[path].encode("utf-8")),
+                     "lang": record["lang"], "kind": _kind(path), "status": "indexed", "reason": None, "record": record})
+    try:
+        with deep.store.transaction():
+            deep.store.upsert_files(deep.generation["id"], rows)
+            for row in rows:
+                deep.store.replace_symbols(deep.generation["id"], row["path"], builder["symbol_rows"](row["path"], row["record"], texts[row["path"]]))
+            deep.store.invalidate_inferences({row["path"]: row["sha256"] for row in rows})
+        deep.report["maintenance"].update(records_upserted=len(rows), pending=len(missing) - len(rows),
+                                          edges_stale=bool(rows), elapsed_ms=round((time.perf_counter() - started) * 1000, 1))
+    except (OSError, ValueError) as exc:
+        deep.report["maintenance"].update(records_upserted=0, failed=str(exc) if isinstance(exc, ValueError) else "write failed")
 
 
 def _llm_layer(engine, settings, root, index, excluded, diagnostics, ranking=None):
@@ -930,13 +1083,27 @@ def _memory_layer(engine, settings, root, index, task, exclusions, scrub, diagno
 
 
 def _intelligent_selection(engine, settings, task, texts, hashes, explicit, role_id, changed, cache, root,
-                           excluded, scrub, compact, diagnostics, explain, oversized=(), rerank_answer=None,
+                           excluded, scrub, compact, diagnostics, explain, oversized=(), rerank_answer=None, deep=None,
                            exclusions=(), pack=None):
     """Repository-intelligence selection over the already-filtered universe; same row/excerpt contract."""
     stats = {}
-    history = _git_history(root, settings["git"]["max_commits"], cache) if settings["git"]["enabled"] else None
+    deep = deep or _DeepIndex()
+    partners = deep.partners
+    history = (_git_history(root, settings["git"]["max_commits"], cache)
+               if settings["git"]["enabled"] and partners is None else None)
     index = engine["build_index"](texts, hashes, _kind, cache=cache, history=history, config=settings, stats=stats,
-                                  path_only=oversized)
+                                  path_only=oversized, store=deep.store, extended=deep.extended or None, partners=partners,
+                                  loader=deep.loader)
+    hashes = index.hashes
+    if deep.events:
+        attached = _sibling("experience")["attach"](index, deep.events, deep.corrections, tuple(deep.settings["experience"]["eligible_outcomes"]))
+        deep.report["experience"]["attached"] = attached
+        if attached and "experience" not in settings["retrievers"]:
+            settings["retrievers"] = [*settings["retrievers"], "experience"]
+    if deep.inferences:
+        index.inferences = deep.inferences
+        if "inference" not in settings["retrievers"]:
+            settings["retrievers"] = [*settings["retrievers"], "inference"]
     settings["context"]["count"] = "excerpts"  # This helper's documented budget covers excerpt text only.
     extra, boost_only = {}, ()
     if changed:
@@ -958,12 +1125,28 @@ def _intelligent_selection(engine, settings, task, texts, hashes, explicit, role
                                        "reason": "project conventions (untrusted evidence)", "value": path}
                                       for rank, path in enumerate(sorted(rules), 1)])
     packet = outcome["packet"]
+    if deep.store is not None:
+        deep.report["experience"]["candidates"] = len(outcome["lists"].get("experience", ()))
+        deep.report["inferences"]["candidates"] = len(outcome["lists"].get("inference", ()))
+        deep.report["counters"] = dict(deep.counters)
+        if deep.events and deep.settings["experience"].get("exposure_log"):
+            _sibling("experience")["log_exposure"](deep.settings["experience"]["exposure_log"],
+                                                  hashlib.sha256(task.encode("utf-8")).hexdigest(),
+                                                  outcome["lists"].get("experience", []), [item["path"] for item in packet["files"]])
+        if deep.maintain:
+            _maintain_index(deep, index, stats, texts, hashes, root)
     selected, excerpts = [], []
-    unread = [item["path"] for item in packet["files"] if not item["excerpts"]]
+    stale = getattr(index.texts, "failed", set())
+    unread = [item["path"] for item in packet["files"] if not item["excerpts"] and item["path"] not in stale]
     if unread:
         diagnostics.append("Ranked as relevant but over the 256 KiB read limit, so not excerpted: " + ", ".join(scrub(p) for p in unread[:3]))
+    if stale:
+        diagnostics.append("Indexed evidence no longer matches the current source and was withheld: " + ", ".join(scrub(p) for p in sorted(stale)[:3]))
     for item in packet["files"]:
         path = item["path"]
+        if path in stale:
+            excluded.append({"path": scrub(path), "reason": "stale index evidence"})
+            continue
         if not item["excerpts"]:
             continue
         ranked = next(row for row in outcome["ranked"] if row["path"] == path)
@@ -983,7 +1166,7 @@ def _intelligent_selection(engine, settings, task, texts, hashes, explicit, role
         for part in item["excerpts"]:
             excerpt = {"path": scrub(path), "lines": part["lines"], "content": part["content"]}
             if compact:
-                excerpt["source_sha256"] = hashes[path]
+                excerpt["source_sha256"] = index.hashes[path]
                 excerpt["id"] = hashlib.sha256(json.dumps(excerpt, sort_keys=True, ensure_ascii=True,
                                                          separators=(",", ":")).encode("utf-8")).hexdigest()
             excerpts.append(excerpt)
@@ -997,7 +1180,7 @@ def _intelligent_selection(engine, settings, task, texts, hashes, explicit, role
     telemetry = {key: value for key, value in {**trace, **stats}.items()
                  if explain or not (key.endswith("_ms") or key == "overlap")}
     report = {"strategy": settings["name"], "task_signals": {k: [scrub(v) for v in values] for k, values in packet["task_signals"].items()},
-              "telemetry": dict(telemetry, seeds=[scrub(p) for p in trace["seeds"]])}
+              "telemetry": dict(telemetry, seeds=[scrub(p) for p in trace["seeds"]]), "index": deep.report}
     if memory is not None:
         report["memory"] = memory
     if (outcome.get("llm") or {}).get("request"):  # Host reranking: one bounded round, answered with --rerank-answer.
@@ -1134,7 +1317,7 @@ def select_context(project, task, role=None, size="standard", max_tokens=None, p
                    compact=False, packet_tokens=None, guide_ids=(), map_maintain=False,
                    reuse_state=None, reuse_scope=None, writable_paths=None, audit=False,
                    parser_cache=True, retrieval="auto", max_files=None, max_bytes=None, explain=False,
-                   rerank_answer=None, _delivery=None):
+                   rerank_answer=None, repository_index=None, index_identity=None, _delivery=None):
     """Prepare context; an explicit audit captures helper writes before they happen."""
     if type(audit) is not bool:
         raise ContextError("Task audit must be a boolean.")
@@ -1146,7 +1329,8 @@ def select_context(project, task, role=None, size="standard", max_tokens=None, p
                                map_maintain=map_maintain, reuse_state=reuse_state, reuse_scope=reuse_scope,
                                writable_paths=writable_paths, parser_cache=parser_cache,
                                retrieval=retrieval, max_files=max_files, max_bytes=max_bytes, explain=explain,
-                               rerank_answer=rerank_answer, _delivery=_delivery, _audit_pending=pending)
+                               rerank_answer=rerank_answer, repository_index=repository_index, index_identity=index_identity,
+                               _delivery=_delivery, _audit_pending=pending)
     except BaseException:
         if pending:
             cleanup = _discard_audit(pending[0])
@@ -1170,7 +1354,7 @@ def _select_context(project, task, role=None, size="standard", max_tokens=None, 
                     compact=False, packet_tokens=None, guide_ids=(), map_maintain=False,
                     reuse_state=None, reuse_scope=None, writable_paths=None, parser_cache=True,
                     retrieval="auto", max_files=None, max_bytes=None, explain=False,
-                    rerank_answer=None, _delivery=None, _audit_pending=None):
+                    rerank_answer=None, repository_index=None, index_identity=None, _delivery=None, _audit_pending=None):
     """Select evidence; opt-in maintenance/reuse writes only bounded owned state."""
     if not isinstance(task, str) or not task.strip() or len(task) > MAX_TASK_CHARS:
         raise ContextError("Task must contain 1–16000 characters; task contents withheld.")
@@ -1194,6 +1378,10 @@ def _select_context(project, task, role=None, size="standard", max_tokens=None, 
         raise ContextError("File and byte limits must be positive integers.")
     if not compact and (packet_tokens is not None or guide_ids or reuse_state is not None or reuse_scope is not None):
         raise ContextError("Packet budgets, supplied guides and evidence reuse require --compact.")
+    if repository_index not in (None, "auto", "off", "require"):
+        raise ContextError("Repository index must be auto, off or require.")
+    if index_identity is not None and (not isinstance(index_identity, str) or not 0 < len(index_identity) <= 200 or "/" in index_identity):
+        raise ContextError("Index identity must be a short name.")
     root = Path(project).expanduser().resolve()
     if not root.is_dir():
         raise ContextError("Project must be an existing readable directory.")
@@ -1205,7 +1393,8 @@ def _select_context(project, task, role=None, size="standard", max_tokens=None, 
     # Only these decisions, never task text or caller path lists, enter the snapshot.
     cache_scope = {target: _cache_write_scope(task, target, preview=map_preview, writable_paths=writable_paths,
                                               read_only_role=read_only_role)
-                   for target in (".agent-dispatcher/project-map.json", ".agent-dispatcher/project-graph.json")}
+                   for target in (".agent-dispatcher/project-map.json", ".agent-dispatcher/project-graph.json",
+                                  ".agent-dispatcher/repository-index.sqlite")}
     task = scrub(task)
     terms, identifiers, phrases, _ = _terms(task)
     hints = {w.lower() for h in hint_phrases for w in WORD.findall(h) if w.lower() not in STOP}
@@ -1241,6 +1430,12 @@ def _select_context(project, task, role=None, size="standard", max_tokens=None, 
     texts, hashes, scanned, scan_complete = _scan_sources(
         root, paths, manual_exclusions, automatic, incremental, scrub, excluded, diagnostics, oversized)
     engine, settings = _retrieval_engine(retrieval, cap, budget, max_files, max_bytes, diagnostics)
+    deep = None
+    if engine is not None:
+        # The deep index is used only when the user built one (and settings allow it); it never starts a build.
+        deep = _repository_index(root, scrub, paths, texts, excluded, excluded_paths, incremental, diagnostics,
+                                 use=repository_index, identity=index_identity or os.environ.get("AGENT_DISPATCHER_INDEX_ID") or None,
+                                 maintain_allowed=cache_writable)
     candidates = {}
     if engine is None:
         for path, text in texts.items():
@@ -1304,7 +1499,7 @@ def _select_context(project, task, role=None, size="standard", max_tokens=None, 
         try:
             selected, excerpts, spent, intelligence, order = _intelligent_selection(
                 engine, settings, task, texts, hashes, explicit, role_id, changed, incremental, root,
-                excluded, scrub, compact, diagnostics, explain, oversized, rerank_answer,
+                excluded, scrub, compact, diagnostics, explain, oversized, rerank_answer, deep,
                 exclusions=excluded_paths, pack=base)
         except (OSError, UnicodeError, SyntaxError, ValueError, TypeError, KeyError, AttributeError,
                 IndexError, RecursionError, ZeroDivisionError):
@@ -1312,6 +1507,9 @@ def _select_context(project, task, role=None, size="standard", max_tokens=None, 
             engine = None
             candidates = {path: c for path, text in texts.items()
                           if (c := _candidate(path, text, terms, identifiers, phrases, explicit, hints, role_id))}
+        finally:
+            if deep is not None:
+                deep.close()
     if engine is None:
         selected, excerpts, spent = _legacy_selection(candidates, texts, cap, budget, excluded, scrub,
                                                       compact, hashes, diagnostics)
@@ -1367,7 +1565,8 @@ def _select_context(project, task, role=None, size="standard", max_tokens=None, 
     return result
 
 
-def explain_retrieval(project, task, *, strategy="full", pack=None, exclude_paths=(), findings=None, iteration=1, llm=True, ranking=None):
+def explain_retrieval(project, task, *, strategy="full", pack=None, exclude_paths=(), findings=None, iteration=1, llm=True, ranking=None,
+                      repository_index=None, index_identity=None):
     """Read-only inspection through the same exclusion filter and engine as select_context.
 
     `findings` are explorer requests (symbols, paths, relationships). They are answered from the
@@ -1392,18 +1591,35 @@ def explain_retrieval(project, task, *, strategy="full", pack=None, exclude_path
         settings = engine["configure"](strategy)
     except ValueError:
         raise ContextError("Unknown retrieval strategy.") from None
-    history = _git_history(root, settings["git"]["max_commits"], cache) if settings["git"]["enabled"] else None
-    index = engine["build_index"](texts, hashes, _kind, cache=cache, history=history, config=settings, path_only=oversized)
-    explicit = _explicit_paths(task, texts, root)
-    memory_extra, memory_boost, memory = _memory_layer(engine, settings, root, index, task, tuple(dict.fromkeys([*manual, *automatic])),
-                                                       scrub, diagnostics, find_pack(pack))
-    outcome = engine["run"](task, index, settings, named=list(explicit), findings=findings, iteration=iteration,
-                            reranker=_llm_layer(engine, settings, root, index, excluded, diagnostics, ranking) if llm else None,
-                            anchors={p: line for p, line in explicit.items() if line}, extra=memory_extra, boost_only=memory_boost)
+    deep = _repository_index(root, scrub, paths, texts, excluded, manual, cache, diagnostics, use=repository_index,
+                             identity=index_identity or os.environ.get("AGENT_DISPATCHER_INDEX_ID") or None, maintain_allowed=False)
+    try:
+        history = (_git_history(root, settings["git"]["max_commits"], cache)
+                   if settings["git"]["enabled"] and deep.partners is None else None)
+        index = engine["build_index"](texts, hashes, _kind, cache=cache, history=history, config=settings, path_only=oversized,
+                                      store=deep.store, extended=deep.extended or None, partners=deep.partners, loader=deep.loader)
+        if deep.events:
+            deep.report["experience"]["attached"] = _sibling("experience")["attach"](
+                index, deep.events, deep.corrections, tuple(deep.settings["experience"]["eligible_outcomes"]))
+            if deep.report["experience"]["attached"] and "experience" not in settings["retrievers"]:
+                settings["retrievers"] = [*settings["retrievers"], "experience"]
+        if deep.inferences:
+            index.inferences = deep.inferences
+            if "inference" not in settings["retrievers"]:
+                settings["retrievers"] = [*settings["retrievers"], "inference"]
+        explicit = _explicit_paths(task, index.kinds, root)
+        memory_extra, memory_boost, memory = _memory_layer(engine, settings, root, index, task, tuple(dict.fromkeys([*manual, *automatic])),
+                                                           scrub, diagnostics, find_pack(pack))
+        outcome = engine["run"](task, index, settings, named=list(explicit), findings=findings, iteration=iteration,
+                                reranker=_llm_layer(engine, settings, root, index, excluded, diagnostics, ranking) if llm else None,
+                                anchors={p: line for p, line in explicit.items() if line}, extra=memory_extra, boost_only=memory_boost)
+    finally:
+        deep.close()
     outcome["diagnostics"] = diagnostics
     if memory is not None:
         outcome["memory"] = memory
-    outcome["universe"] = {"files": len(texts), "withheld": len(excluded)}
+    outcome["universe"] = {"files": len(texts), "withheld": len(excluded), "extended": len(deep.extended)}
+    outcome["index"] = dict(deep.report, counters=dict(deep.counters))
     return outcome
 
 
@@ -1514,6 +1730,8 @@ def main(argv=None):
     parser.add_argument("--max-bytes", type=int, help="Upper bound on excerpt bytes, below the size tier's own")
     parser.add_argument("--explain", action="store_true", help="Include the retrieval trace: query analysis, per-retriever evidence, budgeting")
     parser.add_argument("--rerank-answer", help="Your ordering of a pending rerank request, as JSON; one round, only listed candidates count")
+    parser.add_argument("--repository-index", choices=("auto", "off", "require"), help="Use a deep repository index built with repository_intelligence.py (default: your settings file, else auto)")
+    parser.add_argument("--index-identity", help="Explicit index identity (harness use); AGENT_DISPATCHER_INDEX_ID is the environment equivalent")
     parser.add_argument("--audit", action="store_true", help="Start a task change audit in owned temporary state before cache writes; finish it before claiming file preservation")
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args(argv)
@@ -1535,6 +1753,7 @@ def main(argv=None):
                                 parser_cache=not args.no_parser_cache, retrieval=args.retrieval,
                                 max_files=args.max_files, max_bytes=args.max_bytes, explain=args.explain,
                                 rerank_answer=json.loads(args.rerank_answer) if args.rerank_answer else None,
+                                repository_index=args.repository_index, index_identity=args.index_identity,
                                 _delivery=delivery)
     except (ContextError, OSError, UnicodeError) as exc:
         print(str(exc) if isinstance(exc, ContextError) else "Context input could not be read; contents withheld.", file=sys.stderr)

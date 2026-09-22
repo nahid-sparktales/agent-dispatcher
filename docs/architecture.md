@@ -79,6 +79,9 @@ Hand-edited, and the only things worth editing:
                                           matching — sub() in build.py is what guards that
     decision/                             the decision engine: contract, default and Jev
                                           implementations, provider transports, CLI
+    repo_store.py, repo_builder.py        the optional deep repository index: private SQLite
+    exploration.py, experience.py         stores, the deterministic builder, the onboarding
+    repository_intelligence.py            Explorer, task experience, and their coordinator CLI
     evals/decision/                       routing, skill and tool fixtures, and the harness that
                                           compares engines on identical inputs
 

@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Add optional, opt-in repository memory (`repository_memory.py`, `repo_history.py`, `experience.py`,
+- Add optional, opt-in repository memory (`repository_memory.py`, `repo_history.py`, `memory_experience.py`,
   `docs/repository-memory.md`, `MEMORY.md`, `/agent-memory`, `$agent-dispatcher memory`): an episodic
   layer (eligible commits from HEAD's bounded ancestry through one hardened Git wrapper, admitted
   changed paths with both sides policy-checked, sanitized messages, issue/PR references, reverts,
@@ -22,6 +22,24 @@
   `All@k` (RepoMem's Accuracy@k), target-count strata and memory arms; `chronology.py` replays a
   repository in commit order with leakage checks and oracle-labeled experience arms.
 
+- Add an explicit, persistent deep repository index (`repository_intelligence.py build|refresh|status|explain`,
+  `repo_store.py`, `repo_builder.py`): a complete admitted inventory in deterministic batches with
+  checkpoints and resume, per-file records and corpus statistics, stable symbol identities with
+  content fingerprints and rename aliases, relationships labeled by method and status, bounded
+  `HEAD` history with a recorded horizon, atomic generation publication in the private state
+  directory (SQLite, standard library), fast metadata or strict content refresh that reconciles
+  the working tree and sweeps only after a complete enumeration. The context helper uses a
+  published index automatically (`repository_intelligence.index` in the packet; `--repository-index off`
+  restores the previous behavior), ranks verified files beyond the scan's caps and reads them on
+  selection, withholds stale evidence, and upserts changed records under the existing cache write
+  scope. Optional, off by default and switched separately in the user's own settings file: an
+  onboarding Explorer (`explore`, `exploration.py`) that lets a model ask validated read-only
+  operations of the index and stores evidence-backed claims labeled as inferences, and explicit
+  task experience (`experience record|list|show|correct|forget`, `experience.py`) with fixed
+  outcome categories, corrections, forgetting and a bounded half-weight memory retriever. The
+  offline retrieval benchmark gains a chronological four-condition sequence mode and the
+  end-to-end runner gains `indexed` and `warm_experience` conditions; no live comparison was run.
+  See docs/repository-index.md.
 - Order the project map's eight-fact task view by the retrieval engine's file ranking instead of
   counting request words in each fact. The context selector hands the map its ranking with
   excerpted files last; each unnamed file contributes one fact, a ranked file appears even when

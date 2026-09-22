@@ -105,6 +105,45 @@ in `retrieval.DEFAULTS`, for example `--set rrf_k=30 --set graph.max_hops=2`.
   (default 0.03, about two tasks of the held-out split). Rankings are deterministic, so any
   difference is a code or configuration change, not noise.
 
+## Chronological sequences: indexed and warm-experience conditions
+
+`sequence.py` orders each repository's tasks by the timestamp of their base commit and advances every
+condition through the same predetermined snapshots. Before task t only the repository as of its base
+commit and experience from tasks strictly before t exist; each snapshot's history is `git log` from that
+`HEAD`, so future commits in the clone never enter co-change even though they are present as other refs.
+
+| Condition | Definition |
+| --- | --- |
+| `basic` | the shipped retrieval (`full`): a fresh in-memory index of the scan for every task |
+| `indexed` | a deep index ([docs/repository-index.md](../../docs/repository-index.md)) built at the first snapshot and refreshed at each later one; experience recorded, never used |
+| `warm-experience` | exactly `indexed` plus eligible experience recorded earlier in the same sequence |
+
+Stock (a native client without Dispatcher) has no retrieval to measure offline; it exists only in the
+[end-to-end runner](../end_to_end/README.md). With `--experience-source oracle` the warm arm records each
+task's gold target files as `grader_passed`; that arm is an **oracle diagnostic** of the memory mechanism,
+never evidence that Dispatcher learned from real work. `--experience-source events FILE` replays events
+recorded from actual trials instead (one JSON object per line: `task_id`, `query`, `edited`, `outcome`).
+
+```bash
+D=dist/retrieval-datasets/sqlglot.jsonl
+python3 -B evals/retrieval/sequence.py --dataset $D --split test --conditions basic,indexed,warm-experience \
+  --experience-source oracle --json dist/sequence-sqlglot.json
+python3 -B evals/retrieval/sequence.py --dataset $D --split test --conditions basic,indexed --experience-source none
+python3 -B evals/retrieval/sequence.py --dataset $D --split dev --drop-family-repeats --limit 40
+```
+
+Reported per condition: Recall@1/3/5/8/10 (share of a task's targets in the top k), MRR, candidate recall
+(targets anywhere in the final ranking), packet recall (`ctx_recall`), any-hit rate, files, tokens and
+query latency, plus how many tasks had experience candidates; per repository; early/middle/late thirds of
+each sequence; paired R@8 differences against `basic` with a repository block bootstrap (sequences are the
+dependence unit, and there are few of them); negative transfer of `warm-experience` against `indexed`;
+setup cost (build and refresh time and counters, disk use, zero model calls) apart from query cost, with
+monetary cost reported as unknown rather than zero. Tasks that modify the same target files form a fix
+family; `family_repeat` marks later members and `--drop-family-repeats` removes them, because a memory
+that has seen the same fix is not chronological generalization. `tests/test_retrieval_sequence.py` runs
+the whole protocol on a synthetic repository; no measured results from real datasets are reported here
+because none were run for this change.
+
 ## Optional: repository memory
 
 `--memory` builds the [episodic repository memory](../../docs/repository-memory.md) in memory at each

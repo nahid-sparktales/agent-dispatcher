@@ -38,7 +38,15 @@ the optional decision engine described below.
   is read from the environment at request time and is never stored, logged, rendered or written
   to a file. It cannot grant a permission: relevance and authorization are separate layers, and
   the runtime never consults this one. [docs/jev.md](docs/jev.md) has the full account.
-- **`repository_memory.py`**, **`repo_history.py`** and **`experience.py`** are the optional repository
+- **`repository_intelligence.py`** builds an optional deep index and a task-experience store in
+  the same private, owner-only state directory as the project map (never inside a repository).
+  Both are derived facts bound to source fingerprints, never source text: a forged file can
+  perturb ranking, not inject content, resurrect an excluded path or authorize a read. Its
+  Explorer calls a model only when your own settings file enables it, through registered
+  read-only operations the coordinator validates; experience is recorded only when a host hands
+  over receipts explicitly. Status and dry-run open state read-only and create nothing. See
+  [docs/repository-index.md](docs/repository-index.md).
+- **`repository_memory.py`**, **`repo_history.py`** and **`memory_experience.py`** are the optional repository
   memory. They are inert without a settings file outside every project. Git is invoked through one
   hardened wrapper (argument arrays, scrubbed environment, no pager, external diff, textconv,
   replacement objects, lazy fetch or prompt; byte and time limits) and only HEAD's bounded ancestry

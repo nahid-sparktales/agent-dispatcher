@@ -101,6 +101,11 @@ def _environment(client: str, spec: dict, profile: Path) -> dict[str, str]:
     # conditions so their environments stay identical; only the staged dispatcher reads it.
     if spec.get("llm_settings"):
         env["AGENT_DISPATCHER_LLM_CONFIG"] = spec["llm_settings"]
+    # Deep-index arms: arm-scoped private state, a sequence identity and a settings path. Paths only, set by the runner.
+    for key in ("XDG_CACHE_HOME", "AGENT_DISPATCHER_INDEX_ID", "AGENT_DISPATCHER_INDEX_CONFIG"):
+        value = (spec.get("index_env") or {}).get(key)
+        if isinstance(value, str) and value:
+            env[key] = value
     # Same for repository memory: a settings path, never a secret; memory stores must be built before the run
     # (private state outside the workspace) because trials never build them.
     if spec.get("memory_settings"):
@@ -311,7 +316,7 @@ def _codex_isolation(executable, spec, env, workspace, skill):
 
 
 def build_launch(client: str, spec: dict, workspace: Path,
-                 skill_dir: Path | None = None) -> dict:
+                 skill_dir: Path | None = None, condition: str | None = None) -> dict:
     """Build a shell-free native launch. env is secret-bearing; NEVER serialize it."""
     executable, profile, workspace, skill = _spec(client, spec, workspace, skill_dir)
     errors = _customization_errors(client, profile, workspace, skill)
@@ -320,7 +325,8 @@ def build_launch(client: str, spec: dict, workspace: Path,
     env = _environment(client, spec, profile)
     effective = {
         "client": client, "model": spec["model"], "effort": spec["effort"],
-        "auth": spec["auth"], "condition": "dispatcher" if skill else "baseline",
+        "auth": spec["auth"], "condition": condition or ("dispatcher" if skill else "baseline"),
+        "index_env": {key: value for key, value in (spec.get("index_env") or {}).items() if key != "XDG_CACHE_HOME"},
         "native_system_prompt": True, "memory": False, "hooks": False,
         "external_mcp": False, "personal_plugins": False,
         "isolation": "customization-discovery; not an OS security boundary",
@@ -688,7 +694,7 @@ def validate_startup(client: str, spec: dict, parsed: dict, condition: str) -> l
             errors.append(f"Native startup {key} contains a non-string entry")
     if errors:
         return errors
-    treatment = condition in ("dispatcher", "treatment", "on")
+    treatment = condition in ("dispatcher", "treatment", "on", "indexed", "warm_experience")
     if client == "codex":
         if not startup.get("thread_started"):
             errors.append("Missing Codex thread.started evidence")

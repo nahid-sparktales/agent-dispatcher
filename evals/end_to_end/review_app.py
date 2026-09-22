@@ -430,7 +430,7 @@ class ReviewApp:
                 planned = [item for item in schedule if item.get("client") == client]
                 conditions = {condition: reporting._group([trial for trial in trials if trial["condition"] == condition],
                               ratings, sum(row.get("condition") == condition for row in planned))
-                              for condition in reporting.CONDITIONS}
+                              for condition in reporting.conditions_of(self.metadata)}
                 pairs = reporting._pairs(trials, ratings, planned)
                 pairs.pop("details", None)
                 clients[client] = {"conditions": conditions, "pairs": pairs}

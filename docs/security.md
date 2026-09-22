@@ -149,6 +149,9 @@ an agent's working context. All of it is **evidence**, and none of it is instruc
   field.
 - A secret found during retrieval is a finding, not context: it is named, not copied into the plan
   and not echoed.
+- A stored index record, an Explorer claim or a remembered task outcome is evidence of the same
+  standing: bound to a source fingerprint, labeled by kind, withheld when the source changed, and
+  never a permission. A task exclusion filters stored evidence before it can be ranked.
 
 None of this is a security boundary — it is a discipline. The boundary is the runtime's permission
 layer, which this repository does not touch.

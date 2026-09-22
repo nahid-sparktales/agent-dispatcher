@@ -490,6 +490,15 @@ including Recall@8, is clear of zero; with the local model only R@5 and MRR were
   gain was not established and each request cost ~50 s, so local-only users should stop at
   `full+role`; the post-graph blended placement remains worth trying for R@8 and was not measured
   with Claude.
+- **End-to-end check (2026-09-22, private `dist/evals/big-v4` and `big-v6`)**: on the five-task
+  sqlglot suite (Opus 5, 20 trials each), the deterministic dispatcher scored 9/10 against stock's
+  9/10 and, with Haiku summaries plus a Sonnet rerank in every helper call, 8/10 against 9/10.
+  Localization was visibly better (the OFFSET task's `planner.py` moved from rank 57 to 2 in the
+  packet) at $0.04 and ~4 s per call, and the dispatcher ran faster on 6 of 10 pairs at about 8 %
+  lower total cost; the one fixture that separates the conditions is a coin-flip HAVING-before-
+  OFFSET check that both sides miss, and there sharper excerpts led the model to read less and
+  patch the highlighted lines. Twenty trials cannot resolve less than one task; better retrieval
+  did not change task success here.
 - **Not done, deliberately**: default-on for any LLM feature; embeddings; query rewriting; an
   explorer loop.
 

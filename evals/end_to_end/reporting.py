@@ -25,6 +25,11 @@ DIMENSIONS = (
     "unnecessary_intervention",
 )
 CONDITIONS = ("baseline", "dispatcher")
+ALL_CONDITIONS = ("baseline", "dispatcher", "indexed", "warm_experience")
+
+
+def conditions_of(batch):
+    return tuple((batch or {}).get("config", {}).get("conditions") or CONDITIONS)
 INVALID_STATUSES = {"invalid_configuration", "authentication_failure", "infrastructure_error"}
 STATUSES = INVALID_STATUSES | {"completed", "task_failure", "timeout"}
 EXCLUDED_PARTS = {
@@ -64,7 +69,7 @@ def _trials(batch_dir: Path) -> list[dict]:
         if trial["id"] in seen:
             raise ValueError("Duplicate trial id: " + trial["id"])
         seen.add(trial["id"])
-        if trial.get("condition") not in CONDITIONS or trial.get("status") not in STATUSES:
+        if trial.get("condition") not in ALL_CONDITIONS or trial.get("status") not in STATUSES:
             raise ValueError("Invalid condition or status for trial " + trial["id"])
         key = tuple(trial.get(k) for k in ("client", "condition", "fixture_id", "repetition"))
         if key in pairs:
@@ -685,7 +690,35 @@ def _group(trials: list[dict], ratings: dict, scheduled: int) -> dict:
     }
 
 
-def _pairs(trials: list[dict], ratings: dict, schedule: list[dict]) -> dict:
+def _setup(trials: list[dict]) -> dict:
+    """Deterministic setup outside task timing: deep-index build/refresh time and model calls per condition."""
+    seconds = [(trial.get("deep_index_setup") or {}).get("elapsed_seconds") for trial in trials]
+    calls = [(trial.get("deep_index_setup") or {}).get("model_calls") for trial in trials]
+    recorded = [trial.get("experience_record") for trial in trials if trial.get("experience_record")]
+    return {"deep_index_setup": _measurement(seconds), "setup_model_calls": _measurement(calls),
+            "experience_recorded": sum(1 for r in recorded if r.get("stored")),
+            "experience_eligible": sum(1 for r in recorded if r.get("eligible")),
+            "note": "Setup ran before each task and outside its timer; a missing measurement is unknown, not zero."}
+
+
+def _cost(trials: list[dict]) -> dict:
+    """Amortized cost per attempted task and per verified success; unknown stays unknown, never zero."""
+    attempted = len(trials)
+    verified = sum(1 for trial in trials if trial.get("task_success") is True)
+    costs = [(trial.get("usage") or {}).get("cost_usd") for trial in trials]
+    known = [value for value in costs if _number(value)]
+    total = sum(known) if known and len(known) == attempted else None
+    setup = [(trial.get("deep_index_setup") or {}).get("elapsed_seconds") for trial in trials]
+    setup_known = [value for value in setup if _number(value)]
+    return {"attempted": attempted, "verified_successes": verified,
+            "measured_cost_usd_total": total, "cost_known_for": len(known), "cost_unknown_for": attempted - len(known),
+            "setup_seconds_total": sum(setup_known) if setup_known else 0.0, "setup_measured_for": len(setup_known),
+            "amortized_cost_usd_per_task": (total / attempted) if total is not None and attempted else None,
+            "cost_usd_per_verified_success": (total / verified) if total is not None and verified else None,
+            "note": "Measured provider costs only; subscription usage and unreported calls are unknown. A null value is unknown or undefined (zero denominator), not zero."}
+
+
+def _pairs(trials: list[dict], ratings: dict, schedule: list[dict], treatment: str = "dispatcher") -> dict:
     pairs: dict[tuple, dict] = defaultdict(dict)
     for trial in trials:
         pairs[(trial.get("fixture_id"), trial.get("repetition"))][trial["condition"]] = trial
@@ -694,12 +727,12 @@ def _pairs(trials: list[dict], ratings: dict, schedule: list[dict]) -> dict:
     totals = Counter()
     details, deltas = [], defaultdict(list)
     for (fixture_id, repetition), pair in sorted(pairs.items(), key=lambda item: str(item[0])):
-        baseline, treatment = pair.get("baseline"), pair.get("dispatcher")
+        baseline, treated = pair.get("baseline"), pair.get(treatment)
         left = _outcome(baseline, ratings.get(baseline["id"])) if baseline else None
-        right = _outcome(treatment, ratings.get(treatment["id"])) if treatment else None
-        if not baseline or not treatment:
+        right = _outcome(treated, ratings.get(treated["id"])) if treated else None
+        if not baseline or not treated:
             classification = "missing_attempt"
-        elif baseline["status"] in INVALID_STATUSES or treatment["status"] in INVALID_STATUSES:
+        elif baseline["status"] in INVALID_STATUSES or treated["status"] in INVALID_STATUSES:
             classification = "invalid"
         elif left is None or right is None:
             classification = "pending"
@@ -707,14 +740,14 @@ def _pairs(trials: list[dict], ratings: dict, schedule: list[dict]) -> dict:
             classification = "both_pass" if left and right else "both_fail" if not left and not right else "improved" if right else "regressed"
             for name in ("elapsed_seconds", "input_tokens", "output_tokens", "cached_input_tokens", "cost_usd"):
                 lhs = baseline.get(name) if name == "elapsed_seconds" else (baseline.get("usage") or {}).get(name)
-                rhs = treatment.get(name) if name == "elapsed_seconds" else (treatment.get("usage") or {}).get(name)
+                rhs = treated.get(name) if name == "elapsed_seconds" else (treated.get("usage") or {}).get(name)
                 if _number(lhs) and _number(rhs):
                     deltas[name].append(rhs - lhs)
         totals[classification] += 1
         details.append({"fixture_id": fixture_id, "repetition": repetition, "classification": classification, "baseline_success": left, "dispatcher_success": right})
     comparable = sum(totals[name] for name in ("improved", "regressed", "both_pass", "both_fail"))
     return {
-        "total": len(pairs), "comparable": comparable,
+        "treatment": treatment, "total": len(pairs), "comparable": comparable,
         **{name: totals[name] for name in ("improved", "regressed", "both_pass", "both_fail", "missing_attempt", "invalid", "pending")},
         "deltas_dispatcher_minus_baseline": {name: {"observed_pairs": len(deltas[name]), "missing_pairs": comparable - len(deltas[name]), "median": statistics.median(deltas[name]) if deltas[name] else None} for name in ("elapsed_seconds", "input_tokens", "output_tokens", "cached_input_tokens", "cost_usd")},
         "details": details,
@@ -740,6 +773,8 @@ def report(batch_dir: Path) -> dict:
             if not trial or evidence.get("trial_id") != trial_id or evidence.get("digest") != _digest(_packet(batch_dir, trial)):
                 raise ValueError("Reviewed evidence is missing or changed; cannot report stale ratings")
     schedule = batch.get("schedule", [])
+    conditions = conditions_of(batch)
+    treatments = [c for c in conditions if c != "baseline"]
     clients = sorted({trial["client"] for trial in trials} | {entry["client"] for entry in schedule})
     result = {
         "schema_version": 1, "suite": batch.get("suite"), "seed": batch.get("seed"),
@@ -762,36 +797,56 @@ def report(batch_dir: Path) -> dict:
             "Initial indexing and a parser-cache verification pass occur before native task timing; "
             "their measurements are saved separately in each trial's index-setup.json. "
             "These results do not measure first-use indexing cost or isolate parser effects.")
+    if "indexed" in conditions or "warm_experience" in conditions:
+        result["limitations"].append(
+            "Deep-index conditions: `indexed` builds or refreshes a deep repository index before each task outside the timer "
+            "(deep-index-setup.json); `warm_experience` is the same plus experience its own earlier steps recorded, whose "
+            "outcome is the hidden grader's verdict (`grader_passed`, oracle-adjacent) unless configured otherwise. "
+            "Paired comparisons are against baseline; treatments are not paired with each other. Setup cost and model "
+            "calls are reported apart from task cost; a break-even is claimed only from measured recurring savings.")
     lines = ["# Agent dispatcher end-to-end evaluation", "", f"Suite: {batch.get('suite', 'unknown')}. Randomization seed: {batch.get('seed', 'unknown')}.", "", *["- " + item for item in result["limitations"]], ""]
     for client in clients:
         subset = [trial for trial in trials if trial["client"] == client]
         client_schedule = [entry for entry in schedule if entry["client"] == client]
-        groups = {condition: _group([trial for trial in subset if trial["condition"] == condition], ratings, sum(entry.get("condition") == condition for entry in client_schedule)) for condition in CONDITIONS}
-        pairs = _pairs(subset, ratings, client_schedule)
+        groups = {condition: _group([trial for trial in subset if trial["condition"] == condition], ratings, sum(entry.get("condition") == condition for entry in client_schedule)) for condition in conditions}
+        for condition in conditions:
+            groups[condition]["setup"] = _setup([trial for trial in subset if trial["condition"] == condition])
+            groups[condition]["cost_accounting"] = _cost([trial for trial in subset if trial["condition"] == condition])
+        pairs_by_condition = {name: _pairs(subset, ratings, client_schedule, name) for name in treatments}
+        pairs = pairs_by_condition.get("dispatcher") or (pairs_by_condition[treatments[0]] if treatments else _pairs(subset, ratings, client_schedule))
         fixture_categories = {trial["fixture_id"]: trial.get("category", "unknown") for trial in subset}
-        categories = {category: {condition: _group([trial for trial in subset if trial.get("category", "unknown") == category and trial["condition"] == condition], ratings, sum(entry.get("condition") == condition and fixture_categories.get(entry.get("fixture_id")) == category for entry in client_schedule)) for condition in CONDITIONS} for category in sorted(set(fixture_categories.values()))}
-        result["clients"][client] = {"conditions": groups, "pairs": pairs, "categories": categories, "route_agreement": _route_agreement(subset), "helper_coverage": _helper_coverage(subset)}
-        lines.extend(["## " + client, "", "| Metric | Baseline | Dispatcher |", "| --- | ---: | ---: |"])
+        categories = {category: {condition: _group([trial for trial in subset if trial.get("category", "unknown") == category and trial["condition"] == condition], ratings, sum(entry.get("condition") == condition and fixture_categories.get(entry.get("fixture_id")) == category for entry in client_schedule)) for condition in conditions} for category in sorted(set(fixture_categories.values()))}
+        result["clients"][client] = {"conditions": groups, "pairs": pairs, "pairs_by_condition": pairs_by_condition, "categories": categories,
+                                     "route_agreement": _route_agreement(subset), "helper_coverage": _helper_coverage(subset)}
+        titles = {"baseline": "Baseline", "dispatcher": "Dispatcher", "indexed": "Indexed", "warm_experience": "Warm-experience"}
+        header = "| Metric | " + " | ".join(titles[c] for c in conditions) + " |"
+        lines.extend(["## " + client, "", header, "| --- |" + " ---: |" * len(conditions)])
         rows = [("Scheduled", "scheduled"), ("Attempted", "attempted"), ("Unattempted", "unattempted"), ("Invalid attempts", "invalid"), ("Evaluable attempts", "evaluable_attempts"), ("Graded outcomes", "graded"), ("Successful outcomes", "successful"), ("Pending outcomes", "pending_outcomes"), ("Required reviews pending", "required_reviews_pending"), ("Success rate among graded outcomes", "graded_success_rate"), ("Complete success rate", "complete_success_rate")]
         for title, key in rows:
-            lines.append(f"| {title} | {_display(groups['baseline'][key])} | {_display(groups['dispatcher'][key])} |")
+            lines.append(f"| {title} | " + " | ".join(_display(groups[c][key]) for c in conditions) + " |")
         for status in sorted(STATUSES):
-            lines.append(f"| Status: {status} | {groups['baseline']['statuses'][status]} | {groups['dispatcher']['statuses'][status]} |")
+            lines.append(f"| Status: {status} | " + " | ".join(str(groups[c]["statuses"][status]) for c in conditions) + " |")
         for title, key in (("Automated artifact acceptance", "artifact_acceptance"), ("Claim accuracy", "claim_accuracy"), ("Unnecessary intervention", "unnecessary_intervention"), ("Treatment compliance", "treatment_compliance"), ("Owned-directory scope acceptance", "scope_acceptance")):
-            cells = [f"{groups[condition][key]['numerator']}/{groups[condition][key]['denominator']} observed; {groups[condition][key]['missing']} missing" for condition in CONDITIONS]
-            lines.append(f"| {title} | {cells[0]} | {cells[1]} |")
+            cells = [f"{groups[condition][key]['numerator']}/{groups[condition][key]['denominator']} observed; {groups[condition][key]['missing']} missing" for condition in conditions]
+            lines.append(f"| {title} | " + " | ".join(cells) + " |")
         for name in ("elapsed_seconds", "input_tokens", "output_tokens", "cached_input_tokens", "cost_usd"):
-            measurements = [groups[condition][name] if name == "elapsed_seconds" else groups[condition]["usage"][name] for condition in CONDITIONS]
+            measurements = [groups[condition][name] if name == "elapsed_seconds" else groups[condition]["usage"][name] for condition in conditions]
             cells = [f"{_display(value['median'])} ({value['observed']} observed; {value['missing']} missing)" for value in measurements]
-            lines.append(f"| Median {name} | {cells[0]} | {cells[1]} |")
+            lines.append(f"| Median {name} | " + " | ".join(cells) + " |")
+        for title, key in (("Deep-index setup seconds (median)", "deep_index_setup"), ("Setup model calls (median)", "setup_model_calls")):
+            cells = [f"{_display(groups[c]['setup'][key]['median'])} ({groups[c]['setup'][key]['observed']} observed; {groups[c]['setup'][key]['missing']} missing)" for c in conditions]
+            lines.append(f"| {title} | " + " | ".join(cells) + " |")
+        for title, key in (("Amortized measured cost per task (USD)", "amortized_cost_usd_per_task"), ("Measured cost per verified success (USD)", "cost_usd_per_verified_success")):
+            lines.append(f"| {title} | " + " | ".join(_display(groups[c]["cost_accounting"][key]) for c in conditions) + " |")
+        lines.extend(["", groups["baseline"]["cost_accounting"]["note"], groups["baseline"]["setup"]["note"]])
         lines.extend(["", "### Private process measurements", "", groups["baseline"]["activity"]["note"], "",
-                      "| Measurement | Baseline | Dispatcher |", "| --- | ---: | ---: |"])
+                      "| Measurement | " + " | ".join(titles[c] for c in conditions) + " |", "| --- |" + " ---: |" * len(conditions)])
         for name in ACTIVITY_METRICS:
             cells = []
-            for condition in CONDITIONS:
+            for condition in conditions:
                 metric = groups[condition]["activity"]["metrics"][name]
                 cells.append(f"{_display(metric['total'])} total / {metric['observed']} complete; {metric['missing']} missing; {_display(metric['partial_observed_total'])} partial lower bound / {metric['partial_attempts']} attempts")
-            lines.append(f"| {name} | {cells[0]} | {cells[1]} |")
+            lines.append(f"| {name} | " + " | ".join(cells) + " |")
         coverage = result["clients"][client]["helper_coverage"]
         lines.extend(["", "### Helper adoption on eligible tasks", "", coverage["note"], "",
                       "| Helper | Eligible treatment trials | Observed success | Not observed in complete trace | Unknown |", "| --- | ---: | ---: | ---: | ---: |"])
@@ -809,12 +864,14 @@ def report(batch_dir: Path) -> dict:
                       "Exclusion metadata: " + json.dumps(coverage["exclusions"]["counts"], sort_keys=True)])
         agreement = result["clients"][client]["route_agreement"]
         lines.extend(["", f"Route agreement: {agreement['groups_agreed']}/{agreement['groups_observed']} observed fixture/condition groups agreed; {agreement['groups_varied']} varied; {agreement['unknown_trials']} trials unknown.", agreement["note"]])
-        lines.extend(["", f"Paired outcomes: {pairs['comparable']}/{pairs['total']} comparable; {pairs['improved']} improved, {pairs['regressed']} regressed, {pairs['both_pass']} both passed, {pairs['both_fail']} both failed. Incomplete: {pairs['missing_attempt']} missing attempts, {pairs['invalid']} invalid pairs, {pairs['pending']} pending.", "", "| Paired metric (dispatcher − baseline) | Median difference | Observed pairs | Missing pairs |", "| --- | ---: | ---: | ---: |"])
-        for name, measurement in pairs["deltas_dispatcher_minus_baseline"].items():
-            lines.append(f"| {name} | {_display(measurement['median'])} | {measurement['observed_pairs']} | {measurement['missing_pairs']} |")
-        lines.extend(["", "### Each paired outcome", "", "| Fixture | Repetition | Result |", "| --- | ---: | --- |"])
-        for detail in pairs["details"]:
-            lines.append(f"| {detail['fixture_id']} | {detail['repetition']} | {detail['classification']} |")
+        for name in treatments or ["dispatcher"]:
+            pairs = pairs_by_condition.get(name, pairs)
+            lines.extend(["", f"Paired outcomes ({name} versus baseline): {pairs['comparable']}/{pairs['total']} comparable; {pairs['improved']} improved, {pairs['regressed']} regressed, {pairs['both_pass']} both passed, {pairs['both_fail']} both failed. Incomplete: {pairs['missing_attempt']} missing attempts, {pairs['invalid']} invalid pairs, {pairs['pending']} pending.", "", f"| Paired metric ({name} − baseline) | Median difference | Observed pairs | Missing pairs |", "| --- | ---: | ---: | ---: |"])
+            for metric, measurement in pairs["deltas_dispatcher_minus_baseline"].items():
+                lines.append(f"| {metric} | {_display(measurement['median'])} | {measurement['observed_pairs']} | {measurement['missing_pairs']} |")
+            lines.extend(["", f"### Each paired outcome ({name})", "", "| Fixture | Repetition | Result |", "| --- | ---: | --- |"])
+            for detail in pairs["details"]:
+                lines.append(f"| {detail['fixture_id']} | {detail['repetition']} | {detail['classification']} |")
         lines.append("")
     _write(batch_dir / "report.json", result)
     (batch_dir / "report.md").write_text("\n".join(lines) + "\n", encoding="utf-8")

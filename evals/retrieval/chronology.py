@@ -37,7 +37,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import context  # noqa: E402
-import experience as experience_module  # noqa: E402
+import memory_experience as experience_module  # noqa: E402
 import repo_history  # noqa: E402
 import repository_memory  # noqa: E402
 import retrieval  # noqa: E402

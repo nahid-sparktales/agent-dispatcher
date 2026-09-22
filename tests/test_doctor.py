@@ -58,7 +58,8 @@ class DoctorTests(unittest.TestCase):
                      "DELEGATION.md", "PROJECT-MAP.md", "MEMORY.md", "VERIFICATION.md", "jev.md", "DOCTOR.md", "doctor.py", "context.py", "project_map.py", "resources.py", "verification.py", "preferences.py",
                      "context_packet.py", "context_reuse.py", "parser_cache.py", "project_graph.py", "change_audit.py",
                      "repo_index.py", "retrieval.py", "context_budget.py", "llm_retrieval.py",
-                     "repository_memory.py", "repo_history.py", "experience.py"):
+                     "repo_store.py", "repo_builder.py", "exploration.py", "experience.py", "repository_intelligence.py",
+                     "repository_memory.py", "repo_history.py", "memory_experience.py"):
             write(self.pack / file, "fixture")
 
     def inspect(self, **kwargs):
