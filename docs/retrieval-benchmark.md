@@ -346,6 +346,45 @@ fixed. These are "owns the behavior" judgments that are defensible from the summ
 suggest handing the reranker the change kind (command wiring versus mechanism) rather than a
 prompt patch per case.
 
+### Model comparison: local Qwen versus Claude (same 67 held-out tasks)
+
+Re-run with the `command` provider driving the `claude` CLI (`env MAX_THINKING_TOKENS=0 claude -p
+--tools "" ...`, extended thinking off so that a representation is 150-280 output tokens instead of
+2-6k thinking tokens): Claude Haiku 4.5 writes the representations, Claude Sonnet 5 reranks. The
+stores are keyed by model, so both sets of representations coexist; everything else (tasks,
+deterministic pipeline, prompts, validation, candidate limit 20, `replace` integration) is identical.
+
+| Strategy | R@5 | R@8 | MRR | local Qwen (R@5 / R@8 / MRR) |
+| --- | --- | --- | --- | --- |
+| `full` | .623 | .722 | .535 | same |
+| `full+role` | .725 | .752 | .644 | .728 / .757 / .592 |
+| `full+rerank` | .743 | .774 | .736 | .723 / .747 / .662 |
+| `full+role+rerank` (default) | **.771** | **.802** | **.753** | .736 / .759 / .688 |
+| … reranker + deterministic order blended (w=2) | .771 | .804 | .736 | .736 / .797 / .696 |
+| … reranker as one RRF voter (w=2) | .750 | .772 | .683 | .738 / .762 / .650 |
+| … reranker picks graph seeds only | .730 | .767 | .669 | .728 / .757 / .611 |
+
+Paired-bootstrap 95% intervals against `full`, Claude rows: `full+role` R@5 +.102 [+.037, +.174],
+MRR +.109 [+.039, +.182]; `full+role+rerank` R@5 +.147 [+.070, +.227], **R@8 +.080 [+.011, +.157]**,
+MRR +.218 [+.122, +.311]. With the hosted models every headline gain of the default configuration,
+including Recall@8, is clear of zero; with the local model only R@5 and MRR were.
+
+- **Representations.** Haiku's summaries retrieve better than the local model's: `role-only` R@5
+  .580 / MRR .514 versus .527 / .483, and `full+role` MRR .644 versus .592 with the same recall.
+  Candidate recall in the fused top 5 rises to 63.6% (local 61.8%, deterministic 49.1%).
+- **Reranking.** Inside the 20-candidate set Sonnet improved 34 targets, left 38 and worsened 13
+  (local: 32 / 34 / 20); only 4 offered targets end below rank 8 (local: 9). The remaining misses
+  are 19 targets never in the top 20 and 6 unreadable ones, the same ceiling as before.
+- **By category**, R@8 / MRR, `full` -> `full+role` -> `full+role+rerank`: weak lexical (19)
+  .34/.25 -> .53/.45 -> .62/.62; cross-file (20) .52/.57 -> .52/.76 -> .64/.80; explicit path (10)
+  .61/.40 -> .61/.57 -> .81/.72; explicit symbol (17) .81/.79 -> .81/.86 -> .89/.85; strong
+  lexical (48) .87/.65 -> .84/.72 -> .87/.81. Unlike the local model, Sonnet no longer costs
+  Recall@8 on strongly lexical tasks.
+- **Cost and latency (provider-reported).** Indexing: 832 representations for both repositories,
+  $3.08, about 6 s per file at concurrency 4 (14 minutes wall for pip's 491). Reranking: $0.039 per
+  task (8.9k input + 0.3k output tokens under Claude's tokenizer), p50 4.6 s, p95 8.3 s, versus
+  ~50 s on the local model.
+
 ### Recommendation
 
 - **Deterministic mode stays the default**: it is unchanged, free and 84 ms.
@@ -353,12 +392,13 @@ prompt patch per case.
   local model: +10 points R@5, +6 MRR, largest on weak-lexical and cross-file tasks, no per-query
   model call, and the only step whose gain has a confidence interval clear of zero on both R@5
   and R@8 in at least one configuration.
-- **The reranker earns its cost on MRR** (+.15, interval clear of zero) with role summaries in the
-  prompt, but its R@8 gain is not established on 67 tasks, its regressions cluster on PR-style
-  requests, and on a local model it costs ~50 s per request. Recommended as opt-in for users with
-  a fast provider, in the default `replace` mode with 20 candidates; users who care about R@8 more
-  than MRR should try the post-graph blended placement, which was the best configuration on the
-  test split but was not the one chosen on validation.
+- **The reranker earns its cost with a hosted model**: with Sonnet, `full+role+rerank` improves
+  R@5 by +.15, R@8 by +.08 and MRR by +.22 over deterministic retrieval, every interval clear of
+  zero, at $0.04 and about 5 s per request. Recommended as the opt-in configuration for users with
+  a hosted provider, in the default `replace` mode with 20 candidates. With the local model the R@8
+  gain was not established and each request cost ~50 s, so local-only users should stop at
+  `full+role`; the post-graph blended placement remains worth trying for R@8 and was not measured
+  with Claude.
 - **Not done, deliberately**: default-on for any LLM feature; embeddings; query rewriting; an
   explorer loop.
 
