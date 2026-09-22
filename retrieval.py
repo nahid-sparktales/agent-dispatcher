@@ -157,7 +157,10 @@ GENERIC = set(
     "file files code project repo repository task source target existing current currently instead rather correctly "
     "properly issue issues problem bug bugs behavior behaviour expected actual actually result results following "
     "example examples case cases via etc thanks thank hello hi version versions description steps reproduce "
-    "src lib app py js ts tsx jsx json md yaml yml toml css html txt".split())
+    "src lib app py js ts tsx jsx json md yaml yml toml css html txt "
+    # Process talk that task prompts carry and no file is about.
+    "welcome finish finished finishing summarize summary claim claims claiming verify verified verifying adding "
+    "updating offline".split())
 KNOWN_SUFFIXES = {"py", "js", "jsx", "ts", "tsx", "mjs", "cjs", "go", "rs", "java", "rb", "c", "h", "cpp", "cs", "swift",
                   "kt", "php", "vue", "svelte", "css", "scss", "sh", "md", "rst", "txt", "json", "toml", "yaml", "yml",
                   "ini", "cfg", "html", "sql", "lock", "xml"}
@@ -165,7 +168,8 @@ _URL = re.compile(r"\b(?:https?|ssh|git)://\S+")
 _PATHISH = re.compile(r"(?<![\w/.-])(?:\./)?(?:[\w.@-]+/)*[\w@-]+(?:\.[\w@-]+)+")
 _SLASHED = re.compile(r"(?<![\w/.-])(?:\./)?(?:[\w.@-]+/)+[\w.@-]+")
 _DOTTED = re.compile(r"(?<![\w.])[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)+(?![\w])")
-_CALL = re.compile(r"(?<![\w.])([A-Za-z_][\w.]*)\s*\(")
+# `name(` is a call; `name (` is prose with a parenthetical ("in this checkout (see planner.py)"), never a symbol.
+_CALL = re.compile(r"(?<![\w.])([A-Za-z_][\w.]*)\(")
 _CODE_SPAN = re.compile(r"`([^`\n]{2,120})`")
 _QUOTED = re.compile(r"[`\"']([^`\"'\n]{6,160})[`\"']")
 _WORD = re.compile(r"[A-Za-z_][A-Za-z0-9_]{1,79}")

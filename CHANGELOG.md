@@ -51,6 +51,10 @@
   and a regression check. Held-out Recall@8 rose from .368 to .783 and MRR from .206 to .604,
   with retrieval taking about 70 ms instead of 4.8 s per task; graph expansion, git history and
   the model-free explorer did not measurably improve ranking. See `docs/retrieval-benchmark.md`.
+- Query analysis no longer reads a prose parenthetical as a function call (`checkout (see …)` had
+  made `checkout` a weight-3 symbol that pulled CI workflows into the seeds) and ignores process
+  words task prompts carry (`welcome`, `finish`, `summarize`, `verify`, `claim`, `offline`, …).
+  Held-out benchmark: R@1 .363 -> .376, R@10 .791 -> .808, MRR .604 -> .614, no repository worse.
 - Keep the compact context packet under the host's inline tool-result limit. Claude Code
   replaces a Bash result over 30,000 characters with a 2 KB preview; the standard packet
   budget (8,000 tokens, about 32 KB) sat just past that, so in the big-repository

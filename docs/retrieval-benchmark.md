@@ -273,6 +273,16 @@ Each follows from a measured failure above, not from the feature list.
 6. **End-to-end check**: run the existing dispatcher-versus-stock suite with `--retrieval legacy`
    and `auto` to see whether better localization changes task success or token use.
 
+## Query-analysis fix after the end-to-end evaluation (2026-09-22)
+
+A prose parenthetical (`in this sqlglot checkout (\`sqlglot.executor.execute\`)`) was parsed as a
+call, making `checkout` a weight-3 symbol that seeded graph expansion from CI workflows, and
+process words in task prompts (`welcome`, `finish`, `summarize`, `verify`, `claim`, `offline`)
+counted as concepts. Both are now ignored. Deterministic `full`, all 126 held-out tasks:
+R@1 .363 -> .376, R@5 .698 -> .700, R@8 .783 -> .785, R@10 .791 -> .808, MRR .604 -> .614; development
+split R@8 .720 -> .726, MRR .549 -> .553; no repository regressed beyond noise. `baseline.json`
+records the new numbers. Every Phase 10 table above was measured before this change.
+
 ## LLM-assisted retrieval (Phase 10)
 
 Measured 2026-09-21 with [llm-assisted-retrieval.md](llm-assisted-retrieval.md) enabled. No hosted
