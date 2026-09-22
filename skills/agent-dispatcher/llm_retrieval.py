@@ -278,12 +278,16 @@ def complete(model, system, prompt):
         if done.returncode:
             raise LLMUnavailable(f"Provider command exited with status {done.returncode}.")
         text = done.stdout
-        try:  # `claude -p --output-format json` style envelope: {"result", "usage", "is_error"}.
+        try:  # `claude -p --output-format json` style envelope: {"result", "usage", "is_error", "total_cost_usd"}.
             envelope = json.loads(text)
             if isinstance(envelope, dict) and isinstance(envelope.get("result"), str):
                 if envelope.get("is_error"):
-                    raise LLMUnavailable("Provider command reported an error.")
-                text, usage = envelope["result"], envelope.get("usage") or {}
+                    raise LLMUnavailable("Provider command reported an error.", retry=True)
+                text, usage = envelope["result"], dict(envelope.get("usage") or {})
+                if isinstance(usage.get("input_tokens"), int):  # The CLI reports cached prompt tokens apart from fresh ones.
+                    usage["input_tokens"] += sum(v for k, v in usage.items() if k.startswith("cache_") and k.endswith("_input_tokens") and isinstance(v, int))
+                if isinstance(envelope.get("total_cost_usd"), (int, float)):
+                    usage["cost_usd"] = float(envelope["total_cost_usd"])
         except ValueError:
             pass
     else:
@@ -292,6 +296,7 @@ def complete(model, system, prompt):
         raise LLMOutputError("Provider reply was missing or oversized.")
     counted = isinstance(usage.get("input_tokens"), int) and isinstance(usage.get("output_tokens"), int)
     return {"text": text, "ms": round((time.perf_counter() - started) * 1000, 1), "estimated": not counted,
+            **({"cost_usd": usage["cost_usd"]} if isinstance(usage.get("cost_usd"), float) else {}),
             "input_tokens": usage["input_tokens"] if counted else math.ceil(len(system + prompt) / 4),
             "output_tokens": usage["output_tokens"] if counted else math.ceil(len(text) / 4)}
 
@@ -308,6 +313,8 @@ def _ask(model, system, prompt, parse, budget=None):
             reply = complete(model, system, prompt)
             for name in ("input_tokens", "output_tokens", "ms"):
                 usage[name] += reply[name]
+            if "cost_usd" in reply:
+                usage["cost_usd"] = usage.get("cost_usd", 0.0) + reply["cost_usd"]
             return parse(reply["text"]), usage
         except LLMError as exc:
             if attempt + 1 == attempts or not exc.retry:
@@ -321,7 +328,10 @@ def _ask(model, system, prompt, parse, budget=None):
 
 
 def cost(usage, model):
-    """Estimated dollars from measured tokens and the user's own price list [input, output] per million tokens."""
+    """Dollars: what the provider reported when it did (the claude CLI does), else measured tokens times the
+    user's own price list [input, output] per million tokens."""
+    if isinstance(usage.get("cost_usd"), float):
+        return round(usage["cost_usd"], 6)
     price = model.get("price_per_mtok")
     if not (isinstance(price, list) and len(price) == 2):
         return None
@@ -574,6 +584,8 @@ def generate(index, settings, store, *, refresh=False, limit=None, progress=None
                     report["representation_chars"] += meta["chars"]
                 for name in ("calls", "input_tokens", "output_tokens"):
                     report[name] += usage.get(name, 0)
+                if isinstance(usage.get("cost_usd"), float):
+                    report["cost_usd"] = report.get("cost_usd", 0.0) + usage["cost_usd"]
                 if number % 10 == 0:
                     store.save()
                     note(path)

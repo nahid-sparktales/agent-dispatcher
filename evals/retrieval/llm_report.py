@@ -145,9 +145,10 @@ def main(argv=None):
         fresh = [u for u in usage if not u.get("cached")] or usage
         tokens_in, tokens_out = mean(u.get("input_tokens", 0) for u in usage), mean(u.get("output_tokens", 0) for u in usage)
         latency = [u.get("ms", 0) for u in fresh]
-        spent = dollars(tokens_in, tokens_out)
+        reported = [u["cost_usd"] for u in usage if isinstance(u.get("cost_usd"), float)]
+        spent = mean(reported) if reported else dollars(tokens_in, tokens_out)
         print(f"  query cost: {len(asked) / len(rows):.0%} of tasks call the model once; {tokens_in:.0f} input + {tokens_out:.0f} output tokens per call"
-              + (f"; ~${spent * len(asked) / len(rows):.5f} per task at the stated price" if spent is not None else "")
+              + (f"; ~${spent * len(asked) / len(rows):.5f} per task ({'provider-reported' if reported else 'at the stated price'})" if spent is not None else "")
               + f"; model latency p50 {percentile(latency, 0.5):.0f} ms, p95 {percentile(latency, 0.95):.0f} ms; deterministic part {mean(row['ms'] for _, row in rows) - mean(row['llm']['ms'] for _, row in rows):.0f} ms")
 
     print("\nBy task category (R@5 / R@8 / MRR; n = tasks). Categories come from the deterministic run and overlap.")
@@ -184,9 +185,10 @@ def main(argv=None):
             metas = [e["meta"] for e in entries]
             source, size = [m["source_chars"] / 4 for m in metas], [m["chars"] / 4 for m in metas]
             tokens_in, tokens_out = sum(m["input_tokens"] for m in metas), sum(m["output_tokens"] for m in metas)
-            spent = dollars(tokens_in, tokens_out)
+            reported = [m["cost_usd"] for m in metas if isinstance(m.get("cost_usd"), float)]
+            spent = sum(reported) if reported else dollars(tokens_in, tokens_out)
             print(f"  {store.stem}: {len(entries)} representations, {sum(m['calls'] for m in metas)} calls, {tokens_in} input + {tokens_out} output tokens"
-                  + (f", ~${spent:.2f} at the stated price" if spent is not None else "") + f", {sum(m['ms'] for m in metas) / 1000 / 60:.0f} model-minutes")
+                  + (f", ${spent:.2f} {'provider-reported' if reported else 'at the stated price'}" if spent is not None else "") + f", {sum(m['ms'] for m in metas) / 1000 / 60:.0f} model-minutes")
             print(f"    source tokens/file mean {mean(source):.0f} median {statistics.median(source):.0f}; representation tokens/file mean {mean(size):.0f} "
                   f"median {statistics.median(size):.0f}; compression {sum(source) / sum(size):.1f}x (median file {statistics.median(a / b for a, b in zip(source, size)):.1f}x)")
             print(f"    validation: {sum(bool(m['validation']['dropped_symbols']) for m in metas)} files had unsupported symbols removed "
