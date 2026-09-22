@@ -216,3 +216,153 @@ Each follows from a measured failure above, not from the feature list.
    measured, and it hurt.
 6. **End-to-end check**: run the existing dispatcher-versus-stock suite with `--retrieval legacy`
    and `auto` to see whether better localization changes task success or token use.
+
+## LLM-assisted retrieval (Phase 10)
+
+Measured 2026-09-21 with [llm-assisted-retrieval.md](llm-assisted-retrieval.md) enabled. No hosted
+API key was available, so both the representation writer and the reranker were a **local**
+Ollama model (`Qwen3.6-35B-A3B`, 4-bit, thinking off, temperature 0, `max_source_chars` 5000,
+`max_chars` 1000; schema 1, representation prompt 1, rerank prompt 1). A stronger or hosted model
+may move every number below; the stores are keyed by model, so such a run adds to, and never
+overwrites, these results. Reranker answers were cached by prompt, so the integration variants
+share one model call per task.
+
+**Coverage.** Every eligible file must be represented at every task's base commit, so the
+model-backed evaluation uses the newest tasks of the held-out split, chosen by date alone:
+**67 tasks, 110 targets** (all 30 sqlglot test tasks, all 37 pip test tasks). The deterministic
+`full` baseline scores lower on this subset (R@8 .722, MRR .535) than on the 126-task held-out set
+(.783 / .604); every comparison below is paired on the same tasks. All settings (role vote weight
+2.0, pre-graph placement, `replace` integration, 20 candidates) were chosen on 28 validation
+tasks; the test split was run once per configuration.
+
+### Held-out results (67 tasks)
+
+| Strategy | R@1 | R@3 | R@5 | R@8 | R@10 | MRR | MAP | CtxR | Query cost |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `full` (Phase 1-9) | .297 | .534 | .623 | .722 | .737 | .535 | .480 | .75 | 0 calls, 84 ms |
+| `+ role_summary` (`full+role`) | .306 | .642 | .728 | .757 | .782 | .592 | .523 | .80 | 0 calls, 75 ms |
+| `+ reranker` only (`full+rerank`) | .421 | .599 | .723 | .747 | .754 | .662 | .589 | .77 | 1 call, 4.2k in / 0.5k out |
+| `+ role_summary + reranker` (`full+role+rerank`, default) | .444 | .614 | .736 | .759 | .809 | .688 | .609 | .82 | 1 call, 4.8k in / 0.45k out |
+| … reranker as one RRF voter (w=2) | .380 | .625 | .738 | .762 | .812 | .650 | .567 | .83 | same |
+| … reranker + deterministic order blended (w=2) | .437 | .638 | .736 | .797 | .817 | .696 | .612 | .83 | same |
+| … reranker picks graph seeds only | .341 | .600 | .728 | .757 | .787 | .611 | .539 | .80 | same |
+| … reranker after graph/git, blended | .452 | .673 | .736 | .817 | .822 | .711 | .643 | .84 | 1 call, 5.3k in |
+
+Paired-bootstrap 95% intervals against `full`: `full+role` R@5 +.105 [+.040, +.177], MRR +.057
+[-.002, +.117]; `full+role+rerank` R@5 +.112 [+.031, +.197], R@8 +.038 [-.035, +.114], MRR +.153
+[+.063, +.250]; post-graph blended R@8 +.096 [+.025, +.175], MRR +.176 [+.089, +.267]. Recall@5
+and MRR gains are real; the Recall@8 gain of the default configuration is not distinguishable from
+zero on 67 tasks, and only the post-graph variants clear that bar.
+
+By repository: sqlglot (30) `full` .697 / .763 / .618 (R@5 / R@8 / MRR) -> `full+role+rerank`
+.830 / .863 / .789; pip (37) .564 / .688 / .469 -> .659 / .675 / .606, where `full+role` alone
+reaches .718 / .743 / .567. The reranker helped sqlglot on every metric and pip mainly on MRR.
+
+### Where the gain comes from
+
+- **Candidate recall (RQ2, RQ3).** Targets inside the fused top 20 before any model call: 73.6%
+  with `full`, 78.2% with `full+role`; top 5: 49.1% -> 61.8%. The role retriever put 64 of 110
+  targets in its own top 10, 3 of which no deterministic retriever had; its main effect is
+  agreement, lifting files the lexical retrievers ranked low. `role-only` (.527 / .640 / .483) is
+  below `full` but above raw-source BM25 (`+query-analysis`, .549 / .668 / .469) on MRR, and
+  `bm25+role` fusion (.709 / .753 / .606) beats both alone (RQ1).
+- **Reranking (RQ4, RQ5).** Inside the 20-candidate set the mean target rank moved 3.65 -> 2.67
+  (median 2 -> 1): 32 targets improved, 34 unchanged, 20 worsened, 24 never offered. Against the
+  final `full` order, 44 targets improved, 34 unchanged, 26 worsened. The 24 candidate-generation
+  misses (plus 6 unreadable targets) are the ceiling no reranker can move.
+- **Seed selection** alone (`seeds`) keeps only about a third of the MRR gain: the value is in the
+  ordering, not in better graph seeds. Graph and git contribute nothing measurable on top of the
+  reranker (`rr-no-graph`, `rr-no-git` are within a point).
+- **Task category (RQ6)**, R@8 / MRR, `full` -> `full+role` -> `full+role+rerank`:
+  weak lexical overlap (19 tasks) .34/.25 -> .53/.40 -> .59/.57; cross-file (20) .52/.57 ->
+  .54/.68 -> .59/.79; explicit symbol (17) .81/.79 -> .83/.80 -> .89/.83; explicit path (10)
+  .61/.40 -> .61/.43 -> .71/.56; strong lexical (48) .87/.65 -> .85/.67 -> .83/.74. The role
+  retriever earns its keep where grep fails; the reranker adds ordering everywhere and costs about
+  three points of R@8 on strongly lexical tasks while raising their MRR.
+
+### Representation experiments (no model at query time)
+
+Field ablation of `role-only` on the 67 tasks (R@5 / R@8 / MRR): role .351/.471/.320; +
+responsibilities .448/.492/.405; + symbols .495/.547/.483; + concepts + interactions
+.524/.618/.462; + likely tasks .524/.618/.470. Every field helps in isolation, and the file path
+token adds the rest (full representation .527/.640/.483). Removing `likely_tasks` from the fused
+`full+role` changes nothing (.728/.757/.602 vs .728/.757/.592); removing the path token costs
+MRR (.580). Role vote weight: 0.5 .688/.749/.568, 1.0 .688/.742/.573, 2.0 .728/.757/.592.
+
+### Reranker prompt experiments (sqlglot, 30 tasks)
+
+| Variant | R@5 | R@8 | MRR | Input tokens | p50 latency |
+| --- | --- | --- | --- | --- | --- |
+| 10 candidates | .774 | .786 | .757 | 2957 | 16.5 s |
+| 20 candidates (default) | .830 | .863 | .789 | 5068 | 50 s* |
+| 30 candidates | .841 | .886 | .774 | 7097 | 39 s |
+| candidates in fused order | .819 | .863 | .773 | 5068 | 29 s |
+| candidates in reverse order | .819 | .863 | .758 | 5068 | 29 s |
+| raw source instead of role summaries (same budget) | .830 | .852 | .762 | 6828 | 35 s |
+| paths only | .797 | .819 | .752 | 2474 | 22 s |
+| no deterministic evidence lines | .830 | .852 | .753 | 4210 | 27 s |
+
+\* measured while a second model job shared the GPU; the other rows ran alone.
+
+Ten candidates lose recall (17 targets never offered against 10); thirty gain R@8 at 40% more
+tokens. The hashed order used by default is within noise of fused and reversed order, so position
+bias is not driving the result. Role summaries match truncated raw source at 26% fewer tokens
+and beat paths alone; the deterministic evidence lines and the summaries each add a few MRR
+points. Per candidate a summary costs about 240 tokens, so a 20-candidate prompt is ~5k tokens
+regardless of repository size.
+
+### Conditional reranking (RQ8, replayed from recorded confidence signals)
+
+`full+role+rerank`, asking only when no file is named and fewer than A retrievers agree on a
+leader ahead by G: never .623/.722/.535 (0% of tasks); A=2 G=0.05 .706/.730/.660 (49%); A=3
+G=0.05 .736/.740/.694 (63%); always .736/.759/.688 (100%). Asking on 63% of tasks keeps the whole
+R@5 and MRR gain and gives up 2 points of R@8; asking on half keeps most of it. Left off by
+default (`"when": "always"`) pending a second model.
+
+### Cost (RQ7)
+
+Index time, once per file content: sqlglot 357 representations, 518k input + 99k output tokens,
+20.9x smaller than source (median file 10.8x), 232 tokens per representation; pip 498
+representations, 682k + 125k tokens, 14.0x (median 9.7x), 233 tokens; zod (TypeScript, small
+files) 70 representations, 4.0x. On the local model about 11 s per file; at $1 / $5 per million
+tokens the two Python repositories would cost about $2.30 to index in full. Validation removed
+unsupported symbol names from 30% of files (mostly imported base classes such as `Parser`,
+`Generator`, `Dialect` claimed as defined) and dropped 238 interaction targets that did not
+resolve inside the universe; 582 of 587 kept interactions matched a static edge.
+
+Query time: one call, 4.8k input + 0.45k output tokens per task ($0.007 at the prices above),
+p50 48 s and p95 62 s on the local model with the GPU shared, versus 84 ms for the deterministic
+pipeline. The `role_summary` retriever itself costs nothing at query time.
+
+### Failure patterns
+
+Of 110 held-out targets under the default configuration, 77 are in the top 8; 18 never entered the
+20-candidate set, 6 were unreadable (over the size limit or outside the scan), and 9 were offered
+and ranked below 8. The 9 reranker regressions of three or more places are all pip pull-request
+descriptions: the model preferred the file that implements the described mechanism over the
+command or option file the change actually touched (`commands/list.py`, `cli/cmdoptions.py`,
+`models/link.py`), or a vendored/test file that raises the quoted error over the caller that was
+fixed. These are "owns the behavior" judgments that are defensible from the summary alone; they
+suggest handing the reranker the change kind (command wiring versus mechanism) rather than a
+prompt patch per case.
+
+### Recommendation
+
+- **Deterministic mode stays the default**: it is unchanged, free and 84 ms.
+- **`role_summary` is worth enabling** wherever a user accepts one-time indexing cost or runs a
+  local model: +10 points R@5, +6 MRR, largest on weak-lexical and cross-file tasks, no per-query
+  model call, and the only step whose gain has a confidence interval clear of zero on both R@5
+  and R@8 in at least one configuration.
+- **The reranker earns its cost on MRR** (+.15, interval clear of zero) with role summaries in the
+  prompt, but its R@8 gain is not established on 67 tasks, its regressions cluster on PR-style
+  requests, and on a local model it costs ~50 s per request. Recommended as opt-in for users with
+  a fast provider, in the default `replace` mode with 20 candidates; users who care about R@8 more
+  than MRR should try the post-graph blended placement, which was the best configuration on the
+  test split but was not the one chosen on validation.
+- **Not done, deliberately**: default-on for any LLM feature; embeddings; query rewriting; an
+  explorer loop.
+
+Re-run everything with `dist/retrieval-llm/index_rounds.sh` (indexing, resumable) and
+`dist/retrieval-llm/experiments.sh SPLIT LIMIT rep|rerank|prompt REPO...` after pointing
+`dist/retrieval-llm/settings.json` at a provider; `evals/retrieval/llm_report.py` renders the
+tables above from the saved JSON.
