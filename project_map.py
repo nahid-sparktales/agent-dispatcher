@@ -873,15 +873,21 @@ def context_entries(project, task, pack=None, snapshot=None, *, preview=False, m
                            cached_withheld, task_excluded, refresh_recommended, diagnostics)
 
 
-def _context_report(report, cache_status, origin, coverage, preview_state, maintenance_state,
-                    cached_withheld, task_excluded, refresh_recommended, diagnostics):
+def _view(entries):
+    """The packet's task view: the first eight facts that fit in 4,000 characters, in the given order."""
     selected, chars = [], 0
-    for entry in report["entries"]:
+    for entry in entries:
         cost = len(json.dumps(entry, ensure_ascii=False))
         if len(selected) >= 8 or chars + cost > 4000:
             break
         selected.append(entry)
         chars += cost
+    return selected, chars
+
+
+def _context_report(report, cache_status, origin, coverage, preview_state, maintenance_state,
+                    cached_withheld, task_excluded, refresh_recommended, diagnostics):
+    selected, chars = _view(report["entries"])
     return {"status": cache_status, "cache_status": cache_status, "entries": selected,
             "evidence_origin": origin, "coverage": coverage, "preview": preview_state, "maintenance": maintenance_state,
             "estimated_tokens": math.ceil(chars / 4), "fresh_facts": report["counts"]["fresh"],

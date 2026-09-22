@@ -31,6 +31,7 @@ import time
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 import context  # noqa: E402
+import project_map  # noqa: E402
 import retrieval  # noqa: E402
 
 KS = (1, 3, 5, 8, 10)
@@ -43,7 +44,7 @@ class Memo:
     """Cross-commit memo standing in for the private parser cache: redacted text and index records by content."""
 
     def __init__(self, project):
-        self.project, self.redacted, self.store = project, {}, {}
+        self.project, self.redacted, self.store, self.stats = project, {}, {}, {}
 
     def read(self, relative, remaining, reader, redact):
         text, used, reason = reader(self.project, relative, remaining)
@@ -141,6 +142,36 @@ def _score(found, targets):
     return row
 
 
+def _map_view(task, texts, hashes, memo, scrub, query, clone, found_full):
+    """The project map's packet view (eight facts, 4,000 characters) derived from this task's scan.
+
+    hit: targets among the view's files; gain: targets the excerpts of `full` missed but the view
+    names; packet: targets in the excerpts or the view. All are shares of the task's targets.
+    """
+    snapshot = {"paths": list(texts), "texts": texts, "hashes": hashes, "bytes": 0, "complete": True,
+                "diagnostics": [], "_parser_cache": memo}
+    started = time.perf_counter()
+    data = project_map._derive_map(snapshot, context, scrub)
+    derive_ms = (time.perf_counter() - started) * 1000
+    targets = task["target_files"]
+    excerpted = set(found_full["files"]) if found_full else None
+    mapped = {entry["source"]["path"] for entry in data["entries"]}
+
+    def view(entries):
+        shown, chars = project_map._view(entries)
+        files = {entry["source"]["path"] for entry in shown}
+        gain = packet = None
+        if excerpted is not None:
+            gain = sum(t in files and t not in excerpted for t in targets) / len(targets)
+            packet = sum(t in files or t in excerpted for t in targets) / len(targets)
+        return {"hit": sum(t in files for t in targets) / len(targets), "gain": gain, "packet": packet,
+                "files": len(files), "chars": chars}
+
+    views = {"terms": view(project_map._matching(data["entries"], query, context, clone))}
+    return {"facts": len(data["entries"]), "sources": len(data["sources"]), "omitted": data["scan"]["omitted_facts"],
+            "derive_ms": derive_ms, "target_in_map": sum(t in mapped for t in targets) / len(targets), "views": views}
+
+
 def parse_overrides(items):
     """["graph.max_hops=2", "rrf_k=30"] -> {"graph": {"max_hops": 2}, "rrf_k": 30}"""
     overrides = {}
@@ -153,7 +184,7 @@ def parse_overrides(items):
     return overrides
 
 
-def evaluate(tasks, clone, strategies, overrides=None, variants=None, progress=True, llm=None):
+def evaluate(tasks, clone, strategies, overrides=None, variants=None, progress=True, llm=None, map_view=False):
     scrub = context._scrubber(context.find_pack(str(ROOT)))
     memo = Memo(clone)
     configs = {name: retrieval.configure(name, overrides) for name in strategies if name != "current"}
@@ -192,9 +223,12 @@ def evaluate(tasks, clone, strategies, overrides=None, variants=None, progress=T
         if llm:
             row["llm"] = dict(coverage, targets_represented=[t for t in task["target_files"]
                                                              if t in getattr(index_for(retrieval.STRATEGIES["full"]), "representations", {})])
+        found_full = None
         for name in strategies:
             found = (_legacy(query, texts, hashes, scrub) if name == "current" else
                      _engine(query, index_for(configs[name]), configs[name], llm.reranker if llm else None))
+            if name == "full":
+                found_full = found
             scored = _score(found, task["target_files"])
             place = lambda paths: {t: paths.index(t) + 1 if t in paths else None for t in task["target_files"]}  # noqa: E731
             scored["first_ranks"] = place(found.get("first", []))
@@ -209,6 +243,8 @@ def evaluate(tasks, clone, strategies, overrides=None, variants=None, progress=T
                                       for target in task["target_files"]}
             scored["overlap"], scored["additions"] = found.get("overlap", {}), found.get("additions", (0, 0))
             row["strategies"][name] = scored
+        if map_view:
+            row["map"] = _map_view(task, texts, hashes, memo, scrub, query, clone, found_full)
         results.append(row)
         if llm:
             llm.answers.save()  # Paid-for answers survive an interrupted run.
@@ -237,6 +273,22 @@ def table(results, strategies, title):
                      + f"{mean('candidates'):>6.0f}{mean('files'):>6.1f}{mean('bytes') / 1000:>7.1f}{mean('tokens'):>7.0f}"
                      + f"{mean('density'):>6.2f}{mean('ctx_recall'):>6.2f}{mean('ms'):>8.1f}")
     return "\n".join(lines)
+
+
+def map_report(results, title):
+    """Mean project-map view metrics (see _map_view) for the rows that carry them."""
+    rows = [r["map"] for r in results if r.get("map")]
+    if not rows:
+        return ""
+    parts = []
+    for name in rows[0]["views"]:
+        views = [r["views"][name] for r in rows if name in r["views"]]
+        mean = lambda key: statistics.fmean(v[key] for v in views if v[key] is not None) if any(v[key] is not None for v in views) else float("nan")  # noqa: E731
+        parts.append(f"{name}: hit {mean('hit'):.2f} gain {mean('gain'):.2f} packet {mean('packet'):.2f} "
+                     f"files {mean('files'):.1f} chars {mean('chars'):.0f}")
+    return (f"{title}  project map view (8 facts, {len(rows)} tasks): target has a fact {statistics.fmean(r['target_in_map'] for r in rows):.2f} | "
+            + " | ".join(parts) + f" | facts {statistics.fmean(r['facts'] for r in rows):.0f}, "
+            f"derive {statistics.fmean(r['derive_ms'] for r in rows):.0f} ms")
 
 
 def overlap_report(results, strategy):
@@ -318,6 +370,8 @@ def main(argv=None):
     parser.add_argument("--llm-store-dir", default=str(ROOT / "dist/retrieval-llm"), help="One representation/rerank store per repository lives here")
     parser.add_argument("--llm-index", action="store_true", help="Generate missing representations at each task's commit (model calls); otherwise use only what is stored")
     parser.add_argument("--refresh-llm", action="store_true", help="Ignore stored reranker answers and ask the model again")
+    parser.add_argument("--map", action="store_true", help="Also derive the project map at each commit and measure its 8-fact task view: "
+                        "hit (targets among the view's files), gain (targets the excerpts of 'full' missed), packet (targets in excerpts or view)")
     parser.add_argument("--json", help="Write per-task results here")
     parser.add_argument("--report", action="append", default=[], help="Re-print tables from saved --json files instead of running")
     parser.add_argument("--check", help="Baseline JSON {strategy: {metric: value}}; exit 1 when the chosen split regresses beyond --tolerance")
@@ -348,7 +402,8 @@ def main(argv=None):
                 print(f"Missing clone {clone}; see evals/retrieval/README.md.", file=sys.stderr)
                 return 2
             layer = LLMLayer(args.llm_settings, Path(args.llm_store_dir) / f"{repo}.json", args.llm_index, args.refresh_llm) if args.llm_settings else None
-            results += evaluate([task for task in tasks if task["repo"] == repo], clone.resolve(), strategies, overrides, variants, llm=layer)
+            results += evaluate([task for task in tasks if task["repo"] == repo], clone.resolve(), strategies, overrides, variants,
+                                llm=layer, map_view=args.map)
             if layer and args.llm_index:
                 print(f"  {repo} indexing: " + json.dumps(dict(layer.indexing)), file=sys.stderr, flush=True)
     if args.json:
@@ -366,6 +421,10 @@ def main(argv=None):
         print(f"\nIndex: mean {statistics.fmean(r['index_ms'] for r in results):.0f} ms per task with unchanged records reused; "
               f"scan {statistics.fmean(r['scan_ms'] for r in results):.0f} ms; "
               f"cold first build {max(r['index_ms'] for r in results):.0f} ms (largest)")
+    if any(r.get("map") for r in results):
+        print("\n" + map_report(results, "ALL REPOSITORIES"))
+        for repo in sorted({r["repo"] for r in results if r.get("map")}):
+            print(map_report([r for r in results if r["repo"] == repo], repo))
     if args.analyze in shown:
         print("\n" + overlap_report(results, args.analyze))
         if args.failures:
