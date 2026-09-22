@@ -334,7 +334,7 @@ class ProjectMapTests(unittest.TestCase):
 
     def test_cli_lists_at_most_fifty_facts_after_its_diagnostics(self):
         for index in range(40):
-            self.write(f"feature{index}.py", f"import package{index}\ndef operation{index}(): pass\n")
+            self.write(f"feature{index}.py", f"def operation{index}(): pass\ndef helper{index}(): pass\n")
         self.build()
         command = [sys.executable, "-B", str(ROOT / "project_map.py"), "show", "--project", str(self.project)]
         shown = json.loads(subprocess.run(command + ["--json"], capture_output=True, text=True, check=True).stdout)
@@ -344,6 +344,21 @@ class ProjectMapTests(unittest.TestCase):
         text = subprocess.run(command, capture_output=True, text=True, check=True).stdout.splitlines()
         first_fact = next(number for number, line in enumerate(text) if line.startswith("- "))
         self.assertTrue(any(line.startswith("Diagnostic: Showing 50") for line in text[:first_fact]))
+
+    def test_import_lines_are_not_facts_and_manifests_still_are(self):
+        self.basic()
+        result = self.build()
+        self.assertFalse([e for e in result["entries"] if e["detail"].startswith("Import declaration")])
+        self.assertEqual([e["label"] for e in result["entries"] if e["kind"] == "dependency"], ["react"])
+
+    def test_documented_test_command_is_recorded_once_from_the_makefile(self):
+        self.write("Makefile", "test:\n\t@echo tests\n")
+        self.write("README.md", "Run the checks:\n\n```sh\nmake test\n```\n")
+        self.write("docs/testing.md", "```\nmake test\n```\n")
+        result = self.build()
+        commands = [(e["label"], e["source"]["path"]) for e in result["entries"] if e["kind"] == "test_command"]
+        self.assertEqual(commands, [("make test", "Makefile")])
+        self.assertEqual(json.loads(self.state.read_text())["scan"]["omitted_facts"], 0)
 
     def test_state_cannot_reenter_as_source_or_lexical_context(self):
         self.write("auth.py", "def validate_login(): pass\n")

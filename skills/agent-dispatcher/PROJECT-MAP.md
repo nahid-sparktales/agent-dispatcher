@@ -79,8 +79,9 @@ incomplete even when previous facts remain valid. Current-scan evidence is not a
 refresh when maintenance is deferred or a write fails.
 
 Recheck context when the task focus or relevant source changes. The map is bounded and
-heuristic: a recognized definition suggests a feature location; imports and manifests
-identify declared dependencies. Test command text is discovered, never executed or verified.
+heuristic: a recognized definition suggests a feature location; manifests identify declared
+dependencies (import lines are not facts). Test command text is discovered once per distinct
+command, never executed or verified.
 Decision documents record what their authors stated, not proof that code follows the decision.
 Missing facts are unknown; explain limits instead of inferring architecture or successful checks.
 
