@@ -38,6 +38,14 @@ the optional decision engine described below.
   is read from the environment at request time and is never stored, logged, rendered or written
   to a file. It cannot grant a permission: relevance and authorization are separate layers, and
   the runtime never consults this one. [docs/jev.md](docs/jev.md) has the full account.
+- **`repository_intelligence.py`** builds an optional deep index and a task-experience store in
+  the same private, owner-only state directory as the project map (never inside a repository).
+  Both are derived facts bound to source fingerprints, never source text: a forged file can
+  perturb ranking, not inject content, resurrect an excluded path or authorize a read. Its
+  Explorer calls a model only when your own settings file enables it, through registered
+  read-only operations the coordinator validates; experience is recorded only when a host hands
+  over receipts explicitly. Status and dry-run open state read-only and create nothing. See
+  [docs/repository-index.md](docs/repository-index.md).
 - **`hooks/agent-dispatcher-activate.sh`** runs at `SessionStart` when perpetual mode is armed and
   prints a routing preamble. It reads flag files, writes nothing but a weekly prune of its own
   session-silence directory, makes no network call, and its output is a fixed heredoc — a

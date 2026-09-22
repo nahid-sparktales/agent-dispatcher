@@ -30,7 +30,7 @@ DEFAULTS = {
     "candidate_limit": 50,  # Per retriever.
     "fusion": "rrf",  # "rrf" | "combsum" (max-normalized score sum, kept for ablation).
     "rrf_k": 20,  # Tuned on the benchmark's train split: 10-20 beat the customary 60, which mostly counts lists.
-    "rrf_weights": {"git": 0.5},  # Vote weight per source; unlisted sources vote 1.0.
+    "rrf_weights": {"git": 0.5, "experience": 0.5, "inference": 0.5},  # Vote weight per source; unlisted sources vote 1.0.
     # Correlated voters: sources in a group are fused among themselves first and then vote once, as the group.
     # None keeps every retriever as its own voter. Example: {"lexical": {"sources": ["bm25", "rare_terms",
     # "symbol_references"], "weight": 1.0}}.
@@ -65,6 +65,15 @@ DEFAULTS = {
                 "count": "packet"},  # "packet": the whole rendered section; "excerpts": excerpt text only.
     "explorer": {"enabled": False, "max_iterations": 2, "max_new_symbols": 10, "max_new_files": 5,
                  "stop_confidence": 0.8},
+    # Deep repository index layers (repository_intelligence.py), inert here: `experience` and `inference` are in no
+    # default retriever list and are silent until the context helper attaches eligible records to the index.
+    # Experience: prior checked tasks whose request resembles this one vote for the files they changed. Bounded,
+    # explainable, never an override: a fixed vote weight, a candidate cap, a similarity floor and support counts.
+    "experience": {"min_similarity": 0.2, "min_support": 1, "max_candidates": 10, "half_life_days": 180,
+                   "changed_file_factor": 0.5, "outcome_weights": {"checked_success": 1.0, "accepted": 0.8, "grader_passed": 1.0}},
+    # Inference: model-written subsystem/architecture claims with validated evidence files. A claim votes for its
+    # evidence files, split among them, and is always labeled as an inference rather than a repository fact.
+    "inference": {"max_candidates": 10, "max_files_per_claim": 8},
     # Optional LLM layer (llm_retrieval.py), inert here: `role_summary` is in no default retriever list and is silent
     # until representations are attached to the index; reranking happens only when a caller supplies a reranker,
     # which only the user's own settings file creates. No model is ever called from this module.
@@ -126,6 +135,12 @@ def _strategies():
     out["full+role"] = _merge(full, {"retrievers": DEFAULTS["retrievers"] + ["role_summary"], "rrf_weights": {"role_summary": 2.0}})
     out["full+rerank"] = _merge(full, {"llm_rerank": {"enabled": True}})
     out["full+role+rerank"] = _merge(out["full+role"], {"llm_rerank": {"enabled": True}})
+    # Deep repository index layers, each ablatable on its own: `full+experience`, `full+inference`, both as `full+deep`.
+    out["full+experience"] = _merge(full, {"retrievers": DEFAULTS["retrievers"] + ["experience"]})
+    out["full+inference"] = _merge(full, {"retrievers": DEFAULTS["retrievers"] + ["inference"]})
+    out["full+deep"] = _merge(full, {"retrievers": DEFAULTS["retrievers"] + ["experience", "inference"]})
+    out["full+deep-experience"] = out["full+inference"]
+    out["full+deep-inference"] = out["full+experience"]
     return out
 
 
@@ -436,9 +451,50 @@ def role_summary_retriever(query, index, config):
     return _ranked(scores, reasons, config["candidate_limit"], "role_summary")
 
 
+def experience_retriever(query, index, config):
+    """Which files did earlier, checked tasks like this one change? Silent until experience records are attached."""
+    events = getattr(index, "experience", None)
+    if not events:
+        return []
+    scores, reasons = _sibling("experience")["scores"](query, index, events, config["experience"])
+    return _ranked(scores, reasons, config["experience"]["max_candidates"], "experience")
+
+
+def inference_retriever(query, index, config):
+    """Which architectural claims (model inferences with validated evidence) match the request? Silent until attached."""
+    items = getattr(index, "inferences", None)
+    if not items:
+        return []
+    facts = _sibling("repo_index")
+    tuning, scores, reasons = config["inference"], defaultdict(float), {}
+    documents = []
+    for item in items:
+        terms = set()
+        for identifier in facts["IDENT"].findall(item.get("text", "") + " " + item.get("question", "")):
+            terms.update(facts["expand"](identifier))
+        documents.append((item, terms))
+    frequency = defaultdict(int)
+    for _, terms in documents:
+        for term in terms:
+            frequency[term] += 1
+    for item, terms in documents:
+        gain = sum(weight * math.log(1 + (len(documents) - frequency[term] + 0.5) / (frequency[term] + 0.5))
+                   for term, weight in query["terms"].items() if term in terms)
+        if gain <= 0:
+            continue
+        files = list(dict.fromkeys(e["path"] for e in item.get("evidence", []) if e.get("path") in index.kinds))[:tuning["max_files_per_claim"]]
+        for path in files:
+            share = gain / math.sqrt(len(files))
+            scores[path] += share
+            _note(reasons, path, share, "cited by an architectural inference (model inference, not a repository fact)",
+                  item.get("text", "")[:80])
+    return _ranked(scores, reasons, tuning["max_candidates"], "inference")
+
+
 RETRIEVERS = {"path": path_retriever, "rare_terms": rare_term_retriever, "bm25": bm25_retriever,
               "symbol_definitions": symbol_definition_retriever, "symbol_references": symbol_reference_retriever,
-              "phrases": phrase_retriever, "role_summary": role_summary_retriever}
+              "phrases": phrase_retriever, "role_summary": role_summary_retriever,
+              "experience": experience_retriever, "inference": inference_retriever}
 
 
 # ---------------------------------------------------------------- fusion and expansion
@@ -700,6 +756,11 @@ def retrieve(task, index, config=None, *, named=(), role=None, extra=None, boost
     represented = getattr(index, "representations", None)
     if represented:
         result["roles"] = {row["path"]: represented[row["path"]]["role"] for row in ranked[:10] if row["path"] in represented}
+    if getattr(index, "extended", None):
+        trace["extended_files"] = len(index.extended)
+    for name in ("experience", "inference"):
+        if name in lists:
+            trace[name + "_candidates"] = len(lists[name])
     return result
 
 
@@ -821,21 +882,84 @@ def explore(task, index, config, view_of, *, explorer=deterministic_explorer, **
 # ---------------------------------------------------------------- one call for the context helper
 
 
-def build_index(texts, hashes, kind_of, *, cache=None, history=None, config=None, path_only=(), stats=None):
-    """Facts for the admitted universe. `history` is raw `git log` text, or None when unavailable."""
+class LazyTexts(dict):
+    """Scanned texts plus files the deep index knows but this scan did not read (beyond its caps).
+
+    A loadable path counts as present; its text is read on first use through the caller's loader, which
+    applies the same admission, redaction and fingerprint checks as the scan. `items()` covers only what
+    is loaded, so a whole-text search (quoted literals) is honest about which files it looked at.
+    """
+
+    def __init__(self, texts, loader, loadable):
+        super().__init__(texts)
+        self.loader, self.loadable, self.failed = loader, set(loadable), set()
+
+    def __contains__(self, path):
+        if dict.__contains__(self, path):
+            return True
+        if path in self.loadable and path not in self.failed:
+            # Stale evidence is rejected here: a loadable file whose current content no longer matches its record is absent.
+            return self.get(path) is not None
+        return False
+
+    def __missing__(self, path):
+        if path in self.loadable and path not in self.failed:
+            text = self.loader(path)
+            if text is not None:
+                self[path] = text
+                return text
+            self.failed.add(path)
+        raise KeyError(path)
+
+    def get(self, path, default=None):
+        try:
+            return self[path]
+        except KeyError:
+            return default
+
+
+def build_index(texts, hashes, kind_of, *, cache=None, history=None, config=None, path_only=(), stats=None,
+                store=None, extended=None, partners=None, loader=None):
+    """Facts for the admitted universe. `history` is raw `git log` text, or None when unavailable.
+
+    `store` (a deep repository index) supplies records whose fingerprint matches the scan, in place of the
+    parser-cache shards; `extended` adds records for verified files the scan could not read (their text is
+    loaded on demand through `loader`); `partners` are precomputed co-change rows that replace `history`.
+    """
     config = config or STRATEGIES["full"]
     facts = _sibling("repo_index")
     stats = stats if stats is not None else {}
     started = time.perf_counter()
-    records = facts["load_records"](texts, hashes, cache, stats)
-    partners = None
-    if history and config["git"]["enabled"]:
-        commits = facts["parse_git_log"](history, set(texts) | set(path_only), config["git"]["max_commit_files"])
+    if store is not None:
+        stored = store.records(hashes)
+        stats.update(record_hits=len(stored), record_misses=0, store_records=len(stored))
+        records, missing = {}, []
+        for path, text in texts.items():
+            if path in stored:
+                records[path] = stored[path]
+            else:
+                records[path] = facts["file_record"](path, text)
+                stats["record_misses"] += 1
+                missing.append(path)
+        stats["missing_paths"] = missing
+    else:
+        records = facts["load_records"](texts, hashes, cache, stats)
+    hashes = dict(hashes)
+    if extended:
+        for path, item in extended.items():
+            if path not in records and path not in texts:
+                records[path] = item["record"]
+                hashes[path] = item["sha256"]
+        stats["extended_files"] = len(extended)
+    if partners is None and history and config["git"]["enabled"]:
+        commits = facts["parse_git_log"](history, set(records) | set(path_only), config["git"]["max_commit_files"])
         partners = facts["cochange"](commits, min_support=config["git"]["min_support"],
                                      half_life_days=config["git"]["half_life_days"])
         stats["history_commits"] = len(commits)
-    index = facts["RepoIndex"](records, kind_of, partners, path_only)
-    index.texts, index.hashes = texts, hashes
+    index = facts["RepoIndex"](records, kind_of, partners if config["git"]["enabled"] else None, path_only)
+    index.texts = LazyTexts(texts, loader, extended or ()) if loader is not None and extended else texts
+    index.hashes = hashes
+    index.extended = set(extended or ())
     stats["index_ms"] = round((time.perf_counter() - started) * 1000, 1)
     return index
 
