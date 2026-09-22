@@ -62,6 +62,25 @@ class ContextPacketTests(unittest.TestCase):
         resources["guides"][17]["tiers"] = ["verification"]
         return result
 
+    def test_default_budget_keeps_the_packet_under_the_host_inline_result_cap(self):
+        # A standard packet of 8000 tokens serializes to about 32 KB; Claude Code returns only a 2 KB preview of a
+        # Bash result over 30,000 characters. The default must stay below that; an explicit budget is the caller's.
+        result = self.result()
+        result["size"] = "standard"
+        result["excerpts"] = [self.source(f"src/module_{n}.py", "1-40", f"# module {n}\n" + ("x = 1  # " + "detail " * 12 + "\n") * 40) for n in range(40)]
+        result["context"] = [{"path": e["path"], "lines": e["lines"], "rank": n + 1} for n, e in enumerate(result["excerpts"])]
+        compact = self.compact(result)
+        self.assertGreater(len(packet.dumps(compact)), 32000)
+        fitted = packet.fit_packet(compact)
+        self.assertLessEqual(len(packet.dumps(fitted)), packet.MAX_INLINE_CHARS)
+        self.assertEqual((fitted["budget"]["target_tokens"], fitted["budget"]["max_chars"]), (8000, packet.MAX_INLINE_CHARS))
+        self.assertTrue(fitted["excerpts"])  # Trimmed from the lowest-ranked file up, never emptied.
+        self.assertEqual([e["path"] for e in fitted["excerpts"]], [e["path"] for e in compact["excerpts"][:len(fitted["excerpts"])]])
+        explicit = packet.fit_packet(compact, target=8000)
+        self.assertGreater(len(packet.dumps(explicit)), packet.MAX_INLINE_CHARS)
+        self.assertLessEqual(len(packet.dumps(explicit)), 32000)
+        self.assertEqual(explicit["budget"]["max_chars"], 32000)
+
     def test_large_budget_still_returns_a_small_truthful_candidate_shortlist(self):
         original = self.many_candidates()
         untouched = copy.deepcopy(original)

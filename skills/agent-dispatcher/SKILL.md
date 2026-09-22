@@ -38,7 +38,8 @@ Scopes ship off; helpers cannot enable them.
    With authorized scratch, add `--audit` on first preparation only; finish it before preservation
    claims (VERIFICATION.md). Do not reset the baseline after edits.
 3. Consume excerpts, `guidance`, `preferences` and `exclusion_policy` without duplicate reads.
-   Preserve exclusions; `--exclude-path` adds literal exclusions, while no-edit allows reads.
+   If the host shows only a preview and a saved-output path, read that file first: the packet
+   is the evidence. Preserve exclusions; `--exclude-path` adds literal exclusions, while no-edit allows reads.
    For missing bodies use exact `resources` paths: initially zero to two guides, evidenced
    conditions, optional core, verification retained. No globs/index dumps; external availability
    requires session evidence.

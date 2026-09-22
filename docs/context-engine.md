@@ -183,6 +183,9 @@ the local helper. The helper uses role hints as secondary terms rather than lite
 The read-only `context.py` helper implements local retrieval for both hosts. It accepts
 `--project`, either `--task` or `--task-file -`, and optional `--role`, `--size`, `--max-tokens`,
 `--pack`, and `--json`. The default size is `standard`; a token override can lower a size's ceiling.
+A compact packet is read back as a Bash tool result, and Claude Code replaces any result over
+30,000 characters with a 2 KB preview, so by default the serialized packet is also held under
+28,000 characters (`budget.max_chars`); an explicit `--packet-tokens` budget is honored as given.
 The Python API is `select_context(project, task, role=None, size="standard", max_tokens=None, pack=None)`.
 
 Its versioned JSON result supplies `retrieval`, `context`, `excluded`, `budget` and `diagnostics`

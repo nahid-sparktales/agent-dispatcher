@@ -51,6 +51,14 @@
   and a regression check. Held-out Recall@8 rose from .368 to .783 and MRR from .206 to .604,
   with retrieval taking about 70 ms instead of 4.8 s per task; graph expansion, git history and
   the model-free explorer did not measurably improve ranking. See `docs/retrieval-benchmark.md`.
+- Keep the compact context packet under the host's inline tool-result limit. Claude Code
+  replaces a Bash result over 30,000 characters with a 2 KB preview; the standard packet
+  budget (8,000 tokens, about 32 KB) sat just past that, so in the big-repository
+  end-to-end evaluation 16 of 18 dispatcher trials received a preview of packet metadata and
+  none of the excerpts or guidance. The default packet now serializes under 28,000 characters
+  (`budget.max_chars`, excerpts trimmed from the lowest-ranked file first); an explicit
+  `--packet-tokens` budget is honored unchanged, and the skill tells the host to read a
+  saved-output file if a preview ever appears.
 - Add optional, opt-in LLM-assisted retrieval (`llm_retrieval.py`, `docs/llm-assisted-retrieval.md`):
   model-written role representations of source files, generated once per file content from static
   evidence plus bounded source, validated against the index (unsupported symbols and interaction

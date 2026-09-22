@@ -13,6 +13,11 @@ import re
 import stat
 
 PACKET_LIMITS = {"small": 4000, "standard": 8000, "complex": 18000}
+# The packet is a Bash tool result. Claude Code replaces a result over 30,000 characters
+# (BASH_MAX_OUTPUT_LENGTH) with a 2 KB preview, which loses every excerpt; a default-sized
+# packet therefore serializes below that with margin. An explicit --packet-tokens budget is
+# honored as given, for hosts whose limit is known to differ.
+MAX_INLINE_CHARS = 28000
 DEFAULT_GUIDE_CANDIDATES = 3
 MAX_GUIDANCE_BYTES = 64 * 1024
 GUIDE_ID = re.compile(r"[a-z0-9][a-z0-9-]{0,79}\Z")
@@ -126,6 +131,7 @@ def compact_packet(result, pack, guide_ids=()):
     out["excluded_summary"]["shown"] = len(out["excluded"])
     original = out["budget"]
     out["budget"] = {"target_tokens": PACKET_LIMITS[out["size"]], "estimated_tokens": 0,
+                     "max_chars": min(PACKET_LIMITS[out["size"]] * 4, MAX_INLINE_CHARS),
                      "excerpt_target_tokens": original["target_tokens"],
                      "excerpt_tokens": original["estimated_tokens"], "by_source": {},
                      "scope": "serialized_context_packet", "estimator": "ceil(characters/4)"}
@@ -242,15 +248,20 @@ def _trim_graph(graph):
 def fit_packet(result, target=None, reserve_chars=0):
     """Trim optional material; never truncate supplied guidance or evidence exclusions."""
     out = deepcopy(result)
+    explicit = target is not None
     target = PACKET_LIMITS[out["size"]] if target is None else target
     if type(target) is not int or not 256 <= target <= 100000:
         raise PacketError("Packet budget must be an integer between 256 and 100000.")
     if type(reserve_chars) is not int or not 0 <= reserve_chars <= 400000:
         raise PacketError("Reserved packet space must be a bounded, non-negative integer.")
     out["budget"]["target_tokens"] = target
+    if explicit:
+        out["budget"]["max_chars"] = target * 4
+    else:
+        out["budget"].setdefault("max_chars", min(target * 4, MAX_INLINE_CHARS))
     while True:
         account_packet(out)
-        if len(dumps(out)) + reserve_chars <= target * 4:
+        if len(dumps(out)) + reserve_chars <= out["budget"]["max_chars"]:
             return out
         omitted = out["packet_omissions"]
         if out["excluded"]:
