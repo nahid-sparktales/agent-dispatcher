@@ -188,7 +188,11 @@ candidates keep their order, an unusable answer leaves the deterministic ranking
 deterministic evidence line survives. It is the explorer's `expand` contract applied to ordering:
 one round, no loop. The trade against a provider: no key, no extra process and no per-call charge,
 but the ~5k-token request enters the session's context, the model is whatever the session runs, and
-a second helper invocation is needed.
+a second helper invocation is needed. Smoke comparison on 6 held-out sqlglot tasks (Claude Haiku
+summaries): the host step, played by Opus at its defaults, and a dedicated Sonnet call agreed on
+4-5 of the top 5 candidates on every task and placed each target within two ranks of each other;
+as a standalone call Opus cost about 3x more ($0.12-0.15 versus $0.04) and took 11-17 s versus
+5-7 s, a cost that a real session does not pay separately.
 
 ## Untrusted content
 
