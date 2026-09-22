@@ -312,6 +312,14 @@ modify each file for the request, then rerun with `--rerank-answer '{"ranking": 
 the deterministic evidence stays, and there is no second round. `--retrieval legacy` restores the additive ranking below, which is also the
 manual method when no helper is available. It orders results — nothing more.
 
+When the user built a deep index (`python3 -B PACK/repository_intelligence.py build`), the packet's
+`repository_intelligence.index` says whether it was used, which files beyond the scan's caps were
+verified and read on selection, which were withheld as stale, and whether eligible task experience
+or Explorer inferences voted. Those two vote with a fixed half weight and are labeled in every
+reason as experience or model inference, not repository facts; a task exclusion filters stored
+evidence before ranking. `python3 -B PACK/repository_intelligence.py explain 'REQUEST' --project PROJECT` shows the same
+ranking with index provenance. See [PROJECT-MAP.md](PROJECT-MAP.md).
+
 | Signal | |
 | --- | --- |
 | Exact identifier from the request appears in the file | +3 |

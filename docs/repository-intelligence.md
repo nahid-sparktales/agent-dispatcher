@@ -247,6 +247,11 @@ re-resolved in memory. The project map and graph are private too
 (`~/.cache/agent-dispatcher/state-v1/<project id>/`); in-project copies from older releases are
 only read.
 
+An explicitly built deep index ([repository-index.md](repository-index.md)) can replace the shard
+cache as the source of records, extend the ranking to files the per-request scan could not read,
+and attach two further labeled retrievers (task experience and Explorer inferences); without one,
+this page describes the whole behavior.
+
 ## Inspecting a decision
 
 ```bash

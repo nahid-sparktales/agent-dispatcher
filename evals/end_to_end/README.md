@@ -56,6 +56,36 @@ The shell sandbox blocks outbound network from Bash, which is where the helper's
 run, so also list the provider hosts the settings need as `"llm_network": ["api.anthropic.com"]`;
 only those hosts open, for both conditions, and the list is recorded with the settings path.
 
+### Four conditions: deep index and warm experience
+
+`prepare --conditions baseline dispatcher indexed warm_experience` schedules up to four conditions
+per task (the default stays `baseline dispatcher`; the selection is recorded in `config.json` and
+changes the fingerprint):
+
+| Condition | Definition |
+| --- | --- |
+| `baseline` | the native client without Dispatcher (stock) |
+| `dispatcher` | the shipped Dispatcher, including its existing retrieval and index machinery; no deep index, no experience |
+| `indexed` | Dispatcher plus a deep repository index built before the first step of a sequence and refreshed before every later step, outside the task timer; experience recorded, never used |
+| `warm_experience` | exactly `indexed` plus the experience that arm's own earlier steps recorded |
+
+Fixtures may carry `sequence` (a string) and `step` (an integer). Sequenced fixtures run once each, in
+step order, and every condition advances through the same steps; the condition order inside a step is
+randomized by the seed. Each index arm keeps its private state under `<output>/state/<client>-<condition>/`
+(its own `XDG_CACHE_HOME`, a settings file that requires the index and, for the warm arm only, enables
+experience use, and an identity that maps successive temporary workspaces of one sequence to one
+store). `deep-index-setup.json` per trial records the mode (build or refresh), counters, coverage,
+elapsed seconds and the requirement that setup made zero model calls and left the workspace
+byte-identical. After a `warm_experience` trial the runner records the edited paths and an outcome
+category into that arm's store (`experience-record.json`); with the default
+`experience_outcome: harness_grader` the outcome is `grader_passed` when the hidden grader passed, which
+is oracle-adjacent and stated in the report; grader details, answers and traces are never recorded.
+The report groups every condition, pairs each treatment with `baseline` (`pairs_by_condition`), and
+adds setup time, setup model calls, amortized measured cost per task and cost per verified success
+(unknown stays unknown, a zero denominator is undefined). Live four-condition runs have not been
+performed for this change; the offline tests in `tests/e2e/test_conditions.py` exercise scheduling,
+setup, recording and reporting with the real helper and no model.
+
 ### Evaluate an already indexed project
 
 Add `--warm-project-index` to `prepare` when measuring tasks after initial indexing.

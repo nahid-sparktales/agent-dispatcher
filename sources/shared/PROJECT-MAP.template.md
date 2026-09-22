@@ -145,3 +145,39 @@ Limits: 1,000 sources, 30,000 nodes, 36,000 edges and 16 MiB stored; about 1,500
 16 edges, and eight source hints per task view. Report omissions and parse failures.
 Trimming removes unsupported paths and impact claims. No embeddings, architecture rules,
 extra source scan, provider calls, or worker supervision are added.
+
+## Optional deep repository index
+
+`{{INDEX_COMMAND}}` builds and maintains a complete, persistent index in the same private state
+directory: every admitted file (not the scan's 10,000-path prefix), stable symbol identities,
+relationships with their method and status, corpus statistics, bounded `HEAD` history, optional
+model-written architectural notes and explicit task experience. It is built only on request:
+
+| Request | Helper |
+| --- | --- |
+| deep onboarding | `{{INDEX_COMMAND}} build --project PROJECT --json` (`--dry-run` counts only; `--resume` continues an interrupted build) |
+| bring it up to date | `{{INDEX_COMMAND}} refresh --project PROJECT --json` (`--strict` re-hashes content) |
+| inspect | `{{INDEX_COMMAND}} status --project PROJECT --json` (read-only, creates nothing) |
+| why these files | `{{INDEX_COMMAND}} explain 'REQUEST' --project PROJECT` |
+| architectural notes (model, off by default) | `{{INDEX_COMMAND}} explore --project PROJECT --dry-run`; `inferences list|forget` |
+| task experience | `{{INDEX_COMMAND}} experience record|list|show|correct|forget` |
+| remove state | `{{INDEX_COMMAND}} prune --project PROJECT --index|--experience|--all` |
+
+Never start a build, refresh or exploration as part of an ordinary task unless the user asked for
+it; a normal preparation uses a published index automatically (`repository_intelligence.index` in
+the packet reports `used`, `absent`, `stale` coverage, `incompatible` or `unavailable`) and, under
+the same write scope as the other caches, upserts records for changed files within a small
+budget. It never sweeps or republishes; report `refresh` as the next step when coverage is pending
+or stale. Records the current source no longer matches are withheld (`stale index evidence`).
+
+Evidence kinds stay distinct: observations and derived relationships are labeled by method and
+status (`resolved`, `candidate`); Explorer claims are "model inference, not a repository fact";
+experience is "experience, not a repository fact". None of them is a permission, an instruction,
+or proof of correctness. Record experience only when the host or user asks: hand the helper the
+task id, the request, the packet, the edited files and the verification receipt; a zero-test
+run, an exit code alone or a stale receipt is recorded but never counts as success. A user
+correction changes an interpretation without inventing an observed fact; forgetting removes the
+event and recomputes every aggregate. Settings (`index.use`, `exploration.enabled`,
+`experience.record`, `experience.use`) live in the user's own
+`~/.config/agent-dispatcher/repository-intelligence.json`; a project cannot enable a model call
+or memory. Details: docs/repository-index.md in the source repository.
