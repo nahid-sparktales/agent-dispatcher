@@ -73,6 +73,9 @@ def validate_config(config, live=False):
         profile = Path(spec.get("profile_dir", ""))
         if not profile.is_absolute():
             raise ValueError(f"{client}: profile_dir must be absolute")
+        settings = spec.get("llm_settings")
+        if settings is not None and (not isinstance(settings, str) or not Path(settings).is_absolute() or not Path(settings).is_file()):
+            raise ValueError(f"{client}: llm_settings must be an absolute path to an existing settings file")
         if profile.is_symlink():
             raise ValueError("evaluation profiles cannot be symlinks")
         profiles.append(profile.resolve())

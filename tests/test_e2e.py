@@ -112,6 +112,24 @@ print(json.dumps(result))
         self.assertFalse((self.root / ".run-lock").exists())
 
 
+class LLMSettingsPassThrough(unittest.TestCase):
+    def test_llm_settings_reach_the_client_environment_as_a_path_only(self):
+        from evals.end_to_end import adapters, run
+        with tempfile.TemporaryDirectory() as directory:
+            settings = Path(directory) / "llm.json"
+            settings.write_text('{"enabled": true}')
+            profile = Path(directory) / "profile"
+            base = {"executable": "claude", "model": "m", "effort": "high", "auth": "subscription", "profile_dir": str(profile)}
+            self.assertNotIn("AGENT_DISPATCHER_LLM_CONFIG", adapters._environment("claude", base, profile))
+            env = adapters._environment("claude", dict(base, llm_settings=str(settings)), profile)
+            self.assertEqual(env["AGENT_DISPATCHER_LLM_CONFIG"], str(settings))
+            self.assertFalse({k for k in env if "KEY" in k or "TOKEN" in k})
+            config = lambda spec: {"schema_version": 1, "seed": 1, "timeout_seconds": 600, "clients": {"claude": spec}}  # noqa: E731
+            with self.assertRaisesRegex(ValueError, "llm_settings"):
+                run.validate_config(config(dict(base, llm_settings="relative.json")))
+            run.validate_config(config(dict(base, llm_settings=str(settings))))
+
+
 class SchedulingTests(unittest.TestCase):
     fixtures = [{"id": f"task-{i}", "smoke": i < 2} for i in range(15)]
 

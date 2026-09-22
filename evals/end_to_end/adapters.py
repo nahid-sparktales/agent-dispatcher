@@ -97,6 +97,10 @@ def _environment(client: str, spec: dict, profile: Path) -> dict[str, str]:
         })
         if spec["auth"] == "api" and os.environ.get("ANTHROPIC_API_KEY"):
             env["ANTHROPIC_API_KEY"] = os.environ["ANTHROPIC_API_KEY"]
+    # Experiment knob: the dispatcher's LLM-assisted retrieval settings (a path, never a secret). Set for both
+    # conditions so their environments stay identical; only the staged dispatcher reads it.
+    if spec.get("llm_settings"):
+        env["AGENT_DISPATCHER_LLM_CONFIG"] = spec["llm_settings"]
     return env
 
 
@@ -316,6 +320,7 @@ def build_launch(client: str, spec: dict, workspace: Path,
         "native_system_prompt": True, "memory": False, "hooks": False,
         "external_mcp": False, "personal_plugins": False,
         "isolation": "customization-discovery; not an OS security boundary",
+        "llm_retrieval_settings": spec.get("llm_settings"),
     }
     if client == "codex":
         disabled, proof = _codex_isolation(executable, spec, env, workspace, skill)

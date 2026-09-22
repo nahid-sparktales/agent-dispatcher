@@ -43,6 +43,16 @@ created, and doctor/run inspect or launch only those clients. A Claude-only expe
 does not need Codex installed or authenticated. Keep the selection fixed during a run;
 changing it invalidates prior smoke evidence along with other configuration changes.
 
+### Evaluate with LLM-assisted retrieval
+
+Add `"llm_settings": "/absolute/path/llm-retrieval.json"` to a client in `config.json` to hand the
+staged dispatcher an [LLM-assisted retrieval](../../docs/llm-assisted-retrieval.md) settings file
+through `AGENT_DISPATCHER_LLM_CONFIG`. The file must live outside the artifact and workspace
+directories; give it a `store` outside them too, and index the fixtures into that store before
+the run so representations are cached rather than generated inside a timed trial. Both conditions
+receive the same environment; only the dispatcher reads the variable. The path is recorded in each
+trial's effective settings and changes the configuration fingerprint, so smoke runs again first.
+
 ### Evaluate an already indexed project
 
 Add `--warm-project-index` to `prepare` when measuring tasks after initial indexing.

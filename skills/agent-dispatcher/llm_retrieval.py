@@ -56,6 +56,7 @@ DEFAULTS = {
                       order="hashed",  # "hashed" hides the fused rank from position; "rank" | "reverse" for bias tests
                       evidence=True),
     "budget": {"max_index_calls": 500, "max_query_calls": 1},
+    "store": None,  # Representation store path outside every project; None keys one private store per project.
     "shadow_log": None,  # A JSONL path outside the project: what the reranker would have chosen, paths and hashes only.
 }
 LIMITS = {"responsibilities": (6, 160), "symbols": (12, 80), "concepts": (12, 60), "likely_tasks": (5, 120)}
@@ -800,7 +801,7 @@ def layer(project, index, withheld=(), settings=None, store=None, answer=None):
         settings = settings or load_settings(project=project)
         if not settings["enabled"]:
             return 0, None, {}, None
-        location = store_path(project)
+        location = Path(settings["store"]).expanduser() if settings.get("store") else store_path(project)
         _outside(location, project, "The representation store")
         store = store or Store(location)
         if settings.get("shadow_log"):
