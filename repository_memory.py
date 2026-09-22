@@ -3,15 +3,18 @@
 
     explicit build / refresh  ->  private state outside the project  ->  gated candidates at query time
 
-Nothing here runs unless the user's own settings file (outside any project) enables it, and
-each layer has its own build, retrieval and recording controls. Retrieval never generates a
+Each layer has its own build, retrieval and recording controls in the user's own settings
+file (outside any project). The defaults are: experience recording and retrieval on, episodic
+and semantic retrieval in shadow mode; with no store built and nothing recorded, a packet is
+exactly what it was without this module. Retrieval never generates a
 summary, never fetches, never runs a remembered command. Memory candidates enter retrieval only
 through the current admitted index: history cannot grant access to a file, and a memory record
 is evidence with a label, not an instruction or a fact about the present.
 
 Storage reuses the project map's private, owner-only, validated, atomically published state.
-The stores hold derived, rebuildable facts (never source text); the experience file holds the
-user's own attributable records and is never touched by a cache rebuild.
+The episodic and semantic stores hold derived, rebuildable facts (never source text). Experience
+lives in the shared SQLite experience store (repo_store.ExperienceStore, the same one
+repository_intelligence.py and the evaluation harnesses write) and is never touched by a rebuild.
 """
 from __future__ import annotations
 
@@ -30,10 +33,8 @@ import time
 SCHEMA = 1
 EPISODIC_FILE = "repository-memory.json"
 SEMANTIC_FILE = "memory-semantic.json"
-EXPERIENCE_FILE = "memory-experience.json"
 MAX_EPISODIC_BYTES = 24 * 1024 * 1024
 MAX_SEMANTIC_BYTES = 8 * 1024 * 1024
-MAX_EXPERIENCE_BYTES = 8 * 1024 * 1024
 MAX_SETTINGS_BYTES = 64 * 1024
 MAX_QUERY_CHARS = 16000
 MODES = ("off", "shadow", "on")
@@ -41,7 +42,7 @@ STATES = ("use", "use_limited", "ignore_weak", "ignore_stale", "ignore_unresolve
 LEVELS = ("file", "module", "repository")
 MODULE_PROMPT = 1
 DEFAULTS = {
-    "enabled": False,  # Master switch: off suppresses every memory influence and reads nothing.
+    "enabled": True,  # Master switch: off suppresses every memory influence and reads nothing.
     "git": {"enabled": True, "retrieval": "shadow", "max_commits": 2000, "max_commit_files": 30, "boundary": "inclusive",
             "fields": ["message", "paths", "identifiers", "symbols"],
             "field_weights": {"message": 1.0, "paths": 1.0, "identifiers": 1.5, "symbols": 1.0},
@@ -49,11 +50,15 @@ DEFAULTS = {
                         "max_parsed_bytes": 16 * 1024 * 1024}},
     "semantic": {"enabled": True, "retrieval": "shadow", "max_files_per_module": 6,
                  "generation": {"enabled": False, "model": "representation", "max_calls": 50, "max_modules": 40, "max_chars": 1200}},
-    "experience": {"recording": False, "retrieval": "off", "max_events": 2000, "max_records": 5},
+    # Experience: on by default. Records exist only when a host or user hands them in explicitly (`record`), so a
+    # project with nothing recorded is unaffected. `eligible_outcomes` says which outcomes may vote; a harness may
+    # add `grader_passed` for its own oracle-labeled arms.
+    "experience": {"recording": True, "retrieval": "on", "max_records": 5, "eligible_outcomes": ["checked_success", "accepted"],
+                   "exposure_log": None},
     "hotspots": {"selector": "diversified", "max": 200, "share": 0.15,
                  "weights": {"edits": 1.0, "recency": 0.5, "fixes": 1.0, "incidents": 1.0, "symbols": 0.5, "cochange": 0.5, "penalty": 1.0}},
     "retrieval": {"max_events": 10, "max_files_per_event": 8, "max_candidates": 20,
-                  "rrf_weights": {"memory_git": 0.5, "memory_semantic": 0.5, "memory_experience": 0.5},
+                  "rrf_weights": {"memory_git": 0.5, "memory_semantic": 0.5, "experience": 0.5},
                   # support_fields: which event fields may count as identifier-level support for the gate (a request word that is
                   # only a directory name is weaker evidence than a symbol or a code span in the message).
                   "gate": {"min_concept_matches": 2, "min_score": 0.0, "min_separation": 0.0, "min_relative_score": 0.25, "forced": False,
@@ -141,6 +146,9 @@ def validate_settings(settings):
         raise RepositoryMemoryError("enabled must be a boolean.")
     if type(settings["experience"]["recording"]) is not bool or type(settings["git"]["enabled"]) is not bool:
         raise RepositoryMemoryError("Layer switches must be booleans.")
+    eligible = settings["experience"]["eligible_outcomes"]
+    if not isinstance(eligible, list) or any(v not in _sibling("experience")["OUTCOMES"] for v in eligible):
+        raise RepositoryMemoryError("experience.eligible_outcomes must list known outcome categories.")
     for key, top in (("max_commits", 100000), ("max_commit_files", 5000)):
         value = settings["git"][key]
         if type(value) is not int or not 1 <= value <= top:
@@ -224,17 +232,7 @@ def _valid_semantic(data):
     return data
 
 
-def _valid_experience(data):
-    experience = _sibling("memory_experience")
-    if not isinstance(data, dict) or data.get("schema") != SCHEMA or not isinstance(data.get("records"), list) or len(data["records"]) > 100000:
-        raise ValueError()
-    if any(not experience["valid_record"](record) for record in data["records"]):
-        raise ValueError()
-    return data
-
-
-_STORES = {"episodic": (EPISODIC_FILE, _valid_events, MAX_EPISODIC_BYTES), "semantic": (SEMANTIC_FILE, _valid_semantic, MAX_SEMANTIC_BYTES),
-           "experience": (EXPERIENCE_FILE, _valid_experience, MAX_EXPERIENCE_BYTES)}
+_STORES = {"episodic": (EPISODIC_FILE, _valid_events, MAX_EPISODIC_BYTES), "semantic": (SEMANTIC_FILE, _valid_semantic, MAX_SEMANTIC_BYTES)}
 
 
 def load_store(root, kind):
@@ -257,9 +255,31 @@ def save_store(root, kind, data, expected):
         raise RepositoryMemoryError(f"Repository memory state ({kind}) could not be saved: {exc}") from None
 
 
+def identity():
+    """A harness may map successive temporary workspaces of one sequence to one store (AGENT_DISPATCHER_INDEX_ID)."""
+    return os.environ.get("AGENT_DISPATCHER_INDEX_ID") or None
+
+
+def state_directory(root):
+    return _sibling("repo_store")["state_directory"](root, identity())
+
+
 def state_paths(root):
-    private = _sibling("parser_cache")["state_directory"](root)
-    return {kind: private / row[0] for kind, row in _STORES.items()}
+    private = state_directory(root)
+    paths = {kind: private / row[0] for kind, row in _STORES.items()}
+    paths["experience"] = private / _sibling("repo_store")["EXPERIENCE_FILE"]
+    return paths
+
+
+def experience_store(root, *, create=False, readonly=True):
+    """The shared experience store, or None when it does not exist; unsafe state raises a bounded error."""
+    store_module = _sibling("repo_store")
+    try:
+        return store_module["ExperienceStore"](state_directory(root), create=create, readonly=readonly and not create)
+    except store_module["StoreError"] as exc:
+        if "No repository index" in str(exc):
+            return None
+        raise RepositoryMemoryError("The experience store is unsafe, locked or malformed and was ignored.") from None
 
 
 # ---------------------------------------------------------------- admission and scanning
@@ -631,8 +651,10 @@ def dry_run(project, settings, *, pack=None, exclude_paths=()):
             "bounds": {"git_seconds": settings["budgets"]["git_seconds"], "git_bytes": settings["budgets"]["git_bytes"],
                        "max_commit_files": settings["git"]["max_commit_files"]},
             "writes": "none (dry run)", "state_directory": str(state_paths(root)["episodic"].parent)}
-    if existing["experience"]:
-        plan["experience_records"] = len(existing["experience"]["records"])
+    store = experience_store(root)
+    if store is not None:
+        with store:
+            plan["experience_records"] = len(store.events(status=None))
     return plan
 
 
@@ -691,6 +713,19 @@ def status(project, settings, *, pack=None):
         except OSError:
             out["storage_bytes"][kind] = None
     problems = []
+    try:
+        with_store = experience_store(root)
+        if with_store is None:
+            out["experience"] = {"records": 0, "by_outcome": {}, "corrections": 0}
+        else:
+            with with_store as store:
+                records = store.events(status=None)
+                out["experience"] = {"records": len(records), "by_outcome": dict(Counter(r["outcome"] for r in records)),
+                                     "by_status": store.counts()["events"], "corrections": store.counts()["corrections"],
+                                     "eligible": sum(1 for r in records if r["status"] == "current" and r["outcome"] in settings["experience"]["eligible_outcomes"])}
+    except RepositoryMemoryError as exc:
+        problems.append(str(exc))
+        out["experience"] = None
     for kind in _STORES:
         try:
             data = load_store(root, kind)
@@ -713,12 +748,8 @@ def status(project, settings, *, pack=None):
                                    "symbol_events": len(data["symbols"]), "lineage_entries": len(data["lineage"])}
             else:
                 out["episodic"] = None
-        elif kind == "semantic":
-            out["semantic"] = dict(data["manifest"], current=data["manifest"].get("admitted_universe_digest") == _digest(sorted(index.paths))) if data else None
         else:
-            records = data["records"] if data else []
-            out["experience"] = {"records": len(records), "by_outcome": dict(Counter(r["outcome"] for r in records)),
-                                 "corrections": sum(1 for r in records if r["kind"] == "correction")}
+            out["semantic"] = dict(data["manifest"], current=data["manifest"].get("admitted_universe_digest") == _digest(sorted(index.paths))) if data else None
     out["diagnostics"] = problems + scan["diagnostics"]
     return out
 
@@ -1057,6 +1088,7 @@ def layer(project, index, task, *, exclusions=(), scrub=None, settings=None, pac
         context = _sibling("context")
         scrub = context["_scrubber"](context["find_pack"](pack))
     timings = {}
+    present = 0
     for name in ("git", "semantic", "experience"):
         mode = modes[name]
         entry = {"mode": mode, "state": "unavailable", "reason": "layer is off", "applied": False, "candidates": 0}
@@ -1065,14 +1097,16 @@ def layer(project, index, task, *, exclusions=(), scrub=None, settings=None, pac
             continue
         layer_started = time.perf_counter()
         try:
-            data = load_store(root, {"git": "episodic", "semantic": "semantic", "experience": "experience"}[name])
+            data = load_store(root, {"git": "episodic", "semantic": "semantic"}[name]) if name != "experience" else _experience_view(root, settings)
         except RepositoryMemoryError as exc:
             entry["reason"] = str(exc)
             report["diagnostics"].append(str(exc))
             continue
         if data is None:
-            entry["reason"] = "no memory store has been built for this project (run repository_memory.py build)"
+            entry["reason"] = ("nothing recorded yet for this project" if name == "experience"
+                               else "no memory store has been built for this project (run repository_memory.py build)")
             continue
+        present += 1
         if name == "git" and not data["manifest"].get("completeness", {}).get("available", True):
             entry["reason"] = "the project has no commit history"
             continue
@@ -1098,17 +1132,13 @@ def layer(project, index, task, *, exclusions=(), scrub=None, settings=None, pac
             if stale and decision["state"].startswith("use"):
                 decision = {"state": "use_limited", "reason": "summaries predate the current admitted universe; they may strengthen, not introduce"}
         else:
-            experience = _sibling("memory_experience")
-            items = experience["search"](query, data["records"], index, top_k=settings["experience"]["max_records"])
-            for item in items:
-                item.setdefault("identifier_support", sum(1 for t in item["matched"] if query["terms"].get(t, 0) >= 3.0))
-                item.setdefault("concept_matches", len(item["matched"]) - item["identifier_support"])
-                item["resolved"] = [{"path": p, "label": "exact"} for p in item["files"]]
-            rows = experience["candidates"](items, max_records=settings["experience"]["max_records"], max_files=tuning["max_files_per_event"])
+            items, rows, decision = experience_candidates(query, data, index, settings)
             scores = {row["file"]: row["score"] for row in rows}
-            decision = gate(items, scores, settings=settings, freshness="current", layer="experience")
+            if settings["experience"].get("exposure_log"):
+                _outside(settings["experience"]["exposure_log"], root, "The exposure log")
+                _sibling("experience")["log_exposure"](settings["experience"]["exposure_log"], hashlib.sha256(task.encode("utf-8")).hexdigest(), rows, [])
         entry.update(decision, candidates=len(rows), matches=len(items))
-        source = {"git": "memory_git", "semantic": "memory_semantic", "experience": "memory_experience"}[name]
+        source = {"git": "memory_git", "semantic": "memory_semantic", "experience": "experience"}[name]
         usable = decision["state"] in ("use", "use_limited") and rows
         if usable and mode == "on":
             extra[source] = rows
@@ -1120,7 +1150,7 @@ def layer(project, index, task, *, exclusions=(), scrub=None, settings=None, pac
         elif usable:
             shadow_any = True
         for item in items[:tuning["max_packet_hits"]]:
-            if decision["state"].startswith("ignore") or decision["state"] == "unavailable" or item.get("weak") or item.get("caution"):
+            if decision["state"].startswith("ignore") or decision["state"] == "unavailable" or item.get("weak"):
                 continue
             report["hits"].append(_hit(name, item, decision["state"], mode))
         timings[name] = round((time.perf_counter() - layer_started) * 1000, 1)
@@ -1128,9 +1158,36 @@ def layer(project, index, task, *, exclusions=(), scrub=None, settings=None, pac
     for hit in report["hits"]:
         for key in ("why", "evidence"):
             hit[key] = scrub(hit[key])[:tuning["max_hit_chars"]]
+    if not present:  # Nothing built and nothing recorded: the packet stays exactly what it was without memory.
+        report["status"] = "no_stores"
+        return {"extra": {}, "boost_only": [], "weights": {}, "report": report, "ms": round((time.perf_counter() - started) * 1000, 1), "timings": timings}
     report["status"] = "used" if applied_any else "shadow" if shadow_any else "no_useful_memory"
     return {"extra": extra, "boost_only": boost_only, "weights": weights, "report": report,
             "ms": round((time.perf_counter() - started) * 1000, 1), "timings": timings}
+
+
+def _experience_view(root, settings):
+    """Eligible, corrected experience for one query, or None when nothing was ever recorded."""
+    store = experience_store(root)
+    if store is None:
+        return None
+    experience = _sibling("experience")
+    with store:
+        events, corrections = store.events(), store.corrections()
+    prepared = experience["prepare"](events, corrections, tuple(settings["experience"]["eligible_outcomes"]))
+    return {"prepared": prepared, "events": len(events)}
+
+
+def experience_candidates(query, view, index, settings):
+    """(matching events, fusion rows under the shared `experience` source, gate decision) from prepared experience."""
+    experience, engine = _sibling("experience"), _sibling("retrieval")
+    tuning = dict(engine["DEFAULTS"]["experience"], max_candidates=settings["retrieval"]["max_candidates"])
+    prepared = view["prepared"]
+    items = experience["matches"](query, index, prepared, tuning, top_k=settings["experience"]["max_records"])
+    totals, reasons = experience["scores"](query, index, prepared, tuning)
+    rows = engine["_ranked"](totals, reasons, tuning["max_candidates"], "experience")
+    decision = gate(items, totals, settings=settings, freshness="current", layer="experience")
+    return items, rows, decision
 
 
 def _hit(layer_name, item, state, mode):
@@ -1145,9 +1202,9 @@ def _hit(layer_name, item, state, mode):
         return {"kind": item["level"] + "_summary", "id": item["id"], "why": "matched " + ", ".join(item["matched"][:5]),
                 "files": [r["path"] for r in item.get("resolved", [])[:4]], "evidence": (item.get("purpose") or "module record")[:120],
                 "label": item["label"], "applied": applied}
-    return {"kind": "experience", "id": item["record_id"], "why": "matched " + ", ".join(item["matched"][:5]),
-            "files": item["files"][:4], "evidence": ("; ".join(item.get("hypotheses", [])[:2]) or item["category"])[:120],
-            "label": f"{item['outcome']} ({item['verification']}); files {item['freshness']}", "applied": applied and not item["caution"]}
+    return {"kind": "experience", "id": item["id"], "why": "matched " + ", ".join(item["matched"][:5]),
+            "files": item["files"][:4], "evidence": (item.get("summary") or item["task_id"])[:120],
+            "label": f"{item['outcome']}; files {item['freshness']}; experience, not a repository fact", "applied": applied}
 
 
 # ---------------------------------------------------------------- inspection contracts (SearchCommit, ExamineCommit, ...)
@@ -1273,21 +1330,54 @@ def view_summary(project, entity_id, *, pack=None):
     return {"id": entity_id, **record}
 
 
-# ---------------------------------------------------------------- experience operations
+# ---------------------------------------------------------------- experience operations (shared store)
 
 
-def _experience_store(root):
-    """(a working copy to modify, the loaded state to compare against on save)."""
-    data = load_store(root, "experience")
-    return copy.deepcopy(data) if data is not None else {"schema": SCHEMA, "records": []}, data
+def _observation_event(root, observation, *, scrub, inspection, pack):
+    """One ingested observation -> a bounded event of the shared experience module."""
+    experience = _sibling("experience")
+    if not isinstance(observation, dict) or not isinstance(observation.get("task"), str) or not observation["task"].strip():
+        raise RepositoryMemoryError("An observation must be a JSON object with task text.")
+    asserted = observation.get("outcome")
+    outcome = None
+    try:
+        if inspection is None:
+            outcome = experience["normalize_outcome"](asserted if asserted is not None else "unknown")
+        elif asserted in ("abandoned", "cancelled", "reverted_or_invalidated"):
+            outcome = experience["normalize_outcome"](asserted)  # An explicit abandonment outranks whatever the receipt says.
+        elif asserted is not None:
+            experience["normalize_outcome"](asserted)  # Validated, then the receipt decides.
+    except experience["ExperienceError"] as exc:
+        raise RepositoryMemoryError(str(exc)) from None
+    task_id = observation.get("task_id")
+    if not isinstance(task_id, str) or not 0 < len(task_id) <= 200:
+        task_id = "task-" + hashlib.sha256(re.sub(r"\s+", " ", observation["task"].strip().lower()).encode("utf-8")).hexdigest()[:16]
+    history = _sibling("repo_history")
+    info = history["repository"](root)
+    lists = {key: [p for p in (observation.get(key) or []) if isinstance(p, str)] if isinstance(observation.get(key), list) else []
+             for key in ("retrieved", "read", "modified")}
+    assertions = [a for a in (observation.get("assertions") or []) if isinstance(a, dict)]
+    notes = {"hypotheses": observation.get("hypotheses") or [], "limitations": observation.get("limitations") or [],
+             "assertions": [f"{a.get('by', 'agent')}: {a.get('claim', '')}" for a in assertions]}
+    try:
+        return experience["build_event"](project=root, task_id=task_id, task=observation["task"], scrub=scrub,
+                                         role=observation.get("role") if isinstance(observation.get("role"), str) else None,
+                                         baseline={"head": info["boundary"]} if info["available"] else None,
+                                         retrieved=lists["retrieved"], inspected=lists["read"], edited=lists["modified"], checks=inspection,
+                                         outcome=outcome, source="user_asserted" if any(a.get("by") == "user" for a in assertions) else "explicit",
+                                         notes=notes)
+    except experience["ExperienceError"] as exc:
+        raise RepositoryMemoryError(str(exc)) from None
 
 
 def record_experience(project, observation, *, settings=None, pack=None, receipt=None):
     """Passive ingestion of one task observation; recording must be enabled, and a receipt is the only route to verified success."""
-    root, index, scrub, exclusions, _ = _scan(project, pack=pack)
+    root = _root(project)
     settings = settings or load_settings(project=root)
     if not (settings["enabled"] and settings["experience"]["recording"]):
         return {"status": "recording_disabled", "recorded": False, "note": "enable experience.recording (and the master switch) to record; nothing was written"}
+    context = _sibling("context")
+    scrub = context["_scrubber"](context["find_pack"](pack))
     inspection = None
     if receipt is not None:
         verification = _sibling("verification")
@@ -1295,83 +1385,85 @@ def record_experience(project, observation, *, settings=None, pack=None, receipt
             inspection = verification["inspect_receipt"](root, receipt, pack=pack)
         except verification["VerificationError"] as exc:
             raise RepositoryMemoryError(f"Receipt could not be used: {exc}") from None
-    history = _sibling("repo_history")
-    experience = _sibling("memory_experience")
-    info = history["repository"](root)
-    try:
-        record = experience["new_record"](observation, admit=admission(exclusions), scrub=scrub, hashes=index.hashes,
-                                          snapshot_commit=info["boundary"], inspection=inspection)
-    except experience["ExperienceError"] as exc:
-        raise RepositoryMemoryError(str(exc)) from None
-    store, previous = _experience_store(root)
-    same = next((r for r in store["records"] if not r.get("superseded_by") and r["task_fingerprint"] == record["task_fingerprint"]
-                 and r["modified"] == record["modified"] and r["outcome"] == record["outcome"]
-                 and r["verification"]["source"] == record["verification"]["source"]), None)
-    if same is not None:  # The same observation of the same task is one record, whatever the clock says.
-        return {"status": "duplicate", "recorded": False, "record_id": same["record_id"]}
-    store["records"].append(record)
-    store["records"], _ = experience["prune"](store["records"], max_events=settings["experience"]["max_events"])
-    save_store(root, "experience", store, previous)
-    return {"status": "recorded", "recorded": True, "record_id": record["record_id"], "outcome": record["outcome"],
-            "verification": record["verification"]["source"], "tests_changed": record["tests_changed"], "limitations": record["limitations"]}
+    event = _observation_event(root, observation, scrub=scrub, inspection=inspection, pack=pack)
+    experience = _sibling("experience")
+    with experience_store(root, create=True) as store:
+        result = experience["record"](store, event, tuple(settings["experience"]["eligible_outcomes"]))
+    withheld = {key: len([p for p in (observation.get(key) or []) if isinstance(p, str)]) - len(event[field])
+                for key, field in (("modified", "edited"), ("read", "inspected"), ("retrieved", "retrieved")) if isinstance(observation.get(key), list)}
+    return {"status": "recorded" if result["stored"] else "duplicate", "recorded": result["stored"], "record_id": event["id"],
+            "outcome": event["outcome"], "eligible": result["eligible"], "verification": "receipt" if inspection is not None else event["source"],
+            "tests_changed": event.get("tests_changed", False), "withheld_paths": {k: v for k, v in withheld.items() if v},
+            "limitations": (["verification tests were modified in this task; passing them is not independent evidence"] if event.get("tests_changed") else [])
+            + ([event["outcome_reason"]] if event.get("outcome_reason") else [])}
 
 
-def correct_experience(project, record_id, *, outcome, note, pack=None):
+def correct_experience(project, record_id, *, outcome=None, note="", path=None, verdict=None, pack=None):
+    """Record-level (`outcome`) or path-level (`path` + `verdict`) correction in the shared store."""
     root = _root(project)
     context = _sibling("context")
     scrub = context["_scrubber"](context["find_pack"](pack))
-    experience = _sibling("memory_experience")
-    store, previous = _experience_store(root)
+    experience = _sibling("experience")
+    store = experience_store(root, readonly=False)
+    if store is None:
+        raise RepositoryMemoryError("Unknown experience record for this project.")
     try:
-        fixed = experience["correction"](store["records"], record_id, outcome=outcome, note=note, scrub=scrub)
-    except experience["ExperienceError"] as exc:
+        with store:
+            if path is not None or verdict is not None:
+                return dict(experience["correct"](store, record_id, path, verdict, note, scrub), status="corrected")
+            return dict(experience["recorrect"](store, record_id, outcome, note, scrub), status="corrected")
+    except (experience["ExperienceError"], _sibling("repo_store")["StoreError"]) as exc:
         raise RepositoryMemoryError(str(exc)) from None
-    store["records"].append(fixed)
-    save_store(root, "experience", store, previous)
-    return {"status": "corrected", "record_id": fixed["record_id"], "supersedes": record_id, "outcome": outcome}
 
 
 def forget_experience(project, record_id):
     root = _root(project)
-    experience = _sibling("memory_experience")
-    store, previous = _experience_store(root)
-    try:
-        store["records"], removed = experience["forget"](store["records"], record_id)
-    except experience["ExperienceError"] as exc:
-        raise RepositoryMemoryError(str(exc)) from None
-    save_store(root, "experience", store, previous)
-    return {"status": "forgotten", "removed": removed, "note": "logical deletion from the local experience file; no derived index retains it"}
+    experience = _sibling("experience")
+    store = experience_store(root, readonly=False)
+    if store is None:
+        raise RepositoryMemoryError("Unknown experience record for this project.")
+    with store:
+        if store.get_event(record_id) is None:
+            raise RepositoryMemoryError("Unknown experience record for this project.")
+        removed = experience["forget"](store, event_id=record_id)["removed"]
+    return {"status": "forgotten", "removed": removed, "note": "logical deletion from the local experience store; no derived index retains it"}
 
 
 def prune_experience(project, *, max_age_days=None, settings=None):
     root = _root(project)
-    settings = settings or load_settings(project=root)
-    experience = _sibling("memory_experience")
-    store, previous = _experience_store(root)
-    store["records"], removed = experience["prune"](store["records"], max_events=settings["experience"]["max_events"], max_age_days=max_age_days)
-    if removed:
-        save_store(root, "experience", store, previous)
-    return {"status": "pruned", "removed": removed, "remaining": len(store["records"])}
+    experience = _sibling("experience")
+    store = experience_store(root, readonly=False)
+    if store is None:
+        return {"status": "pruned", "removed": 0, "remaining": 0}
+    with store:
+        removed = experience["prune"](store, max_age_days=max_age_days)["removed"] if max_age_days is not None else 0
+        remaining = len(store.events(status=None))
+    return {"status": "pruned", "removed": removed, "remaining": remaining}
 
 
 def search_experience(project, task, *, top_k=5, settings=None, pack=None, exclude_paths=()):
     root, index, scrub, exclusions, _ = _scan(project, pack=pack, exclude_paths=exclude_paths)
-    data = load_store(root, "experience")
-    if data is None:
+    settings = settings or load_settings(project=root)
+    view = _experience_view(root, settings)
+    if view is None:
         return {"status": "unavailable", "items": [], "coverage": None, "truncated": False, "diagnostics": ["no experience records"]}
     query = _sibling("retrieval")["analyze_query"](scrub(_task(task)))
-    items = _sibling("memory_experience")["search"](query, data["records"], index, top_k=_bound(top_k))
-    return {"status": "ok" if items else "no_matches", "items": items, "coverage": {"records": len(data["records"])},
+    experience, engine = _sibling("experience"), _sibling("retrieval")
+    items = experience["matches"](query, index, view["prepared"], engine["DEFAULTS"]["experience"], top_k=_bound(top_k))
+    return {"status": "ok" if items else "no_matches", "items": items, "coverage": {"records": view["events"], "eligible": len(view["prepared"])},
             "truncated": len(items) >= top_k, "diagnostics": []}
 
 
 def view_experience(project, record_id):
     root = _root(project)
-    data = load_store(root, "experience")
-    record = next((r for r in (data["records"] if data else []) if r["record_id"] == record_id), None)
-    if record is None:
+    store = experience_store(root)
+    if store is None:
         raise RepositoryMemoryError("Unknown experience record for this project.")
-    return record
+    with store:
+        record = store.get_event(record_id)
+        if record is None:
+            raise RepositoryMemoryError("Unknown experience record for this project.")
+        return dict(record, corrections=store.corrections(record_id))
 
 
 # ---------------------------------------------------------------- command line
@@ -1420,7 +1512,9 @@ def main(argv=None):
     record.add_argument("--receipt", help="A verification.py receipt whose observed run decides the outcome")
     correct = common(sub.add_parser("correct"))
     correct.add_argument("record")
-    correct.add_argument("--outcome", required=True, choices=_sibling("memory_experience")["ASSERTABLE"])
+    correct.add_argument("--outcome", choices=_sibling("experience")["ASSERTABLE"], help="Record-level correction: a superseding event with this outcome")
+    correct.add_argument("--path", help="Path-level correction with --verdict relevant|irrelevant")
+    correct.add_argument("--verdict", choices=("relevant", "irrelevant"))
     correct.add_argument("--note", required=True)
     common(sub.add_parser("forget")).add_argument("record")
     common(sub.add_parser("explain"), task=True)
@@ -1467,7 +1561,9 @@ def main(argv=None):
                 raise RepositoryMemoryError("Observation exceeds 256 KiB.")
             result = record_experience(args.project, json.loads(raw), settings=settings, pack=args.pack, receipt=args.receipt)
         elif args.command == "correct":
-            result = correct_experience(args.project, args.record, outcome=args.outcome, note=args.note, pack=args.pack)
+            if bool(args.outcome) == bool(args.path or args.verdict):
+                raise RepositoryMemoryError("correct takes either --outcome or --path with --verdict.")
+            result = correct_experience(args.project, args.record, outcome=args.outcome, note=args.note, path=args.path, verdict=args.verdict, pack=args.pack)
         elif args.command == "forget":
             result = forget_experience(args.project, args.record)
         else:

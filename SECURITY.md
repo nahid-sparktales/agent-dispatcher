@@ -46,8 +46,9 @@ the optional decision engine described below.
   read-only operations the coordinator validates; experience is recorded only when a host hands
   over receipts explicitly. Status and dry-run open state read-only and create nothing. See
   [docs/repository-index.md](docs/repository-index.md).
-- **`repository_memory.py`**, **`repo_history.py`** and **`memory_experience.py`** are the optional repository
-  memory. They are inert without a settings file outside every project. Git is invoked through one
+- **`repository_memory.py`** and **`repo_history.py`** are the repository memory layers (experience
+  on by default, history and summaries in shadow mode); they have no effect until a store is built
+  or an observation is recorded, and a settings file outside every project switches them. Git is invoked through one
   hardened wrapper (argument arrays, scrubbed environment, no pager, external diff, textconv,
   replacement objects, lazy fetch or prompt; byte and time limits) and only HEAD's bounded ancestry
   is read. Historical paths pass the same credential and exclusion rules as current source on both

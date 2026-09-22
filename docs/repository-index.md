@@ -30,8 +30,8 @@ each later task            context.py ... (as today)
 | Deep deterministic indexing | `repository_intelligence.py build` / `refresh`; used when `index.use` is `auto` and a published index exists | off until built |
 | Onboarding Explorer (model) | `exploration.enabled` in the settings file, plus `repository_intelligence.py explore` | off |
 | Query-time model reranking | unchanged: `llm-retrieval.json` ([llm-assisted-retrieval.md](llm-assisted-retrieval.md)) | off |
-| Experience recording | `repository_intelligence.py experience record` (explicit); `experience.record` only documents the host's intent | off |
-| Experience use at query time | `experience.use` | off |
+| Experience recording | `repository_intelligence.py experience record` or `repository_memory.py record` (explicit); one shared store | on (`experience.recording` in `repository-memory.json`) |
+| Experience use at query time | `experience.retrieval` in `repository-memory.json` (the unified memory layer; `experience.use` here is superseded) | on |
 
 Settings live in `~/.config/agent-dispatcher/repository-intelligence.json` (or the path in
 `AGENT_DISPATCHER_INDEX_CONFIG`); a file inside the inspected project is refused, so a repository

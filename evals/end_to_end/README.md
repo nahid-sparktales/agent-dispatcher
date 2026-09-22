@@ -90,7 +90,8 @@ setup, recording and reporting with the real helper and no model.
 
 Add `"memory_settings": "/absolute/path/repository-memory.json"` to a client to hand the staged
 dispatcher a [repository memory](../../docs/repository-memory.md) settings file through
-`AGENT_DISPATCHER_MEMORY_CONFIG`. Build the memory stores for each fixture workspace before the run
+`AGENT_DISPATCHER_MEMORY_CONFIG`. The index arms write their own per-arm file (`experience.retrieval`
+on for `warm_experience`, off for `indexed`), because the unified experience layer is on by default. Build the memory stores for each fixture workspace before the run
 (`repository_memory.py build`, private state keyed by the workspace path); trials never build them,
 and a fixture without commit history yields an `unavailable` layer, which is a valid arm. Both
 conditions receive the same environment; only the dispatcher reads the variable. The path is recorded

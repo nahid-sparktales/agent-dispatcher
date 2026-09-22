@@ -156,14 +156,17 @@ found). `--memory-symbols` adds bounded symbol history per task (blob reads per 
 `Hit@k`, `All@k` (every target in the top k: RepoMem's Accuracy@k), strata by target count, and a
 memory line: gate states, targets introduced only by memory, candidates per task.
 
-`chronology.py` replays one repository's tasks in commit order with memory pinned before each task
-and two oracle-labeled experience arms (frozen after the first block, accumulated), held-out probes
-every fifth task, per-block tables and paired-bootstrap intervals against `full`. It measures whether
-recorded experience could help retrieval, not whether an agent acquires it; see the docstring.
+`chronology.py` replays every given repository's tasks in commit order (one clone per repository)
+with memory pinned before each task and two oracle-labeled experience arms (frozen after the first
+block, accumulated) that go through the shipped `experience` module and memory layer, held-out probes
+every fifth task, pooled and per-repository tables, and paired-bootstrap intervals against `full` at
+task level and by repository block. It measures whether recorded experience could help retrieval, not
+whether an agent acquires it; see the docstring. `--report FILE` re-prints pooled tables from saved runs.
 
 ```bash
 python3 -B evals/retrieval/run.py --dataset $D --strategy full,full+memory,full+memory-forced,full+memory-messages --memory
-python3 -B evals/retrieval/chronology.py --dataset $D --split dev --blocks 4 --json out/chronology.json
+python3 -B evals/retrieval/chronology.py --dataset dist/retrieval-datasets/sqlglot.jsonl --dataset dist/retrieval-datasets/pip.jsonl \
+  --dataset dist/retrieval-datasets/networkx.jsonl --dataset dist/retrieval-datasets/zod.jsonl --split dev --blocks 4 --json out/chronology.json
 ```
 
 ## Optional: LLM-assisted retrieval

@@ -7,14 +7,14 @@ state outside the project and used only through the current admitted source inde
 | --- | --- | --- | --- |
 | episodic | eligible commits, admitted changed paths, rename lineage, changed symbols, issue/PR references, hotspots | explicit `build` / `refresh` | `git.retrieval` is `on` (`shadow` only reports) |
 | semantic | deterministic module records; optional model summaries with evidence keys | `build`; `summaries generate` for model prose | `semantic.retrieval` is `on` |
-| experience | bounded task observations, verification receipts, corrections | explicit `record` per task | `experience.retrieval` is `on`; `recording` is separate |
+| experience | bounded task events in the shared SQLite store, verification receipts, corrections | explicit `record` per task | on by default (`experience.retrieval`, `experience.recording`) |
 
-Nothing here runs without the user's own settings file outside every project
-(`~/.config/agent-dispatcher/repository-memory.json` or `AGENT_DISPATCHER_MEMORY_CONFIG`), and
-`"enabled": false` (the default) suppresses every memory influence. Memory is evidence with a
-label, never an instruction, a permission or proof: a commit message that says "fixes a crash"
-is prose, a passing receipt is scoped to the command and snapshot it recorded, and history can
-never make a withheld file readable.
+Settings live in the user's own file outside every project
+(`~/.config/agent-dispatcher/repository-memory.json` or `AGENT_DISPATCHER_MEMORY_CONFIG`);
+`"enabled": false` suppresses every memory influence. Without a built store or a recorded
+observation nothing changes. Memory is evidence with a label, never an instruction, a permission
+or proof: a commit message that says "fixes a crash" is prose, a passing receipt is scoped to the
+command and snapshot it recorded, and history can never make a withheld file readable.
 
 ## Commands
 
@@ -60,12 +60,14 @@ Recording is passive: hand the helper what was observed, on stdin as JSON, after
  "outcome": "partial", "assertions": [{"by": "user", "claim": "works for me"}], "limitations": []}
 ```
 
-`outcome` may be `unknown`, `in_progress`, `abandoned`, `partial`, `failed_verification` or
-`reverted_or_invalidated`. `verified_scoped_success` is never accepted from the observation:
-pass `--receipt` with a retained VERIFICATION receipt whose observed run passed and is still
-current. Omit `read` when the host does not expose reads; do not invent it. Modified test files
-are recorded as `tests_changed`, which is not independent evidence. Recording is refused
-(nothing written) unless `experience.recording` is enabled; recording never enables retrieval.
+`outcome` may be `unknown`, `in_progress`, `abandoned`, `partial`, `failed_verification`,
+`reverted_or_invalidated` or `accepted` (only when the user accepted the result); it is stored in
+the shared vocabulary. A verified success is never accepted from the observation: pass
+`--receipt` with a retained VERIFICATION receipt whose observed run passed and is still current.
+Omit `read` when the host does not expose reads; do not invent it. Modified test files are
+recorded as `tests_changed`, which is not independent evidence. Only `checked_success` and
+`accepted` records vote later. Recording is refused (nothing written) when
+`experience.recording` is off; recording never enables retrieval.
 
 ## Limits
 

@@ -31,8 +31,15 @@ OUTCOMES = {
     "infrastructure_error": "the run or its checks could not complete for reasons unrelated to the task",
     "cancelled": "the task was interrupted",
     "insufficient_evidence": "no check, acceptance or failure evidence was supplied",
+    "reverted_or_invalidated": "a later revert, correction or refactor invalidated the recorded result",
 }
+# The repository-memory vocabulary maps onto these categories; nothing here can assert a verified success.
+ALIASES = {"unknown": "insufficient_evidence", "in_progress": "unresolved", "partial": "unresolved", "abandoned": "cancelled",
+           "failed_verification": "failed_checks", "user_accepted": "accepted"}
+ASSERTABLE = tuple(sorted((set(OUTCOMES) | set(ALIASES)) - {"checked_success", "grader_passed", "verified_scoped_success"}))
 ELIGIBLE = ("checked_success", "accepted")
+MAX_NOTES = 8
+MAX_NOTE = 200
 MAX_FILES = 200
 MAX_SUMMARY = 240
 MAX_TERMS = 200
@@ -98,6 +105,16 @@ def outcome_from_receipt(inspection):
     return "insufficient_evidence", str(outcome)
 
 
+def normalize_outcome(value):
+    """An asserted outcome in either vocabulary -> canonical category; verified success is never assertable."""
+    if value in ("checked_success", "grader_passed", "verified_scoped_success"):
+        raise ExperienceError("Verified success cannot be asserted; supply a verification receipt instead.")
+    outcome = ALIASES.get(value, value)
+    if outcome not in OUTCOMES:
+        raise ExperienceError("Unknown outcome category.")
+    return outcome
+
+
 def file_hashes(project, paths):
     """Current content fingerprints of edited files through the helper's policy reader; withheld files get None."""
     context = _sibling("context")
@@ -113,8 +130,12 @@ def file_hashes(project, paths):
 
 
 def build_event(*, project, task_id, task, scrub, role=None, config_id=None, baseline=None, retrieved=(), inspected=(),
-                edited=(), checks=None, outcome=None, source="explicit", resources=None, corrections=()):
-    """Assemble one bounded event. `edited` paths are fingerprinted now; `checks` is a verification inspection."""
+                edited=(), checks=None, outcome=None, source="explicit", resources=None, corrections=(), notes=None):
+    """Assemble one bounded event. `edited` paths are fingerprinted now; `checks` is a verification inspection.
+
+    `notes` carries bounded, scrubbed assertions (`hypotheses`, `assertions`, `limitations`); they are what someone
+    reported, kept apart from the observed checks, and never enter retrieval terms.
+    """
     if not isinstance(task_id, str) or not 0 < len(task_id) <= 200:
         raise ExperienceError("A task id of at most 200 characters is required.")
     if outcome is None and checks is not None:
@@ -143,6 +164,10 @@ def build_event(*, project, task_id, task, scrub, role=None, config_id=None, bas
              "checks": receipt, "outcome": outcome, "outcome_reason": reason, "source": source,
              "resources": dict(list({k: v for k, v in resources.items() if isinstance(v, (int, float)) and not isinstance(v, bool)}.items())[:20])
              if isinstance(resources, dict) else None}
+    if isinstance(notes, dict):
+        event["notes"] = {key: [scrub(str(v))[:MAX_NOTE] for v in values[:MAX_NOTES] if isinstance(v, str) and v.strip()]
+                          for key, values in notes.items() if key in ("hypotheses", "assertions", "limitations") and isinstance(values, list)}
+        event["tests_changed"] = any(_sibling("repo_index")["is_test"](path) for path in edited_paths)
     event["id"] = _digest({"task": task_id, "final": final["digest"], "outcome": outcome})
     return event
 
@@ -164,11 +189,52 @@ def correct(store, event_id, path, verdict, note, scrub):
     return {"event": event_id, "path": path, "verdict": verdict}
 
 
+def recorrect(store, event_id, outcome, note, scrub):
+    """A record-level correction: a new event with the corrected outcome supersedes the old one, which keeps its text."""
+    old = store.get_event(event_id)
+    if old is None:
+        raise ExperienceError("Unknown experience event.")
+    outcome = normalize_outcome(outcome)
+    fixed = {k: v for k, v in old.items() if k not in ("status", "superseded_by")}
+    fixed.update(outcome=outcome, outcome_reason="corrected by the user", source="user_correction", recorded=int(time.time()),
+                 supersedes=event_id, notes=dict(old.get("notes") or {}, corrections=[scrub(str(note or ""))[:MAX_NOTE]]))
+    fixed["id"] = _digest({"task": old["task_id"], "final": old["final"]["digest"], "outcome": outcome, "supersedes": event_id})
+    with store.transaction():
+        stored = store.add_event(fixed)
+        if stored:
+            store.supersede(event_id, fixed["id"])
+    return {"id": fixed["id"], "supersedes": event_id, "outcome": outcome, "stored": stored}
+
+
 def forget(store, *, event_id=None, task_id=None, everything=False):
+    """Remove an event (and the corrections that superseded it), a task's events, or everything."""
     if not (event_id or task_id or everything):
         raise ExperienceError("Say what to forget: an event id, a task id, or everything.")
     with store.transaction():
-        removed = store.forget(event_id=event_id, task_id=task_id) if not everything else store.forget()
+        if everything:
+            return {"removed": store.forget()}
+        if task_id is not None:
+            return {"removed": store.forget(task_id=task_id)}
+        removed, pending = 0, [event_id]
+        while pending:
+            current = pending.pop()
+            event = store.get_event(current)
+            if event is None:
+                continue
+            if event.get("superseded_by"):
+                pending.append(event["superseded_by"])
+            removed += store.forget(event_id=current)
+    return {"removed": removed}
+
+
+def prune(store, *, max_age_days=None, now=None):
+    """Forget events older than the age (any status); the store's own retention cap already retires the oldest."""
+    now = now if now is not None else time.time()
+    old = [e["id"] for e in store.events(status=None) if max_age_days is not None and now - e["recorded"] > max_age_days * 86400]
+    removed = 0
+    with store.transaction():
+        for ident in old:
+            removed += store.forget(event_id=ident)
     return {"removed": removed}
 
 
@@ -207,6 +273,32 @@ def _cosine(query_terms, event_terms):
     dot = sum(query_terms[t] * event_terms[t] for t in shared)
     norm = math.sqrt(sum(v * v for v in query_terms.values())) * math.sqrt(sum(v * v for v in event_terms.values()))
     return dot / norm if norm else 0.0
+
+
+def matches(query, index, events, tuning, *, top_k=5):
+    """Events resembling the request, best first: what a packet can show and a gate can judge."""
+    floor = 3.0  # retrieval.DEFAULTS query_weights identifier/symbol level
+    identifiers = {t for t, w in query["terms"].items() if w >= floor}
+    now, items = time.time(), []
+    for event in events:
+        similarity = _cosine(query["terms"], event["terms"])
+        if similarity < tuning["min_similarity"]:
+            continue
+        shared = set(query["terms"]) & set(event["terms"])
+        files = [row for row in event["files"] if row["path"] in index.kinds]
+        known = [row for row in files if row.get("sha256") is not None]  # A user-asserted path carries no fingerprint to compare.
+        changed = [row["path"] for row in known if index.hashes.get(row["path"]) != row["sha256"]]
+        age_days = max(0.0, (now - event["recorded"]) / 86400)
+        recency = 0.5 ** (age_days / tuning["half_life_days"]) if tuning.get("half_life_days") else 1.0
+        items.append({"id": event["id"], "task_id": event["task_id"], "score": round(similarity, 4), "similarity": round(similarity, 4),
+                      "matched": sorted(shared, key=lambda t: -query["terms"][t])[:8], "identifier_support": len(shared & identifiers),
+                      "concept_matches": len(shared - identifiers), "outcome": event["outcome"], "summary": event.get("summary", ""),
+                      "files": [row["path"] for row in files], "changed": changed,
+                      "freshness": "unknown" if not known else "compatible" if not changed else "partially_changed" if len(changed) < len(known) else "changed",
+                      "weight": round(similarity * tuning["outcome_weights"].get(event["outcome"], 0.0) * recency, 4),
+                      "resolved": [{"path": row["path"], "label": "exact"} for row in files[:6]]})
+    items.sort(key=lambda item: (-item["score"], item["id"]))
+    return items[:top_k]
 
 
 def scores(query, index, events, tuning):

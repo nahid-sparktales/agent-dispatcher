@@ -990,20 +990,13 @@ def _repository_index(root, scrub, paths, texts, excluded, exclusions, increment
             else:
                 omitted += 1
         stale_inferences = len(deep.store.inferences(status="stale"))
-        experience = {"enabled": bool(settings["experience"]["use"]), "attached": 0}
-        if settings["experience"]["use"]:
-            try:
-                with store_module["ExperienceStore"](directory, readonly=True) as events:
-                    deep.events, deep.corrections = events.events(), events.corrections()
-            except (OSError, ValueError) as exc:
-                experience["detail"] = str(exc) if isinstance(exc, ValueError) else "unavailable"
         coverage = generation.get("coverage") or {}
         deep.report = {"status": "used", "generation": generation["id"], "identity": identity,
                        "coverage": {key: coverage.get(key) for key in ("discovered", "indexed", "pending", "failed", "complete_within_policy")},
                        "head_match": bool(history.get("head")) and head == history.get("head"),
                        "extended": {"candidates": len(candidates), "verified": len(deep.extended), "stale": stale, "pending": pending},
                        "inferences": {"attached": len(deep.inferences), "omitted": omitted, "stale": stale_inferences},
-                       "experience": experience, "maintenance": {"allowed": deep.maintain}}
+                       "experience": "unified: see the packet's memory.layers.experience", "maintenance": {"allowed": deep.maintain}}
     except (OSError, ValueError, TypeError, KeyError) as exc:
         deep.report = {"status": "unavailable", "detail": str(exc) if isinstance(exc, ValueError) else type(exc).__name__}
         deep.close()
@@ -1079,7 +1072,7 @@ def _memory_layer(engine, settings, root, index, task, exclusions, scrub, diagno
     if stats is not None:  # Timing is diagnostics: shown only with --explain, like every other _ms.
         stats["memory_ms"] = outcome["ms"]
         stats.update({f"memory_{name}_ms": value for name, value in outcome.get("timings", {}).items()})
-    return outcome["extra"], tuple(outcome["boost_only"]), report if report["status"] != "off" else None
+    return outcome["extra"], tuple(outcome["boost_only"]), report if report["status"] not in ("off", "no_stores") else None
 
 
 def _intelligent_selection(engine, settings, task, texts, hashes, explicit, role_id, changed, cache, root,
@@ -1095,11 +1088,6 @@ def _intelligent_selection(engine, settings, task, texts, hashes, explicit, role
                                   path_only=oversized, store=deep.store, extended=deep.extended or None, partners=partners,
                                   loader=deep.loader)
     hashes = index.hashes
-    if deep.events:
-        attached = _sibling("experience")["attach"](index, deep.events, deep.corrections, tuple(deep.settings["experience"]["eligible_outcomes"]))
-        deep.report["experience"]["attached"] = attached
-        if attached and "experience" not in settings["retrievers"]:
-            settings["retrievers"] = [*settings["retrievers"], "experience"]
     if deep.inferences:
         index.inferences = deep.inferences
         if "inference" not in settings["retrievers"]:
@@ -1126,13 +1114,8 @@ def _intelligent_selection(engine, settings, task, texts, hashes, explicit, role
                                       for rank, path in enumerate(sorted(rules), 1)])
     packet = outcome["packet"]
     if deep.store is not None:
-        deep.report["experience"]["candidates"] = len(outcome["lists"].get("experience", ()))
         deep.report["inferences"]["candidates"] = len(outcome["lists"].get("inference", ()))
         deep.report["counters"] = dict(deep.counters)
-        if deep.events and deep.settings["experience"].get("exposure_log"):
-            _sibling("experience")["log_exposure"](deep.settings["experience"]["exposure_log"],
-                                                  hashlib.sha256(task.encode("utf-8")).hexdigest(),
-                                                  outcome["lists"].get("experience", []), [item["path"] for item in packet["files"]])
         if deep.maintain:
             _maintain_index(deep, index, stats, texts, hashes, root)
     selected, excerpts = [], []
@@ -1598,11 +1581,6 @@ def explain_retrieval(project, task, *, strategy="full", pack=None, exclude_path
                    if settings["git"]["enabled"] and deep.partners is None else None)
         index = engine["build_index"](texts, hashes, _kind, cache=cache, history=history, config=settings, path_only=oversized,
                                       store=deep.store, extended=deep.extended or None, partners=deep.partners, loader=deep.loader)
-        if deep.events:
-            deep.report["experience"]["attached"] = _sibling("experience")["attach"](
-                index, deep.events, deep.corrections, tuple(deep.settings["experience"]["eligible_outcomes"]))
-            if deep.report["experience"]["attached"] and "experience" not in settings["retrievers"]:
-                settings["retrievers"] = [*settings["retrievers"], "experience"]
         if deep.inferences:
             index.inferences = deep.inferences
             if "inference" not in settings["retrievers"]:

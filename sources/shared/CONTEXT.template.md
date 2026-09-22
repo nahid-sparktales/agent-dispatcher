@@ -49,7 +49,7 @@ exclusions win.
   without checking changes. Declared commands are not checks. See [PROJECT-MAP.md](PROJECT-MAP.md),
   and the optional deep index (`repository_intelligence.index`).
 - `project_graph` gives bounded structural hints, not runtime traces.
-- `memory` (user-enabled): gated history, summary and experience hits with trust labels; see [MEMORY.md](MEMORY.md).
+- `memory` (when present): gated history, summary and experience hits with trust labels; see [MEMORY.md](MEMORY.md).
 - Explain missing/partial helpers and continue; never bypass denials or install/run tools to
   fill metadata.
 

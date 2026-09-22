@@ -173,10 +173,25 @@ def arm_settings(config, client, condition):
     return path
 
 
+def memory_settings(config, client, condition):
+    """The unified experience switch lives in the repository-memory settings: retrieval on for the warm arm only."""
+    home = arm_home(config, client, condition)
+    home.mkdir(parents=True, exist_ok=True, mode=0o700)
+    path = home / "repository-memory.json"
+    settings = {"enabled": True, "git": {"retrieval": "off"}, "semantic": {"retrieval": "off"},
+                "experience": {"recording": True, "retrieval": "on" if condition == "warm_experience" else "off",
+                               "eligible_outcomes": list(config.get("warm_experience_eligible") or ["grader_passed"])}}
+    text = json.dumps(settings, indent=2, sort_keys=True) + "\n"
+    if not path.is_file() or path.read_text(encoding="utf-8") != text:
+        path.write_text(text, encoding="utf-8")
+    return path
+
+
 def arm_env(config, client, condition, row, fixture):
     home = arm_home(config, client, condition)
     return {"XDG_CACHE_HOME": str(home / "cache"), "AGENT_DISPATCHER_INDEX_ID": arm_identity(client, condition, row, fixture),
-            "AGENT_DISPATCHER_INDEX_CONFIG": str(arm_settings(config, client, condition))}
+            "AGENT_DISPATCHER_INDEX_CONFIG": str(arm_settings(config, client, condition)),
+            "AGENT_DISPATCHER_MEMORY_CONFIG": str(memory_settings(config, client, condition))}
 
 
 def _helper(config, client, name):

@@ -42,7 +42,7 @@ GENERATED.extend("skills/agent-dispatcher/" + name for name in ("context_packet.
                                                                "repo_index.py", "retrieval.py", "context_budget.py", "llm_retrieval.py",
                                                                "repo_store.py", "repo_builder.py", "exploration.py", "experience.py",
                                                                "repository_intelligence.py",
-                                                               "repository_memory.py", "repo_history.py", "memory_experience.py"))
+                                                               "repository_memory.py", "repo_history.py"))
 GENERATED.extend(["skills/agent-dispatcher/resources.py", "catalog/resource-paths.json"])
 GENERATED.extend(["skills/agent-dispatcher/verification.py", "skills/agent-dispatcher/preferences.py",
                   "skills/agent-dispatcher/change_audit.py"])
