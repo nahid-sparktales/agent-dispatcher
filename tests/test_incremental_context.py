@@ -10,6 +10,7 @@ from unittest import mock
 
 import context
 import parser_cache
+import project_map
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -45,7 +46,7 @@ class IncrementalContextTests(unittest.TestCase):
                                       role="implementer", pack=ROOT, map_maintain=True, **kwargs)
 
     def state(self, name):
-        return json.loads((self.project / ".agent-dispatcher" / name).read_text())
+        return json.loads(project_map.state_path(self.project, name).read_text())
 
     def calls(self):
         graph = self.state("project-graph.json")
@@ -138,7 +139,7 @@ class IncrementalContextTests(unittest.TestCase):
         for node in graph["nodes"]:
             if node["kind"] == "function":
                 node["label"] = "forged_function"
-        (self.project / ".agent-dispatcher/project-graph.json").write_text(json.dumps(graph))
+        project_map.state_path(self.project, "project-graph.json").write_text(json.dumps(graph))
         result = self.select()
         self.assertEqual(result["parser_cache"]["parsed_files"], 0)
         self.assertEqual(self.state("project-graph.json"), original)

@@ -40,12 +40,20 @@ class CacheScopeTests(unittest.TestCase):
         target.write_text(text, encoding="utf-8")
         return target
 
+    def stored(self, target):
+        """Where a logical cache target is persisted: private state outside the project."""
+        return project_map.state_path(self.project, Path(target).name)
+
     def tree(self):
-        """Record names, file bytes and mtimes; exclude Git's own bookkeeping."""
-        return {path.relative_to(self.project).as_posix():
-                ("directory",) if path.is_dir() else ("file", path.read_bytes(), path.stat().st_mtime_ns)
-                for path in self.project.rglob("*")
-                if ".git" not in path.relative_to(self.project).parts}
+        """Record names, file bytes and mtimes of the project and of its private index state."""
+        found = {path.relative_to(self.project).as_posix():
+                 ("directory",) if path.is_dir() else ("file", path.read_bytes(), path.stat().st_mtime_ns)
+                 for path in self.project.rglob("*")
+                 if ".git" not in path.relative_to(self.project).parts}
+        private = self.stored(MAP).parent
+        found.update({"<private>/" + path.name: ("file", path.read_bytes(), path.stat().st_mtime_ns)
+                      for path in (private.iterdir() if private.is_dir() else ())})
+        return found
 
     def snapshot(self):
         helper = project_map._context()
@@ -82,14 +90,14 @@ class CacheScopeTests(unittest.TestCase):
                 shutil.copytree(FIXTURES / fixture["source_dir"], self.project, dirs_exist_ok=True)
                 # Derive a valid owned cache, then make its evidence stale.
                 self.select(map_maintain=True)
-                (self.project / GRAPH).unlink()
+                self.stored(GRAPH).unlink()
                 self.write("core.py", "def validate_token():\n    return False\n")
                 before = self.tree()
                 packet = self.select(fixture["prompt"], map_maintain=True, compact=True,
                                      packet_tokens=10000, auto_exclude=False)
                 self.assert_packet_deferred(packet, "task_scope_restricted")
                 self.assertEqual(self.tree(), before)
-                self.assertFalse((self.project / GRAPH).exists())
+                self.assertFalse(self.stored(GRAPH).exists())
 
     def test_actual_eval_prompts_do_not_create_cache_directory(self):
         for fixture in self.fixture_cases():
@@ -174,7 +182,7 @@ class CacheScopeTests(unittest.TestCase):
         self.assert_packet_deferred(packet, "task_scope_restricted")
         built = self.select(role="implementer", map_maintain=True)
         self.assertEqual(built["project_graph"]["maintenance"]["action"], "built")
-        self.assertTrue((self.project / MAP).exists() and (self.project / GRAPH).exists())
+        self.assertTrue(self.stored(MAP).exists() and self.stored(GRAPH).exists())
 
     def test_indexes_cover_repositories_beyond_the_old_eighty_source_cap(self):
         for number in range(150):
@@ -183,11 +191,11 @@ class CacheScopeTests(unittest.TestCase):
             self.write(f"services/module_{number:03d}.py", following + f"def step_{number:03d}():\n" + call)
         packet = self.select("Trace step_000 through its dependencies.", role="debugger", map_maintain=True)
         self.assertEqual(packet["project_graph"]["maintenance"]["action"], "built")
-        graph = json.loads((self.project / GRAPH).read_text())
+        graph = json.loads(self.stored(GRAPH).read_text())
         self.assertEqual(len(graph["sources"]), 154)  # 150 generated + 4 from setUp
         self.assertEqual(graph["omitted"]["sources"], 0)
         self.assertEqual(graph["omitted"]["nodes"], 0)
-        self.assertGreater(len(json.loads((self.project / MAP).read_text())["sources"]), 80)
+        self.assertGreater(len(json.loads(self.stored(MAP).read_text())["sources"]), 80)
 
     def test_oversized_text_file_is_skipped_without_blocking_persistence(self):
         self.write("pydoc_data/topics.py", "TOPICS = " + repr("x" * (300 * 1024)) + "\n")
@@ -196,7 +204,7 @@ class CacheScopeTests(unittest.TestCase):
             self.assertIs(packet[key]["coverage"]["scan_complete"], True)
             self.assertEqual(packet[key]["maintenance"]["action"], "built")
         self.assertIn({"path": "pydoc_data/topics.py", "reason": "file exceeds 256 KiB limit"}, packet["excluded"])
-        graph = json.loads((self.project / GRAPH).read_text())
+        graph = json.loads(self.stored(GRAPH).read_text())
         self.assertNotIn("pydoc_data/topics.py", {source["path"] for source in graph["sources"]})
         self.assertIs(project_map.build_map(self.project, pack=ROOT, refresh=True)["status"], "fresh")
 
@@ -214,7 +222,7 @@ class CacheScopeTests(unittest.TestCase):
                                               pack=ROOT, snapshot=self.snapshot(), maintain=True)
             self.assertEqual(graph["maintenance"]["action"], "built")
             self.assertGreater(graph["omitted"]["nodes"], 0)
-            self.assertLessEqual((self.project / GRAPH).stat().st_size, limit)
+            self.assertLessEqual(self.stored(GRAPH).stat().st_size, limit)
 
     def test_preview_takes_precedence_over_maintenance_without_losing_evidence(self):
         before = self.tree()
@@ -233,8 +241,8 @@ class CacheScopeTests(unittest.TestCase):
 
     def test_exact_writable_file_allows_only_that_cache(self):
         packet = self.select(map_maintain=True, writable_paths=[MAP])
-        self.assertTrue((self.project / MAP).is_file())
-        self.assertFalse((self.project / GRAPH).exists())
+        self.assertTrue(self.stored(MAP).is_file())
+        self.assertFalse(self.stored(GRAPH).exists())
         self.assertEqual(packet["project_map"]["maintenance"]["write_scope"],
                          {"allowed": True, "reason": "explicit_writable_paths", "target": MAP})
         self.deferred(packet["project_graph"], GRAPH, "outside_writable_paths")
@@ -242,7 +250,8 @@ class CacheScopeTests(unittest.TestCase):
     def test_writable_subtree_allows_both_owned_caches(self):
         packet = self.select(map_maintain=True, writable_paths=[".agent-dispatcher/"])
         for key, target in (("project_map", MAP), ("project_graph", GRAPH)):
-            self.assertTrue((self.project / target).is_file())
+            self.assertTrue(self.stored(target).is_file())
+            self.assertFalse((self.project / target).exists())  # the name is logical; nothing lands in the tree
             self.assertTrue(packet[key]["maintenance"]["persisted"])
             self.assertEqual(packet[key]["maintenance"]["write_scope"]["reason"], "explicit_writable_paths")
 
@@ -389,7 +398,7 @@ class CacheScopeTests(unittest.TestCase):
         packet = json.loads(child.stdout)
         self.assertTrue(packet["project_map"]["maintenance"]["persisted"])
         self.deferred(packet["project_graph"], GRAPH, "outside_writable_paths")
-        self.assertFalse((self.project / GRAPH).exists())
+        self.assertFalse(self.stored(GRAPH).exists())
 
 
 if __name__ == "__main__":

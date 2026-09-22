@@ -139,7 +139,10 @@ not authorization.
 
 The optional local map is built or refreshed explicitly with `project_map.py`, or through
 `/agent-map build|refresh` in Claude and `$agent-dispatcher map build|refresh` in Codex.
-The file `.agent-dispatcher/project-map.json` stores bounded facts about definitions,
+The map is private state outside the project
+(`~/.cache/agent-dispatcher/state-v1/<project id>/project-map.json`, or under an absolute
+`XDG_CACHE_HOME`); an in-project `.agent-dispatcher/project-map.json` left by an older release
+is read as a fallback and never written. It stores bounded facts about definitions,
 dependencies, discovered test commands, and documented architecture decisions. Every fact
 has a source path, line, and content fingerprint; heuristic feature labels are identified.
 
@@ -201,11 +204,13 @@ Its token estimate covers supplied workspace passages rather than the model's en
 window. During an ordinary active task the dispatcher uses the helper when substantial or
 unfamiliar local work warrants it.
 
-Lexical search, path search, symbol-shaped search, a little structure, and one bounded hop along
-local imports supply retrieval candidates. Map modes also derive a bounded structural graph,
-whose task and role projection can promote related sources. There are no embeddings or vector
-stores. Lexical ranking is additive and ordinal — it orders results and is not a
-probability. Everything retained carries provenance, everything dropped carries a reason, and that
+[Repository intelligence](repository-intelligence.md) supplies retrieval candidates: the request
+is analyzed into named things and concepts, independent retrievers (path, rare terms, BM25, symbol
+definitions and references, quoted literals) rank files, reciprocal rank fusion combines them, and
+the strongest results pull in import, call, test and git co-change neighbors before a budget step
+selects reasons, symbols and excerpts. Map modes also derive a bounded structural graph for the
+packet's task view. There are no embeddings or vector stores. Ranks are ordinal, not
+probabilities. `--retrieval legacy` keeps the earlier additive scorer. Everything retained carries provenance, everything dropped carries a reason, and that
 is what makes `/agent-context` answerable and a bad retrieval diagnosable.
 
 Unrestricted `--map-maintain` also fills a private authenticated host parser cache at

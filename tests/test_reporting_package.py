@@ -233,8 +233,10 @@ class ReportingPackageTests(unittest.TestCase):
                                     "--state", state, "--writable-path", "auth.py", "--json", expected=1)
                 self.assertTrue(audit["complete"])
                 self.assertEqual(audit["changes"]["modified"], ["auth.py"])
-                self.assertEqual(audit["out_of_scope"], [".agent-dispatcher/project-graph.json",
-                                                       ".agent-dispatcher/project-map.json", "untracked.txt"])
+                # Index maintenance persists to private state, so it is no longer an out-of-scope project change.
+                self.assertEqual(audit["out_of_scope"], ["untracked.txt"])
+                self.assertFalse((project / ".agent-dispatcher").exists())
+                self.assertTrue(packet["project_map"]["maintenance"]["persisted"])
                 self.assertEqual(audit["scope_status"], "out_of_scope")
                 self.assertEqual(audit["cleanup"]["status"], "removed")
                 self.assertFalse(state.parent.exists())

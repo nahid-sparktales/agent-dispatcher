@@ -3,6 +3,7 @@
 import hashlib
 import json
 from pathlib import Path
+import shutil
 import subprocess
 import tempfile
 import unittest
@@ -23,7 +24,7 @@ class ProjectGraphTests(unittest.TestCase):
         self.project = self.root / "project"
         self.project.mkdir()
         subprocess.run(["git", "init", "-q", str(self.project)], check=True)
-        self.state = self.project / ".agent-dispatcher/project-graph.json"
+        self.state = project_map.state_path(self.project, project_graph.STATE_FILE)  # private, outside the project
 
     def write(self, path, text):
         target = self.project / path
@@ -206,10 +207,26 @@ class ProjectGraphTests(unittest.TestCase):
         self.query(maintain=True)
         self.assertNotIn("forged_instruction", self.state.read_text())
 
+    def test_graph_is_private_and_an_in_project_graph_from_before_the_move_is_only_read(self):
+        self.basic()
+        self.assertEqual(self.query(maintain=True)["maintenance"]["action"], "built")
+        self.assertFalse((self.project / ".agent-dispatcher").exists())
+        old = self.project / ".agent-dispatcher/project-graph.json"
+        old.parent.mkdir()
+        shutil.move(self.state, old)
+        original = old.read_bytes()
+        self.assertEqual(self.query()["cache_status"], "fresh")  # read through the fallback
+        self.write("extra.py", "def added():\n    return 1\n")
+        self.assertEqual(self.query()["cache_status"], "stale")
+        self.assertEqual(self.query(maintain=True)["maintenance"]["action"], "refreshed")
+        self.assertEqual(old.read_bytes(), original)
+        self.assertIn("extra.py", self.state.read_text())
+        self.assertEqual(self.query()["cache_status"], "fresh")
+
     def test_malformed_or_symlinked_graph_leaves_legacy_map_and_user_files_untouched(self):
         self.basic()
         project_map.build_map(self.project, pack=ROOT)
-        legacy = self.project / ".agent-dispatcher/project-map.json"
+        legacy = project_map.state_path(self.project)  # the fact map kept beside the graph
         original = legacy.read_bytes()
         self.state.write_text('{"foreign":true}')
         result = self.query(maintain=True)

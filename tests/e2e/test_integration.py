@@ -302,7 +302,10 @@ class PipelineIntegrationTests(unittest.TestCase):
                     self.assertTrue(result['ok'], result)
                     files = rt.tree_files(workspace, rt.EXCLUDED)
                     initial.append(rt.digest_files(files))
-                    graph = json.loads(files['.agent-dispatcher/project-graph.json'])
+                    self.assertFalse(any(path.startswith('.agent-dispatcher/') for path in files))
+                    # The graph is private state under the helper's HOME, keyed by this workspace.
+                    saved = [json.loads(path.read_text()) for path in home.glob('.cache/agent-dispatcher/state-v1/*/project-graph.json')]
+                    graph = next(g for g in saved if any(s['path'] == 'greeting.py' for s in g['sources']))
                     self.assertTrue(all(not s['path'].startswith('.agents/') for s in graph['sources']))
         self.assertEqual(initial[0], initial[1])
 

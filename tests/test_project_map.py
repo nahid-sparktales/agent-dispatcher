@@ -26,7 +26,12 @@ class ProjectMapTests(unittest.TestCase):
         self.project = self.root / "project"
         self.project.mkdir()
         subprocess.run(["git", "init", "-q", str(self.project)], check=True)
-        self.state = self.project / ".agent-dispatcher/project-map.json"
+        self.state = project_map.state_path(self.project)  # private, outside the project
+        self.legacy = self.project / ".agent-dispatcher/project-map.json"
+
+    def own_state_directory(self):
+        """The private directory as the helper would create it: owner-only, outside the project."""
+        self.state.parent.mkdir(parents=True, mode=0o700, exist_ok=True)
 
     def write(self, relative, text):
         path = self.project / relative
@@ -187,7 +192,7 @@ class ProjectMapTests(unittest.TestCase):
 
     def test_unowned_or_unknown_schema_state_is_never_overwritten(self):
         self.write("auth.py", "def validate_login(): pass\n")
-        self.state.parent.mkdir()
+        self.own_state_directory()
         self.state.write_text('{"mine":"user data"}')
         before = self.state.read_bytes()
         with self.assertRaises(project_map.ProjectMapError):
@@ -203,16 +208,66 @@ class ProjectMapTests(unittest.TestCase):
             self.build(refresh=True)
         self.assertEqual(self.state.read_bytes(), before)
 
+    def test_state_is_private_and_the_working_tree_is_never_touched(self):
+        self.basic()
+        before = self.snapshot()
+        self.build()
+        context.select_context(self.project, "validate_login", pack=ROOT, map_maintain=True)
+        self.assertEqual(self.snapshot(), before)
+        self.assertFalse((self.project / ".agent-dispatcher").exists())
+        self.assertFalse(self.state.is_relative_to(self.project))
+        self.assertEqual(self.state.parent.stat().st_mode & 0o777, 0o700)
+        self.assertEqual(self.state.stat().st_mode & 0o777, 0o600)
+        other = self.root / "other"
+        other.mkdir()
+        self.assertNotEqual(project_map.state_path(other).parent, self.state.parent)  # one directory per project
+        with mock.patch.dict(os.environ, {"XDG_CACHE_HOME": str(self.project / "cache")}):
+            with self.assertRaises(project_map.ProjectMapError):
+                self.build(refresh=True)  # a cache home inside the project is refused, not created
+        self.assertFalse((self.project / "cache").exists())
+
+    def test_in_project_state_from_before_the_move_is_read_but_never_written(self):
+        self.basic()
+        self.build()
+        self.legacy.parent.mkdir()
+        shutil.move(self.state, self.legacy)  # what an older release left behind, possibly committed
+        original = self.legacy.read_bytes()
+        self.assertEqual(self.show()["status"], "fresh")
+        with self.assertRaises(project_map.ProjectMapError):
+            self.build()  # it still counts as the existing map
+        self.write("src/auth.py", "import sqlite3\ndef validate_session(user):\n    return user\n")
+        self.assertEqual(self.show()["status"], "stale")
+        self.assertEqual(self.build(refresh=True)["action"], "refreshed")
+        self.assertEqual(self.legacy.read_bytes(), original)
+        self.assertIn("validate_session", self.state.read_text())
+        self.assertEqual(self.show()["status"], "fresh")  # private state now wins over the stale file
+        maintained = context.select_context(self.project, "validate_session", pack=ROOT, map_maintain=True)
+        self.assertEqual(maintained["project_map"]["maintenance"]["action"], "unchanged")
+        self.assertEqual(self.legacy.read_bytes(), original)
+        self.assertEqual(sorted(p.name for p in self.legacy.parent.iterdir()), ["project-map.json"])
+
+    def test_malformed_in_project_state_is_refused_and_preserved(self):
+        self.basic()
+        self.legacy.parent.mkdir()
+        self.legacy.write_text('{"foreign":true}')
+        with self.assertRaises(project_map.ProjectMapError):
+            self.build()
+        report = context.select_context(self.project, "validate_login", pack=ROOT, map_maintain=True)
+        self.assertEqual(report["project_map"]["status"], "unavailable")
+        self.assertEqual(self.legacy.read_text(), '{"foreign":true}')
+        self.assertFalse(self.state.exists())
+
     def test_symlink_state_directory_target_and_temporary_path_are_refused(self):
         self.write("auth.py", "def validate_login(): pass\n")
         outside = self.root / "outside"
-        outside.mkdir()
+        outside.mkdir(mode=0o700)
+        self.state.parent.parent.mkdir(parents=True, exist_ok=True)
         self.state.parent.symlink_to(outside, target_is_directory=True)
         with self.assertRaises(project_map.ProjectMapError):
             self.build()
         self.assertEqual(list(outside.iterdir()), [])
         self.state.parent.unlink()
-        self.state.parent.mkdir()
+        self.own_state_directory()
         victim = outside / "victim.json"
         victim.write_text("keep")
         self.state.symlink_to(victim)
@@ -442,7 +497,7 @@ class ProjectMapTests(unittest.TestCase):
         # selected. The matching path, order and ranges remain the same here.
         for field in ("path", "rank", "lines"):
             self.assertEqual([row[field] for row in plain["context"]], [row[field] for row in preview["context"]])
-        self.state.parent.mkdir()
+        self.own_state_directory()
         self.state.write_text('{"foreign":true}')
         before = self.snapshot()
         refused = context.select_context(self.project, "validate_login", pack=ROOT, map_preview=True)["project_map"]
@@ -575,7 +630,7 @@ class ProjectMapTests(unittest.TestCase):
 
     def test_maintenance_preserves_malformed_unowned_and_symlinked_state(self):
         self.write("auth.py", "def validate_login(): pass\n")
-        self.state.parent.mkdir()
+        self.own_state_directory()
         for text in ('{broken', '{"mine":"user data"}'):
             self.state.write_text(text)
             result = project_map.maintain_map(self.project, pack=ROOT)
@@ -661,7 +716,7 @@ class ProjectMapTests(unittest.TestCase):
             shutil.copytree(ROOT / "catalog", runtime / "catalog")
             scripts = pack / "scripts" if layout == "codex" else pack / "skills/agent-dispatcher" if layout == "claude-plugin" else pack
             scripts.mkdir(parents=True, exist_ok=True)
-            for name in ("context.py", "project_map.py"):
+            for name in ("context.py", "project_map.py", "parser_cache.py"):
                 shutil.copyfile(ROOT / name, scripts / name)
             child = subprocess.run([sys.executable, "-B", str(scripts / "project_map.py"), "show", "--project", str(self.project),
                                     "--task", "validate_login", "--json"], capture_output=True, text=True, cwd=self.project, check=True)

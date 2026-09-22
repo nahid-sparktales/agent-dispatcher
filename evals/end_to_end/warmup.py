@@ -8,7 +8,10 @@ import sys
 
 from . import runtime as rt
 
+# Indexes persist to private state outside the workspace. These in-tree paths are where older
+# releases (and some frozen fixtures) keep them; when present they are inputs to preserve.
 INDEX_PATHS = (".agent-dispatcher/project-map.json", ".agent-dispatcher/project-graph.json")
+PERSISTED = {"built", "refreshed", "unchanged"}
 
 
 def warm_project_indexes(config, client, workspace):
@@ -25,7 +28,7 @@ def warm_project_indexes(config, client, workspace):
     helper = package / ("scripts/context.py" if client == "codex" else "context.py")
     report = {"schema_version": 1, "requested": True, "ok": False,
               "excluded_from_task_timing": True, "elapsed_seconds": 0.0,
-              "index_paths": list(INDEX_PATHS), "stages": [], "diagnostics": []}
+              "index_storage": "private_state", "stages": [], "diagnostics": []}
     try:
         before = rt.tree_files(workspace, rt.EXCLUDED)
         for mode in ("maintain", "preview"):
@@ -54,10 +57,14 @@ def warm_project_indexes(config, client, workspace):
                         or coverage.get("task_filtered") is not False
                         or coverage.get("excluded_files") != 0):
                     raise ValueError("Index setup did not establish complete, fresh project indexes.")
-                stage["indexes"][name] = {
-                    "status": item["status"], "coverage": coverage,
-                    "maintenance_action": item.get("maintenance", {}).get("action"),
-                }
+                action = item.get("maintenance", {}).get("action")
+                if mode == "maintain" and action not in PERSISTED:
+                    raise ValueError("Index setup did not save both project indexes.")
+                stage["indexes"][name] = {"status": item["status"], "coverage": coverage, "maintenance_action": action}
+                # Counts only: enough to show both conditions were prepared alike, never index contents.
+                for key in ("fresh_facts", "omitted"):
+                    if isinstance(item.get(key), (int, dict)) and type(item[key]) is not bool:
+                        stage["indexes"][name][key] = item[key]
             stats = packet.get("parser_cache")
             if not isinstance(stats, dict) or stats.get("enabled") is not True:
                 raise ValueError("Index setup did not report incremental parser cache evidence.")
@@ -80,16 +87,12 @@ def warm_project_indexes(config, client, workspace):
                                       or stats["graph_hits"] != 1 or stats.get("graph_misses", 0) != 0):
                 raise ValueError("Warm index preview did not reuse the unchanged relationship graph.")
             report["stages"].append(stage)
-            after = rt.tree_files(workspace, rt.EXCLUDED)
-            if any(before.get(path) != after.get(path)
-                   for path in set(before) | set(after) if path not in INDEX_PATHS):
-                raise ValueError("Index setup changed files outside its two permitted project indexes.")
-            if not all(path in after for path in INDEX_PATHS):
-                raise ValueError("Index setup did not save both project indexes.")
-            if mode == "preview" and after != maintained:
-                raise ValueError("Warm preview unexpectedly changed project files.")
-            maintained = after
-        report["index_files_digest"] = rt.digest_files({p: maintained[p] for p in INDEX_PATHS})
+            # A fresh preview after maintenance proves the saved indexes are readable; the workspace
+            # itself, including any index files a fixture ships, must be byte-identical throughout.
+            if rt.tree_files(workspace, rt.EXCLUDED) != before:
+                raise ValueError("Index setup changed project files; indexes must persist to private state outside the workspace.")
+        evidence = json.dumps(report["stages"][-1]["indexes"], sort_keys=True).encode("utf-8")
+        report["index_evidence_digest"] = rt.digest_files({"index-evidence.json": evidence})
         report["ok"] = True
     except (OSError, ValueError, TypeError, KeyError) as error:
         report["diagnostics"].append(str(error) if isinstance(error, ValueError)
@@ -98,12 +101,13 @@ def warm_project_indexes(config, client, workspace):
 
 
 def fixture_after_warmup(fixture, initial_dir):
-    """Keep scope grading relative to setup, protecting caches on limited tasks."""
+    """Keep scope grading relative to setup, protecting in-tree index files a baseline contains."""
     result = deepcopy(fixture)
     result["source_dir"] = str(initial_dir)
+    present = [path for path in INDEX_PATHS if (Path(initial_dir) / path).is_file()]
     for check in result["checks"]:
         if check["kind"] == "unchanged":
-            check["paths"] = list(dict.fromkeys([*check["paths"], *INDEX_PATHS]))
+            check["paths"] = list(dict.fromkeys([*check["paths"], *present]))
     return result
 
 

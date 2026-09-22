@@ -72,6 +72,8 @@ def _cache_write_scope(task, target, *, preview=False, writable_paths=None, snap
     Literal caller paths are the exact boundary. The conservative language guard
     is supplementary, not a general natural-language authorization interpreter.
     Shared snapshot decisions can only tighten a later helper's own decision.
+    Targets are logical names: the indexes now persist to private state outside the
+    project, and a restricted, read-only or path-scoped task still defers that write.
     """
     targets = {".agent-dispatcher/project-map.json", ".agent-dispatcher/project-graph.json"}
     if target not in targets or type(preview) is not bool:
@@ -196,8 +198,8 @@ def _role(pack, role):
     raise ContextError("Role catalog missing; repair the installed pack.")
 
 
-def _path_command(command, project):
-    """Read a NUL path stream with byte/time limits, including a bounded stalled child."""
+def _bounded_output(command, project):
+    """Run a read-only command with byte/time limits, including a bounded stalled child."""
     env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
     env["GIT_OPTIONAL_LOCKS"] = "0"
     process = subprocess.Popen(command, cwd=project, stdout=subprocess.PIPE,
@@ -229,11 +231,19 @@ def _path_command(command, project):
     except (OSError, subprocess.TimeoutExpired):
         process.kill()
         process.wait()
-        return [], False, False
+        return None, None, False
     finally:
         process.stdout.close()
+    return bytes(output), code, limited
+
+
+def _path_command(command, project):
+    """Read a NUL path stream with byte/time limits, including a bounded stalled child."""
+    output, code, limited = _bounded_output(command, project)
+    if output is None:
+        return [], False, False
     # Never admit a truncated final path.
-    raw_paths = bytes(output).split(b"\0")[:-1]
+    raw_paths = output.split(b"\0")[:-1]
     paths = []
     for raw in raw_paths:
         try:
@@ -325,6 +335,89 @@ def _read(project, relative, remaining):
         return data.decode("utf-8"), len(data), None
     except (OSError, UnicodeError, ValueError):
         return None, consumed, "unreadable or non-UTF-8 file"
+
+
+def _scan_sources(root, paths, manual_exclusions, automatic, incremental, scrub, excluded, diagnostics, oversized=None):
+    """The retrieval universe: exclusion, credential and size rules run before any file is opened.
+
+    Everything downstream (legacy scoring, the repository index, symbols, graph, history,
+    explorer requests, excerpts, explain output) sees only the texts admitted here.
+    """
+    texts, hashes = {}, {}
+    scanned = 0
+    scan_complete = not any("partial" in d or "enumeration unavailable" in d for d in diagnostics)
+    for path in paths:
+        reason = ("explicit task exclusion" if _excluded(path, manual_exclusions) else
+                  "automatic task exclusion" if _excluded(path, automatic) else _skip(path))
+        if reason:
+            excluded.append({"path": scrub(path), "reason": reason})
+            continue
+        if incremental is not None:
+            text, used, reason, raw_sha = incremental.read(
+                path, MAX_SCAN_BYTES - scanned, _read, lambda value: _redact_source(value, scrub))
+        else:
+            text, used, reason = _read(root, path, MAX_SCAN_BYTES - scanned)
+            raw_sha = None
+        scanned += used
+        if reason:
+            excluded.append({"path": scrub(path), "reason": reason})
+            if reason not in RULE_SKIPS:
+                scan_complete = False
+            if reason == "scan byte budget exhausted":
+                diagnostics.append("Text scanning reached the 32 MiB limit; results are partial.")
+                break
+            # Admitted by every exclusion and credential rule, only too large to read: its name may
+            # still be ranked (path, imports, history), its content is never opened.
+            if oversized is not None and reason == "file exceeds 256 KiB limit" and scrub(path) == path:
+                oversized.append(path)
+            continue
+        hashes[path] = raw_sha or hashlib.sha256(text.encode("utf-8")).hexdigest()
+        if incremental is None:
+            text = _redact_source(text, scrub)
+        texts[path] = text
+    return texts, hashes, scanned, scan_complete
+
+
+def _retrieval_engine(retrieval, cap, budget, max_files, max_bytes, diagnostics):
+    """Load the repository-intelligence engine, or fall back to legacy selection with a diagnostic."""
+    if retrieval == "legacy":
+        return None, None
+    try:
+        engine = _sibling("retrieval")
+        settings = engine["configure"]("full" if retrieval == "auto" else retrieval, {"context": {
+            "max_files": min(cap, max_files) if max_files else cap,
+            "max_bytes": min(budget * 4, max_bytes) if max_bytes else budget * 4}})
+        return engine, settings
+    except (OSError, UnicodeError, SyntaxError, ValueError, TypeError, KeyError):
+        diagnostics.append("Repository intelligence unavailable; legacy retrieval used.")
+        return None, None
+
+
+def _git_history(project, max_commits, cache=None):
+    """Bounded `git log` of changed paths, reduced to policy-allowed names before it is cached or counted."""
+    git = shutil.which("git")
+    if not git:
+        return None
+    try:
+        base = [git, "-c", "core.fsmonitor=false", "-c", "core.quotepath=off"]
+        head, code, _ = _bounded_output(base + ["rev-parse", "--verify", "--quiet", "HEAD"], project)
+        if code != 0 or not head:
+            return None
+        key = [head.decode("ascii", "replace").strip(), max_commits]
+        cached = cache.get("git-history", key) if cache is not None else None
+        if isinstance(cached, str):
+            return cached
+        raw, code, limited = _bounded_output(base + ["log", f"-n{max_commits}", "--no-merges", "--no-renames",
+                                                     "--name-only", "--relative", "--format=%x01%ct", "--", "."], project)
+        if raw is None or (code != 0 and not limited):
+            return None
+        kept = "\n".join(line for line in raw.decode("utf-8", "replace").split("\n")
+                         if line.startswith("\x01") or (line and not _skip(line)))
+        if cache is not None:
+            cache.put("git-history", key, kept)
+        return kept
+    except (OSError, ValueError):
+        return None
 
 
 def _terms(task):
@@ -687,6 +780,175 @@ def _ranges(candidate, radius=8):
     return [(start + 1, end, "\n".join(lines[start:end])) for start, end in windows]
 
 
+def _legacy_rank(candidates, texts):
+    """Pre-intelligence ranking: flat scores, then paired tests and one-hop imports of the top three."""
+    strongest = sorted(candidates.values(), key=_sort)
+    # Tests are admitted only when paired to an already relevant source file.
+    source_stems = {_stem(c["path"]) for c in strongest[:3] if c["type"] == "source"}
+    for path, text in texts.items():
+        if _kind(path) == "test" and _stem(path) in source_stems:
+            if path not in candidates:
+                candidates[path] = {"path": path, "type": "test", "reason": "paired test for a strong source result",
+                                    "match": "filename", "score": 0, "defined": False, "hint": False,
+                                    "text": text, "centers": [0], "symbols": []}
+            candidates[path]["score"] += 2
+            if "paired test" not in candidates[path]["reason"]:
+                candidates[path]["reason"] += "; paired test for a strong source result"
+    added = 0
+    for parent in strongest[:3]:
+        for path in _neighbors(parent["path"], parent["text"], texts):
+            if path in candidates:
+                continue
+            if added == 2:
+                break
+            candidates[path] = {"path": path, "type": _kind(path), "reason": "one-hop local import",
+                                "match": "expansion", "via": parent["path"], "score": 1,
+                                "defined": False, "hint": False, "text": texts[path],
+                                "centers": [0], "symbols": []}
+            added += 1
+    return sorted(candidates.values(), key=_sort)
+
+
+def _legacy_selection(candidates, texts, cap, budget, excluded, scrub, compact, hashes, diagnostics):
+    """Pre-intelligence selection: legacy ranking, then excerpt windows under the token budget."""
+    selected, excerpts = [], []
+    spent = 0
+    for candidate in _legacy_rank(candidates, texts):
+        path = candidate["path"]
+        if len(selected) >= cap:
+            excluded.append({"path": scrub(path), "reason": "artifact cap"})
+            continue
+        ranges = _ranges(candidate)
+        cleaned = ranges
+        total = sum(math.ceil(len(content) / 4) for _, _, content in cleaned)
+        if total > budget - spent:
+            # Narrow windows before dropping files; never emit a partial source line.
+            cleaned = _ranges(candidate, radius=2)
+        emitted = []
+        for start, end, content in cleaned:
+            lines = content.split("\n")
+            if math.ceil(len(content) / 4) > budget - spent:
+                centers = [c for c in candidate["centers"] if start - 1 <= c < end]
+                center = (centers[0] if centers else start - 1) - start + 1
+                left, right = center, center + 1
+                if math.ceil(len(lines[center]) / 4) > budget - spent:
+                    continue
+                for _ in range(len(lines)):
+                    options = ((left - 1, right), (left, right + 1))
+                    expanded = False
+                    for a, b in options:
+                        if (a >= 0 and b <= len(lines)
+                                and math.ceil(len("\n".join(lines[a:b])) / 4) <= budget - spent):
+                            left, right = a, b
+                            expanded = True
+                            break
+                    if not expanded:
+                        break
+                content = "\n".join(lines[left:right])
+                start += left
+                end = start + right - left - 1
+            if not content:
+                continue
+            spent += math.ceil(len(content) / 4)
+            actual_end = end
+            emitted.append(f"{start}-{actual_end}")
+            excerpt = {"path": scrub(path), "lines": f"{start}-{actual_end}", "content": content}
+            if compact:
+                excerpt["source_sha256"] = hashes[path]
+                excerpt["id"] = hashlib.sha256(json.dumps(excerpt, sort_keys=True, ensure_ascii=True,
+                                                         separators=(",", ":")).encode("utf-8")).hexdigest()
+            excerpts.append(excerpt)
+        if not emitted:
+            excluded.append({"path": scrub(path), "reason": "excerpt token budget"})
+            continue
+        row = {key: candidate[key] for key in ("path", "type", "reason", "match")}
+        row["path"] = scrub(path)
+        row.update(rank=len(selected) + 1, lines=", ".join(emitted))
+        if candidate["symbols"]:
+            row["symbols"] = [scrub(symbol) for symbol in candidate["symbols"]]
+        if candidate.get("via"):
+            row["via"] = scrub(candidate["via"])
+        selected.append(row)
+        if sum(math.ceil(len(content) / 4) for _, _, content in cleaned) > sum(
+                math.ceil(len(e["content"]) / 4) for e in excerpts if e["path"] == row["path"]):
+            diagnostics.append("Some selected ranges were trimmed to the excerpt budget.")
+    return selected, excerpts, spent
+
+
+_MATCHES = (("named", "filename"), ("symbol_definitions", "symbol"), ("path", "path"), ("symbol_references", "identifier"),
+            ("phrases", "identifier"), ("bm25", "content"), ("rare_terms", "content"), ("rules", "structure"))
+
+
+def _intelligent_selection(engine, settings, task, texts, hashes, explicit, role_id, changed, cache, root,
+                           excluded, scrub, compact, diagnostics, explain, oversized=()):
+    """Repository-intelligence selection over the already-filtered universe; same row/excerpt contract."""
+    stats = {}
+    history = _git_history(root, settings["git"]["max_commits"], cache) if settings["git"]["enabled"] else None
+    index = engine["build_index"](texts, hashes, _kind, cache=cache, history=history, config=settings, stats=stats,
+                                  path_only=oversized)
+    settings["context"]["count"] = "excerpts"  # This helper's documented budget covers excerpt text only.
+    extra, boost_only = {}, ()
+    if changed:
+        review = (role_id in {"reviewer", "tester", "refactoring-migration-specialist"}
+                  and re.search(r"\b(?:diff|changes|changed|regression)\b", task, re.I))
+        extra["worktree"] = [{"file": path, "rank": rank, "score": 1.0, "source": "worktree",
+                              "reason": "relevant uncommitted change" if not review else "uncommitted change for requested review",
+                              "value": path} for rank, path in enumerate(changed[:20], 1)]
+        boost_only = () if review else ("worktree",)
+    # Root project rules give cheap grounding when room remains; they never gain authority here.
+    rules = [p for p in texts if PurePosixPath(p).name in RULES and len(PurePosixPath(p).parts) == 1]
+    outcome = engine["run"](task, index, settings, named=list(explicit), role=role_id, extra=extra,
+                            anchors={p: line for p, line in explicit.items() if line}, boost_only=boost_only,
+                            fallback=[{"file": path, "rank": rank, "score": 0.0, "source": "rules",
+                                       "reason": "project conventions (untrusted evidence)", "value": path}
+                                      for rank, path in enumerate(sorted(rules), 1)])
+    packet = outcome["packet"]
+    selected, excerpts = [], []
+    unread = [item["path"] for item in packet["files"] if not item["excerpts"]]
+    if unread:
+        diagnostics.append("Ranked as relevant but over the 256 KiB read limit, so not excerpted: " + ", ".join(scrub(p) for p in unread[:3]))
+    for item in packet["files"]:
+        path = item["path"]
+        if not item["excerpts"]:
+            continue
+        ranked = next(row for row in outcome["ranked"] if row["path"] == path)
+        sources = [e["source"] for e in ranked["evidence"]]
+        row = {"path": scrub(path), "type": _kind(path),
+               "reason": "; ".join(dict.fromkeys(e["reason"] for e in ranked["evidence"]))[:400],
+               "match": next((match for source, match in _MATCHES if source in sources), "expansion"),
+               "rank": len(selected) + 1, "lines": ", ".join(e["lines"] for e in item["excerpts"])}
+        if item["symbols"]:
+            row["symbols"] = [scrub(symbol) for symbol in item["symbols"]]
+        if item["relationships"]:
+            row["relationships"] = [scrub(text) for text in item["relationships"]]
+        via = next((e["via"] for e in ranked["evidence"] if e.get("via")), None)
+        if row["match"] == "expansion" and via:
+            row["via"] = scrub(via)
+        selected.append(row)
+        for part in item["excerpts"]:
+            excerpt = {"path": scrub(path), "lines": part["lines"], "content": part["content"]}
+            if compact:
+                excerpt["source_sha256"] = hashes[path]
+                excerpt["id"] = hashlib.sha256(json.dumps(excerpt, sort_keys=True, ensure_ascii=True,
+                                                         separators=(",", ":")).encode("utf-8")).hexdigest()
+            excerpts.append(excerpt)
+    for item in packet["dropped"]:
+        excluded.append({"path": scrub(item["path"]), "reason": "artifact cap" if item["reason"] == "file limit"
+                         else "excerpt token budget" if item["reason"] == "byte budget" else item["reason"]})
+    if packet.get("trimmed"):
+        diagnostics.append("Some selected ranges were trimmed to the excerpt budget.")
+    trace = outcome["trace"]
+    # Timings vary between identical calls, so they appear only when a trace was asked for.
+    telemetry = {key: value for key, value in {**trace, **stats}.items()
+                 if explain or not (key.endswith("_ms") or key == "overlap")}
+    report = {"strategy": settings["name"], "task_signals": {k: [scrub(v) for v in values] for k, values in packet["task_signals"].items()},
+              "telemetry": dict(telemetry, seeds=[scrub(p) for p in trace["seeds"]])}
+    if explain:
+        report["explain"] = scrub(engine["render_explain"](outcome, verbose=True))
+    spent = sum(math.ceil(len(e["content"]) / 4) for e in excerpts)
+    return selected, excerpts, spent, report
+
+
 def _project_map(project, task, pack, snapshot, preview=False, maintain=False, writable_paths=None):
     missing = {"status": "missing", "entries": [], "estimated_tokens": 0,
                "cache_status": "missing", "evidence_origin": "none",
@@ -696,9 +958,16 @@ def _project_map(project, task, pack, snapshot, preview=False, maintain=False, w
                "preview": {"requested": preview, "used": False, "persisted": False},
                "maintenance": {"requested": maintain, "action": "unavailable" if maintain else "not_requested", "persisted": False},
                "fresh_facts": 0, "withheld_facts": 0, "refresh_recommended": False, "diagnostics": []}
-    state = project / ".agent-dispatcher" / "project-map.json"
-    if not preview and not maintain and not state.exists() and not state.is_symlink():
-        return missing
+    # The map lives in private state outside the project; an in-project file from before that move is
+    # still read, never written. With neither present, an ordinary call needs no map helper at all.
+    legacy = project / ".agent-dispatcher" / "project-map.json"
+    if not preview and not maintain and not legacy.exists() and not legacy.is_symlink():
+        try:
+            private = _sibling("parser_cache")["state_directory"](project) / "project-map.json"
+            if not private.exists() and not private.is_symlink():
+                return missing
+        except (OSError, UnicodeError, SyntaxError, ValueError, TypeError, KeyError):
+            return missing
     # Load only the packaged sibling; never resolve imports against the project/cwd.
     helper_path = Path(__file__).resolve().with_name("project_map.py")
     try:
@@ -799,7 +1068,8 @@ def select_context(project, task, role=None, size="standard", max_tokens=None, p
                    *, exclude_paths=(), map_preview=False, auto_exclude=True,
                    compact=False, packet_tokens=None, guide_ids=(), map_maintain=False,
                    reuse_state=None, reuse_scope=None, writable_paths=None, audit=False,
-                   parser_cache=True, _delivery=None):
+                   parser_cache=True, retrieval="auto", max_files=None, max_bytes=None, explain=False,
+                   _delivery=None):
     """Prepare context; an explicit audit captures helper writes before they happen."""
     if type(audit) is not bool:
         raise ContextError("Task audit must be a boolean.")
@@ -810,6 +1080,7 @@ def select_context(project, task, role=None, size="standard", max_tokens=None, p
                                compact=compact, packet_tokens=packet_tokens, guide_ids=guide_ids,
                                map_maintain=map_maintain, reuse_state=reuse_state, reuse_scope=reuse_scope,
                                writable_paths=writable_paths, parser_cache=parser_cache,
+                               retrieval=retrieval, max_files=max_files, max_bytes=max_bytes, explain=explain,
                                _delivery=_delivery, _audit_pending=pending)
     except BaseException:
         if pending:
@@ -833,6 +1104,7 @@ def _select_context(project, task, role=None, size="standard", max_tokens=None, 
                     *, exclude_paths=(), map_preview=False, auto_exclude=True,
                     compact=False, packet_tokens=None, guide_ids=(), map_maintain=False,
                     reuse_state=None, reuse_scope=None, writable_paths=None, parser_cache=True,
+                    retrieval="auto", max_files=None, max_bytes=None, explain=False,
                     _delivery=None, _audit_pending=None):
     """Select evidence; opt-in maintenance/reuse writes only bounded owned state."""
     if not isinstance(task, str) or not task.strip() or len(task) > MAX_TASK_CHARS:
@@ -851,6 +1123,10 @@ def _select_context(project, task, role=None, size="standard", max_tokens=None, 
         raise ContextError("Parser cache must be a boolean.")
     if packet_tokens is not None and (type(packet_tokens) is not int or not 256 <= packet_tokens <= 100000):
         raise ContextError("Packet budget must be an integer between 256 and 100000.")
+    if not isinstance(retrieval, str) or not re.fullmatch(r"[a-z+_-]{1,40}", retrieval) or type(explain) is not bool:
+        raise ContextError("Retrieval must name a strategy (auto, legacy, full, ...); explain must be a boolean.")
+    if any(v is not None and (type(v) is not int or not 1 <= v <= 1000000) for v in (max_files, max_bytes)):
+        raise ContextError("File and byte limits must be positive integers.")
     if not compact and (packet_tokens is not None or guide_ids or reuse_state is not None or reuse_scope is not None):
         raise ContextError("Packet budgets, supplied guides and evidence reuse require --compact.")
     root = Path(project).expanduser().resolve()
@@ -896,41 +1172,20 @@ def _select_context(project, task, role=None, size="standard", max_tokens=None, 
     if parser_cache and (map_preview or map_maintain):
         incremental = _parser_cache(root, writable=cache_writable,
                                     policy_extra=getattr(scrub, "_dispatcher_policy", None))
-    texts, candidates, hashes = {}, {}, {}
-    scanned = 0
-    scan_complete = not any("partial" in d or "enumeration unavailable" in d for d in diagnostics)
-    for path in paths:
-        reason = ("explicit task exclusion" if _excluded(path, manual_exclusions) else
-                  "automatic task exclusion" if _excluded(path, automatic) else _skip(path))
-        if reason:
-            excluded.append({"path": scrub(path), "reason": reason})
-            continue
-        if incremental is not None:
-            text, used, reason, raw_sha = incremental.read(
-                path, MAX_SCAN_BYTES - scanned, _read, lambda value: _redact_source(value, scrub))
-        else:
-            text, used, reason = _read(root, path, MAX_SCAN_BYTES - scanned)
-            raw_sha = None
-        scanned += used
-        if reason:
-            excluded.append({"path": scrub(path), "reason": reason})
-            if reason not in RULE_SKIPS:
-                scan_complete = False
-            if reason == "scan byte budget exhausted":
-                diagnostics.append("Text scanning reached the 32 MiB limit; results are partial.")
-                break
-            continue
-        hashes[path] = raw_sha or hashlib.sha256(text.encode("utf-8")).hexdigest()
-        if incremental is None:
-            text = _redact_source(text, scrub)
-        texts[path] = text
-        candidate = _candidate(path, text, terms, identifiers, phrases, explicit, hints, role_id)
-        if candidate:
-            candidates[path] = candidate
+    oversized = []
+    texts, hashes, scanned, scan_complete = _scan_sources(
+        root, paths, manual_exclusions, automatic, incremental, scrub, excluded, diagnostics, oversized)
+    engine, settings = _retrieval_engine(retrieval, cap, budget, max_files, max_bytes, diagnostics)
+    candidates = {}
+    if engine is None:
+        for path, text in texts.items():
+            candidate = _candidate(path, text, terms, identifiers, phrases, explicit, hints, role_id)
+            if candidate:
+                candidates[path] = candidate
     if not terms and not phrases and not explicit:
         diagnostics.append("No specific search terms found; only project conventions may be selected.")
     changed = _changed_paths(root, texts) if compact else []
-    for path in changed:
+    for path in changed if engine is None else ():
         if path in candidates:
             candidates[path]["score"] += 1
             candidates[path]["reason"] += "; relevant uncommitted change"
@@ -963,7 +1218,7 @@ def _select_context(project, task, role=None, size="standard", max_tokens=None, 
             graph_evidence = _sibling("project_graph")["query_graph"](
                 root, task, role=role_id, pack=base, snapshot=snapshot, maintain=map_maintain,
                 preview=map_preview, writable_paths=writable_paths)
-            for path, priority in list(graph_evidence.get("source_priorities", {}).items())[:8]:
+            for path, priority in list(graph_evidence.get("source_priorities", {}).items())[:8] if engine is None else ():
                 if path not in texts:
                     continue
                 centers = [line - 1 for line in priority.get("lines", [])
@@ -979,91 +1234,21 @@ def _select_context(project, task, role=None, size="standard", max_tokens=None, 
                                         "text": texts[path], "centers": centers or [0], "symbols": []}
         except (OSError, UnicodeError, SyntaxError, ValueError, TypeError, KeyError, RecursionError):
             graph_evidence = {"status": "unavailable", "diagnostics": ["Structural graph unavailable; using source retrieval."]}
-    strongest = sorted(candidates.values(), key=_sort)
-    # Tests are admitted only when paired to an already relevant source file.
-    source_stems = {_stem(c["path"]) for c in strongest[:3] if c["type"] == "source"}
-    for path, text in texts.items():
-        if _kind(path) == "test" and _stem(path) in source_stems:
-            if path not in candidates:
-                candidates[path] = {"path": path, "type": "test", "reason": "paired test for a strong source result",
-                                    "match": "filename", "score": 0, "defined": False, "hint": False,
-                                    "text": text, "centers": [0], "symbols": []}
-            candidates[path]["score"] += 2
-            if "paired test" not in candidates[path]["reason"]:
-                candidates[path]["reason"] += "; paired test for a strong source result"
-    added = 0
-    for parent in strongest[:3]:
-        for path in _neighbors(parent["path"], parent["text"], texts):
-            if path in candidates:
-                continue
-            if added == 2:
-                break
-            candidates[path] = {"path": path, "type": _kind(path), "reason": "one-hop local import",
-                                "match": "expansion", "via": parent["path"], "score": 1,
-                                "defined": False, "hint": False, "text": texts[path],
-                                "centers": [0], "symbols": []}
-            added += 1
-    selected, excerpts = [], []
-    spent = 0
-    for candidate in sorted(candidates.values(), key=_sort):
-        path = candidate["path"]
-        if len(selected) >= cap:
-            excluded.append({"path": scrub(path), "reason": "artifact cap"})
-            continue
-        ranges = _ranges(candidate)
-        cleaned = ranges
-        total = sum(math.ceil(len(content) / 4) for _, _, content in cleaned)
-        if total > budget - spent:
-            # Narrow windows before dropping files; never emit a partial source line.
-            cleaned = _ranges(candidate, radius=2)
-        emitted = []
-        for start, end, content in cleaned:
-            lines = content.split("\n")
-            if math.ceil(len(content) / 4) > budget - spent:
-                centers = [c for c in candidate["centers"] if start - 1 <= c < end]
-                center = (centers[0] if centers else start - 1) - start + 1
-                left, right = center, center + 1
-                if math.ceil(len(lines[center]) / 4) > budget - spent:
-                    continue
-                for _ in range(len(lines)):
-                    options = ((left - 1, right), (left, right + 1))
-                    expanded = False
-                    for a, b in options:
-                        if (a >= 0 and b <= len(lines)
-                                and math.ceil(len("\n".join(lines[a:b])) / 4) <= budget - spent):
-                            left, right = a, b
-                            expanded = True
-                            break
-                    if not expanded:
-                        break
-                content = "\n".join(lines[left:right])
-                start += left
-                end = start + right - left - 1
-            if not content:
-                continue
-            spent += math.ceil(len(content) / 4)
-            actual_end = end
-            emitted.append(f"{start}-{actual_end}")
-            excerpt = {"path": scrub(path), "lines": f"{start}-{actual_end}", "content": content}
-            if compact:
-                excerpt["source_sha256"] = hashes[path]
-                excerpt["id"] = hashlib.sha256(json.dumps(excerpt, sort_keys=True, ensure_ascii=True,
-                                                         separators=(",", ":")).encode("utf-8")).hexdigest()
-            excerpts.append(excerpt)
-        if not emitted:
-            excluded.append({"path": scrub(path), "reason": "excerpt token budget"})
-            continue
-        row = {key: candidate[key] for key in ("path", "type", "reason", "match")}
-        row["path"] = scrub(path)
-        row.update(rank=len(selected) + 1, lines=", ".join(emitted))
-        if candidate["symbols"]:
-            row["symbols"] = [scrub(symbol) for symbol in candidate["symbols"]]
-        if candidate.get("via"):
-            row["via"] = scrub(candidate["via"])
-        selected.append(row)
-        if sum(math.ceil(len(content) / 4) for _, _, content in cleaned) > sum(
-                math.ceil(len(e["content"]) / 4) for e in excerpts if e["path"] == row["path"]):
-            diagnostics.append("Some selected ranges were trimmed to the excerpt budget.")
+    intelligence = None
+    if engine is not None:
+        try:
+            selected, excerpts, spent, intelligence = _intelligent_selection(
+                engine, settings, task, texts, hashes, explicit, role_id, changed, incremental, root,
+                excluded, scrub, compact, diagnostics, explain, oversized)
+        except (OSError, UnicodeError, SyntaxError, ValueError, TypeError, KeyError, AttributeError,
+                IndexError, RecursionError, ZeroDivisionError):
+            diagnostics.append("Repository intelligence failed; legacy retrieval used.")
+            engine = None
+            candidates = {path: c for path, text in texts.items()
+                          if (c := _candidate(path, text, terms, identifiers, phrases, explicit, hints, role_id))}
+    if engine is None:
+        selected, excerpts, spent = _legacy_selection(candidates, texts, cap, budget, excluded, scrub,
+                                                      compact, hashes, diagnostics)
     if not selected:
         diagnostics.append("No relevant readable excerpts selected; this is not evidence that the code does not exist.")
     exclusion_summary = {"total": len(excluded), "shown": min(len(excluded), MAX_EXCLUDED),
@@ -1072,8 +1257,9 @@ def _select_context(project, task, role=None, size="standard", max_tokens=None, 
         diagnostics.append("Excluded file details limited to the first 100 paths; counts include all exclusions.")
     map_evidence = _project_map(root, task, base, snapshot, preview=map_preview, maintain=map_maintain,
                                 writable_paths=writable_paths)
-    wrote_project = any(e and e.get("maintenance", {}).get("persisted") for e in (map_evidence, graph_evidence))
-    result = {"schema_version": 1, "read_only": not wrote_project, "project": scrub(str(root)), "role": role_id, "size": size,
+    # Indexes persist to private state outside the project: a helper write, never a project write.
+    persisted = any(e and e.get("maintenance", {}).get("persisted") for e in (map_evidence, graph_evidence))
+    result = {"schema_version": 1, "read_only": not persisted, "project": scrub(str(root)), "role": role_id, "size": size,
             "project_map": map_evidence, "resources": _resources(base, role_id),
             "preferences": _preferences(root),
             "retrieval": [{"query": scrub(q), "reason": "request search term"}
@@ -1091,23 +1277,59 @@ def _select_context(project, task, role=None, size="standard", max_tokens=None, 
         incremental.finish()
         result["parser_cache"] = dict(incremental.stats, enabled=True,
                                       write_allowed=incremental.writable, logical_source_bytes=scanned)
-        result["project_read_only"] = not wrote_project
+        result["project_read_only"] = True
         if incremental.stats.get("writes", 0):
             result["read_only"] = False
         if incremental.stats.get("write_failures", 0):
             result["diagnostics"].append("Private parser-cache persistence failed; current evidence remains usable, but future calls may repeat extraction.")
+    if intelligence is not None:
+        result["repository_intelligence"] = intelligence
     if graph_evidence is not None:
         result["project_graph"] = graph_evidence
     if audit_report is not None:
         result["change_audit"] = audit_report
-        result["project_read_only"] = not wrote_project
+        result["project_read_only"] = True
         result["read_only"] = False
     if compact:
-        result["project_read_only"] = not wrote_project
+        result["project_read_only"] = True
         result["change_focus"] = {"source": "git_uncommitted", "paths": [scrub(p) for p in changed[:12]],
                                   "total": len(changed), "scope": "allowed readable tracked files; relevance still required"}
         return _finish_packet(result, base, packet_tokens, guide_ids, reuse_state, reuse_scope, _delivery)
     return result
+
+
+def explain_retrieval(project, task, *, strategy="full", pack=None, exclude_paths=(), findings=None, iteration=1):
+    """Read-only inspection through the same exclusion filter and engine as select_context.
+
+    `findings` are explorer requests (symbols, paths, relationships). They are answered from the
+    filtered index only, so asking for an excluded or credential file returns nothing.
+    """
+    if not isinstance(task, str) or not task.strip() or len(task) > MAX_TASK_CHARS:
+        raise ContextError("Task must contain 1–16000 characters; task contents withheld.")
+    root = Path(project).expanduser().resolve()
+    if not root.is_dir():
+        raise ContextError("Project must be an existing readable directory.")
+    manual = _exclusions(root, exclude_paths)
+    scrub = _scrubber(find_pack(pack))
+    task = scrub(task)
+    diagnostics, excluded = [], []
+    paths = _enumerate(root, diagnostics)
+    automatic, _ = _automatic_exclusions(task, paths, root)
+    cache = _parser_cache(root, writable=False, policy_extra=getattr(scrub, "_dispatcher_policy", None))
+    oversized = []
+    texts, hashes, _, _ = _scan_sources(root, paths, manual, automatic, cache, scrub, excluded, diagnostics, oversized)
+    engine = _sibling("retrieval")
+    try:
+        settings = engine["configure"](strategy)
+    except ValueError:
+        raise ContextError("Unknown retrieval strategy.") from None
+    history = _git_history(root, settings["git"]["max_commits"], cache) if settings["git"]["enabled"] else None
+    index = engine["build_index"](texts, hashes, _kind, cache=cache, history=history, config=settings, path_only=oversized)
+    explicit = _explicit_paths(task, texts, root)
+    outcome = engine["run"](task, index, settings, named=list(explicit), findings=findings, iteration=iteration,
+                            anchors={p: line for p, line in explicit.items() if line})
+    outcome["universe"] = {"files": len(texts), "withheld": len(excluded)}
+    return outcome
 
 
 def _parser_cache(project, *, writable, policy_extra=None):
@@ -1177,6 +1399,9 @@ def render(result):
             lines.append(f"- {fact['kind']} ({fact['basis']}): {fact['label']} — {fact['detail']} ([source]({destination}))")
         lines.extend("Diagnostic: " + message for message in mapping.get("diagnostics", []))
     lines.extend("Diagnostic: " + message for message in result["diagnostics"])
+    explained = result.get("repository_intelligence", {}).get("explain")
+    if explained:
+        lines += ["", "Retrieval trace (why these files):", explained]
     return "\n".join(lines)
 
 
@@ -1201,6 +1426,10 @@ def main(argv=None):
     parser.add_argument("--guide", action="append", default=[], help="Include a selected eligible guide's full body; repeatable, compact only")
     parser.add_argument("--reuse-state", help="Explicit private evidence ledger outside the project; compact only")
     parser.add_argument("--reuse-scope", help="Identity of context that still retains earlier evidence; compact only")
+    parser.add_argument("--retrieval", default="auto", help="auto (repository intelligence), legacy (flat scoring), or a named strategy such as hybrid")
+    parser.add_argument("--max-files", type=int, help="Upper bound on selected files, below the size tier's own")
+    parser.add_argument("--max-bytes", type=int, help="Upper bound on excerpt bytes, below the size tier's own")
+    parser.add_argument("--explain", action="store_true", help="Include the retrieval trace: query analysis, per-retriever evidence, budgeting")
     parser.add_argument("--audit", action="store_true", help="Start a task change audit in owned temporary state before cache writes; finish it before claiming file preservation")
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args(argv)
@@ -1219,7 +1448,9 @@ def main(argv=None):
                                 packet_tokens=args.packet_tokens, guide_ids=args.guide,
                                 map_maintain=args.map_maintain, reuse_state=args.reuse_state, reuse_scope=args.reuse_scope,
                                 writable_paths=args.writable_path, audit=args.audit,
-                                parser_cache=not args.no_parser_cache, _delivery=delivery)
+                                parser_cache=not args.no_parser_cache, retrieval=args.retrieval,
+                                max_files=args.max_files, max_bytes=args.max_bytes, explain=args.explain,
+                                _delivery=delivery)
     except (ContextError, OSError, UnicodeError) as exc:
         print(str(exc) if isinstance(exc, ContextError) else "Context input could not be read; contents withheld.", file=sys.stderr)
         return 2

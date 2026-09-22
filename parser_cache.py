@@ -85,7 +85,8 @@ def _source(project, relative):
 def _policy(extra=None):
     root = Path(__file__).resolve().parent
     files = {}
-    for name in ("parser_cache.py", "context.py", "project_map.py", "project_graph.py", "doctor.py"):
+    for name in ("parser_cache.py", "context.py", "project_map.py", "project_graph.py", "doctor.py",
+                 "repo_index.py", "retrieval.py", "context_budget.py"):
         path = root / name
         files[name] = hashlib.sha256(path.read_bytes()).hexdigest() if path.is_file() else None
     for candidate in (root / "decision/redact.py", root / "runtime/decision/redact.py",
@@ -95,6 +96,57 @@ def _policy(extra=None):
             break
     # Content identity survives copying the same package into an evaluation.
     return _digest({"schema": SCHEMA, "python": list(sys.version_info[:3]), "files": files, "extra": extra})
+
+
+@contextmanager
+def private_directory(path, create=False, created=None):
+    """Open an owner-only directory outside any project, walking from the anchor without following links.
+
+    Every component must resist replacement by other users; the leaf must be ours and 0700.
+    Shared by the parser cache and the private project-state directory (map and graph).
+    """
+    if not hasattr(os, "O_NOFOLLOW") or not hasattr(os, "O_DIRECTORY"):
+        raise ValueError()
+    path = Path(path)
+    if not path.is_absolute() or ".." in path.parts:
+        raise ValueError()
+    current = os.open(path.anchor, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+    try:
+        for index, part in enumerate(path.parts[1:], 1):
+            try:
+                child = os.open(part, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=current)
+            except FileNotFoundError:
+                if not create:
+                    raise
+                os.mkdir(part, 0o700, dir_fd=current)
+                if created is not None:
+                    created()
+                child = os.open(part, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=current)
+            info = os.fstat(child)
+            leaf = index == len(path.parts) - 1
+            if ((leaf and (info.st_uid != os.getuid() or stat.S_IMODE(info.st_mode) != 0o700))
+                    or (info.st_mode & 0o022 and not info.st_mode & stat.S_ISVTX)):
+                os.close(child)
+                raise ValueError()
+            os.close(current)
+            current = child
+        yield current
+    finally:
+        os.close(current)
+
+
+def state_directory(project):
+    """Private per-project directory for derived indexes (project map and graph).
+
+    Keyed like the parser cache (resolved path, device, inode) and never inside the project, so
+    maintaining an index does not touch the working tree. An absolute XDG_CACHE_HOME relocates it.
+    """
+    root = Path(project).resolve()
+    info = root.stat()
+    base = os.environ.get("XDG_CACHE_HOME", "")
+    # Resolved once, like the home directory: the hardened walk then refuses any remaining link.
+    home = Path(base).resolve() if base and Path(base).is_absolute() else Path.home().resolve() / ".cache"
+    return home / "agent-dispatcher" / "state-v1" / _digest({"path": str(root), "dev": info.st_dev, "ino": info.st_ino})
 
 
 class Cache:
@@ -127,35 +179,8 @@ class Cache:
             self.usable = False
         self.stats["cache_available"] = self.usable
 
-    @contextmanager
     def _directory(self, create=False):
-        if not hasattr(os, "O_NOFOLLOW") or not hasattr(os, "O_DIRECTORY"):
-            raise ValueError()
-        path = self.directory
-        if not path.is_absolute() or ".." in path.parts:
-            raise ValueError()
-        current = os.open(path.anchor, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
-        try:
-            for index, part in enumerate(path.parts[1:], 1):
-                try:
-                    child = os.open(part, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=current)
-                except FileNotFoundError:
-                    if not create:
-                        raise
-                    os.mkdir(part, 0o700, dir_fd=current)
-                    self.stats["writes"] = 1
-                    child = os.open(part, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=current)
-                info = os.fstat(child)
-                leaf = index == len(path.parts) - 1
-                if ((leaf and (info.st_uid != os.getuid() or stat.S_IMODE(info.st_mode) != 0o700))
-                        or (info.st_mode & 0o022 and not info.st_mode & stat.S_ISVTX)):
-                    os.close(child)
-                    raise ValueError()
-                os.close(current)
-                current = child
-            yield current
-        finally:
-            os.close(current)
+        return private_directory(self.directory, create, lambda: self.stats.__setitem__("writes", 1))
 
     @staticmethod
     def _read_private(parent, name, limit):

@@ -326,6 +326,13 @@
               "type": "string"
             }
           },
+          "relationships": {
+            "type": "array",
+            "description": "Source-grounded links to other selected files, e.g. \"called by app/api.py (connect)\". Evidence, not runtime traces.",
+            "items": {
+              "type": "string"
+            }
+          },
           "lines": {
             "type": "string",
             "description": "The range actually read, e.g. \"120-180\". Absent means the whole file."

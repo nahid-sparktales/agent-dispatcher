@@ -23,6 +23,9 @@ from urllib.parse import quote
 
 OWNER = "agent-dispatcher-project-map"
 SCHEMA_VERSION = 1
+# The map and graph live in a private per-project directory outside the working tree (see
+# parser_cache.state_directory). STATE_DIR names the pre-relocation in-project directory, which is
+# still read as a fallback and never written, and it prefixes the logical cache-write-scope targets.
 STATE_DIR = ".agent-dispatcher"
 STATE_FILE = "project-map.json"
 # Sized for repos of about 1,000 source files: each source contributes at most three
@@ -342,6 +345,8 @@ def _extract(path, text, sha, helper):
                                r"^\s*from\s+([.\w]+)\s+import\b|^\s*import\s+([\w.]+))", line)
             if module and imports < 3:
                 value = next((group for group in module.groups() if group), "")
+                if value == "__future__":
+                    continue  # A compiler directive, never a fact about this project.
                 add("dependency", value, "Import declaration: " + line.strip(), number)
                 imports += 1
     if kind in {"doc", "workflow"} or name == "Makefile":
@@ -474,16 +479,45 @@ def _valid_map(data):
     return data
 
 
+def _private():
+    """Load our packaged sibling by exact path; it owns the private cache layout and its hardened walk."""
+    path = Path(__file__).resolve().with_name("parser_cache.py")
+    try:
+        namespace = {"__name__": "_dispatcher_map_private", "__file__": str(path)}
+        exec(compile(path.read_text(encoding="utf-8"), str(path), "exec"), namespace)
+        return SimpleNamespace(**namespace)
+    except (OSError, UnicodeError, SyntaxError):
+        raise ProjectMapError("Packaged private-cache helper missing or unreadable; repair the pack.") from None
+
+
+def state_path(project, state_file=STATE_FILE):
+    """Where this project's map (or graph) is persisted: private, and never inside the project."""
+    return _private().state_directory(_root(project)) / state_file
+
+
 def _state_fd(root, create=False):
+    """Open the private state directory. Nothing under the project is ever created or written."""
+    try:
+        helper = _private()
+        directory = helper.state_directory(root)
+        if directory == root or root in directory.parents:
+            raise ProjectMapError("Project map state must live outside the project; set XDG_CACHE_HOME elsewhere.")
+        with helper.private_directory(directory, create) as fd:
+            return os.dup(fd)
+    except FileNotFoundError:
+        if not create:
+            return None
+        raise ProjectMapError("Project map directory could not be created safely.") from None
+    except (OSError, ValueError):
+        raise ProjectMapError("Project map directory is unsafe or inaccessible; symlinks are not followed.") from None
+
+
+def _legacy_fd(root):
+    """The pre-relocation in-project directory: a read-only fallback, never created, written or removed."""
     flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0)
     try:
         with_root = os.open(root, flags)
         try:
-            if create:
-                try:
-                    os.mkdir(STATE_DIR, mode=0o700, dir_fd=with_root)
-                except FileExistsError:
-                    pass
             fd = os.open(STATE_DIR, flags, dir_fd=with_root)
         finally:
             os.close(with_root)
@@ -492,9 +526,7 @@ def _state_fd(root, create=False):
             raise ProjectMapError("Project map directory is not owned by the current user; left untouched.")
         return fd
     except FileNotFoundError:
-        if not create:
-            return None
-        raise ProjectMapError("Project map directory could not be created safely.") from None
+        return None
     except OSError:
         raise ProjectMapError("Project map directory is unsafe or inaccessible; symlinks are not followed.") from None
 
@@ -530,13 +562,18 @@ def _read_state(fd, *, state_file=STATE_FILE, validator=_valid_map, max_bytes=MA
 
 
 def _load(root, *, state_file=STATE_FILE, validator=_valid_map, max_bytes=MAX_MAP_BYTES):
-    fd = _state_fd(root)
-    if fd is None:
-        return None
-    try:
-        return _read_state(fd, state_file=state_file, validator=validator, max_bytes=max_bytes)[0]
-    finally:
-        os.close(fd)
+    """Private state wins; an in-project file from before the relocation is only ever read."""
+    for opener in (_state_fd, _legacy_fd):
+        fd = opener(root)
+        if fd is None:
+            continue
+        try:
+            data = _read_state(fd, state_file=state_file, validator=validator, max_bytes=max_bytes)[0]
+        finally:
+            os.close(fd)
+        if data is not None:
+            return data
+    return None
 
 
 def _write(root, data, refresh, *, expected=_EXPECTED_UNSET, state_file=STATE_FILE,
@@ -546,11 +583,20 @@ def _write(root, data, refresh, *, expected=_EXPECTED_UNSET, state_file=STATE_FI
     raw = (json.dumps(data, indent=2, ensure_ascii=False) + "\n").encode("utf-8")
     if len(raw) > max_bytes:
         raise ProjectMapError("Generated project map exceeds its size limit; existing state left untouched.")
+    # Validate any in-project predecessor before creating private state; it is never modified.
+    legacy = _legacy_fd(root)
+    inherited = None
+    if legacy is not None:
+        try:
+            inherited = _read_state(legacy, state_file=state_file, validator=validator, max_bytes=max_bytes)[0]
+        finally:
+            os.close(legacy)
     fd = _state_fd(root, create=True)
     temporary = "." + Path(state_file).stem + "-" + secrets.token_hex(8) + ".tmp"
     created = False
     try:
-        existing, before = _read_state(fd, state_file=state_file, validator=validator, max_bytes=max_bytes)
+        private, before = _read_state(fd, state_file=state_file, validator=validator, max_bytes=max_bytes)
+        existing = private if private is not None else inherited  # What _load reports: build/refresh and `expected` refer to it.
         if expected is not _EXPECTED_UNSET and existing != expected:
             raise ProjectMapError("Project map changed during maintenance; concurrent changes left untouched.")
         if existing is not None and not refresh:
@@ -566,7 +612,7 @@ def _write(root, data, refresh, *, expected=_EXPECTED_UNSET, state_file=STATE_FI
         _, current = _read_state(fd, state_file=state_file, validator=validator, max_bytes=max_bytes)
         if current != before:
             raise ProjectMapError("Project map changed during construction; concurrent changes left untouched.")
-        if refresh:
+        if private is not None:
             os.replace(temporary, state_file, src_dir_fd=fd, dst_dir_fd=fd)
         else:
             # Unlike replace, link fails atomically if another writer created the destination.
@@ -598,8 +644,10 @@ def _matching(entries, task, helper, project=None):
         score = sum(term in haystack for term in terms)
         named = entry["source"]["path"] in explicit
         if score or named:
-            scored.append((-named, -score, index, entry))
-    return [entry for _, _, _, entry in sorted(scored)]
+            # Where something is defined answers more than what a file imports; imports rank last among equals.
+            imported = entry["detail"].startswith("Import declaration")
+            scored.append((-named, -score, imported, index, entry))
+    return [row[-1] for row in sorted(scored, key=lambda row: row[:-1])]
 
 
 def _coverage(snapshot):

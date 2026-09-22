@@ -20,6 +20,8 @@ MODULES = (
     "tests.test_cache_scope",
     "tests.test_project_map",
     "tests.test_project_graph",
+    "tests.test_retrieval",
+    "tests.test_retrieval_security",
     "tests.test_e2e",
     "tests.test_verification",
     "tests.test_change_audit",

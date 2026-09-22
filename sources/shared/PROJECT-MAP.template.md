@@ -21,11 +21,14 @@ Add `--task "<request>"` to filter displayed facts and `--json` for structured o
 The request filters evidence; it does not authorize executing that task. Show the result,
 including source links, freshness, omissions, and diagnostics. Do not invent a map when absent.
 
-`build` and `refresh` explicitly write `.agent-dispatcher/project-map.json` in PROJECT.
-They do not change host settings, activation, project rules, or Git ignore files. Existing
-unrecognized state and symlinked destinations are refused. Let the user decide whether to
-share the map through version control; it is local project data. Do not manually edit cached
-claims. Correct their source and refresh the map.
+`build` and `refresh` write `project-map.json` to private state outside PROJECT:
+`~/.cache/agent-dispatcher/state-v1/<project id>/` (under an absolute `XDG_CACHE_HOME` when
+set), owner-only and keyed by the project's resolved path. Nothing is created in the working
+tree, and host settings, activation, project rules and Git ignore files are untouched. An
+older in-project `.agent-dispatcher/project-map.json` is still read when no private map
+exists, validated like any other; it is never rewritten or removed, so delete it yourself once
+it is no longer wanted. Unrecognized state and symlinked destinations are refused in both
+places. Do not manually edit cached claims. Correct their source and refresh the map.
 
 ## Use during work
 
@@ -119,8 +122,11 @@ This cache is used by context map modes; standalone map build and refresh still 
 ## Optional structural graph
 
 --map-preview and --map-maintain also derive a structural view from the same redacted
-scan. Only maintenance can save `.agent-dispatcher/project-graph.json`; partial scans
-defer writes. This separate cache cannot invalidate legacy map facts.
+scan. Only maintenance can save `project-graph.json`, beside the map in private state;
+partial scans defer writes. This separate cache cannot invalidate legacy map facts. Write-scope
+targets keep their logical names (`.agent-dispatcher/project-map.json`, `.../project-graph.json`):
+a preview, a restricted or read-only task, or a `--writable-path` list that omits them still
+defers persistence even though no project file would change.
 
 Python AST supplies definitions, local imports, and unambiguous static direct calls.
 JavaScript/TypeScript relative imports remain inferred candidates. Every edge cites its

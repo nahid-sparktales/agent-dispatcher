@@ -58,7 +58,8 @@ remain available. `CONTEXT.md` is the concise procedure; detailed references are
 
 `/agent-map build` records a source-linked project map; `show <request>` inspects relevant
 facts and `refresh` updates it. The shared `PROJECT-MAP.md` guide documents `project_map.py`.
-Only build/refresh writes `.agent-dispatcher/project-map.json` in the project. Context
+Only build/refresh writes the map, to private state outside the project
+(`~/.cache/agent-dispatcher/state-v1/`); the working tree is never touched. Context
 selection checks source fingerprints and support before using existing facts, and reports
 stale or incomplete coverage without silently refreshing. Plugin commands use the usual prefix.
 

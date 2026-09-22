@@ -12,6 +12,7 @@ import unittest
 from unittest import mock
 
 import context
+import project_map
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -234,7 +235,7 @@ class ContextTests(unittest.TestCase):
         self.write("src/auth.py", 'from .old import legacyLogin\ndef validateLogin(): return legacyLogin()\n')
         self.write("src/old.py", "def legacyLogin(): return True\n")
         project_map.build_map(self.project, pack=ROOT)
-        state = self.project / ".agent-dispatcher/project-map.json"
+        state = project_map.state_path(self.project)
         before = state.read_bytes()
         with mock.patch.object(context, "_read", wraps=context._read) as reading:
             result = self.select("src/old.py is a distractor. Fix validateLogin and legacyLogin.",
@@ -380,7 +381,7 @@ class ContextTests(unittest.TestCase):
         for path in (source, config):
             opened = [call for call in opening.call_args_list if call.args[0] == path]
             self.assertEqual(len(opened), 1, f"source scanned more than once: {path.name}")
-        cache = self.project / ".agent-dispatcher/project-map.json"
+        cache = project_map.state_path(self.project)
         self.assertEqual(built["project_map"]["maintenance"]["action"], "built")
         self.assertTrue(built["project_map"]["maintenance"]["persisted"])
         self.assertFalse(built["read_only"])
@@ -400,7 +401,7 @@ class ContextTests(unittest.TestCase):
         self.write("auth.py", "def validateLogin():\n    return True\n")
         archive = self.write("archive/old.py", "def obsoleteLogin(): return False\n")
         self.select(compact=True, map_maintain=True)
-        cache = self.project / ".agent-dispatcher/project-map.json"
+        cache = project_map.state_path(self.project)
         before = cache.read_bytes()
         with mock.patch("os.open", wraps=os.open) as opening:
             filtered = self.select(compact=True, map_maintain=True, exclude_paths=["archive"])
@@ -421,12 +422,18 @@ class ContextTests(unittest.TestCase):
     def test_graph_relationships_admit_nonlexical_dependencies_and_callers_into_context(self):
         self.graph_fixture()
         # debugger: test-oriented ranking like reviewer, but not a read-only role, so maintenance may write.
-        ordinary = self.select("Inspect validateLogin", role="debugger", compact=True)
+        # Repository intelligence expands structurally on every call and names the seed that led there.
+        intelligent = self.select("Inspect validateLogin", role="debugger", compact=True, packet_tokens=10000)
+        for related, seed in (("storage.py", "auth.py"), ("web.py", "gateway.py")):
+            row = next(row for row in intelligent["context"] if row["path"] == related)
+            self.assertEqual((row["match"], row["via"]), ("expansion", seed))
+        # Legacy retrieval admits the same files only through the optional task graph.
+        ordinary = self.select("Inspect validateLogin", role="debugger", compact=True, retrieval="legacy")
         self.assertNotIn("storage.py", self.paths(ordinary))
         self.assertNotIn("web.py", self.paths(ordinary))
         for mode in ("map_preview", "map_maintain"):
             with self.subTest(mode=mode):
-                packet = self.select("Inspect validateLogin", role="debugger", compact=True,
+                packet = self.select("Inspect validateLogin", role="debugger", compact=True, retrieval="legacy",
                                      packet_tokens=10000, **{mode: True})
                 for related in ("storage.py", "web.py"):
                     self.assertIn(related, self.paths(packet))
@@ -448,7 +455,7 @@ class ContextTests(unittest.TestCase):
     def test_graph_retrieval_exclusions_prevent_dependency_reads_and_preserve_global_graph(self):
         self.graph_fixture()
         self.select("Inspect validateLogin", compact=True, map_maintain=True)
-        cache = self.project / ".agent-dispatcher/project-graph.json"
+        cache = project_map.state_path(self.project, "project-graph.json")
         before = cache.read_bytes()
         excluded = self.project / "storage.py"
         with mock.patch("os.open", wraps=os.open) as opening:
@@ -468,7 +475,7 @@ class ContextTests(unittest.TestCase):
     def test_graph_symbols_and_evidence_stay_stable_until_rename_then_refresh(self):
         self.graph_fixture()
         first = self.select("Inspect validateLogin", compact=True, map_maintain=True)["project_graph"]
-        cache = self.project / ".agent-dispatcher/project-graph.json"
+        cache = project_map.state_path(self.project, "project-graph.json")
         before, stamp = cache.read_bytes(), cache.stat().st_mtime_ns
         second = self.select("Inspect validateLogin", compact=True, map_maintain=True)["project_graph"]
         for field in ("nodes", "edges", "sources"):
@@ -607,7 +614,8 @@ class ContextTests(unittest.TestCase):
 
     def test_relocated_compact_helpers_use_packaged_modules_and_guidance_not_project_namesakes(self):
         self.write("auth.py", "def validateLogin(): return True\n")
-        for name in ("context_packet", "context_reuse", "parser_cache", "project_map", "project_graph", "resources", "preferences"):
+        for name in ("context_packet", "context_reuse", "parser_cache", "project_map", "project_graph", "resources", "preferences",
+                     "repo_index", "retrieval", "context_budget"):
             self.write(name + ".py", f"raise RuntimeError('project {name} must not execute')\n")
         for layout in ("manual", "codex", "claude-plugin"):
             with self.subTest(layout=layout):
@@ -620,7 +628,8 @@ class ContextTests(unittest.TestCase):
                             "claude-plugin": "skills/agent-dispatcher/context.py"}[layout]
                 script = pack / relative
                 script.parent.mkdir(parents=True, exist_ok=True)
-                helpers = ("context", "context_packet", "context_reuse", "parser_cache", "project_map", "resources", "preferences")
+                helpers = ("context", "context_packet", "context_reuse", "parser_cache", "project_map", "resources", "preferences",
+                           "repo_index", "retrieval", "context_budget")
                 for name in helpers:
                     shutil.copyfile(ROOT / (name + ".py"), script.parent / (name + ".py"))
                 if (ROOT / "project_graph.py").is_file():
@@ -655,9 +664,15 @@ class ContextTests(unittest.TestCase):
         self.write("src/two.ts", "export const two = 2;\n")
         self.write("src/three.ts", "export const three = 3;\n")
         self.write("src/deep.ts", "export const deep = 4;\n")
-        result = self.select("Fix validateLogin")
+        result = self.select("Fix validateLogin", retrieval="legacy")
         expansion = [c for c in result["context"] if c["match"] == "expansion"]
         self.assertEqual({c["path"] for c in expansion}, {"src/one.ts", "src/two.ts"})
+        self.assertTrue(all(c["via"] == "src/auth.ts" for c in expansion))
+        self.assertNotIn("src/deep.ts", self.paths(result))
+        # Repository intelligence bounds expansion by hops and neighbors per seed, not by a fixed two.
+        result = self.select("Fix validateLogin")
+        expansion = [c for c in result["context"] if c["match"] == "expansion"]
+        self.assertEqual({c["path"] for c in expansion}, {"src/one.ts", "src/two.ts", "src/three.ts"})
         self.assertTrue(all(c["via"] == "src/auth.ts" for c in expansion))
         self.assertNotIn("src/deep.ts", self.paths(result))
 

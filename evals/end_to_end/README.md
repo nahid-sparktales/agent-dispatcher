@@ -50,17 +50,23 @@ Before **each** native task, the runner uses the frozen package to generate a pr
 fact map, relationship graph, and host-private incremental parser cache, then performs
 a read-only verification pass. Setup must establish complete, fresh indexes and show
 zero source reads, parse misses, or writes on that warm pass. Any setup failure stops
-the experiment before a model request. Both stock and Dispatcher receive the same
-source, map, and graph files; only Dispatcher receives the installed skill.
+the experiment before a model request. The fact map and graph persist to private state
+outside the workspace (`$HOME/.cache/agent-dispatcher/state-v1/`, keyed by the workspace
+path), so setup must leave every workspace file byte-identical; a helper that writes an
+index into the tree fails setup. Both stock and Dispatcher receive the same source files
+and the same prepared private state; only Dispatcher receives the installed skill.
 
 Indexing and verification happen **outside** the task timer and model usage measurements.
 Their separate durations and parser-cache counters are saved in each trial's
-`index-setup.json` and result metadata. Post-setup files are saved under `initial/` and
-their hashes are compared between paired conditions. Protected-file and extra-file
-checks use that snapshot, and fixtures with preservation checks also protect both
-generated project indexes. Thus setup writes do not count as agent writes, but later
-out-of-scope cache modifications still fail grading. Cold mode remains the default;
-changing the warm setting invalidates smoke evidence.
+`index-setup.json` (with an `index_evidence_digest` over the reported index status,
+coverage and counts; index bytes are private and not captured) and result metadata.
+Post-setup files are saved under `initial/` and their hashes are compared between paired
+conditions. Protected-file and extra-file checks use that snapshot. In-tree
+`.agent-dispatcher/project-*.json` files exist only where a fixture ships them (the
+location older releases used); preservation checks protect those. Warm runs made before
+the indexes moved to private state kept them in the workspace and are not comparable
+with newer warm runs. Cold mode remains the default; changing the warm setting
+invalidates smoke evidence.
 
 Use a separately named warm fixture variant if the original prompt says a Dispatcher
 metadata cache is stale: regenerating that cache changes the premise. For example,
