@@ -7,14 +7,17 @@
 
 Agent Dispatcher routes your request to a focused role, loads relevant guidance, and defines
 what evidence will count as done. Ask it to debug a failure, design an interface, review a
-change, or research a decision. For substantial code tasks, it maintains local project facts
-and code relationships, reuses valid parsing results, and selects a bounded context packet
-for the current role. Small, known edits can take the direct path.
+change, or research a decision. For substantial code tasks, it combines paths, symbols, source
+content, code relationships, and Git history to find relevant files and assemble a bounded
+context packet. Project indexes stay in private local storage and reuse unchanged evidence.
+Small, known edits can take the direct path. Optional model assistance adds file summaries and
+candidate reranking when you enable it.
 
 <!-- counts:start -->**27 roles · 79 local skills · 31 external skills · 8 recipes · 19 MCP servers · 50 detection signals**<!-- counts:end -->
 
 [How it works](#how-it-works) · [Quick start](#quick-start) · [Usage](#usage) ·
-[Project mapping](#keep-a-project-map-current) · [Catalog](#catalog) ·
+[Local context](#build-local-context) · [Project mapping](#keep-a-project-map-current) ·
+[Optional model assistance](#optional-model-assisted-retrieval) · [Catalog](#catalog) ·
 [Documentation](#documentation) · [Contributing](#contributing)
 
 ## Why use it?
@@ -24,7 +27,10 @@ for the current role. Small, known edits can take the direct path.
 - **Load context as needed.** Roles select a small set of skills, project files, and available
   tools. Full skill instructions are read only when selected.
 - **Reuse project knowledge.** Source-linked facts and a structural graph help locate relevant
-  code. A private incremental cache lets later preparation reuse unchanged sources and the resolved graph.
+  code. Private caches let later preparation reuse unchanged sources, index records, and the
+  resolved graph without adding files to the working tree.
+- **Explain file selection.** Several search methods contribute ranked candidates. Each selected
+  file carries its reasons, matched symbols, relationships, and relevant source excerpts.
 - **Make verification explicit.** The role defines the evidence needed and reports which checks
   actually ran, what passed, and what remains unverified.
 - **Respect the task's edit scope.** Cache maintenance checks its write boundary. Read-only
@@ -44,29 +50,29 @@ flowchart TD
     Route -->|Small, known edit| Direct[Use native tools directly]
     Route -->|Substantial work| Prepare[Select a role and prepare context]
     Files[Permitted project files] --> Index[Source-linked facts and code graph]
-    Cache[Private parser cache] <--> Index
-    Index --> Prepare
+    Cache[Private local state] <--> Index
+    Index --> Retrieve[Combine search rankings and related files]
+    Retrieve --> Prepare
     Prepare --> Packet[Bounded context packet]
     Packet --> Work[Work with host tools and selected guidance]
     Direct --> Check[Verify the result and report evidence]
     Work --> Check
 ```
 
-Preparation searches permitted files, reuses valid cached evidence, and ranks relevant facts,
-symbols, relationships, and excerpts for the task. Ranking is
-[repository intelligence](docs/repository-intelligence.md): the request's paths, modules and
-symbols are weighed above its prose, several independent retrievers vote through rank fusion,
-strong results pull in structurally and historically related files, and every selected file
-says why it is there (`python3 -B retrieval.py explain "<request>"`). It is measured on real
-changes by an [offline benchmark](docs/retrieval-benchmark.md). An opt-in layer can add model-written
-file role summaries and a bounded candidate reranker ([LLM-assisted retrieval](docs/llm-assisted-retrieval.md));
-it is off, and nothing is sent anywhere, unless your own settings file enables it. The agent receives that selected
-context; the full repository index stays local. When useful independent subtasks exist, the host's
-subagent tools can handle them with separate scopes.
+Preparation analyzes the request, searches permitted files, and combines evidence from paths,
+rare terms, source text, symbol definitions, symbol references, and quoted literals. Strong
+matches can bring in related imports, callers, tests, and files that frequently change together.
+A final budget selects source excerpts and preserves the reason each file was included. See
+[repository intelligence](docs/repository-intelligence.md) for the selection rules.
 
-The local indexing helpers make no model or network calls and run during preparation, without
-a background service. Claude Code or Codex still provides the model, tools, permissions, and
-execution environment. Dispatcher does not silently switch the host's model or effort.
+Default retrieval is deterministic and local: its helpers make no model or network calls and
+need no background service. The [optional model layer](#optional-model-assisted-retrieval) can
+search stored file summaries and rerank a bounded candidate set. Those summaries help find
+files; the coding agent still receives actual source excerpts. The full index stays local.
+
+Claude Code or Codex provides the model, tools, permissions, and execution environment.
+Dispatcher does not switch the host's model or effort. When useful independent subtasks exist
+and delegation is authorized, the host's subagent tools can handle them with separate scopes.
 
 ## Quick start
 
@@ -93,6 +99,7 @@ Start a new Codex task, select **Agent Dispatcher** from the skill picker or inv
 $agent-dispatcher Find why the tests are failing, fix the cause, and verify the fix.
 $agent-dispatcher reviewer Review this change for correctness and missing tests.
 $agent-dispatcher context explain
+$agent-dispatcher doctor
 $agent-dispatcher status
 ```
 
@@ -227,11 +234,9 @@ still retains the earlier content. Changed evidence is supplied again. A fresh c
 or lost/compacted evidence needs a fresh scope or full output. This does not enable automatic
 cross-chat memory, an observer or background processing. See the
 [context procedure](skills/agent-dispatcher/CONTEXT.md) for limits and inspection controls.
-The [project-intelligence design](docs/project-intelligence.md) explains the flow, research
-inspiration and what still needs benchmarking.
-
-These mechanisms bound preparation and avoid unnecessary loading; savings in completed-task
-time or model usage require matched live evaluations and are not guaranteed.
+The [project-intelligence design](docs/project-intelligence.md) explains how mapping, caching,
+retrieval, and the final packet fit together. Packet limits cover the helper's output, not the
+host's entire conversation or model usage.
 
 ### Choose a role or inspect a decision
 
@@ -371,42 +376,75 @@ file locations, line numbers, selection reasons, exclusions and an estimated siz
 not perform the requested change. Existing `context`, `context explain`, and `context verbose`
 commands still inspect the context plan.
 
-The selector searches local files, favors definitions and related tests, and expands lexical
-matches by at most one hop of simple relative imports. Map modes can also add graph-selected
-related sources. It respects ignore rules, skips generated and recognized credential files,
-and reports when scan limits or unavailable search tools leave gaps. It uses no model requests,
-network services or background process. Optional maps and the private incremental cache retain
-bounded local evidence. A limited result is a starting point:
-the agent can read additional evidence when needed.
+The selector uses repository intelligence by default (`--retrieval auto`). It recognizes paths,
+dotted modules, code identifiers, and quoted errors; combines independent search rankings using
+reciprocal rank fusion; then expands the strongest matches through bounded code relationships
+and Git co-change history. Explicitly named files stay first. `--retrieval legacy` selects the
+older flat scorer, which is also the fallback if the new engine cannot load.
+
+Ignore rules, task exclusions, and credential checks run before retrieval. Excluded sources
+cannot reappear through symbols, history, explorer requests, or explain output. Files above
+the 256 KiB source-read limit can still be ranked by path and relationships, but their contents
+are not read or excerpted. Scan limits and unavailable evidence are reported. A limited packet
+is a starting point; the agent can read additional evidence when needed.
+
+Default retrieval needs no model call. If you have enabled model assistance, preparation can
+also use current stored summaries and the configured reranker. Querying never generates missing
+summaries. Optional bounded exploration (`--retrieval full+explorer` or `retrieval.py expand`)
+can request symbols, paths, callers, references, and neighbors from the existing index;
+it is off by default.
 
 The dispatcher entrypoint and concise context guide are each capped at 6 KiB per host. Role
 catalogs, configuration controls, delegation and advanced examples live in references read only
 when needed. These are limits on dispatcher instructions and retrieved passages, not the host's
 whole context window or a claim of improved model performance.
 
-For a read-only preview from the source checkout, pass the task directly on quoted standard input:
+From the source checkout, pass the request as one quoted argument. This also avoids heredoc
+handling differences between hosts:
 
 ```bash
 python3 -B context.py --project /path/to/project --role debugger \
-  --task-file - --compact --map-preview <<'TASK'
-Investigate why validate_login rejects valid sessions. Do not change any files.
-TASK
+  --task='Investigate why validate_login rejects valid sessions. Do not change any files.' \
+  --compact --map-preview --json
 ```
 
-Use `--size small|standard|complex` for retrieval scope, `--max-tokens N` for excerpts, or
-`--packet-tokens N` for the whole compact packet. See [context selection](docs/context-engine.md)
-for controls and limits.
+`--map-preview` prevents map and parser-cache writes; it does not disable a user-enabled
+reranker. To inspect deterministic retrieval without model assistance:
+
+```bash
+python3 -B retrieval.py explain-query 'Investigate why validate_login rejects valid sessions'
+python3 -B retrieval.py explain 'Investigate why validate_login rejects valid sessions' \
+  --project /path/to/project --verbose --no-llm
+```
+
+`explain-query` shows which words became paths, symbols, concepts, or ignored terms. `explain`
+shows each search method's contribution, relationships, and budgeting decisions. Omit
+`--no-llm` to include your enabled model layer; `context.py --explain` embeds the trace in a packet.
+
+Use `--size small|standard|complex` for retrieval scope, `--max-files N` and `--max-bytes N`
+to tighten file and excerpt limits, `--max-tokens N` for excerpt tokens, or `--packet-tokens N`
+for the whole compact packet. Each file gets an initial excerpt before second excerpts are
+added; duplicate content and tests are constrained to leave room for distinct source files.
+See [context selection](docs/context-engine.md) for controls and limits.
 
 ### Keep a project map current
 
-Dispatcher maintains two project indexes and a separate private cache. These serve different
-purposes; none stores a conversation or replaces the host's instructions.
+Dispatcher maintains two project indexes and a separate private cache. Optional model-written
+representations have their own store. These serve different purposes; none stores a conversation
+or replaces the host's instructions.
 
 | Stored data | Location | Purpose |
 | --- | --- | --- |
 | Fact map | `~/.cache/agent-dispatcher/state-v1/<project id>/project-map.json` | Feature locations, declared dependencies, test commands, and documented architecture decisions, with source locations and fingerprints. |
 | Structural graph | `~/.cache/agent-dispatcher/state-v1/<project id>/project-graph.json` | Files, Python symbols, imports, supported direct calls, and candidate test relationships, with evidence and confidence labels. |
-| Incremental parser cache | `~/.cache/agent-dispatcher/parser-v1/` | Authenticated records of redacted source text, extracted facts, and resolved graphs for reuse. |
+| Incremental parser cache | `~/.cache/agent-dispatcher/parser-v1/` | Authenticated records of redacted source text, extracted facts, per-file retrieval records, filtered Git history, and resolved graphs. |
+| Optional file summaries | `~/.cache/agent-dispatcher/llm-retrieval-v1/` | Model-written retrieval aids keyed by source content, model, provider, and prompt/schema versions. |
+
+The map, graph, and parser cache honor an absolute `XDG_CACHE_HOME`. Their locations must be
+outside the inspected project. Older `.agent-dispatcher/project-map.json` and
+`project-graph.json` files are validated and read when no private copy exists; maintenance
+does not rewrite or delete them. Current index maintenance creates no `.agent-dispatcher/`
+directory or working-tree changes. The optional summary store uses the separate path above.
 
 During substantial guided work, `context.py --compact --map-maintain` requests automatic
 maintenance. A complete, unrestricted scan can create or refresh both project indexes and
@@ -427,10 +465,12 @@ On later preparations:
    excerpts for the request and role. The complete indexes are not dumped into model context.
 
 Python definitions, imports, and a conservative subset of direct calls use the standard AST
-parser. JavaScript/TypeScript support covers inferred relative-import candidates. Possible
+parser. JavaScript/TypeScript support covers inferred relative-import candidates; the retrieval
+index also recognizes declaration patterns in other languages. Possible
 call paths are static hints; test links do not prove coverage, and documented decisions do
 not prove that the code follows them. The graph is bounded to 1,000 source files, 30,000 nodes,
-36,000 edges and 16 MiB; omitted evidence and parse failures are reported.
+36,000 edges and 16 MiB. The fact map is bounded to 1,000 source files, 6,200 facts, and 4 MiB;
+both stop at their storage limits and report omitted evidence or parse failures.
 
 #### Control mapping and cache writes
 
@@ -438,15 +478,17 @@ not prove that the code follows them. The graph is bounded to 1,000 source files
 | --- | --- |
 | `--map-maintain` | Request index maintenance when the task, role, write scope, scan, and destination permit it. |
 | `--map-preview` | Derive or reuse current evidence without saving indexes or the private parser cache. Takes precedence over maintenance. |
-| `--writable-path PATH` | Restrict optional project-cache writes to literal files or subtrees; repeat as needed and end directory paths with `/`. |
+| `--writable-path PATH` | Restrict optional index/cache writes to literal files or subtrees; repeat as needed and end directory paths with `/`. Index writes still require their logical cache targets to be allowed. |
 | `--exclude-path PATH` | Omit a file or directory from source retrieval before reading or using its evidence. |
 | `--no-parser-cache` | Bypass private cache reads and writes and perform fresh source extraction. Does not itself make project-map maintenance read-only. |
 
 Read-only tasks and recognized edit restrictions veto automatic cache writes. Explicit limited
 write scopes also prevent private host-cache writes. Partial or task-excluded scans return
 permitted evidence and defer persistence, preserving the existing global indexes. Unsafe or
-unrecognized cache destinations are left untouched. These controls govern the helpers; host
-permissions still govern the agent's other tools.
+unrecognized cache destinations are left untouched. Write checks retain the logical targets
+`.agent-dispatcher/project-map.json` and `.agent-dispatcher/project-graph.json` even though
+storage is now private. Moving storage outside the project does not bypass task restrictions.
+These controls govern the helpers; host permissions still govern the agent's other tools.
 
 File metadata checks are a reuse shortcut, not a newly computed content hash on every call.
 Use `--no-parser-cache` when fresh reads are required. Redaction is best-effort. Project-local
@@ -478,6 +520,55 @@ python3 -B project_map.py show --project /path/to/project --task authentication
 
 See the [project-map reference](skills/agent-dispatcher/PROJECT-MAP.md) for freshness checks,
 coverage limits, and write-scope diagnostics.
+
+### Optional model-assisted retrieval
+
+This layer is **off by default**. Enable it in your own settings file outside the project:
+`~/.config/agent-dispatcher/llm-retrieval.json`, or a path selected with
+`AGENT_DISPATCHER_LLM_CONFIG`. An absolute `XDG_CONFIG_HOME` changes the default configuration
+root. A project cannot enable it or choose the destination for its source.
+
+| Feature | What it does | When a model is called |
+| --- | --- | --- |
+| File role summaries | Describes a file's responsibilities, symbols, concepts, and interactions; searches those descriptions locally alongside source-based retrieval. | During an explicit indexing run, for missing or changed content. |
+| Candidate reranker | Orders a bounded set of already retrieved files using summaries and retrieval evidence. | During retrieval, if separately enabled and its policy and budget permit it. |
+
+File summaries describe what code does; they are separate from the dispatcher's specialist
+roles. Summaries are checked against the index, stale summaries are skipped, and unsupported
+symbol names or interaction targets are discarded. They remain advisory; the packet supplies
+real source excerpts for the agent to inspect.
+
+Representation generation and reranking can use different models. Supported transports are
+OpenAI-compatible endpoints, Anthropic's Messages API, and a local command. API credentials
+come from named environment variables. See the [LLM-assisted retrieval guide](docs/llm-assisted-retrieval.md)
+for a complete settings example, provider options, and payload details.
+
+After configuring a provider, run from the source checkout:
+
+```bash
+python3 -B llm_retrieval.py index --project /path/to/project --dry-run
+python3 -B llm_retrieval.py index --project /path/to/project
+python3 -B llm_retrieval.py status --project /path/to/project
+```
+
+The dry run counts eligible files and estimates input tokens without calling a model. Indexing
+is incremental and resumable: stored results are reused for unchanged content under the same
+model and versions. It sends eligible files' paths, static evidence, and bounded redacted source
+to the configured provider. Retrieval itself never fills missing summaries.
+
+The reranker defaults to at most 20 candidates, runs before graph expansion, and uses `replace`
+integration: its order leads the candidate list while explicitly named files remain pinned.
+It cannot introduce a new file. Optional settings allow post-graph placement, blended rankings,
+seed-only use, reranking only when the deterministic result is ambiguous, or shadow mode that
+records a proposed order without applying it. Invalid or unavailable model responses fall back
+to deterministic ordering with diagnostics.
+
+Summary search makes no per-query model call. Reranking sends the request, candidate paths,
+summaries or symbol metadata, and selection evidence to the configured provider. Indexing and
+querying have separate call budgets. Exclusions apply before either operation; redaction is
+best-effort. Provider access and usage costs are separate from normal dispatcher use.
+Usage records include model and prompt versions, tokens, and latency. Cost reporting uses
+provider-reported amounts when available, otherwise an estimate from your configured prices.
 
 ### Check health and get setup recommendations
 
@@ -743,14 +834,16 @@ using your own credential and billed usage. Task redaction is best-effort. See t
 | --- | --- |
 | [Architecture](docs/architecture.md) | Roles, skills, tools, recipes, and their boundaries. |
 | [Context engine](docs/context-engine.md) | Context selection, budgets, provenance, and inspection. |
+| [Repository intelligence](docs/repository-intelligence.md) | Query analysis, search methods, rank fusion, code relationships, history, and explain controls. |
+| [LLM-assisted retrieval](docs/llm-assisted-retrieval.md) | Optional file summaries and reranking, provider settings, payloads, and call budgets. |
+| [Project intelligence](docs/project-intelligence.md) | How project facts, structural graphs, caching, and context packets fit together. |
 | [Project maps](skills/agent-dispatcher/PROJECT-MAP.md) | Fact maps, structural graphs, incremental parsing, freshness, and cache write scope. |
 | [Skills](docs/skills.md) | Local and external skills, triggers, and loadouts. |
 | [MCPs](docs/mcps.md) | Tool registry, availability, risks, and fallbacks. |
 | [Recipes](docs/recipes.md) | Workflows and role handoffs. |
 | [Verification](docs/verification.md) | Required evidence and reporting limits. |
 | [Security](docs/security.md) | Permissions and dependency trust. |
-| [Decision-engine evaluations](evals/decision/README.md) | Fixtures, measurement methods, and known limits. |
-| [End-to-end evaluations](evals/end_to_end/README.md) | Compare stock Codex and Claude Code with the dispatcher on identical tasks. |
+| [Codex adapter](adapters/codex/README.md) | Installation, updates, activation, hook trust, and uninstall. |
 | [Claude Code adapter](adapters/claude-code/README.md) | Installation layout and generated files. |
 | [Changelog](CHANGELOG.md) | Release history. |
 
@@ -766,9 +859,13 @@ sources/shared/            Shared router, context, reporting, and hook templates
 skills/<category>/<id>/    Local skills and manifests
 recipes/                   Workflow definitions
 catalog/                   Registries and schemas
+adapters/                  Host-specific entrypoints, packaging, and controls
+context.py                 Context preparation, scan boundaries, and write gates
+repo_index.py              Source facts, symbols, relationships, and filtered history
+retrieval.py               Candidate retrieval, ranking, expansion, and explain CLI
+context_budget.py          Source excerpts within file, byte, and token limits
+llm_retrieval.py            Optional file summaries, model providers, and reranking
 decision/                  Optional decision-engine implementation
-evals/decision/            Selection fixtures and evaluation harness
-evals/end_to_end/          Matched stock/dispatcher tasks and private acceptance checks
 tests/                     Offline test suite and one-command runner
 docs/                      Detailed guides
 build.py                   Generator and validator
@@ -782,18 +879,14 @@ python3 -B -m tests
 ```
 
 These checks run offline without provider credentials. They validate generated-file agreement,
-references, loadout limits, registry consistency, hook behavior, and decision-engine boundaries.
+references, loadout limits, registry consistency, hook behavior, cache and retrieval boundaries,
+and optional model-provider failures using mocks.
 Run an individual group with `python3 -B -m tests.test_context`, substituting its module name.
 The manual installer runs build validation and decision checks before installation;
-CI runs the full offline suite. Live model comparisons require a separately configured run.
+CI runs the full offline suite.
 
-To run the offline keyword baseline:
-
-```bash
-python3 evals/decision/run.py
-```
-
-The keyword baseline is a measurement floor; it does not run Claude's in-session routing.
+Generated exports and one-off documents belong under the ignored `output/` directory.
+Distribution builds and local run artifacts belong under the ignored `dist/` directory.
 See [adding a role](docs/adding-an-agent.md) or [adding a skill](docs/adding-a-skill.md) to extend
 the catalog. Preserve generated regions between `<!-- name:start -->` and `<!-- name:end -->`
 markers in this README and the documentation.
