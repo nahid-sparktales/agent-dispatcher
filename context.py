@@ -977,10 +977,14 @@ def _intelligent_selection(engine, settings, task, texts, hashes, explicit, role
     if explain:
         report["explain"] = scrub(engine["render_explain"](outcome, verbose=True))
     spent = sum(math.ceil(len(e["content"]) / 4) for e in excerpts)
-    return selected, excerpts, spent, report
+    # The project map's view follows this ranking, pointing at the files the excerpts do not cover first.
+    excerpted = {item["path"] for item in packet["files"] if item["excerpts"]}
+    order = ([row["path"] for row in outcome["ranked"] if row["path"] not in excerpted]
+             + [row["path"] for row in outcome["ranked"] if row["path"] in excerpted])
+    return selected, excerpts, spent, report, order
 
 
-def _project_map(project, task, pack, snapshot, preview=False, maintain=False, writable_paths=None):
+def _project_map(project, task, pack, snapshot, preview=False, maintain=False, writable_paths=None, order=None, role=None):
     missing = {"status": "missing", "entries": [], "estimated_tokens": 0,
                "cache_status": "missing", "evidence_origin": "none",
                "coverage": {"scan_complete": bool(snapshot["complete"]),
@@ -1004,8 +1008,8 @@ def _project_map(project, task, pack, snapshot, preview=False, maintain=False, w
     try:
         namespace = {"__name__": "_dispatcher_project_map", "__file__": str(helper_path)}
         exec(compile(helper_path.read_text(encoding="utf-8"), str(helper_path), "exec"), namespace)
-        return namespace["context_entries"](project, task, pack=pack, snapshot=snapshot,
-                                            preview=preview, maintain=maintain, writable_paths=writable_paths)
+        return namespace["context_entries"](project, task, pack=pack, snapshot=snapshot, preview=preview,
+                                            maintain=maintain, writable_paths=writable_paths, order=order, role=role)
     except (OSError, UnicodeError, SyntaxError, ValueError, TypeError, KeyError):
         return dict(missing, status="unavailable", cache_status="unavailable",
                     diagnostics=["Project map helper unavailable or map unsafe; no cached facts used."])
@@ -1265,10 +1269,10 @@ def _select_context(project, task, role=None, size="standard", max_tokens=None, 
                                         "text": texts[path], "centers": centers or [0], "symbols": []}
         except (OSError, UnicodeError, SyntaxError, ValueError, TypeError, KeyError, RecursionError):
             graph_evidence = {"status": "unavailable", "diagnostics": ["Structural graph unavailable; using source retrieval."]}
-    intelligence = None
+    intelligence, order = None, None
     if engine is not None:
         try:
-            selected, excerpts, spent, intelligence = _intelligent_selection(
+            selected, excerpts, spent, intelligence, order = _intelligent_selection(
                 engine, settings, task, texts, hashes, explicit, role_id, changed, incremental, root,
                 excluded, scrub, compact, diagnostics, explain, oversized, rerank_answer)
         except (OSError, UnicodeError, SyntaxError, ValueError, TypeError, KeyError, AttributeError,
@@ -1287,7 +1291,7 @@ def _select_context(project, task, role=None, size="standard", max_tokens=None, 
     if len(excluded) > MAX_EXCLUDED:
         diagnostics.append("Excluded file details limited to the first 100 paths; counts include all exclusions.")
     map_evidence = _project_map(root, task, base, snapshot, preview=map_preview, maintain=map_maintain,
-                                writable_paths=writable_paths)
+                                writable_paths=writable_paths, order=order, role=role_id)
     # Indexes persist to private state outside the project: a helper write, never a project write.
     persisted = any(e and e.get("maintenance", {}).get("persisted") for e in (map_evidence, graph_evidence))
     result = {"schema_version": 1, "read_only": not persisted, "project": scrub(str(root)), "role": role_id, "size": size,

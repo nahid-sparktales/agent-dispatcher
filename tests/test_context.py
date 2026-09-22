@@ -75,6 +75,16 @@ class ContextTests(unittest.TestCase):
         self.assertTrue(all("explicit project path" in row["reason"] for row in result["context"]))
         self.assertIn("adapters/codex/SKILL.template.md", [row["query"] for row in result["retrieval"]])
 
+    def test_map_preview_points_at_ranked_files_beyond_the_excerpts(self):
+        for index in range(20):
+            self.write(f"src/module{index}.py", f"def validate_login_{index}(user):\n    return user\n")
+        result = self.select("Fix validate_login", map_preview=True)
+        excerpted = set(self.paths(result))
+        mapped = [entry["source"]["path"] for entry in result["project_map"]["entries"]]
+        self.assertTrue(excerpted and mapped)
+        self.assertFalse(set(mapped) & excerpted)
+        self.assertEqual(len(mapped), len(set(mapped)))
+
     def test_named_paths_support_spaces_relative_absolute_and_line_annotations(self):
         names = ["src/my file.test.ts", "src/module.config.test.py", "Makefile"]
         for path in names:

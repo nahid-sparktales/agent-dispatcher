@@ -168,6 +168,9 @@ def _map_view(task, texts, hashes, memo, scrub, query, clone, found_full):
                 "files": len(files), "chars": chars}
 
     views = {"terms": view(project_map._matching(data["entries"], query, context, clone))}
+    if found_full:  # The helper's order: the engine ranking with excerpted files last.
+        order = [p for p in found_full["ranked"] if p not in excerpted] + [p for p in found_full["ranked"] if p in excerpted]
+        views["engine"] = view(project_map._matching(data["entries"], query, context, clone, order=order))
     return {"facts": len(data["entries"]), "sources": len(data["sources"]), "omitted": data["scan"]["omitted_facts"],
             "derive_ms": derive_ms, "target_in_map": sum(t in mapped for t in targets) / len(targets), "views": views}
 
