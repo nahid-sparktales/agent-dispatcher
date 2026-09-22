@@ -28,8 +28,9 @@ SCHEMA_VERSION = 1
 # still read as a fallback and never written, and it prefixes the logical cache-write-scope targets.
 STATE_DIR = ".agent-dispatcher"
 STATE_FILE = "project-map.json"
-# Sized for repos of about 1,000 source files: each source contributes at most three features;
-# dependencies come from manifests only. Task output stays bounded separately (8 facts, 4,000 chars).
+# Sized for repos of about 1,000 source files: each source contributes at most three features, or
+# one import when it defines nothing; other dependencies come from manifests. Task output stays
+# bounded separately (8 facts, 4,000 chars).
 MAX_MAP_BYTES = 4 * 1024 * 1024
 MAX_SOURCES = 1000
 MAX_SOURCE_PATH = 240
@@ -346,6 +347,16 @@ def _extract(path, text, sha, helper):
                 add("feature", match.group(1), "Candidate feature location; definition: " + line.strip(), number, "heuristic")
                 found += 1
                 if found >= 3:
+                    break
+        if not found:
+            # A module without definitions (a data table, a re-export barrel) is still a location the
+            # view must be able to name: its first import or re-export stands in, one fact per module.
+            for number, line in enumerate(lines, 1):
+                module = re.search(r"(?:\bfrom\s*['\"]([^'\"]+)['\"]|^\s*import\s*['\"]([^'\"]+)['\"]|"
+                                   r"^\s*from\s+([.\w]+)\s+import\b|^\s*import\s+([\w.]+))", line)
+                value = next((group for group in module.groups() if group), "") if module else ""
+                if value and value != "__future__":  # A compiler directive, never a fact about this project.
+                    add("dependency", value, "Import declaration (module without definitions): " + line.strip(), number)
                     break
     if kind in {"doc", "workflow"} or name == "Makefile":
         for number, line in enumerate(lines, 1):

@@ -72,7 +72,11 @@ context preparation changed project state. Do not confuse successful evidence pr
 a saved cache, or recommend an out-of-scope refresh to remove the diagnostic.
 
 Saved-cache status and evidence origin are reported separately; eight facts and 1,000
-estimated tokens bound the evidence. Intentional task exclusions are not stale sources.
+estimated tokens bound the evidence. The context selector orders those facts by its retrieval
+ranking, one per file, with files that received no excerpt first, so the map points at the next
+relevant files rather than repeating the excerpts; files the request names keep all their facts,
+and tester, debugger and reviewer see up to two test commands first (architect: decisions).
+Standalone `show` ranks by request words only. Intentional task exclusions are not stale sources.
 Changed, deleted, ignored, or unreadable sources cannot supply current facts. Report stale
 or partial coverage and fill gaps with targeted investigation. A new file can make coverage
 incomplete even when previous facts remain valid. Current-scan evidence is not a persisted
@@ -80,8 +84,9 @@ refresh when maintenance is deferred or a write fails.
 
 Recheck context when the task focus or relevant source changes. The map is bounded and
 heuristic: a recognized definition suggests a feature location; manifests identify declared
-dependencies (import lines are not facts). Test command text is discovered once per distinct
-command, never executed or verified.
+dependencies, and a module that defines nothing keeps one import or re-export line so it can
+still be named. Test command text is discovered once per distinct command, never executed or
+verified.
 Decision documents record what their authors stated, not proof that code follows the decision.
 Missing facts are unknown; explain limits instead of inferring architecture or successful checks.
 

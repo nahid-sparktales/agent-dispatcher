@@ -345,11 +345,14 @@ class ProjectMapTests(unittest.TestCase):
         first_fact = next(number for number, line in enumerate(text) if line.startswith("- "))
         self.assertTrue(any(line.startswith("Diagnostic: Showing 50") for line in text[:first_fact]))
 
-    def test_import_lines_are_not_facts_and_manifests_still_are(self):
+    def test_import_lines_are_facts_only_for_modules_without_definitions(self):
         self.basic()
+        self.write("src/registry.py", "from __future__ import annotations\nimport sqlite3\nimport json\nTABLES = {}\n")
+        self.write("src/index.ts", 'export * from "./auth.js";\nexport * from "./registry.js";\n')
         result = self.build()
-        self.assertFalse([e for e in result["entries"] if e["detail"].startswith("Import declaration")])
-        self.assertEqual([e["label"] for e in result["entries"] if e["kind"] == "dependency"], ["react"])
+        imports = [(e["label"], e["source"]["path"]) for e in result["entries"] if e["detail"].startswith("Import declaration")]
+        self.assertEqual(imports, [("./auth.js", "src/index.ts"), ("sqlite3", "src/registry.py")])
+        self.assertEqual([e["label"] for e in result["entries"] if e["kind"] == "dependency"], ["react", "./auth.js", "sqlite3"])
 
     def test_documented_test_command_is_recorded_once_from_the_makefile(self):
         self.write("Makefile", "test:\n\t@echo tests\n")
