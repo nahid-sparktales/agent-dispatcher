@@ -547,7 +547,7 @@ def _llm_opinion(task, order, evidence, index, config, reranker):
     prompt = {key: config["llm_rerank"][key] for key in ("content", "order", "evidence", "max_prompt_chars")
               if config["llm_rerank"][key] is not None}
     answer = reranker(task, rows, index, prompt) if rows else {"error": "no candidates"}
-    record = {"candidates": [row["path"] for row in rows], **{key: answer[key] for key in ("error", "usage", "invalid") if key in answer}}
+    record = {"candidates": [row["path"] for row in rows], **{key: answer[key] for key in ("error", "usage", "invalid", "request") if key in answer}}
     record["ms"] = round((time.perf_counter() - started) * 1000, 1)
     ordered = list(dict.fromkeys(path for path in answer.get("order", ()) if path in set(record["candidates"])))
     if not ordered:
@@ -587,7 +587,7 @@ def _integrate(order, rows, lists, evidence, index, query, config, pinned, role)
     return [(path, score) for path, score, _ in sorted(blended, key=lambda row: (row[0] not in fixed, -row[1], row[2]))]
 
 
-def retrieve(task, index, config=None, *, named=(), role=None, extra=None, boost_only=(), fallback=None, reranker=None):
+def retrieve(task, index, config=None, *, named=(), role=None, extra=None, boost_only=(), fallback=None, reranker=None):  # noqa: C901
     """Run the pipeline once.
 
     `extra` carries candidate lists from outside (worktree, explorer). Sources in `boost_only` may
@@ -858,6 +858,11 @@ def render_explain(result, verbose=False, top=10):
         lines += [f"   + {e['source']} rank #{e['rank']}: {e['reason']} ({e['value']})" for e in row["evidence"]]
         if verbose and row["path"] in result.get("roles", {}):
             lines.append("   ~ role summary (model-written retrieval aid): " + result["roles"][row["path"]])
+    request = (result.get("llm") or {}).get("request")
+    if request:
+        lines += ["", "RERANK REQUEST (host step: order these candidates for the request above, then run "
+                      "`retrieval.py rerank` with --ranking '{\"ranking\": [{\"id\": \"C..\", \"label\": \"primary|supporting|weak\", "
+                      "\"reason\": \"...\"}, ...]}'; only supplied ids count)", request]
     for step in result.get("exploration", []):
         lines += ["", f"EXPLORER iteration {step.get('iteration', 1)}: confidence {step['confidence']}, "
                       f"{'stop' if step['stop'] else 'expand'} - {step['reason']}"]
@@ -892,7 +897,7 @@ def render_explain(result, verbose=False, top=10):
 def main(argv=None):
     parser = argparse.ArgumentParser(prog="retrieval.py", description="Inspect repository retrieval decisions. Read-only.")
     sub = parser.add_subparsers(dest="command", required=True)
-    for name in ("explain", "explain-query", "expand"):
+    for name in ("explain", "explain-query", "expand", "rerank"):
         command = sub.add_parser(name)
         command.add_argument("task")
         if name != "explain-query":
@@ -906,20 +911,24 @@ def main(argv=None):
         if name == "expand":
             command.add_argument("--findings", required=True, help="Explorer findings as JSON (see docs/repository-intelligence.md)")
             command.add_argument("--iteration", type=int, default=1)
+        if name == "rerank":
+            command.add_argument("--ranking", required=True, help="The host's answer to a RERANK REQUEST, as JSON (see docs/llm-assisted-retrieval.md)")
     args = parser.parse_args(argv)
     if args.command == "explain-query":
         print(render_query(analyze_query(args.task)))
         return 0
     context = _sibling("context")
     try:
-        findings = None
+        findings = ranking = None
+        if args.command == "rerank":
+            ranking = json.loads(args.ranking)
         if args.command == "expand":
             if not 1 <= args.iteration <= DEFAULTS["explorer"]["max_iterations"]:
                 raise context["ContextError"]("Explorer iteration limit reached; no further expansion.")
             findings = json.loads(args.findings)
         result = context["explain_retrieval"](args.project, args.task, strategy=args.strategy, pack=args.pack,
                                               exclude_paths=args.exclude_path, findings=findings,
-                                              iteration=getattr(args, "iteration", 1), llm=not args.no_llm)
+                                              iteration=getattr(args, "iteration", 1), llm=not args.no_llm, ranking=ranking)
     except (context["ContextError"], ValueError, OSError) as exc:
         print(str(exc) if isinstance(exc, context["ContextError"]) else "Retrieval input could not be used; values withheld.", file=sys.stderr)
         return 2

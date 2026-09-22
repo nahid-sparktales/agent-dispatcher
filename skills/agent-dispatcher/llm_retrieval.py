@@ -234,7 +234,8 @@ def complete(model, system, prompt):
 
     Providers: "openai" (any OpenAI-compatible endpoint: OpenAI, Ollama, LM Studio, vLLM, gateways),
     "anthropic", "command" (a local CLI: prompt on stdin, answer on stdout), or a Python callable
-    (system, prompt) -> str | dict for tests and embedding hosts.
+    (system, prompt) -> str | dict for tests and embedding hosts. Reranking also accepts "host":
+    no call at all; the session's own model answers the rendered request as one of its steps.
     """
     provider, started = model.get("provider"), time.perf_counter()
     limit, timeout = model.get("max_output_tokens", 500), model.get("timeout", 120)
@@ -728,9 +729,14 @@ def parse_ranking(raw, ids):
     return {"order": order, "unranked": missing, "reasons": reasons, "labels": labels, "invalid": invalid}
 
 
-def make_reranker(settings, store=None, refresh=False):
+def make_reranker(settings, store=None, refresh=False, answer=None):
     """settings -> callable(task, rows, index) -> ranking dict, or {"error": ...}. It never raises an LLMError:
-    the retrieval engine needs no knowledge of this module's types to fall back to its own ranking."""
+    the retrieval engine needs no knowledge of this module's types to fall back to its own ranking.
+
+    With provider "host" nothing is called: the first pass returns the rendered request under "request"
+    (the deterministic ranking stands), and a second pass with `answer` (the host's JSON) validates it
+    exactly like a provider's reply. One bounded round, the same contract as the explorer's `expand`.
+    """
     model = settings["reranking"]
     if not (settings["enabled"] and model["enabled"]):
         return None
@@ -738,6 +744,14 @@ def make_reranker(settings, store=None, refresh=False):
     def reranker(task, rows, index, options=None):
         budget = Budget(settings["budget"]["max_query_calls"])
         prompt, ids = rerank_prompt(task, rows, index, dict(model, **(options or {})))
+        if model.get("provider") == "host":
+            if answer is None:
+                return {"error": "host reranking: answer the request with `rerank --ranking`", "request": prompt, "candidates": len(ids)}
+            try:
+                return dict(parse_ranking(answer, ids), usage={"calls": 0, "input_tokens": 0, "output_tokens": 0, "ms": 0.0,
+                                                               "prompt_chars": len(prompt)}, candidates=len(ids))
+            except LLMError as exc:
+                return {"error": str(exc), "usage": {}}
         key = _key("rerank", RERANK_PROMPT, _identity(model), hashlib.sha256((RERANK_SYSTEM + prompt).encode("utf-8")).hexdigest())
         cached = None if refresh or store is None else store.get(key)
         try:
@@ -779,8 +793,9 @@ def _shadow(location, task, rows, result):
         pass
 
 
-def layer(project, index, withheld=(), settings=None, store=None):
-    """Everything the context helper needs, or a diagnostic: (representations attached, reranker or None, overrides, diagnostic)."""
+def layer(project, index, withheld=(), settings=None, store=None, answer=None):
+    """Everything the context helper needs, or a diagnostic: (representations attached, reranker or None, overrides, diagnostic).
+    `answer` is the host's ranking for provider "host" (see make_reranker)."""
     try:
         settings = settings or load_settings(project=project)
         if not settings["enabled"]:
@@ -791,7 +806,7 @@ def layer(project, index, withheld=(), settings=None, store=None):
         if settings.get("shadow_log"):
             _outside(settings["shadow_log"], project, "The shadow log")
         attached = attach(index, store, settings, withheld) if settings["representation"]["enabled"] else 0
-        return attached, make_reranker(settings), settings.get("retrieval") or {}, None
+        return attached, make_reranker(settings, answer=answer), settings.get("retrieval") or {}, None
     except LLMError as exc:
         return 0, None, {}, f"LLM-assisted retrieval unavailable ({exc}); deterministic retrieval used."
 

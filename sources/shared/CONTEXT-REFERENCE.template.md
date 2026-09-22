@@ -286,7 +286,11 @@ any of this, so no retriever, edge, history entry or explorer request can reach 
 `expand` is the optional explorer step: when the packet lacks a definition, caller, reference, path
 or neighbor you can name, ask for it (types `symbol`, `path`, `callers`, `references`, `neighbors`;
 two iterations at most). Answers come from the same filtered index and are inserted below the
-strongest results. `--retrieval legacy` restores the additive ranking below, which is also the
+strongest results. A packet carrying `rerank_request` (the user enabled host reranking) asks you
+for one step in return: order the listed candidate ids by how likely a developer must inspect or
+modify each file for the request, then rerun with `--rerank-answer '{"ranking": [...]}'`
+(`{{RETRIEVAL_COMMAND}} rerank 'REQUEST' --ranking ...` shows the result). Only listed ids count,
+the deterministic evidence stays, and there is no second round. `--retrieval legacy` restores the additive ranking below, which is also the
 manual method when no helper is available. It orders results — nothing more.
 
 | Signal | |

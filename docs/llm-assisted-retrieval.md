@@ -170,6 +170,26 @@ A file the request names outright stays pinned in every mode. Placement and inte
 chosen on the benchmark's validation split, where `replace` beat the more conservative modes; the
 deterministic evidence of every file is kept and shown either way.
 
+## Host reranking: the session's model as the reranker
+
+`"reranking": {"enabled": true, "provider": "host"}` makes no call at all. The helper renders the
+same bounded request (opaque candidate ids, role summaries, deterministic evidence) into the packet
+under `rerank_request` (and as `RERANK REQUEST` in `retrieval.py explain`) and reports the
+deterministic ranking; the session's own model orders the candidates as one of its steps and hands
+the answer back once:
+
+```bash
+python3 -B retrieval.py rerank "TASK" --project . --ranking '{"ranking": [{"id": "C07", "label": "primary", "reason": "..."}, "C02", "C11"]}'
+python3 -B context.py --project . --task "TASK" --rerank-answer '{"ranking": [...]}'   # the packet, reranked
+```
+
+The answer is validated exactly like a provider's (unknown or repeated ids are discarded, omitted
+candidates keep their order, an unusable answer leaves the deterministic ranking), and every
+deterministic evidence line survives. It is the explorer's `expand` contract applied to ordering:
+one round, no loop. The trade against a provider: no key, no extra process and no per-call charge,
+but the ~5k-token request enters the session's context, the model is whatever the session runs, and
+a second helper invocation is needed.
+
 ## Untrusted content
 
 Repository text and model output are both data. Source is sent inside a delimited evidence block

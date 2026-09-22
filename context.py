@@ -882,7 +882,7 @@ _MATCHES = (("named", "filename"), ("symbol_definitions", "symbol"), ("path", "p
 _SENSITIVE_SKIPS = {"explicit task exclusion", "automatic task exclusion", "credential file withheld"}
 
 
-def _llm_layer(engine, settings, root, index, excluded, diagnostics):
+def _llm_layer(engine, settings, root, index, excluded, diagnostics, ranking=None):
     """Optional LLM-assisted retrieval, on only through the user's own settings file (llm_retrieval.py).
 
     Runs after the exclusion filter built the index: attaches fresh role summaries of admitted files and
@@ -890,7 +890,7 @@ def _llm_layer(engine, settings, root, index, excluded, diagnostics):
     """
     try:
         attached, reranker, overrides, problem = _sibling("llm_retrieval")["layer"](
-            root, index, [item["path"] for item in excluded if item["reason"] in _SENSITIVE_SKIPS])
+            root, index, [item["path"] for item in excluded if item["reason"] in _SENSITIVE_SKIPS], answer=ranking)
     except (OSError, UnicodeError, SyntaxError, ValueError, TypeError, KeyError):
         return None
     if problem:
@@ -906,7 +906,7 @@ def _llm_layer(engine, settings, root, index, excluded, diagnostics):
 
 
 def _intelligent_selection(engine, settings, task, texts, hashes, explicit, role_id, changed, cache, root,
-                           excluded, scrub, compact, diagnostics, explain, oversized=()):
+                           excluded, scrub, compact, diagnostics, explain, oversized=(), rerank_answer=None):
     """Repository-intelligence selection over the already-filtered universe; same row/excerpt contract."""
     stats = {}
     history = _git_history(root, settings["git"]["max_commits"], cache) if settings["git"]["enabled"] else None
@@ -924,7 +924,7 @@ def _intelligent_selection(engine, settings, task, texts, hashes, explicit, role
     # Root project rules give cheap grounding when room remains; they never gain authority here.
     rules = [p for p in texts if PurePosixPath(p).name in RULES and len(PurePosixPath(p).parts) == 1]
     outcome = engine["run"](task, index, settings, named=list(explicit), role=role_id, extra=extra,
-                            reranker=_llm_layer(engine, settings, root, index, excluded, diagnostics),
+                            reranker=_llm_layer(engine, settings, root, index, excluded, diagnostics, rerank_answer),
                             anchors={p: line for p, line in explicit.items() if line}, boost_only=boost_only,
                             fallback=[{"file": path, "rank": rank, "score": 0.0, "source": "rules",
                                        "reason": "project conventions (untrusted evidence)", "value": path}
@@ -970,6 +970,10 @@ def _intelligent_selection(engine, settings, task, texts, hashes, explicit, role
                  if explain or not (key.endswith("_ms") or key == "overlap")}
     report = {"strategy": settings["name"], "task_signals": {k: [scrub(v) for v in values] for k, values in packet["task_signals"].items()},
               "telemetry": dict(telemetry, seeds=[scrub(p) for p in trace["seeds"]])}
+    if (outcome.get("llm") or {}).get("request"):  # Host reranking: one bounded round, answered with --rerank-answer.
+        report["rerank_request"] = scrub(outcome["llm"]["request"])
+        diagnostics.append("Rerank request pending: order the listed candidates and rerun with --rerank-answer; "
+                           "the ranking above is deterministic until then.")
     if explain:
         report["explain"] = scrub(engine["render_explain"](outcome, verbose=True))
     spent = sum(math.ceil(len(e["content"]) / 4) for e in excerpts)
@@ -1096,7 +1100,7 @@ def select_context(project, task, role=None, size="standard", max_tokens=None, p
                    compact=False, packet_tokens=None, guide_ids=(), map_maintain=False,
                    reuse_state=None, reuse_scope=None, writable_paths=None, audit=False,
                    parser_cache=True, retrieval="auto", max_files=None, max_bytes=None, explain=False,
-                   _delivery=None):
+                   rerank_answer=None, _delivery=None):
     """Prepare context; an explicit audit captures helper writes before they happen."""
     if type(audit) is not bool:
         raise ContextError("Task audit must be a boolean.")
@@ -1108,7 +1112,7 @@ def select_context(project, task, role=None, size="standard", max_tokens=None, p
                                map_maintain=map_maintain, reuse_state=reuse_state, reuse_scope=reuse_scope,
                                writable_paths=writable_paths, parser_cache=parser_cache,
                                retrieval=retrieval, max_files=max_files, max_bytes=max_bytes, explain=explain,
-                               _delivery=_delivery, _audit_pending=pending)
+                               rerank_answer=rerank_answer, _delivery=_delivery, _audit_pending=pending)
     except BaseException:
         if pending:
             cleanup = _discard_audit(pending[0])
@@ -1132,7 +1136,7 @@ def _select_context(project, task, role=None, size="standard", max_tokens=None, 
                     compact=False, packet_tokens=None, guide_ids=(), map_maintain=False,
                     reuse_state=None, reuse_scope=None, writable_paths=None, parser_cache=True,
                     retrieval="auto", max_files=None, max_bytes=None, explain=False,
-                    _delivery=None, _audit_pending=None):
+                    rerank_answer=None, _delivery=None, _audit_pending=None):
     """Select evidence; opt-in maintenance/reuse writes only bounded owned state."""
     if not isinstance(task, str) or not task.strip() or len(task) > MAX_TASK_CHARS:
         raise ContextError("Task must contain 1–16000 characters; task contents withheld.")
@@ -1266,7 +1270,7 @@ def _select_context(project, task, role=None, size="standard", max_tokens=None, 
         try:
             selected, excerpts, spent, intelligence = _intelligent_selection(
                 engine, settings, task, texts, hashes, explicit, role_id, changed, incremental, root,
-                excluded, scrub, compact, diagnostics, explain, oversized)
+                excluded, scrub, compact, diagnostics, explain, oversized, rerank_answer)
         except (OSError, UnicodeError, SyntaxError, ValueError, TypeError, KeyError, AttributeError,
                 IndexError, RecursionError, ZeroDivisionError):
             diagnostics.append("Repository intelligence failed; legacy retrieval used.")
@@ -1325,7 +1329,7 @@ def _select_context(project, task, role=None, size="standard", max_tokens=None, 
     return result
 
 
-def explain_retrieval(project, task, *, strategy="full", pack=None, exclude_paths=(), findings=None, iteration=1, llm=True):
+def explain_retrieval(project, task, *, strategy="full", pack=None, exclude_paths=(), findings=None, iteration=1, llm=True, ranking=None):
     """Read-only inspection through the same exclusion filter and engine as select_context.
 
     `findings` are explorer requests (symbols, paths, relationships). They are answered from the
@@ -1354,7 +1358,7 @@ def explain_retrieval(project, task, *, strategy="full", pack=None, exclude_path
     index = engine["build_index"](texts, hashes, _kind, cache=cache, history=history, config=settings, path_only=oversized)
     explicit = _explicit_paths(task, texts, root)
     outcome = engine["run"](task, index, settings, named=list(explicit), findings=findings, iteration=iteration,
-                            reranker=_llm_layer(engine, settings, root, index, excluded, diagnostics) if llm else None,
+                            reranker=_llm_layer(engine, settings, root, index, excluded, diagnostics, ranking) if llm else None,
                             anchors={p: line for p, line in explicit.items() if line})
     outcome["diagnostics"] = diagnostics
     outcome["universe"] = {"files": len(texts), "withheld": len(excluded)}
@@ -1459,6 +1463,7 @@ def main(argv=None):
     parser.add_argument("--max-files", type=int, help="Upper bound on selected files, below the size tier's own")
     parser.add_argument("--max-bytes", type=int, help="Upper bound on excerpt bytes, below the size tier's own")
     parser.add_argument("--explain", action="store_true", help="Include the retrieval trace: query analysis, per-retriever evidence, budgeting")
+    parser.add_argument("--rerank-answer", help="Your ordering of a pending rerank request, as JSON; one round, only listed candidates count")
     parser.add_argument("--audit", action="store_true", help="Start a task change audit in owned temporary state before cache writes; finish it before claiming file preservation")
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args(argv)
@@ -1479,6 +1484,7 @@ def main(argv=None):
                                 writable_paths=args.writable_path, audit=args.audit,
                                 parser_cache=not args.no_parser_cache, retrieval=args.retrieval,
                                 max_files=args.max_files, max_bytes=args.max_bytes, explain=args.explain,
+                                rerank_answer=json.loads(args.rerank_answer) if args.rerank_answer else None,
                                 _delivery=delivery)
     except (ContextError, OSError, UnicodeError) as exc:
         print(str(exc) if isinstance(exc, ContextError) else "Context input could not be read; contents withheld.", file=sys.stderr)
