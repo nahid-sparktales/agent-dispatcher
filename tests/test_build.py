@@ -33,7 +33,7 @@ def check(name, cond, detail=""):
 GENERATED = ["skills/agent-dispatcher/DOCTOR.md", "skills/agent-dispatcher/doctor.py", "skills/agent-dispatcher/INVENTORY.md", "skills/agent-dispatcher/INVENTORY.json", "skills/agent-dispatcher/ACTIVITY.md", "skills/agent-dispatcher/SKILL.md", "skills/agent-dispatcher/INDEX.md",
              "skills/agent-dispatcher/CONTEXT.md", "skills/agent-dispatcher/SIGNALS.md",
              "catalog/skills.json", "catalog/loadouts.json", "README.md",
-             "docs/skills.md", "docs/mcps.md", "docs/recipes.md",
+             "docs/catalog.md", "docs/skills.md", "docs/mcps.md", "docs/recipes.md",
              "docs/context-engine.md"]
 GENERATED += ["skills/agent-dispatcher/" + name for name in build.REFERENCE_FILES]
 GENERATED.append("skills/agent-dispatcher/context.py")

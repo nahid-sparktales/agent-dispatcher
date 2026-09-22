@@ -11,7 +11,7 @@ recording controls:
 | **Experience** (`experience.py`, shared with the deep index) | bounded task events in the SQLite experience store, verification receipts, corrections, forgetting | explicit `record` per task | `experience.recording` **on** and `experience.retrieval` **on** by default |
 
 Defaults: experience recording and retrieval are **on**; episodic and semantic retrieval ship in
-`shadow` mode (they report what they would add and change nothing) until a project turns them
+`shadow` mode (they report what they would add and change nothing) until the user turns them
 `on`. A layer only has anything to say once a store was built (`build`) or a record was handed in
 (`record`): with nothing built and nothing recorded, a packet is byte-for-byte what it was before
 this feature, no file is created, and the master switch `"enabled": false` suppresses every memory
@@ -20,8 +20,8 @@ influence while leaving baseline retrieval, including the pre-existing Git co-ch
 The design takes RepoMem (*Improving Code Localization with Repository Memory*, Wang et al.,
 ICLR 2026, [arXiv:2510.01003](https://arxiv.org/abs/2510.01003)) as motivation for commit memory
 and hotspot summaries. Its reported gains are not a promise for this implementation; every layer
-here is measured separately with [the retrieval benchmark](retrieval-benchmark.md), and the
-experience layer starts in shadow mode until a measurement says otherwise.
+here is measured separately with [the retrieval benchmark](retrieval-benchmark.md). Any layer
+can be placed in shadow mode to inspect its contribution without changing rankings.
 
 ```text
 explicit build / refresh                                  query time (context.py, retrieval.py explain)
@@ -46,7 +46,7 @@ an absolute `XDG_CONFIG_HOME` moves the default). A file inside the inspected pr
           "symbols": {"enabled": true, "max_commits": 300}},
   "semantic": {"retrieval": "shadow", "generation": {"enabled": false}},
   "experience": {"recording": true, "retrieval": "on", "eligible_outcomes": ["checked_success", "accepted"]},
-  "retrieval": {"rrf_weights": {"memory_git": 0.5, "memory_semantic": 0.5, "memory_experience": 0.5},
+  "retrieval": {"rrf_weights": {"memory_git": 0.5, "memory_semantic": 0.5, "experience": 0.5},
                 "max_events": 10, "max_files_per_event": 8, "file_affinity": 1.0,
                 "gate": {"min_concept_matches": 2, "min_relative_score": 0.25,
                          "support_fields": ["message", "paths", "identifiers", "symbols"]}}
@@ -255,17 +255,20 @@ evidence (`memory_git rank #3: changed in eligible commit ...`) next to the dete
 ## Storage, integrity and migration
 
 Stores live in the project's private state directory (`~/.cache/agent-dispatcher/state-v1/<id>/`,
-under an absolute `XDG_CACHE_HOME`) as `repository-memory.json`, `memory-semantic.json` and
-`memory-experience.json`, written through the project map's helper: owner-only directory, 0600
-files, schema validation on every read, atomic publication, a concurrent-change check on save,
-size limits (24, 8 and 8 MiB). Nothing is created in the working tree, and nothing inside the
-project is read as memory state. Malformed, oversized, symlinked or foreign state is ignored with
-a diagnostic and rebuilt on the next `build`; the experience file is never rewritten by a cache
-rebuild. There is no HMAC on these files: they hold derived facts and the user's own records,
-never source text, and every candidate they yield must resolve to a file the current admitted
-index contains, so a forged store can at most reorder. A schema bump makes old files invalid,
+under an absolute `XDG_CACHE_HOME`). Episodic and semantic stores are `repository-memory.json`
+and `memory-semantic.json`, written through the project map's helper: owner-only directory,
+0600 files, schema validation on every read, atomic publication, a concurrent-change check on
+save, and size limits of 24 and 8 MiB. Experience uses the shared `experience.sqlite` store
+described in [the deep-index guide](repository-index.md#storage-and-trust); a memory rebuild
+never rewrites it.
+
+Nothing is created in the working tree, and nothing inside the project is read as memory state.
+Invalid episodic or semantic state is ignored with a diagnostic and rebuilt on the next `build`;
+unavailable experience state is reported separately. These stores are not HMAC-signed. They hold
+derived facts and bounded task records, never source text, and every candidate must resolve to a
+file the current admitted index contains. A schema bump invalidates older rebuildable stores,
 which `status` reports and `build` replaces. Read-only commands (`status`, `dry-run`, searches,
-`explain`, packets) create no files.
+`explain`, packets) create no files unless a query-time exposure log was explicitly configured.
 
 ## Cost and budgets
 

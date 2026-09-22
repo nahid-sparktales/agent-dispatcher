@@ -21,7 +21,7 @@ Generated (Claude Code adapter + registries):
     skills/agent-dispatcher/SKILL.md, roles/*.md, INDEX.md, CONTEXT.md, SIGNALS.md
     commands/agent-*.md, hooks/agent-dispatcher-activate.sh, hooks/hooks.json
     catalog/skills.json, catalog/loadouts.json
-    README.md tables, docs/*.md tables
+    README.md counts, docs/*.md tables
 """
 import json
 import pathlib
@@ -1046,7 +1046,17 @@ def write_readme(d):
     readme = ROOT / "README.md"
     if not readme.exists():
         return
-    txt = readme.read_text()
+    txt = marked(readme.read_text(), "counts",
+                 f"**{len(d['roles'])} roles · {len(d['skills'])} local skills · "
+                 f"{len(d['external'])} external skills · {len(d['recipes'])} recipes · "
+                 f"{len(d['mcp'])} MCP servers · {len(d['signals'])} detection signals**",
+                 inline=True)
+    readme.write_text(txt)
+
+
+def write_catalog(d):
+    catalog = DOCS / "catalog.md"
+    txt = catalog.read_text()
     out = []
     for cat in CATEGORIES:
         rows = [r for r in d["roles"] if r["category"] == cat]
@@ -1073,12 +1083,7 @@ def write_readme(d):
 
     recs = [f"- **`{r['id']}`** — {r['summary']}" for r in d["recipes"]]
     txt = marked(txt, "recipes", "\n".join(recs))
-    txt = marked(txt, "counts",
-                 f"**{len(d['roles'])} roles · {len(d['skills'])} local skills · "
-                 f"{len(d['external'])} external skills · {len(d['recipes'])} recipes · "
-                 f"{len(d['mcp'])} MCP servers · {len(d['signals'])} detection signals**",
-                 inline=True)
-    readme.write_text(txt)
+    catalog.write_text(txt)
 
 
 def main():
@@ -1092,6 +1097,7 @@ def main():
     write_commands(d)
     write_hook(d)
     write_readme(d)
+    write_catalog(d)
     write_docs(d)
     print(f"indexed {len(d['roles'])} roles, {len(d['skills'])} local skills, "
           f"{len(d['external'])} external, {len(d['recipes'])} recipes, {len(d['mcp'])} mcp, "

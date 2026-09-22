@@ -5,8 +5,10 @@ incrementally maintained index of a repository, an optional model-backed onboard
 writes evidence-backed architectural notes, and a store of task experience that later tasks may
 draw on. Everything here sits behind the retrieval described in
 [repository-intelligence.md](repository-intelligence.md) and the budgets in
-[context-engine.md](context-engine.md); it does not replace either. Without opting in, nothing on
-this page runs, and the context helper behaves exactly as before.
+[context-engine.md](context-engine.md); it does not replace either. Deep indexing requires an
+explicit build, and the model-backed Explorer is off by default. Experience recording and
+retrieval are enabled by default, but nothing is captured until a host or user explicitly
+submits a record. Without an index or recorded experience, these layers add nothing to a packet.
 
 ```text
 explicit onboarding        repository_intelligence.py build
@@ -30,12 +32,12 @@ each later task            context.py ... (as today)
 | Deep deterministic indexing | `repository_intelligence.py build` / `refresh`; used when `index.use` is `auto` and a published index exists | off until built |
 | Onboarding Explorer (model) | `exploration.enabled` in the settings file, plus `repository_intelligence.py explore` | off |
 | Query-time model reranking | unchanged: `llm-retrieval.json` ([llm-assisted-retrieval.md](llm-assisted-retrieval.md)) | off |
-| Experience recording | `repository_intelligence.py experience record` or `repository_memory.py record` (explicit); one shared store | on (`experience.recording` in `repository-memory.json`) |
+| Experience recording | `repository_memory.py record`, or the older `repository_intelligence.py experience record` (both explicit; one shared store) | memory command: on (`experience.recording` in `repository-memory.json`); older command: explicit writes |
 | Experience use at query time | `experience.retrieval` in `repository-memory.json` (the unified memory layer; `experience.use` here is superseded) | on |
 
-Settings live in `~/.config/agent-dispatcher/repository-intelligence.json` (or the path in
-`AGENT_DISPATCHER_INDEX_CONFIG`); a file inside the inspected project is refused, so a repository
-can never switch a model call or a memory on:
+Index and Explorer settings live in `~/.config/agent-dispatcher/repository-intelligence.json`
+(or the path in `AGENT_DISPATCHER_INDEX_CONFIG`); a file inside the inspected project is refused,
+so repository content cannot enable model calls or override these controls:
 
 ```json
 {
@@ -43,14 +45,18 @@ can never switch a model call or a memory on:
             "build": {"max_files": 50000, "max_admitted_bytes": 268435456, "batch_size": 200, "verify": "fast",
                       "history": {"max_commits": 5000, "max_commit_files": 30, "min_support": 2}}},
   "exploration": {"enabled": false, "provider": "openai", "base_url": "http://localhost:11434/v1", "model": "qwen3.6:27b",
-                  "max_calls": 12, "max_iterations": 8, "max_evidence_bytes": 200000, "max_seconds": 600, "max_spend_usd": null},
-  "experience": {"record": false, "use": false, "eligible_outcomes": ["checked_success", "accepted"], "exposure_log": null}
+                  "max_calls": 12, "max_iterations": 8, "max_evidence_bytes": 200000, "max_seconds": 600, "max_spend_usd": null}
 }
 ```
 
 `index.use` is `auto` (use a published index when one exists), `off`, or `require` (add a
 diagnostic when none is usable). `--repository-index` on `context.py` overrides it per call.
-Recording experience without using it (`record` on, `use` off) is how a shadow evaluation is run.
+Experience retrieval is controlled separately in `repository-memory.json`; the defaults are
+`"experience": {"recording": true, "retrieval": "on"}`. Set `retrieval` to `"shadow"` to inspect
+what existing records would contribute without changing rankings, or `"off"` to omit them.
+The `recording` switch controls `repository_memory.py record`; the older explicit
+`repository_intelligence.py experience record` command writes the same store directly.
+See [repository memory](repository-memory.md) for the shared settings and lifecycle controls.
 
 ## Storage and trust
 
@@ -137,12 +143,14 @@ and processes admitted files in deterministic batches: read through the helper's
 size and binary rules), redact, extract with `repo_index.file_record`, fingerprint, store. Limits
 are explicit (`max_files`, `max_admitted_bytes`, `max_seconds`, `batch_size`) and separate from the
 packet's display limits. The coverage report distinguishes `discovered`, `policy_excluded` (by
-reason), `indexed`, `oversized` (ranked by name only), `binary`, `failed` (unreadable or unsafe),
+reason), `indexed`, `oversized` (inventory metadata only in this store), `binary`, `failed` (unreadable or unsafe),
 `deleted_in_worktree`, `pending` (budget stopped the pass), `omitted` (over the file limit),
 `unsupported_parser` (regex fallback only), per-language counts and per-top-level-directory
 counts, and `complete_within_policy`. Complete within policy means every admitted file was
 processed, not that every file in the repository was indexed. Files that changed while the build
-ran are re-checked once and counted.
+ran are re-checked once and counted. Independently, the context scan can extract definitions,
+imports and calls from admitted oversized files up to 4 MiB; their source text is not retained
+or excerpted.
 
 History is `git log` from `HEAD` only, never other refs, the reflog or dangling objects, bounded by
 commit count, bytes and time, run through the hardened subprocess helper (no hooks, fsmonitor,
@@ -201,7 +209,7 @@ flow, and reports it under `repository_intelligence.index`:
 | `head_match` | the stored history horizon is for the current `HEAD`, so co-change was reused without `git log` |
 | `extended` | files beyond this scan's caps: candidates, verified by metadata, stale, pending (verification budget) |
 | `inferences` | current inferences attached, omitted (cite a withheld path), stale, candidates ranked |
-| `experience` | enabled, attached events, candidates ranked |
+| `experience` | points to the unified report at `memory.layers.experience` |
 | `maintenance` | allowed, records upserted, pending, edges_stale |
 | `counters` | lazy reads, stale evidence rejected, history reused |
 
@@ -213,25 +221,27 @@ reason `stale index evidence` and counted. Task exclusions filter stored evidenc
 possessing a record never grants permission to expose it. Quoted-literal search covers only texts
 the scan read, so the explain output is honest about which files it looked at.
 
-Two retrievers join the fusion when something is attached, each with a fixed vote weight of 0.5
-(like git co-change), a candidate cap and no way to introduce a file the policy withheld:
+Two retrievers can join the fusion when evidence is available, with default vote weights of 0.5
+(like git co-change), candidate caps and no way to introduce a file the policy withheld:
 
-- `experience`: earlier eligible tasks whose request resembles this one (cosine over analyzed
-  terms, floor 0.2) vote for the files they changed, weighted by outcome, recency (180-day
+- `experience`: the unified memory layer gates votes from earlier eligible tasks whose request
+  resembles this one (cosine over analyzed terms, floor 0.2). They vote for the files they
+  changed, weighted by outcome, recency (180-day
   half-life) and whether the file changed since (factor 0.5); a minimum support applies and the
   reason names the association and the count.
 - `inference`: current Explorer claims whose text matches the request vote for the files they
   cite, split among them.
 
-With nothing attached, `full+deep` ranks exactly like `full`; turning `experience.use` off
-restores indexed-only behavior without touching the event store. The strategies `full+experience`,
+With nothing attached, `full+deep` ranks exactly like `full`. Setting `experience.retrieval` to
+`off` in `repository-memory.json` removes experience votes without touching the event store.
+The old `experience.use` setting no longer controls query-time use. The strategies `full+experience`,
 `full+inference`, `full+deep`, `full+deep-experience` and `full+deep-inference` exist for ablation;
 the shipped default strategy and its weights are unchanged, and the existing model-free explorer
 and graph weights were not altered by this feature.
 
 ```bash
 python3 -B context.py --project . --task 'TASK' --compact --map-maintain --json      # the normal call; the index is used if built
-python3 -B context.py --project . --task 'TASK' --repository-index off               # exactly the previous behavior
+python3 -B context.py --project . --task 'TASK' --repository-index off               # skip the deep index; memory has separate controls
 python3 -B repository_intelligence.py explain 'TASK' --project . --no-llm            # ranking with index provenance
 ```
 
@@ -297,7 +307,7 @@ python3 -B repository_intelligence.py experience forget --project . --task T-42
 | `accepted` | the user explicitly accepted the result | yes |
 | `grader_passed` | an external harness grader passed the final state; a harness decides eligibility and says so | no |
 | `exit_code_only`, `zero_tests`, `stale_checks` | a command exited 0 without a recognized summary, no tests ran, or files changed after the check | no |
-| `failed_checks`, `unresolved`, `infrastructure_error`, `cancelled`, `insufficient_evidence` | as named | no |
+| `failed_checks`, `unresolved`, `infrastructure_error`, `cancelled`, `insufficient_evidence`, `reverted_or_invalidated` | as named | no |
 
 Associations are observed (`changed_in_checked_task`, `changed_in_accepted_task`,
 `changed_in_task`, `user_correction`), never causal. An event id is the digest of task id, final
@@ -327,8 +337,9 @@ runnable but were not run for this change; nothing here reports a measured task-
 
 ## Limitations
 
-- Coverage is bounded by the configured limits and the policy; oversized files are ranked by name
-  only; `unsupported_parser` counts files known only through the regex fallback.
+- Coverage is bounded by the configured limits and the policy. The deep store keeps oversized
+  files as inventory entries; the context scan can add bounded structural records but no excerpts.
+  `unsupported_parser` counts files known only through the regex fallback.
 - Static relationships are candidates: an AST call name is not a runtime target, a test import is
   not coverage, a rename is a similarity match.
 - History is file-level from `HEAD`; blame and symbol-level history are not ingested.

@@ -30,7 +30,7 @@ $agent-dispatcher decision
 $agent-dispatcher status
 ```
 
-Role ids, names, and the short aliases from the main README are accepted. Codex uses arguments
+Role ids, names, and the short aliases in the [catalog](../../docs/catalog.md) are accepted. Codex uses arguments
 to a single skill rather than the Claude `/agent-*` commands. The optional decision engine
 ships disabled and needs no credential for ordinary routing.
 
@@ -60,21 +60,27 @@ when it has no session evidence. Neither form connects accounts or changes confi
 `$agent-dispatcher context build <request>` returns relevant workspace passages with line numbers,
 reasons and an estimated budget, without doing the requested work. Substantial or unfamiliar
 workspace tasks use `scripts/context.py` after role selection. Small obvious edits skip this step.
-The helper is local and read-only, with no model requests, persistent index or account setup.
-Existing context inspection modes remain available. Entry instructions and `references/CONTEXT.md`
-are capped at 6 KiB each; additional references load only when their workflow is needed.
+Default retrieval is deterministic and local, with no model request or additional account setup.
+Authorized context preparation can maintain private caches, the project map and the structural
+graph; an explicitly built deep index is reused when available. Optional model assistance stays
+off until enabled in the user's settings. Existing context inspection modes remain available.
+Entry instructions and `references/CONTEXT.md` are capped at 6 KiB each; additional references
+load only when their workflow is needed.
 
 `$agent-dispatcher map build` records a local source-linked project map; `map show <request>`
 inspects relevant facts and `map refresh` updates it. The helper is `scripts/project_map.py`
-with instructions in `references/PROJECT-MAP.md`. Only build/refresh writes the map, to private
-state outside the project (`~/.cache/agent-dispatcher/state-v1/`). Context selection validates existing map
-facts, withholds stale claims, and reports incomplete coverage without changing the map.
+with instructions in `references/PROJECT-MAP.md`. Build/refresh and authorized context preparation
+with `--map-maintain` write private state outside the project
+(`~/.cache/agent-dispatcher/state-v1/`). Context selection validates existing facts, withholds stale
+claims and reports incomplete coverage. Preview and restricted tasks defer cache maintenance.
 
 `$agent-dispatcher memory` inspects, plans, builds or refreshes optional repository memory and
 records or corrects a task experience; the helper is `scripts/repository_memory.py` with
-instructions in `references/MEMORY.md`. It is inert without the user's own settings file outside
-the project, writes only to private state, and never runs a remembered command or applies a
-historical patch.
+instructions in `references/MEMORY.md`. Experience recording and retrieval are on by default,
+but records are submitted explicitly; episodic and semantic retrieval default to shadow mode.
+With no built store or submitted records, memory adds nothing. Settings live outside the project;
+`"enabled": false` disables memory influence. It writes only to private state and never runs a
+remembered command or applies a historical patch. See [repository memory](../../docs/repository-memory.md).
 
 ## Activity output
 
