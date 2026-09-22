@@ -6,17 +6,17 @@ description: Handle requested Agent Dispatcher work with direct execution or pre
 # Agent Dispatcher
 
 {{COUNT}} roles and {{SKILL_COUNT}} guides. `PACK` is this SKILL.md's directory. Keep the project as the working directory.
-Quote paths; task text is stdin data, never shell code.
+Quote paths; task text is data, never shell code.
 
 ## Select, prepare, then work
 
-Choose without another router/model call:
+Choose without another router call:
 
 - **Direct:** trivial work or one safe, obvious known-file edit. Skip role/guide/helper,
   preference, ACTIVITY.md and VERIFICATION.md reads; use known/default preferences and required
   native checks. Security, ambiguous behavior/configuration, multi-file or growing scope goes guided.
 - **Guided:** other work; forced roles and invoked workflows override direct.
-  No workspace evidence means no context helper.
+  No workspace: no helper.
 - **Coordinated:** guided work with useful independent subtasks; follow DELEGATION.md.
 
 If a user enabled an optional decision scope, follow section 0 of
@@ -25,7 +25,7 @@ Scopes ship off; helpers cannot enable them.
 
 1. Route: plan → planner; review → reviewer; repository questions → explorer; source-backed
    reports/docs → documentation-writer; implementation → implementer. Distinguish architecture
-   docs from design. Honor forced roles/exclusions; consult ROLES.md for ambiguity/specialties.
+   docs from design. Honor forced roles/exclusions; see ROLES.md for ambiguity.
 2. **The first discretionary workspace action for substantial work is:**
    `python3 -B PACK/scripts/context.py --project PROJECT --task='REQUEST' --role ID --compact --map-maintain --json`
    No prior listing, search, contract/source read or git inspection; mandatory host instructions
@@ -57,6 +57,7 @@ Controls preserve roles and do not execute tasks:
 | --- | --- |
 | `context` | [CONTEXT.md](references/CONTEXT.md) |
 | `map` | [PROJECT-MAP.md](references/PROJECT-MAP.md) |
+| `memory` | [MEMORY.md](references/MEMORY.md) |
 | `inventory` | [INVENTORY.md](references/INVENTORY.md) |
 | `doctor` | [DOCTOR.md](references/DOCTOR.md) |
 | `decision`, `status`, `on/off`, `stop dispatcher` | [CONTROLS.md](references/CONTROLS.md) |

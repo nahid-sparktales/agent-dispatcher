@@ -46,6 +46,15 @@ the optional decision engine described below.
   read-only operations the coordinator validates; experience is recorded only when a host hands
   over receipts explicitly. Status and dry-run open state read-only and create nothing. See
   [docs/repository-index.md](docs/repository-index.md).
+- **`repository_memory.py`**, **`repo_history.py`** and **`memory_experience.py`** are the optional repository
+  memory. They are inert without a settings file outside every project. Git is invoked through one
+  hardened wrapper (argument arrays, scrubbed environment, no pager, external diff, textconv,
+  replacement objects, lazy fetch or prompt; byte and time limits) and only HEAD's bounded ancestry
+  is read. Historical paths pass the same credential and exclusion rules as current source on both
+  sides of a change; messages and patch text are redacted before storage. Stores live in the same
+  private, owner-only state as the project map, hold derived facts and the user's own records (never
+  source text), and can only name files the current admitted index contains. No model call, network
+  access or command execution happens at query time. See [docs/repository-memory.md](docs/repository-memory.md).
 - **`hooks/agent-dispatcher-activate.sh`** runs at `SessionStart` when perpetual mode is armed and
   prints a routing preamble. It reads flag files, writes nothing but a weekly prune of its own
   session-silence directory, makes no network call, and its output is a fixed heredoc — a

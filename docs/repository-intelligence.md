@@ -285,6 +285,9 @@ context limits, explorer limits). Named strategies are overlays on it:
 An optional, opt-in LLM layer (model-written role summaries as one more retriever, and a bounded
 candidate reranker) is described in [llm-assisted-retrieval.md](llm-assisted-retrieval.md). With it
 off, which is the default, everything on this page is unchanged and no model is ever called.
+Likewise optional and off: [repository memory](repository-memory.md), whose gated candidates from
+eligible Git history, module summaries and recorded experience enter the same fusion as
+`memory_git`, `memory_semantic` and `memory_experience` voters.
 
 ## Measuring it
 

@@ -86,6 +86,17 @@ adds setup time, setup model calls, amortized measured cost per task and cost pe
 performed for this change; the offline tests in `tests/e2e/test_conditions.py` exercise scheduling,
 setup, recording and reporting with the real helper and no model.
 
+### Evaluate with repository memory
+
+Add `"memory_settings": "/absolute/path/repository-memory.json"` to a client to hand the staged
+dispatcher a [repository memory](../../docs/repository-memory.md) settings file through
+`AGENT_DISPATCHER_MEMORY_CONFIG`. Build the memory stores for each fixture workspace before the run
+(`repository_memory.py build`, private state keyed by the workspace path); trials never build them,
+and a fixture without commit history yields an `unavailable` layer, which is a valid arm. Both
+conditions receive the same environment; only the dispatcher reads the variable. The path is recorded
+in each trial's effective settings and changes the configuration fingerprint. The memory arms of the
+offline retrieval benchmark (`evals/retrieval/run.py --memory`) do not need this runner.
+
 ### Evaluate an already indexed project
 
 Add `--warm-project-index` to `prepare` when measuring tasks after initial indexing.

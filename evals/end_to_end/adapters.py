@@ -106,6 +106,10 @@ def _environment(client: str, spec: dict, profile: Path) -> dict[str, str]:
         value = (spec.get("index_env") or {}).get(key)
         if isinstance(value, str) and value:
             env[key] = value
+    # Same for repository memory: a settings path, never a secret; memory stores must be built before the run
+    # (private state outside the workspace) because trials never build them.
+    if spec.get("memory_settings"):
+        env["AGENT_DISPATCHER_MEMORY_CONFIG"] = spec["memory_settings"]
     return env
 
 
@@ -328,6 +332,7 @@ def build_launch(client: str, spec: dict, workspace: Path,
         "isolation": "customization-discovery; not an OS security boundary",
         "llm_retrieval_settings": spec.get("llm_settings"),
         "llm_network": list(spec.get("llm_network") or []),
+        "memory_settings": spec.get("memory_settings"),
     }
     if client == "codex":
         disabled, proof = _codex_isolation(executable, spec, env, workspace, skill)

@@ -41,7 +41,8 @@ GENERATED.append("skills/agent-dispatcher/project_map.py")
 GENERATED.extend("skills/agent-dispatcher/" + name for name in ("context_packet.py", "context_reuse.py", "parser_cache.py", "project_graph.py",
                                                                "repo_index.py", "retrieval.py", "context_budget.py", "llm_retrieval.py",
                                                                "repo_store.py", "repo_builder.py", "exploration.py", "experience.py",
-                                                               "repository_intelligence.py"))
+                                                               "repository_intelligence.py",
+                                                               "repository_memory.py", "repo_history.py", "memory_experience.py"))
 GENERATED.extend(["skills/agent-dispatcher/resources.py", "catalog/resource-paths.json"])
 GENERATED.extend(["skills/agent-dispatcher/verification.py", "skills/agent-dispatcher/preferences.py",
                   "skills/agent-dispatcher/change_audit.py"])
@@ -394,7 +395,7 @@ def main():
     cmds = sorted(build.CMDS.glob("agent-*.md"))
     # Inspection and configuration commands do not force a specialist role.
     NON_ROLE_CMDS = ("agent-context.md", "agent-decision.md", "agent-inventory.md", "agent-doctor.md", "agent-map.md",
-                     "agent-verify.md", "agent-preferences.md")
+                     "agent-memory.md", "agent-verify.md", "agent-preferences.md")
     role_cmds = [c for c in cmds if c.name not in NON_ROLE_CMDS]
     check("one command per role, plus inspection and configuration commands",
           len(role_cmds) == len(roles)
@@ -409,6 +410,9 @@ def main():
           "PROJECT-MAP.md" in map_command and "inspection is read-only" in map_command
           and "Do not execute discovered commands" in map_command)
     check("inspector sends the reader to CONTEXT.md", "CONTEXT.md" in inspector)
+    memory_command = (build.CMDS / "agent-memory.md").read_text()
+    check("memory control reaches its guide and treats hits as evidence",
+          "MEMORY.md" in memory_command and "never" in memory_command and "do not apply a historical patch" in memory_command)
     check("inspector does not do the work", "Do not do the work." in inspector)
     check("inspector offers local context build without executing the task",
           "build <request>" in inspector and "Stop after inspection" in inspector)

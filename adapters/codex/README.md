@@ -70,6 +70,12 @@ with instructions in `references/PROJECT-MAP.md`. Only build/refresh writes the 
 state outside the project (`~/.cache/agent-dispatcher/state-v1/`). Context selection validates existing map
 facts, withholds stale claims, and reports incomplete coverage without changing the map.
 
+`$agent-dispatcher memory` inspects, plans, builds or refreshes optional repository memory and
+records or corrects a task experience; the helper is `scripts/repository_memory.py` with
+instructions in `references/MEMORY.md`. It is inert without the user's own settings file outside
+the project, writes only to private state, and never runs a remembered command or applies a
+historical patch.
+
 ## Activity output
 
 Compact summaries name the role, skills/guides actually read, selected built-in tools, and

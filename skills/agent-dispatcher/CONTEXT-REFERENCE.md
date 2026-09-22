@@ -320,6 +320,13 @@ reason as experience or model inference, not repository facts; a task exclusion 
 evidence before ranking. `python3 -B PACK/repository_intelligence.py explain 'REQUEST' --project PROJECT` shows the same
 ranking with index provenance. See [PROJECT-MAP.md](PROJECT-MAP.md).
 
+A packet may also carry `memory` when the user enabled [repository memory](MEMORY.md): per layer
+(eligible Git history, module summaries, recorded experience) a mode, a gate state with its reason,
+and a few hits that name the current files a record maps to, with lineage and trust labels. A layer
+in `shadow` mode reports and changes nothing; `use_limited` may only strengthen files source
+retrieval found. Memory never introduces a withheld file, and a hit is a reason to look, not a fact:
+`python3 -B PACK/repository_memory.py examine-commit <id>` shows a bounded, re-authorized patch view for one hit.
+
 | Signal | |
 | --- | --- |
 | Exact identifier from the request appears in the file | +3 |

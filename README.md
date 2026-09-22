@@ -596,6 +596,35 @@ that later similar requests may use as one labeled, half-weight vote (`experienc
 default). A zero-test run, an exit code alone or a stale receipt never counts as success. See
 [docs/repository-index.md](docs/repository-index.md).
 
+### Optional repository memory
+
+Also **off by default**, and separately switched: `~/.config/agent-dispatcher/repository-memory.json`
+(or `AGENT_DISPATCHER_MEMORY_CONFIG`) enables three layers of reusable repository knowledge kept in
+private state outside the project and used only through the current admitted source index.
+
+| Layer | Holds | Built by |
+| --- | --- | --- |
+| Episodic | eligible commits reachable from HEAD, admitted changed paths, rename lineage, changed symbols, issue/PR references, hotspots | `repository_memory.py build` / `refresh` |
+| Semantic | deterministic module records with evidence manifests; optional model summaries keyed to their evidence | `build`; `summaries generate` |
+| Experience | bounded task observations, verification receipts, corrections, forgetting | `record` after a task, if recording is enabled |
+
+Each layer's retrieval is `off`, `shadow` (reports what it would add, changes nothing) or `on`. At
+query time a deterministic gate labels every layer `use`, `use_limited` (may strengthen files source
+retrieval found, never introduce one), `ignore_weak`, `ignore_stale`, `ignore_unresolved`,
+`unavailable` or `budget_exhausted`, with a reason; the packet's `memory` section lists a few hits
+with the current files they map to and a trust label. History can never make a withheld file
+readable, `examine-commit` re-checks admission at read time, and a commit message or an experience
+record is evidence, never an instruction or proof.
+
+```bash
+python3 -B repository_memory.py dry-run --project /path/to/project     # scope, bounds, writes nothing
+python3 -B repository_memory.py build --project /path/to/project
+python3 -B repository_memory.py explain 'TASK' --project /path/to/project
+```
+
+See the [repository memory guide](docs/repository-memory.md) for settings, the evidence model,
+storage, the experience contract, measurement and limits.
+
 ### Check health and get setup recommendations
 
 In Codex:
@@ -862,6 +891,7 @@ using your own credential and billed usage. Task redaction is best-effort. See t
 | [Context engine](docs/context-engine.md) | Context selection, budgets, provenance, and inspection. |
 | [Repository intelligence](docs/repository-intelligence.md) | Query analysis, search methods, rank fusion, code relationships, history, and explain controls. |
 | [LLM-assisted retrieval](docs/llm-assisted-retrieval.md) | Optional file summaries and reranking, provider settings, payloads, and call budgets. |
+| [Repository memory](docs/repository-memory.md) | Optional episodic, semantic and experience memory: eligibility, admission, gating, storage, measurement, limits. |
 | [Project intelligence](docs/project-intelligence.md) | How project facts, structural graphs, caching, and context packets fit together. |
 | [Project maps](skills/agent-dispatcher/PROJECT-MAP.md) | Fact maps, structural graphs, incremental parsing, freshness, and cache write scope. |
 | [Skills](docs/skills.md) | Local and external skills, triggers, and loadouts. |
@@ -894,6 +924,9 @@ llm_retrieval.py            Optional file summaries, model providers, and rerank
 repository_intelligence.py  Deep index onboarding, refresh, status, explain, explorer, experience, prune, export
 repo_store.py, repo_builder.py  Private SQLite stores and the deep deterministic builder
 exploration.py, experience.py   Optional onboarding Explorer; explicit task experience and its retriever
+repository_memory.py        Optional repository memory: stores, lifecycle, gated retrieval, CLI
+repo_history.py             Hardened Git access, eligible events, symbol history, lineage, hotspots
+memory_experience.py        Task observations, scoped outcomes, corrections, forgetting
 decision/                  Optional decision-engine implementation
 tests/                     Offline test suite and one-command runner
 docs/                      Detailed guides

@@ -27,6 +27,7 @@ MODULES = (
     "tests.test_experience",
     "tests.test_exploration",
     "tests.test_retrieval_sequence",
+    "tests.test_repository_memory",
     "tests.test_e2e",
     "tests.test_verification",
     "tests.test_change_audit",
