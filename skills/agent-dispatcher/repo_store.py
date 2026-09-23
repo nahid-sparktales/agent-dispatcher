@@ -128,6 +128,9 @@ class _Base:
                 self._migrate()
             else:
                 self._check()
+        except StoreError:
+            self.close()  # A schema refusal is a StoreError, not a sqlite3.Error; the connection must not outlive it.
+            raise
         except sqlite3.Error as exc:
             self.close()
             raise StoreError("Repository index is locked, corrupt or incompatible: " + type(exc).__name__) from None
