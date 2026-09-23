@@ -25,7 +25,8 @@ DIMENSIONS = (
     "unnecessary_intervention",
 )
 CONDITIONS = ("baseline", "dispatcher")
-ALL_CONDITIONS = ("baseline", "dispatcher", "indexed", "warm_experience")
+ALL_CONDITIONS = ("baseline", "dispatcher", "indexed", "warm_experience", "learned_skills", "learned_recipes", "learned_global", "learned_full")
+LEARNED_CONDITIONS = ("learned_skills", "learned_recipes", "learned_global", "learned_full")
 
 
 def conditions_of(batch):
@@ -695,10 +696,17 @@ def _setup(trials: list[dict]) -> dict:
     seconds = [(trial.get("deep_index_setup") or {}).get("elapsed_seconds") for trial in trials]
     calls = [(trial.get("deep_index_setup") or {}).get("model_calls") for trial in trials]
     recorded = [trial.get("experience_record") for trial in trials if trial.get("experience_record")]
+    learning = [trial.get("learning_setup") for trial in trials if trial.get("learning_setup")]
+    observations = [trial.get("learning_observation") for trial in trials if trial.get("learning_observation")]
     return {"deep_index_setup": _measurement(seconds), "setup_model_calls": _measurement(calls),
             "experience_recorded": sum(1 for r in recorded if r.get("stored")),
             "experience_eligible": sum(1 for r in recorded if r.get("eligible")),
-            "note": "Setup ran before each task and outside its timer; a missing measurement is unknown, not zero."}
+            "learning_setup": _measurement([item.get("elapsed_seconds") for item in learning]),
+            "learning_library_imports": sum(1 for item in learning if item.get("mode") == "import" and item.get("ok")),
+            "learning_observations_recorded": sum(1 for item in observations if item.get("stored")),
+            "learning_feedback_class": sorted({item.get("feedback_class") for item in observations if item.get("feedback_class")}),
+            "note": "Setup ran before each task and outside its timer; a missing measurement is unknown, not zero. Learning setup covers library import only; "
+                    "proposal, evaluation and rejected-candidate costs of the library's own history are reported by `learning evaluations`, not here."}
 
 
 def _cost(trials: list[dict]) -> dict:
@@ -709,6 +717,7 @@ def _cost(trials: list[dict]) -> dict:
     known = [value for value in costs if _number(value)]
     total = sum(known) if known and len(known) == attempted else None
     setup = [(trial.get("deep_index_setup") or {}).get("elapsed_seconds") for trial in trials]
+    setup += [(trial.get("learning_setup") or {}).get("elapsed_seconds") for trial in trials if trial.get("learning_setup")]
     setup_known = [value for value in setup if _number(value)]
     return {"attempted": attempted, "verified_successes": verified,
             "measured_cost_usd_total": total, "cost_known_for": len(known), "cost_unknown_for": attempted - len(known),
@@ -804,6 +813,13 @@ def report(batch_dir: Path) -> dict:
             "outcome is the hidden grader's verdict (`grader_passed`, oracle-adjacent) unless configured otherwise. "
             "Paired comparisons are against baseline; treatments are not paired with each other. Setup cost and model "
             "calls are reported apart from task cost; a break-even is claimed only from measured recurring savings.")
+    if any(c in LEARNED_CONDITIONS for c in conditions):
+        result["limitations"].append(
+            "Learned conditions: each `learned_*` arm is `warm_experience` plus a frozen overlay library imported into the arm's own isolated "
+            "store as an explicitly authorized experimental canary (learning-setup.json); observations recorded after each trial carry the hidden "
+            "grader's verdict (`hidden_grader`, oracle-adjacent) and unknown overlay exposure. The sequential ladder estimates incremental bundle "
+            "effects in its order, not independent component effects; an experimental canary is never a stable measured win, and the library's "
+            "own proposal and evaluation costs are outside this report.")
     lines = ["# Agent dispatcher end-to-end evaluation", "", f"Suite: {batch.get('suite', 'unknown')}. Randomization seed: {batch.get('seed', 'unknown')}.", "", *["- " + item for item in result["limitations"]], ""]
     for client in clients:
         subset = [trial for trial in trials if trial["client"] == client]
@@ -818,7 +834,8 @@ def report(batch_dir: Path) -> dict:
         categories = {category: {condition: _group([trial for trial in subset if trial.get("category", "unknown") == category and trial["condition"] == condition], ratings, sum(entry.get("condition") == condition and fixture_categories.get(entry.get("fixture_id")) == category for entry in client_schedule)) for condition in conditions} for category in sorted(set(fixture_categories.values()))}
         result["clients"][client] = {"conditions": groups, "pairs": pairs, "pairs_by_condition": pairs_by_condition, "categories": categories,
                                      "route_agreement": _route_agreement(subset), "helper_coverage": _helper_coverage(subset)}
-        titles = {"baseline": "Baseline", "dispatcher": "Dispatcher", "indexed": "Indexed", "warm_experience": "Warm-experience"}
+        titles = {"baseline": "Baseline", "dispatcher": "Dispatcher", "indexed": "Indexed", "warm_experience": "Warm-experience",
+                  "learned_skills": "Learned-skills", "learned_recipes": "Learned-recipes", "learned_global": "Learned-global", "learned_full": "Learned-full"}
         header = "| Metric | " + " | ".join(titles[c] for c in conditions) + " |"
         lines.extend(["## " + client, "", header, "| --- |" + " ---: |" * len(conditions)])
         rows = [("Scheduled", "scheduled"), ("Attempted", "attempted"), ("Unattempted", "unattempted"), ("Invalid attempts", "invalid"), ("Evaluable attempts", "evaluable_attempts"), ("Graded outcomes", "graded"), ("Successful outcomes", "successful"), ("Pending outcomes", "pending_outcomes"), ("Required reviews pending", "required_reviews_pending"), ("Success rate among graded outcomes", "graded_success_rate"), ("Complete success rate", "complete_success_rate")]

@@ -172,7 +172,7 @@ def account_packet(out):
     _sync_evidence(out)
     categories = {"excerpts": "workspace_excerpts", "project_map": "project_map",
                   "project_graph": "project_graph", "memory": "repository_memory",
-                  "guidance": "guidance", "resources": "resource_metadata",
+                  "guidance": "guidance", "learning": "learning_guidance", "resources": "resource_metadata",
                   "exclusion_policy": "constraints_and_diagnostics", "diagnostics": "constraints_and_diagnostics",
                   "limits": "constraints_and_diagnostics"}
     budget = out["budget"]

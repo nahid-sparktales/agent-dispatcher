@@ -75,9 +75,11 @@ print(json.dumps([module.resolve_resources(sys.argv[2], role) for role in json.l
                                     else s["path"].replace("skills/", "lib/", 1) if layout == "claude_manual"
                                     else "references/" + s["path"].replace("/SKILL.md", "/GUIDE.md"))
                           for s in self.data["skills"]}
+                recipes = {r["id"]: (r["path"] if layout in ("source", "claude_manual") else "references/" + r["path"])
+                           for r in self.data["recipes"]}
                 self.assertEqual(manifest, {"schema_version": 1, "layout": layout,
-                                            "roles": roles, "guides": guides})
-                for relative in [*roles.values(), *guides.values()]:
+                                            "roles": roles, "guides": guides, "recipes": recipes})
+                for relative in [*roles.values(), *guides.values(), *recipes.values()]:
                     self.assertFalse(PurePosixPath(relative).is_absolute())
                     self.assertNotIn("..", PurePosixPath(relative).parts)
                     self.assertTrue((pack / relative).resolve().is_relative_to(pack.resolve()))

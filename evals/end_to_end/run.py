@@ -28,7 +28,10 @@ CONDITIONS = ("baseline", "dispatcher")
 # Every condition the runner can schedule, in canonical order. `indexed` and `warm_experience` add the deep
 # repository index (built or refreshed before each task, outside timing) and, for the warm arm only, the
 # experience its own earlier tasks recorded. A configuration selects a subset that must include baseline.
-ALL_CONDITIONS = ("baseline", "dispatcher", "indexed", "warm_experience")
+ALL_CONDITIONS = ("baseline", "dispatcher", "indexed", "warm_experience", "learned_skills", "learned_recipes", "learned_global", "learned_full")
+# Learned arms: warm_experience plus a frozen, explicitly authorized overlay library of increasing kinds (skills, recipes,
+# a frozen user-global library, the full bundle). Each arm keeps its own library, learning store and observations.
+LEARNED_CONDITIONS = ("learned_skills", "learned_recipes", "learned_global", "learned_full")
 
 
 def conditions_of(config):
@@ -71,9 +74,22 @@ def validate_config(config, live=False):
     chosen = config.get("conditions", list(CONDITIONS))
     if (not isinstance(chosen, list) or not chosen or "baseline" not in chosen or len(set(chosen)) != len(chosen)
             or any(c not in ALL_CONDITIONS for c in chosen) or chosen != [c for c in ALL_CONDITIONS if c in chosen]):
-        raise ValueError("conditions must be a canonical-order subset of baseline, dispatcher, indexed, warm_experience that includes baseline")
+        raise ValueError("conditions must be a canonical-order subset of " + ", ".join(ALL_CONDITIONS) + " that includes baseline")
     if config.get("experience_outcome", "harness_grader") not in ("harness_grader",):
         raise ValueError("experience_outcome must be harness_grader")
+    if any(c in LEARNED_CONDITIONS for c in chosen):
+        library = config.get("learning_library")
+        if not isinstance(library, str) or not Path(library).is_absolute() or not Path(library).is_file():
+            raise ValueError("learning_library must be an absolute path to a frozen library exported with `learning export-generation` when a learned condition is selected")
+        authorization = config.get("experiment_authorization")
+        if (not isinstance(authorization, dict) or set(authorization) != {"actor", "experiment"}
+                or any(not isinstance(authorization[k], str) or not authorization[k].strip() for k in ("actor", "experiment"))):
+            raise ValueError("experiment_authorization must name the authorizing person (actor) and the experiment id for learned conditions")
+        global_library = config.get("learning_global_library")
+        if global_library is not None and (not isinstance(global_library, str) or not Path(global_library).is_absolute() or not Path(global_library).is_file()):
+            raise ValueError("learning_global_library must be an absolute path to a frozen global library")
+    elif config.get("learning_library") or config.get("learning_global_library"):
+        raise ValueError("learning_library is only meaningful with a learned condition")
     eligible = config.get("warm_experience_eligible", ["grader_passed"])
     if not isinstance(eligible, list) or any(not isinstance(v, str) for v in eligible):
         raise ValueError("warm_experience_eligible must be a list of outcome names")
@@ -411,14 +427,23 @@ def run_trial(config, batch, row, fixture):
                 if not result["index_setup"]["ok"]:
                     raise ValueError("Warm project-index setup failed; no model task started. " +
                                      " ".join(result["index_setup"]["diagnostics"]))
-            if condition in ("indexed", "warm_experience"):
-                from evals.end_to_end.warmup import deep_index_setup
-                setup = deep_index_setup(config, client, workspace, condition, row, fixture)
+            from evals.end_to_end import warmup
+            if condition in warmup.INDEX_CONDITIONS:
+                setup = warmup.deep_index_setup(config, client, workspace, condition, row, fixture)
                 spec = dict(spec, index_env=setup.pop("_env"))
                 result["deep_index_setup"] = setup
                 rt.write_json(artifacts / "deep-index-setup.json", setup)
                 if not setup["ok"]:
                     raise ValueError("Deep index setup failed; no model task started. " + " ".join(setup["diagnostics"]))
+                if condition in warmup.LEARNED_CONDITIONS:
+                    learning = warmup.learning_setup(config, client, workspace, condition, row, fixture, spec["index_env"])
+                    result["learning_setup"] = learning
+                    rt.write_json(artifacts / "learning-setup.json", learning)
+                    if not learning["ok"]:
+                        raise ValueError("Learning library setup failed; no model task started. " + " ".join(learning["diagnostics"]))
+            elif condition == "dispatcher":
+                # The static arm never reads the user's own learning configuration or stores.
+                spec = dict(spec, index_env={"AGENT_DISPATCHER_LEARNING_CONFIG": str(warmup.disabled_learning_settings(config))})
             initial = rt.tree_files(workspace, rt.EXCLUDED)
             if config.get("warm_project_index", False):
                 validate_final_artifacts(initial, {})
@@ -494,12 +519,15 @@ def run_trial(config, batch, row, fixture):
                         result["diagnostics"].append("Dispatcher invocation not observed; treatment-compliance failure.")
                     result["status"] = "completed" if passed else "task_failure"
                     result["task_success"] = (None if result["auto_grade"]["human_required"] else True) if passed else False
-            if condition == "warm_experience" and started:
-                from evals.end_to_end.warmup import record_trial_experience
+            if (condition == "warm_experience" or condition in warmup.LEARNED_CONDITIONS) and started:
                 # The arm records its own experience before the next step; grader content never enters the record.
-                result["experience_record"] = record_trial_experience(config, client, workspace, condition, row, fixture, result, initial,
-                                                                      rt.tree_files(workspace, rt.EXCLUDED))
+                result["experience_record"] = warmup.record_trial_experience(config, client, workspace, condition, row, fixture, result, initial,
+                                                                             rt.tree_files(workspace, rt.EXCLUDED))
                 rt.write_json(artifacts / "experience-record.json", result["experience_record"])
+                if condition in warmup.LEARNED_CONDITIONS:
+                    # Oracle-adjacent learning observation keyed to that event; exposure stays unknown to the harness.
+                    result["learning_observation"] = warmup.record_trial_observation(config, client, workspace, condition, row, fixture, result, result["experience_record"])
+                    rt.write_json(artifacts / "learning-observation.json", result["learning_observation"])
     except ValueError as exc:
         result.update(status="task_failure" if started else "invalid_configuration",
                       task_success=False if started else None)

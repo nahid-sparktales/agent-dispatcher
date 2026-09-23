@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "description": "Synthetic repository families for the procedural-learning demo and tests. Every observation carries feedback_class synthetic_fixture, which keeps it out of any production library.",
+  "families": [
+    {
+      "id": "alpha-auth", "enrolled": true,
+      "files": {"auth/tokens.py": "def validate_token(token):\n    return bool(token)\n", "auth/session.py": "def open_session(user):\n    return {'user': user}\n",
+                "tests/test_tokens.py": "from auth.tokens import validate_token\n"},
+      "tasks": [
+        {"family": "alpha-expired-token", "task": "Fix the failing regression bug: validate_token accepts an expired token in auth/tokens.py", "role": "debugger", "outcome": "exit_code_only", "history": "used", "edited": ["auth/tokens.py"]},
+        {"family": "alpha-empty-token", "task": "Debug the crash when validate_token receives an empty token string", "role": "debugger", "outcome": "accepted", "history": "used", "edited": ["auth/tokens.py"]},
+        {"family": "alpha-session-bug", "task": "Fix the bug where open_session drops the user id after a token refresh", "role": "debugger", "outcome": "zero_tests", "history": "used", "edited": ["auth/session.py"]},
+        {"family": "alpha-session-bug", "task": "open_session loses the user id after refresh; find the root cause and fix it", "role": "debugger", "outcome": "stale_checks", "history": "used", "edited": ["auth/session.py"], "note": "a paraphrase of the previous task: same family, no new support"},
+        {"family": "alpha-refresh-race", "task": "Fix the intermittent failure when refresh races validate_token during login", "role": "debugger", "outcome": "exit_code_only", "history": "used", "edited": ["auth/tokens.py"]},
+        {"family": "alpha-cookie-bug", "task": "Debug the bug where the session cookie is rejected right after validate_token succeeds", "role": "debugger", "outcome": "accepted", "history": "used", "edited": ["auth/session.py"]},
+        {"family": "alpha-login-loop", "task": "Fix the regression where login loops forever when the token is rotated", "role": "debugger", "outcome": "accepted", "history": "used", "edited": ["auth/session.py", "auth/tokens.py"]},
+        {"family": "alpha-rename-symbol", "task": "Rename validate_token to check_token across the auth package", "role": "implementer", "outcome": "accepted", "history": "not_applicable", "edited": ["auth/tokens.py", "tests/test_tokens.py"], "note": "history is irrelevant for a rename"}
+      ]
+    },
+    {
+      "id": "beta-billing", "enrolled": true,
+      "files": {"billing/retry.py": "def charge_with_retry(amount, attempts=3):\n    return amount\n", "billing/ledger.py": "def post(entry):\n    return entry\n",
+                "tests/test_retry.py": "from billing.retry import charge_with_retry\n"},
+      "tasks": [
+        {"family": "beta-double-charge", "task": "Fix the regression bug: charge_with_retry double charges when the first attempt times out", "role": "debugger", "outcome": "exit_code_only", "history": "used", "edited": ["billing/retry.py"]},
+        {"family": "beta-ledger-order", "task": "Debug the failing ledger test: post() writes entries out of order after a retry", "role": "debugger", "outcome": "accepted", "history": "used", "edited": ["billing/ledger.py"]},
+        {"family": "beta-negative-amount", "task": "Fix the crash when charge_with_retry gets a negative amount", "role": "debugger", "outcome": "stale_checks", "history": "used", "edited": ["billing/retry.py"]}
+      ]
+    },
+    {
+      "id": "gamma-cli", "enrolled": true,
+      "files": {"cli/parse.py": "def parse_args(argv):\n    return dict(a.split('=') for a in argv)\n", "cli/main.py": "from cli.parse import parse_args\n",
+                "tests/test_parse.py": "from cli.parse import parse_args\n"},
+      "tasks": [
+        {"family": "gamma-flag-bug", "task": "Fix the regression bug: parse_args crashes on a flag without a value", "role": "debugger", "outcome": "accepted", "history": "used", "edited": ["cli/parse.py"]},
+        {"family": "gamma-help-text", "task": "Debug why the failing test for the help text output keeps breaking", "role": "debugger", "outcome": "exit_code_only", "history": "unavailable", "edited": ["cli/main.py"], "note": "history unavailable: contradicting evidence for the history branch"},
+        {"family": "gamma-quiet-flag", "task": "Add a --quiet flag to the CLI", "role": "implementer", "outcome": "accepted", "history": "not_applicable", "edited": ["cli/parse.py", "cli/main.py"]}
+      ]
+    },
+    {
+      "id": "delta-heldout", "enrolled": false,
+      "files": {"pipeline/stream.py": "def batch(items, size):\n    return [items[i:i + size] for i in range(0, len(items), size)]\n", "tests/test_stream.py": "from pipeline.stream import batch\n"},
+      "tasks": [
+        {"family": "delta-batch-bug", "task": "Fix the regression bug: batch drops the final partial chunk", "role": "debugger", "outcome": "accepted", "history": "not_applicable", "edited": ["pipeline/stream.py"], "note": "held out: never enters the learner"}
+      ]
+    }
+  ],
+  "transfer_pairs": {
+    "note": "Synthetic paired outcomes for the fake_test_runner (test only): the global history branch helps the enrolled families and harms the held-out family.",
+    "enrolled": [{"family": "alpha-1", "block": "alpha", "candidate": true, "incumbent": false}, {"family": "alpha-2", "block": "alpha", "candidate": true, "incumbent": true},
+                 {"family": "alpha-3", "block": "alpha", "candidate": true, "incumbent": false}, {"family": "beta-1", "block": "beta", "candidate": true, "incumbent": false},
+                 {"family": "beta-2", "block": "beta", "candidate": true, "incumbent": false}, {"family": "beta-3", "block": "beta", "candidate": true, "incumbent": true},
+                 {"family": "gamma-1", "block": "gamma", "candidate": true, "incumbent": false}, {"family": "gamma-2", "block": "gamma", "candidate": true, "incumbent": false},
+                 {"family": "gamma-3", "block": "gamma", "candidate": false, "incumbent": false}],
+    "held_out": [{"family": "delta-1", "block": "delta", "candidate": false, "incumbent": true}, {"family": "delta-2", "block": "delta", "candidate": false, "incumbent": true},
+                 {"family": "delta-3", "block": "delta", "candidate": true, "incumbent": true}, {"family": "delta-4", "block": "delta", "candidate": false, "incumbent": true},
+                 {"family": "delta-5", "block": "delta", "candidate": false, "incumbent": false}, {"family": "delta-6", "block": "delta", "candidate": false, "incumbent": true}]
+  }
+}

@@ -53,8 +53,8 @@ Scopes ship off; helpers cannot enable them.
 
 `/agent-dispatcher <request>` routes work. Bare invocation activates routing and waits.
 Exact role ids use `roles/<id>.md`; [ROLES.md](ROLES.md) resolves aliases (`coder` / `dev`: implementer). Forced roles persist until changed/stopped; never re-route or chain out.
-Claude also accepts `/agent-<role>`, `/agent-context`, `/agent-map`, `/agent-inventory`,
-`/agent-doctor`, `/agent-decision`, `/agent-verify`, and `/agent-preferences`.
+Claude also accepts `/agent-<role>`, `/agent-context`, `/agent-map`, `/agent-memory`, `/agent-learning`,
+`/agent-inventory`, `/agent-doctor`, `/agent-decision`, `/agent-verify`, and `/agent-preferences`.
 
 Controls preserve roles and do not execute tasks:
 
@@ -62,6 +62,8 @@ Controls preserve roles and do not execute tasks:
 | --- | --- |
 | `context` | [CONTEXT.md](CONTEXT.md) |
 | `map` | [PROJECT-MAP.md](PROJECT-MAP.md) |
+| `memory` | [MEMORY.md](MEMORY.md) |
+| `learning` | [LEARNING.md](LEARNING.md) (off by default) |
 | `inventory` | [INVENTORY.md](INVENTORY.md) |
 | `doctor` | [DOCTOR.md](DOCTOR.md) |
 | `decision`, `status`, `on/off`, `stop dispatcher` | [CONTROLS.md](CONTROLS.md) |

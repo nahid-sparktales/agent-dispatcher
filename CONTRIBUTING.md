@@ -35,6 +35,12 @@ repository_memory.py                 optional, opt-in: episodic/semantic/experie
 repo_history.py                      hardened Git wrapper, eligible commit events, symbol history, rename lineage, hotspots
 memory_experience.py                 task observations, receipt-backed outcomes, corrections, forgetting, experience retrieval
 sources/shared/MEMORY.template.md    the repository memory guide shared by both hosts
+learning.py                          optional, off by default: procedural learning stores, observations, review, proposals, approval, publication, rollback, CLI
+learning_compose.py                  procedural learning, pure part: strict candidate schemas, slot contracts, applicability, composition
+learning_eval.py                     procedural learning evaluation: frozen specs, paired statistics, registered runners, component checks
+recipes/<id>.workflow.json           optional machine-readable recipe sidecar (stable step ids, gates), validated against the Markdown by build.py
+sources/shared/LEARNING.template.md  the procedural learning guide shared by both hosts
+evals/learning/                      offline fixture demonstration of the whole learning lifecycle (demo.py)
 evals/retrieval/                     offline file-localization benchmark (mine.py builds datasets, run.py evaluates)
 sources/shared/VERIFICATION.template.md, verification.py task-scoped check receipts and completion evidence
 change_audit.py                       task baseline, actual file changes, scope and cleanup

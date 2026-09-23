@@ -2,6 +2,24 @@
 
 ## Unreleased
 
+- Add optional, off-by-default procedural learning (`learning.py`, `learning_compose.py`,
+  `learning_eval.py`, `docs/procedural-learning.md`, `LEARNING.md`, `/agent-learning`,
+  `$agent-dispatcher learning`, `repository_intelligence.py learning`): explicit observations keyed
+  to experience events, a deterministic pattern review with host- and provider-assisted proposal
+  paths, strict candidate schemas with structural and security validation, immutable
+  content-addressed revisions, a controller-owned lifecycle with human approval bound to the exact
+  candidate, evaluation, composed bundle and incumbent generation, compare-and-swap publication,
+  rollback, revocation with provenance descendants, pruning and forgetting that consult experience
+  corrections. Five artifact kinds share the lifecycle: skill overlays, recipe overlays (the debug
+  recipe gains a validated `debug-application.workflow.json` sidecar with stable step ids and
+  mandatory gates), role method overlays, allowlisted retrieval profiles and verification scheduling
+  hints. In `active` mode `context.py --compact` composes admitted overlays onto the guidance it
+  already read (labeled `derived`, base digest kept) inside a separate added-guidance budget; reuse
+  keys include the learning generation; disabled and shadow packets are unchanged. Evaluation keeps
+  three tiers apart with standard-library paired statistics, a labeled test-only runner and an
+  authoritative end-to-end batch import; the end-to-end runner gains `learned_*` arms with isolated
+  libraries and oracle-adjacent observation recording. An offline fixture demo (`evals/learning`)
+  exercises the whole path; no live agent evaluation was run and no benefit is claimed.
 - Retrieval reads stack-trace frames (`File "...", line N, in f`, `at f (path:line:col)`) as frames:
   the longest suffix of the frame path that exists in the index votes in the path retriever (the
   innermost frame counts double, never pinned), the frame's line anchors the excerpt and its

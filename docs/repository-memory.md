@@ -225,6 +225,12 @@ evidence. Fingerprints of edited files bind a record to its snapshot; at retriev
 changed since counts at half weight and a record whose files all changed can only strengthen,
 never introduce.
 
+Experience records facts about tasks. The optional [procedural learning](procedural-learning.md)
+layer (off by default) may attach explicit observations to these records and review them into
+evaluated, human-approved overlays on bundled guidance; it consults the corrections and forgetting
+described below rather than keeping its own copy, so a corrected or forgotten record withdraws the
+support of every candidate that cited it.
+
 Corrections come in two forms: a path verdict (`correct <id> --path P --verdict irrelevant|relevant`)
 that removes or adds one file from the record's vote, and a record-level outcome
 (`correct <id> --outcome reverted_or_invalidated --note ...`) that writes a superseding event while

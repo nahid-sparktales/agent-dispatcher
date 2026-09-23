@@ -36,16 +36,8 @@ GENERATED = ["skills/agent-dispatcher/DOCTOR.md", "skills/agent-dispatcher/docto
              "docs/catalog.md", "docs/skills.md", "docs/mcps.md", "docs/recipes.md",
              "docs/context-engine.md"]
 GENERATED += ["skills/agent-dispatcher/" + name for name in build.REFERENCE_FILES]
-GENERATED.append("skills/agent-dispatcher/context.py")
-GENERATED.append("skills/agent-dispatcher/project_map.py")
-GENERATED.extend("skills/agent-dispatcher/" + name for name in ("context_packet.py", "context_reuse.py", "parser_cache.py", "project_graph.py",
-                                                               "repo_index.py", "retrieval.py", "context_budget.py", "llm_retrieval.py",
-                                                               "repo_store.py", "repo_builder.py", "exploration.py", "experience.py",
-                                                               "repository_intelligence.py",
-                                                               "repository_memory.py", "repo_history.py"))
-GENERATED.extend(["skills/agent-dispatcher/resources.py", "catalog/resource-paths.json"])
-GENERATED.extend(["skills/agent-dispatcher/verification.py", "skills/agent-dispatcher/preferences.py",
-                  "skills/agent-dispatcher/change_audit.py"])
+GENERATED.extend("skills/agent-dispatcher/" + name for name in build.RUNTIME_MODULES)
+GENERATED.append("catalog/resource-paths.json")
 
 
 def drift():
@@ -395,7 +387,7 @@ def main():
     cmds = sorted(build.CMDS.glob("agent-*.md"))
     # Inspection and configuration commands do not force a specialist role.
     NON_ROLE_CMDS = ("agent-context.md", "agent-decision.md", "agent-inventory.md", "agent-doctor.md", "agent-map.md",
-                     "agent-memory.md", "agent-verify.md", "agent-preferences.md")
+                     "agent-memory.md", "agent-learning.md", "agent-verify.md", "agent-preferences.md")
     role_cmds = [c for c in cmds if c.name not in NON_ROLE_CMDS]
     check("one command per role, plus inspection and configuration commands",
           len(role_cmds) == len(roles)
