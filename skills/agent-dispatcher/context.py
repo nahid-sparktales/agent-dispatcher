@@ -418,19 +418,56 @@ def _scan_sources(root, paths, manual_exclusions, automatic, incremental, scrub,
     return texts, hashes, scanned, scan_complete
 
 
-def _retrieval_engine(retrieval, cap, budget, max_files, max_bytes, diagnostics):
-    """Load the repository-intelligence engine, or fall back to legacy selection with a diagnostic."""
+def _retrieval_engine(retrieval, cap, budget, max_files, max_bytes, diagnostics, profile=None):
+    """Load the repository-intelligence engine, or fall back to legacy selection with a diagnostic.
+
+    `profile` is an admitted, bounded retrieval profile (learning.py): it may choose an approved deterministic strategy
+    when the caller left the choice to `auto` and adjust allowlisted parameters; the caller's own caps always win.
+    """
     if retrieval == "legacy":
         return None, None
     try:
         engine = _sibling("retrieval")
-        settings = engine["configure"]("full" if retrieval == "auto" else retrieval, {"context": {
-            "max_files": min(cap, max_files) if max_files else cap,
-            "max_bytes": min(budget * 4, max_bytes) if max_bytes else budget * 4}})
+        strategy = "full" if retrieval == "auto" else retrieval
+        overrides = {}
+        if profile:
+            if retrieval == "auto" and profile.get("strategy"):
+                strategy = profile["strategy"]
+            overrides = engine["_merge"](profile.get("overrides") or {}, {})
+        caps = {"context": {"max_files": min(cap, max_files) if max_files else cap,
+                            "max_bytes": min(budget * 4, max_bytes) if max_bytes else budget * 4}}
+        settings = engine["configure"](strategy, engine["_merge"](overrides, caps))
         return engine, settings
     except (OSError, UnicodeError, SyntaxError, ValueError, TypeError, KeyError):
         diagnostics.append("Repository intelligence unavailable; legacy retrieval used.")
         return None, None
+
+
+def _learning_layer(root, pack, task, role_id, diagnostics, *, identity, caller_strategy_explicit):
+    """Optional procedural learning (learning.py): read-only view of admitted overlays for this request.
+
+    Off by default and inert without the user's own settings file: a disabled layer returns None and the packet is
+    byte-for-byte unchanged. Any failure is a diagnostic; guidance stays the bundled text.
+    """
+    try:
+        module = _sibling("learning")
+        settings = module["load_settings"](project=root)
+        if not settings["enabled"]:
+            return None
+        return module["resolve"](root, pack, task, role=role_id, settings=settings, identity=identity, caller_strategy_explicit=caller_strategy_explicit)
+    except (OSError, UnicodeError, SyntaxError, ValueError, TypeError, KeyError, AttributeError, RecursionError) as exc:
+        detail = str(exc) if exc.__class__.__name__ == "LearningError" else "helper failure"
+        diagnostics.append("Procedural learning unavailable (" + detail + "); bundled guidance used.")
+        return None
+
+
+def _learning_worth_reporting(report):
+    """Ordinary output gains a `learning` section only when an admitted overlay was actually decided about."""
+    if not report:
+        return False
+    if report.get("diagnostics"):
+        return True
+    return any(row["state"] != "not_applicable" for row in report.get("overlays", []))
 
 
 def _git_history(project, max_commits, cache=None):
@@ -1306,15 +1343,148 @@ def _changed_paths(project, allowed):
         return []
 
 
-def _finish_packet(result, pack, packet_tokens, guide_ids, reuse_state, reuse_scope, _delivery=None):
+def _apply_learning(out, report, packet_tokens, *, force_omit=False):
+    """Compose admitted overlays onto the packet's own trusted guidance reads, inside a separate added-guidance budget.
+
+    The bundled reader is untouched: a composed body replaces a body the packet already read from the package, is
+    labeled `derived`, and keeps the base digest. Recipe additions and verification hints travel in a labeled derived
+    channel. Overlays leave whole, lowest priority first, before any protected content would be trimmed.
+    """
+    import copy as _copy
+    packet, compose = _sibling("context_packet"), _sibling("learning_compose")
+    explain = {key: _copy.deepcopy(value) for key, value in report.items() if not key.startswith("_")}
+    rows = {row["revision_id"]: row for row in explain.get("overlays", [])}
+    materials = dict(report.get("_materials") or {})
+    hints = list(report.get("_hints") or [])
+    guide_ids = {guide["id"] for guide in out["guidance"].get("guides", [])}
+    role = out["guidance"].get("role")
+    for key in list(materials):
+        kind, artifact_id = key
+        reason = None
+        if kind == "skill_overlay" and artifact_id not in guide_ids:
+            reason = "guide not selected in this packet; the overlay applies when the guide is supplied"
+        elif kind == "role_method_overlay" and (not role or role.get("id") != artifact_id):
+            reason = "role not selected in this packet"
+        elif kind in ("skill_overlay", "role_method_overlay"):
+            body = role if kind == "role_method_overlay" else next(g for g in out["guidance"]["guides"] if g["id"] == artifact_id)
+            if body["sha256"] != materials[key]["base"]["sha256"]:
+                reason = "packet read a different base than the overlay was evaluated against"
+        if reason:
+            for layer in materials.pop(key)["layers"]:
+                if layer["revision_id"] in rows:
+                    rows[layer["revision_id"]].update(state="not_applicable" if "selected" in reason else "stale_base", reason=reason)
+    # Budget units are single layers in the resolver's priority order, so the lowest-priority overlay leaves first even
+    # when several slots of one artifact compose together.
+    position = {row["revision_id"]: index for index, row in enumerate(explain.get("overlays", []))}
+    units = sorted(((key, layer) for key, item in materials.items() for layer in item["layers"]),
+                   key=lambda unit: position.get(unit[1]["revision_id"], len(position)))
+    if force_omit:
+        units, hints = [], []
+    target = packet_tokens or packet["PACKET_LIMITS"][out["size"]]
+    limit = min(report["budget"]["max_added_tokens"], int(report["budget"]["max_added_share"] * target))
+    baseline = len(packet["dumps"](dict(out, learning=explain)))
+
+    def render(selected_units, hint_rows):
+        candidate = _copy.deepcopy(out)
+        derived = {"recipes": [], "verification_hints": []}
+        exposure = _copy.deepcopy(report.get("exposure") or {})
+        emitted = set()
+        selected = {}
+        for key, layer in selected_units:
+            selected.setdefault(key, []).append(layer)
+        for key, layers in selected.items():
+            layers.sort(key=lambda layer: (layer["scope"] != "global", layer["revision_id"]))  # composition order: global, then repo
+            kind, artifact_id = key
+            item = materials[key]
+            if kind == "recipe_overlay":
+                composed = compose["compose"](kind, item["base"]["content"], layers, item["workflow"])
+                if composed["state"] != "active":
+                    for layer in layers:
+                        rows[layer["revision_id"]].update(state=composed["state"], reason=composed["reason"])
+                    continue
+                derived["recipes"].append({"id": artifact_id, "source": "derived", "base_sha256": item["base"]["sha256"],
+                                           "effective_sha256": compose["text_digest"](composed["content"]), "derived_block": composed["diff"],
+                                           "layers": [{k: layer[k] for k in ("revision_id", "scope", "slot")} for layer in layers],
+                                           "note": "Read the bundled recipe as usual; this block is lower-priority derived guidance appended to its steps."})
+            else:
+                body = candidate["guidance"]["role"] if kind == "role_method_overlay" else next(g for g in candidate["guidance"]["guides"] if g["id"] == artifact_id)
+                composed = compose["compose"](kind, body["content"], layers, None)
+                if composed["state"] != "active":
+                    for layer in layers:
+                        rows[layer["revision_id"]].update(state=composed["state"], reason=composed["reason"])
+                    continue
+                body.update(content=composed["content"], source="derived", base_sha256=body["sha256"], sha256=compose["text_digest"](composed["content"]),
+                            layers=[{k: layer[k] for k in ("revision_id", "scope", "slot")} for layer in layers])
+            emitted.update(layer["revision_id"] for layer in layers)
+        for hint in hint_rows:
+            derived["verification_hints"].append({k: v for k, v in hint.items()} | {"source": "derived", "note": "Scheduling advice inside the existing verification contract; it adds no command and removes no check."})
+            emitted.add(hint["revision_id"])
+        if derived["recipes"] or derived["verification_hints"]:
+            candidate["guidance"]["derived"] = {k: v for k, v in derived.items() if v}
+            candidate["guidance"]["derived"]["source"] = "learned_overlays"
+        # Retrieval profiles act on retrieval settings, not on guidance text, so their rows keep their state here.
+        for revision_id in emittable:
+            row = rows.get(revision_id)
+            if row and row["state"] == "active" and revision_id not in emitted:
+                row.update(state="budget_omitted", reason="added-guidance budget reached; complete overlay omitted")
+        if exposure:
+            exposure["revisions"] = [dict(entry, state="emitted" if entry["revision_id"] in emitted else "eligible") for entry in exposure.get("revisions", [])]
+            exposure["digest"] = compose["digest"]({k: v for k, v in exposure.items() if k != "digest"})
+        state = explain.copy()
+        state.update(exposure=exposure, status="active" if emitted else ("shadow" if explain.get("mode") == "shadow" else "not_applicable"),
+                     added_tokens=None, budget=dict(report["budget"], added_token_limit=limit))
+        candidate["learning"] = state
+        return candidate
+
+    emittable = {layer["revision_id"] for item in materials.values() for layer in item["layers"]} | {hint["revision_id"] for hint in hints}
+    keys, hint_rows = list(units), list(hints)
+    while True:
+        candidate = render(keys, hint_rows)
+        added = max(0, math.ceil((len(packet["dumps"](candidate)) - baseline) / 4))
+        if added <= limit or not (keys or hint_rows):
+            candidate["learning"]["added_tokens"] = added
+            if force_omit:
+                for row in candidate["learning"]["overlays"]:
+                    if row["state"] == "active" and row["revision_id"] in emittable:
+                        row.update(state="budget_omitted", reason="packet budget cannot hold protected content plus learned guidance; overlays omitted")
+                candidate["learning"]["status"] = "not_applicable"
+            return candidate
+        if hint_rows:
+            hint_rows.pop()
+        else:
+            keys.pop()
+
+
+def _finish_packet(result, pack, packet_tokens, guide_ids, reuse_state, reuse_scope, _delivery=None, learning=None):
     try:
         packet = _sibling("context_packet")
         reuse = _sibling("context_reuse")
-        out = packet["compact_packet"](result, pack, guide_ids)
-        out, pending = reuse["prepare_reuse"](out, reuse_state, reuse_scope)
-        # Reserve space for commit diagnostics. No trimming after a successful commit:
-        # only excerpts actually delivered may be recorded as retained evidence.
-        out = packet["fit_packet"](out, packet_tokens, reserve_chars=512 if pending else 0)
+        prepared = packet["compact_packet"](result, pack, guide_ids)
+
+        def fit(candidate):
+            candidate, pending = reuse["prepare_reuse"](candidate, reuse_state, reuse_scope)
+            # Reserve space for commit diagnostics. No trimming after a successful commit:
+            # only excerpts actually delivered may be recorded as retained evidence.
+            return packet["fit_packet"](candidate, packet_tokens, reserve_chars=512 if pending else 0), pending
+
+        def evidence(candidate):
+            omissions = candidate["packet_omissions"]
+            return (len(candidate["excerpts"]) + len(candidate.get("reuse", {}).get("references", [])),
+                    tuple(omissions.get(key, 0) for key in ("map_facts", "graph_items", "memory_hits", "excerpts")))
+
+        attempts = [False, True] if learning else [None]
+        reference = evidence(fit(prepared)[0]) if learning else None
+        for attempt, force_omit in enumerate(attempts):
+            out = _apply_learning(prepared, learning, packet_tokens, force_omit=force_omit) if learning else prepared
+            try:
+                out, pending = fit(out)
+            except ValueError as exc:
+                if exc.__class__.__name__ != "PacketError" or attempt + 1 == len(attempts):
+                    raise
+                continue  # Protected content outranks learned text: retry with every overlay omitted before failing the packet.
+            if reference is not None and not force_omit and evidence(out) != reference:
+                continue  # Learned text would evict source evidence, map facts or memory hits; the overlays go instead.
+            break
         if pending and _delivery is not None:
             out["reuse"]["status"] = "delivery_pending"
             out["reuse"]["commit_policy"] = "after_stdout_flush"
@@ -1451,7 +1621,11 @@ def _select_context(project, task, role=None, size="standard", max_tokens=None, 
     oversized, structural = [], {}
     texts, hashes, scanned, scan_complete = _scan_sources(
         root, paths, manual_exclusions, automatic, incremental, scrub, excluded, diagnostics, oversized, structural)
-    engine, settings = _retrieval_engine(retrieval, cap, budget, max_files, max_bytes, diagnostics)
+    # Procedural learning reads its immutable active generation here, read-only; disabled means None and no trace.
+    learning = _learning_layer(root, base, task, role_id, diagnostics, identity=index_identity or os.environ.get("AGENT_DISPATCHER_INDEX_ID") or None,
+                               caller_strategy_explicit=retrieval != "auto")
+    engine, settings = _retrieval_engine(retrieval, cap, budget, max_files, max_bytes, diagnostics,
+                                         profile=(learning or {}).get("_retrieval") if learning and learning.get("mode") == "active" else None)
     deep = None
     if engine is not None:
         # The deep index is used only when the user built one (and settings allow it); it never starts a build.
@@ -1579,11 +1753,14 @@ def _select_context(project, task, role=None, size="standard", max_tokens=None, 
         result["change_audit"] = audit_report
         result["project_read_only"] = True
         result["read_only"] = False
+    if learning is not None and _learning_worth_reporting(learning):
+        result["learning"] = {key: value for key, value in learning.items() if not key.startswith("_")}
     if compact:
         result["project_read_only"] = True
         result["change_focus"] = {"source": "git_uncommitted", "paths": [scrub(p) for p in changed[:12]],
                                   "total": len(changed), "scope": "allowed readable tracked files; relevance still required"}
-        return _finish_packet(result, base, packet_tokens, guide_ids, reuse_state, reuse_scope, _delivery)
+        return _finish_packet(result, base, packet_tokens, guide_ids, reuse_state, reuse_scope, _delivery,
+                              learning=learning if learning is not None and learning.get("mode") == "active" and _learning_worth_reporting(learning) else None)
     return result
 
 

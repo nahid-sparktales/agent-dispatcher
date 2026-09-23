@@ -386,6 +386,7 @@ def check_setup(pack, host, config, project, evidence, issues):
         hook_status = "usable"
         hook_detail += " Optional for explicit invocation; no repair is required."
     rows.append(entry("hook", "setup", hook_status, hook_detail))
+    rows.append(learning_row(project, issues))
     if config:
         candidates = [config / "skills/agent-dispatcher", config.parent / ".agents/skills/agent-dispatcher",
                       project / ".agents/skills/agent-dispatcher", project / ".claude/skills/agent-dispatcher"]
@@ -395,6 +396,23 @@ def check_setup(pack, host, config, project, evidence, issues):
         if len(copies) > 1:
             rows.append(entry("multiple-copies", "setup", "unknown", "Multiple distinct dispatcher copies were found. Check host discovery for precedence before removing anything."))
     return rows
+
+
+def learning_row(project, issues):
+    """Procedural learning is the user's own switch and off by default; off is healthy, not a repair item."""
+    helper = Path(__file__).resolve().with_name("learning.py")
+    if not helper.is_file():
+        return entry("procedural-learning", "setup", "unknown", "Learning helper is not installed beside doctor.py; repair the pack if learning is wanted.")
+    try:
+        namespace = {"__name__": "_dispatcher_doctor_learning", "__file__": str(helper)}
+        exec(compile(helper.read_text(encoding="utf-8"), str(helper), "exec"), namespace)
+        settings = namespace["load_settings"](project=project)
+    except (OSError, UnicodeError, SyntaxError, ValueError, TypeError, KeyError):
+        issues.append("Procedural learning settings are unreadable or invalid; learned guidance is declined until repaired.")
+        return entry("procedural-learning", "setup", "unknown", "Learning settings could not be read; packets use bundled guidance only.")
+    if not settings["enabled"]:
+        return entry("procedural-learning", "setup", "usable", "Procedural learning is off (default): bundled guidance only, nothing recorded. Enable shadow mode in the user's own settings file to start.")
+    return entry("procedural-learning", "setup", "usable", f"Procedural learning is enabled in {settings['mode']} mode; overlays need evaluation and human approval before they compose into packets.")
 
 
 def project_signals(project, issues):

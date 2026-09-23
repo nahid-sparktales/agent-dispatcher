@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "recipe": "debug-application",
+  "steps": [
+    {"id": "reproduce", "index": 1, "title": "Reproduce it first", "requires": []},
+    {"id": "gather-evidence", "index": 2, "title": "Gather evidence before theorizing", "requires": ["reproduce"], "capability": "quality.debugging"},
+    {"id": "hypothesize", "index": 3, "title": "Form a hypothesis that predicts something", "requires": ["gather-evidence"]},
+    {"id": "isolate", "index": 4, "title": "Isolate", "requires": ["hypothesize"]},
+    {"id": "fix", "index": 5, "title": "Fix the cause, not the path the report named", "requires": ["isolate"]},
+    {"id": "regression-test", "index": 6, "title": "Write the regression test", "requires": ["fix"], "capability": "quality.regression"},
+    {"id": "reproduce-again", "index": 7, "title": "Run the original reproduction again", "requires": ["regression-test"]}
+  ],
+  "gates": [
+    {"id": "original-reproduction-after-fix", "steps": ["reproduce", "reproduce-again"], "text": "The original reproduction was run after the fix, not just the new test."},
+    {"id": "regression-test-fails-without-fix", "steps": ["regression-test"], "text": "The regression test was confirmed to fail without the fix."},
+    {"id": "no-timing-fix-without-race-evidence", "steps": ["fix"], "text": "A timing change (a delay, a retry) is never reported as a root-cause fix without evidence of the actual race."}
+  ],
+  "mandatory": ["reproduce", "fix", "regression-test", "reproduce-again"],
+  "evolvable": {"insert_after": ["reproduce", "gather-evidence", "hypothesize", "isolate"], "max_added_steps": 4}
+}

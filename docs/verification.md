@@ -59,6 +59,11 @@ removes the owned audit state. Without a baseline, disclose the gap instead of i
 Final summaries default to ELI5 succinct: a brief explanation of the change, observed results
 and remaining gaps. Detailed output expands the evidence; it cannot upgrade uncertainty.
 
+A learned verification hint ([procedural-learning.md](procedural-learning.md)) can suggest running
+a registered check first or adding one; it cannot remove the original reproduction, replace a
+required regression check with lint, accept zero tests or turn a missing check into a pass, and its
+prose is never turned into a command.
+
 The failure mode this pack cares most about is a confident report of a check that never ran.
 
 > **Wrong:** "UI verified successfully."

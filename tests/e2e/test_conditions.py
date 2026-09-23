@@ -66,7 +66,7 @@ class ArmSetupTests(unittest.TestCase):
         package = self.output / "packages/claude"
         package.mkdir(parents=True)
         for name in ("repository_intelligence.py", "repo_store.py", "repo_builder.py", "exploration.py", "experience.py", "context.py",
-                     "repository_memory.py", "repo_history.py",
+                     "repository_memory.py", "repo_history.py", "learning.py", "learning_compose.py", "learning_eval.py",
                      "repo_index.py", "retrieval.py", "context_budget.py", "llm_retrieval.py", "parser_cache.py", "project_map.py",
                      "project_graph.py", "verification.py", "change_audit.py", "resources.py", "context_packet.py", "context_reuse.py", "preferences.py"):
             (package / name).write_bytes((ROOT / name).read_bytes())
@@ -99,7 +99,9 @@ class ArmSetupTests(unittest.TestCase):
         self.assertTrue(setup["coverage"]["complete_within_policy"])
         self.assertEqual(rt.tree_files(first, rt.EXCLUDED), before)
         env = setup["_env"]
-        self.assertEqual(set(env), {"XDG_CACHE_HOME", "AGENT_DISPATCHER_INDEX_ID", "AGENT_DISPATCHER_INDEX_CONFIG", "AGENT_DISPATCHER_MEMORY_CONFIG"})
+        self.assertEqual(set(env), {"XDG_CACHE_HOME", "AGENT_DISPATCHER_INDEX_ID", "AGENT_DISPATCHER_INDEX_CONFIG", "AGENT_DISPATCHER_MEMORY_CONFIG",
+                                    "AGENT_DISPATCHER_LEARNING_CONFIG"})
+        self.assertFalse(json.loads(Path(env["AGENT_DISPATCHER_LEARNING_CONFIG"]).read_text())["enabled"])  # static arms never learn
         self.assertEqual(json.loads(Path(env["AGENT_DISPATCHER_MEMORY_CONFIG"]).read_text())["experience"]["retrieval"], "off")
         self.assertTrue(env["XDG_CACHE_HOME"].startswith(str(self.output / "state/claude-indexed")))
         self.assertFalse(json.loads(Path(env["AGENT_DISPATCHER_INDEX_CONFIG"]).read_text())["experience"]["use"])

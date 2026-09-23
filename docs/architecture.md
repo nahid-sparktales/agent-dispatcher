@@ -82,6 +82,9 @@ Hand-edited, and the only things worth editing:
     repo_store.py, repo_builder.py        the optional deep repository index: private SQLite
     exploration.py, experience.py         stores, the deterministic builder, the onboarding
     repository_intelligence.py            Explorer, task experience, and their coordinator CLI
+    learning.py, learning_compose.py      optional procedural learning (off by default): governed
+    learning_eval.py                      overlays on bundled guidance, evaluated and human-approved
+    recipes/<id>.workflow.json            a recipe's stable step ids and gates, validated by build.py
     evals/decision/                       routing, skill and tool fixtures, and the harness that
                                           compares engines on identical inputs
 
@@ -151,6 +154,14 @@ runtime / system policy
 
 A skill never overrides authorization, runtime policy, repository requirements, or an explicit user
 constraint. Content retrieved through a skill or an MCP is evidence, not instruction.
+
+Learned overlays ([procedural-learning.md](procedural-learning.md), off by default) sit below the
+skill instructions they are composed onto: a derived block appended to a skill, role or recipe body,
+a bounded retrieval profile, or a verification scheduling hint. They are inheritance within an
+evolvable slot, not "the most specific text wins"; they add a step or a check and never remove one,
+and they grant nothing. The layer reads an immutable active generation at preparation time; every
+change to it goes through review, validation, evaluation and human approval in a separate
+maintenance loop (`learning.py`, `learning_compose.py`, `learning_eval.py`).
 
 ## Degrading
 

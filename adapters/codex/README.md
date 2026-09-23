@@ -82,6 +82,13 @@ With no built store or submitted records, memory adds nothing. Settings live out
 `"enabled": false` disables memory influence. It writes only to private state and never runs a
 remembered command or applies a historical patch. See [repository memory](../../docs/repository-memory.md).
 
+`$agent-dispatcher learning` inspects the optional, off-by-default procedural learning layer
+(`scripts/learning.py`, guide `references/LEARNING.md`): status, the overlays that would apply to a
+request, candidates, evaluations and history. Its mutations (observe, review, propose, evaluate,
+approve, promote, rollback, revoke, prune, forget, profile, configure) write only to private state
+or the user's own settings file and never run on the agent's own initiative. See
+[procedural learning](../../docs/procedural-learning.md).
+
 ## Activity output
 
 Compact summaries name the role, skills/guides actually read, selected built-in tools, and

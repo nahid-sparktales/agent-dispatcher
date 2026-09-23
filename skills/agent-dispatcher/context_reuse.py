@@ -155,8 +155,13 @@ def prepare_reuse(result, state_path=None, scope=None):
         policy = result["exclusion_policy"]
         if not isinstance(policy, dict) or len(_encoded(policy)) > 64 * 1024:
             raise ValueError()
-        identity = {"schema_version": 1, "project_sha256": _digest(project),
-                    "scope_sha256": _digest(scope), "policy_sha256": _digest(policy)}
+        # An admitted learning generation is part of the delivery policy: evidence reused under a revoked or changed
+        # overlay set is a new delivery. Without learning the key is exactly what it was before.
+        learning_key = (result.get("learning") or {}).get("reuse_key") if isinstance(result.get("learning"), dict) else None
+        if learning_key is not None and not _hex(learning_key):
+            raise ValueError()
+        identity = {"schema_version": 1, "project_sha256": _digest(project), "scope_sha256": _digest(scope),
+                    "policy_sha256": _digest(policy) if learning_key is None else _digest([policy, learning_key])}
         excerpts = result["excerpts"]
         if not isinstance(excerpts, list) or len(excerpts) > MAX_ENTRIES:
             raise ValueError()

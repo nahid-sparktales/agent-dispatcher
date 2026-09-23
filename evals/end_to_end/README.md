@@ -86,6 +86,39 @@ adds setup time, setup model calls, amortized measured cost per task and cost pe
 performed for this change; the offline tests in `tests/e2e/test_conditions.py` exercise scheduling,
 setup, recording and reporting with the real helper and no model.
 
+### Learned conditions (procedural learning ladder)
+
+`prepare --conditions baseline dispatcher indexed warm_experience learned_skills learned_recipes learned_global learned_full`
+adds up to four learned arms. Each is exactly `warm_experience` plus a frozen overlay library of increasing kinds:
+
+| Condition | Adds |
+| --- | --- |
+| `learned_skills` | repository skill overlays (D4) |
+| `learned_recipes` | plus recipe overlays (D5) |
+| `learned_global` | plus a frozen user-global library through the arm's own `experiment` profile (D6) |
+| `learned_full` | the full bundle: role-method overlays, retrieval profiles and verification hints as well (D7) |
+
+The configuration must name `learning_library` (an absolute path to a file written by
+`learning export-generation`), optionally `learning_global_library`, and `experiment_authorization`
+(`{"actor": "...", "experiment": "..."}`): the human decision that authorizes this experiment. Before a
+sequence's first step the runner imports the library into the arm's isolated learning store as an
+explicitly authorized **experimental canary** (`learning-setup.json`, outside the timer, zero model
+calls, workspace byte-identical); every arm, including `dispatcher`, points `AGENT_DISPATCHER_LEARNING_CONFIG`
+at an arm-owned settings file, so a static arm can never read the user's ordinary learning stores. After
+each trial the arm records its experience and a learning observation whose outcome is the hidden grader's
+verdict (`feedback_class: hidden_grader`, oracle-adjacent, stated in the report) and whose overlay exposure
+is unknown to the harness. Import re-derives each revision under the arm's package and policy digests; a
+library whose base artifacts differ from the staged package (for example role overlays exported from
+another host layout) is refused at setup rather than silently skipped.
+
+The ladder estimates incremental bundle effects in its order. For component claims, run
+leave-one-component-out configurations (a separate `prepare`, its own smoke evidence). The report pairs
+every learned arm with `baseline`; to compare a learned arm with `warm_experience`, freeze an evaluation
+specification with `learning evaluate REVISION --spec SPEC.json --runner end_to_end_batch --batch BATCH_DIR`
+whose `arms` name the two conditions and whose `environment.batch_fingerprint` is the batch's configuration
+fingerprint. No live learned-arm run has been performed for this change; `tests/e2e/test_learning_conditions.py`
+exercises configuration, setup, import, observation recording and reporting offline with the real helper.
+
 ### Evaluate with repository memory
 
 Add `"memory_settings": "/absolute/path/repository-memory.json"` to a client to hand the staged

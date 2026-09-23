@@ -469,6 +469,28 @@ python3 -B repository_memory.py explain 'TASK' --project /path/to/project
 See the [repository memory guide](repository-memory.md) for settings, the evidence model,
 storage, the experience contract, measurement and limits.
 
+### Procedural learning
+
+Off by default. When enabled in `~/.config/agent-dispatcher/procedural-learning.json` (or
+`AGENT_DISPATCHER_LEARNING_CONFIG`; never a file inside the project), Dispatcher can attach explicit
+observations to recorded task experience, review them for recurring patterns, and carry candidate
+overlays (a repository procedure on a skill, an optional recipe step, a role method note, a bounded
+retrieval profile, a verification scheduling hint) through validation, a paired evaluation against
+the frozen incumbent and a human approval before they compose into packets. `shadow` mode reports
+what would apply and changes nothing; `active` composes admitted overlays within a separate
+added-guidance budget. No key, account or service is needed for the deterministic lifecycle.
+
+```bash
+python3 -B learning.py configure --enable --mode shadow --record-observations on
+python3 -B learning.py status --project /path/to/project --json
+python3 -B learning.py explain --task 'TASK' --role debugger --project /path/to/project
+python3 -B learning.py review --project /path/to/project --packet
+```
+
+`/agent-learning` (Claude) and `$agent-dispatcher learning` (Codex) read the shared `LEARNING.md`
+guide. See [procedural learning](procedural-learning.md) for the lifecycle, approval flow, budgets,
+privacy controls and limits.
+
 ### Check health and get setup recommendations
 
 In Codex:

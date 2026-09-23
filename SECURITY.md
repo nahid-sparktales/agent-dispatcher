@@ -56,6 +56,16 @@ the optional decision engine described below.
   private, owner-only state as the project map, hold derived facts and the user's own records (never
   source text), and can only name files the current admitted index contains. No model call, network
   access or command execution happens at query time. See [docs/repository-memory.md](docs/repository-memory.md).
+- **`learning.py`**, **`learning_compose.py`** and **`learning_eval.py`** are the optional procedural
+  learning layer, off by default. When a settings file outside every project enables it, explicitly
+  recorded task outcomes can be reviewed into candidate overlays on bundled guidance; a candidate is
+  untrusted data that must pass structural and security validation, a paired evaluation against a
+  frozen incumbent and a human approval bound to its exact digest before it composes into a packet,
+  and the runtime reads the published generation read-only. Overlays cannot change redaction,
+  admission, permissions, required verification, provider settings or the admission policy itself,
+  and prose checks are a filter rather than a proof; the host's permission layer is unchanged. Optional
+  provider-assisted proposals need their own explicit enablement and budgets. See
+  [docs/procedural-learning.md](docs/procedural-learning.md).
 - **`hooks/agent-dispatcher-activate.sh`** runs at `SessionStart` when perpetual mode is armed and
   prints a routing preamble. It reads flag files, writes nothing but a weekly prune of its own
   session-silence directory, makes no network call, and its output is a fixed heredoc — a

@@ -110,5 +110,15 @@
     "ux-writing": "skills/design/ux-writing/SKILL.md",
     "visual-verification": "skills/frontend/visual-verification/SKILL.md",
     "webhooks": "skills/backend/webhooks/SKILL.md"
+  },
+  "recipes": {
+    "build-production-ui": "recipes/build-production-ui.md",
+    "database-migration": "recipes/database-migration.md",
+    "debug-application": "recipes/debug-application.md",
+    "investigate-incident": "recipes/investigate-incident.md",
+    "research-technical-decision": "recipes/research-technical-decision.md",
+    "review-pull-request": "recipes/review-pull-request.md",
+    "security-review": "recipes/security-review.md",
+    "ship-feature": "recipes/ship-feature.md"
   }
 }

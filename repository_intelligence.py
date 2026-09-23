@@ -139,6 +139,17 @@ def status(args):
             report["experience"] = {"status": "present", "counts": events.counts(), "disk_bytes": events.disk_bytes()}
     except ValueError as exc:
         report["experience"] = {"status": "absent" if "No repository index" in str(exc) else "unavailable", "detail": str(exc)}
+    try:  # Procedural learning: read-only summary of the user's own switch and this repository's store.
+        learning = _sibling("learning")
+        configured = learning["load_settings"](project=root)
+        item = {"enabled": configured["enabled"], "mode": configured["mode"], "store": "absent"}
+        if learning["store_exists"](directory):
+            with learning["open_store"](directory, readonly=True) as store:
+                active = store.active_generation()
+                item.update(store="present", active_generation=(active or {}).get("generation_id"), counts=store.counts())
+        report["learning"] = item
+    except ValueError as exc:
+        report["learning"] = {"status": "unavailable", "detail": str(exc)}
     return report
 
 
@@ -416,7 +427,12 @@ def main(argv=None):
     command = sub.add_parser("export")
     common(command)
     command.add_argument("--out")
+    # Procedural learning shares this coordinator; learning.py holds the one implementation and its own help.
+    command = sub.add_parser("learning", add_help=False)
+    command.add_argument("rest", nargs=argparse.REMAINDER)
     args = parser.parse_args(argv)
+    if args.command == "learning":
+        return _sibling("learning")["main"](args.rest)
     try:
         if args.command in ("build", "refresh"):
             result = build(args, args.command)

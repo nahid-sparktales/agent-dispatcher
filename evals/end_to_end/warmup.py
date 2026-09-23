@@ -146,7 +146,15 @@ def grade_warm_fixture(fixture, initial_dir, final_dir, final_answer):
 
 # ---------------------------------------------------------------- deep-index conditions
 
-INDEX_CONDITIONS = ("indexed", "warm_experience")
+LEARNED_CONDITIONS = ("learned_skills", "learned_recipes", "learned_global", "learned_full")
+INDEX_CONDITIONS = ("indexed", "warm_experience", *LEARNED_CONDITIONS)
+# The ladder: each learned arm is the warm-experience treatment plus a frozen, explicitly authorized overlay library
+# restricted to these artifact kinds. Global arms also consume a frozen user-global library through the arm's own profile.
+LEARNED_KINDS = {"learned_skills": ["skill_overlay"], "learned_recipes": ["skill_overlay", "recipe_overlay"],
+                 "learned_global": ["skill_overlay", "recipe_overlay"],
+                 "learned_full": ["skill_overlay", "recipe_overlay", "role_method_overlay", "retrieval_profile", "verification_hint"]}
+GLOBAL_CONDITIONS = ("learned_global", "learned_full")
+EXPERIMENT_PROFILE = "experiment"
 
 
 def arm_home(config, client, condition):
@@ -163,9 +171,10 @@ def arm_settings(config, client, condition):
     home = arm_home(config, client, condition)
     home.mkdir(parents=True, exist_ok=True, mode=0o700)
     path = home / "repository-intelligence.json"
+    warm = condition != "indexed"  # warm_experience and every learned arm use the experience their own earlier steps recorded
     settings = {"index": {"use": "require", "maintain": {"enabled": True}},
                 "exploration": {"enabled": False},
-                "experience": {"record": condition == "warm_experience", "use": condition == "warm_experience",
+                "experience": {"record": warm, "use": warm,
                                "eligible_outcomes": list(config.get("warm_experience_eligible") or ["grader_passed"])}}
     text = json.dumps(settings, indent=2, sort_keys=True) + "\n"
     if not path.is_file() or path.read_text(encoding="utf-8") != text:
@@ -178,7 +187,7 @@ def memory_settings(config, client, condition):
     home = arm_home(config, client, condition)
     home.mkdir(parents=True, exist_ok=True, mode=0o700)
     path = home / "repository-memory.json"
-    warm = condition == "warm_experience"
+    warm = condition != "indexed"
     # The warm arm is the maximal treatment: every memory layer on (a fixture without commit history leaves the
     # episodic layer unavailable; module records come from the memory build in deep_index_setup).
     settings = {"enabled": True, "git": {"retrieval": "on" if warm else "off"}, "semantic": {"retrieval": "on" if warm else "off"},
@@ -190,11 +199,41 @@ def memory_settings(config, client, condition):
     return path
 
 
+def learning_settings(config, client, condition):
+    """Every arm names its own learning settings file: enabled and active only for learned arms, disabled elsewhere,
+    so no arm can read the user's ordinary learning configuration or stores."""
+    home = arm_home(config, client, condition)
+    home.mkdir(parents=True, exist_ok=True, mode=0o700)
+    path = home / "procedural-learning.json"
+    learned = condition in LEARNED_CONDITIONS
+    settings = {"enabled": learned, "mode": "active" if learned else "shadow", "observation": {"record": learned},
+                "kinds": LEARNED_KINDS.get(condition, LEARNED_KINDS["learned_full"]),
+                "profile": EXPERIMENT_PROFILE if condition in GLOBAL_CONDITIONS else None,
+                # Experimental canaries must outlive the whole sequence; the bounds are recorded in each imported revision.
+                "canary": {"max_tasks": 1000, "max_days": 365}}
+    text = json.dumps(settings, indent=2, sort_keys=True) + "\n"
+    if not path.is_file() or path.read_text(encoding="utf-8") != text:
+        path.write_text(text, encoding="utf-8")
+    return path
+
+
+def disabled_learning_settings(config):
+    """The static dispatcher arm points at an explicitly disabled learning configuration."""
+    home = Path(config["output_dir"]) / "state"
+    home.mkdir(parents=True, exist_ok=True, mode=0o700)
+    path = home / "learning-disabled.json"
+    text = json.dumps({"enabled": False}, indent=2) + "\n"
+    if not path.is_file() or path.read_text(encoding="utf-8") != text:
+        path.write_text(text, encoding="utf-8")
+    return path
+
+
 def arm_env(config, client, condition, row, fixture):
     home = arm_home(config, client, condition)
     return {"XDG_CACHE_HOME": str(home / "cache"), "AGENT_DISPATCHER_INDEX_ID": arm_identity(client, condition, row, fixture),
             "AGENT_DISPATCHER_INDEX_CONFIG": str(arm_settings(config, client, condition)),
-            "AGENT_DISPATCHER_MEMORY_CONFIG": str(memory_settings(config, client, condition))}
+            "AGENT_DISPATCHER_MEMORY_CONFIG": str(memory_settings(config, client, condition)),
+            "AGENT_DISPATCHER_LEARNING_CONFIG": str(learning_settings(config, client, condition))}
 
 
 def _helper(config, client, name):
@@ -261,6 +300,90 @@ def deep_index_setup(config, client, workspace, condition, row, fixture):
     except (OSError, ValueError, TypeError, KeyError) as error:
         report["diagnostics"].append(str(error) if isinstance(error, ValueError) else "Deep index setup could not be validated: " + type(error).__name__)
     return dict(report, _env=index_env)
+
+
+def learning_setup(config, client, workspace, condition, row, fixture, index_env):
+    """Import the frozen overlay library into the arm's isolated store once per sequence, as an explicitly authorized
+    experimental canary. Outside task timing, no model, no workspace writes; failure is setup failure."""
+    from .adapters import _environment
+    spec = config["clients"][client]
+    env = _environment(client, dict(spec, index_env=index_env), Path(spec["profile_dir"]))
+    env["PYTHONDONTWRITEBYTECODE"] = "1"
+    marker = arm_home(config, client, condition) / "learning-imported.json"
+    imported = set(json.loads(marker.read_text(encoding="utf-8"))) if marker.is_file() else set()
+    identity = index_env["AGENT_DISPATCHER_INDEX_ID"]
+    authorization = config.get("experiment_authorization") or {}
+    report = {"schema_version": 1, "requested": True, "ok": False, "condition": condition, "excluded_from_task_timing": True,
+              "elapsed_seconds": 0.0, "model_calls": None, "mode": "already_imported" if identity in imported else "import",
+              "libraries": [], "experiment": authorization.get("experiment"), "feedback_class": "hidden_grader", "diagnostics": []}
+    try:
+        before = rt.tree_files(workspace, rt.EXCLUDED)
+        if identity not in imported:
+            libraries = [("repo", config["learning_library"], [])]
+            if condition in GLOBAL_CONDITIONS and config.get("learning_global_library"):
+                libraries.append(("global", config["learning_global_library"], ["--scope", "global", "--profile", EXPERIMENT_PROFILE]))
+            for scope, path, extra in libraries:
+                execution = rt.execute([sys.executable, "-B", str(_helper(config, client, "learning.py")), "import-generation", "--from", str(path),
+                                        "--experiment", str(authorization["experiment"]), "--authorize-as", str(authorization["actor"]),
+                                        "--project", str(workspace), "--identity", identity, "--config", index_env["AGENT_DISPATCHER_LEARNING_CONFIG"], "--json", *extra],
+                                       cwd=workspace, env=env, prompt="", timeout=300, output_limit=1_000_000)
+                report["elapsed_seconds"] += execution["elapsed_seconds"]
+                if execution["returncode"] or execution["timed_out"] or execution.get("cancelled") or execution["output_overflow"]:
+                    raise ValueError(f"Learning library import ({scope}) failed: " + rt.scrub_text(execution["stderr"][-300:], env).strip())
+                packet = json.loads(execution["stdout"])
+                if not isinstance(packet.get("installed"), list) or packet.get("state") != "experimental_canary":
+                    raise ValueError("Learning library import did not record an experimental canary.")
+                report["libraries"].append({"scope": scope, "installed": len(packet["installed"]), "state": packet["state"]})
+            if rt.tree_files(workspace, rt.EXCLUDED) != before:
+                raise ValueError("Learning library import changed project files; state must stay outside the workspace.")
+            imported.add(identity)
+            marker.write_text(json.dumps(sorted(imported)), encoding="utf-8")
+        report.update(ok=True, model_calls=0)
+    except (OSError, ValueError, TypeError, KeyError) as error:
+        report["diagnostics"].append(str(error) if isinstance(error, ValueError) else "Learning setup could not be validated: " + type(error).__name__)
+    return report
+
+
+def record_trial_observation(config, client, workspace, condition, row, fixture, result, experience_record):
+    """After a learned-arm trial: attach an oracle-adjacent observation to the experience event the arm just recorded.
+
+    The harness cannot observe which overlays the agent read, so exposure stays unknown; tokens and duration are
+    measured where the client reported them and `unavailable` otherwise. Nothing about the grade's content is handed over.
+    """
+    from .adapters import _environment
+    event_id = (experience_record or {}).get("event_id")
+    record = {"schema_version": 1, "condition": condition, "event_id": event_id, "stored": None, "feedback_class": "hidden_grader", "diagnostics": []}
+    if not event_id:
+        record["diagnostics"].append("no experience event to attach the observation to")
+        return record
+    spec = config["clients"][client]
+    index_env = arm_env(config, client, condition, row, fixture)
+    env = _environment(client, dict(spec, index_env=index_env), Path(spec["profile_dir"]))
+    env["PYTHONDONTWRITEBYTECODE"] = "1"
+    usage = result.get("usage") or {}
+    tokens = None
+    if all(type(usage.get(k)) is int for k in ("input_tokens", "output_tokens")):
+        tokens = usage["input_tokens"] + usage["output_tokens"]
+    measured = lambda value: {"value": value, "provenance": "measured"} if isinstance(value, (int, float)) and not isinstance(value, bool) else {"value": None, "provenance": "unavailable"}  # noqa: E731
+    observation = {"schema_version": 1, "event_id": event_id, "task_family": f"{client}:{fixture['id']}",
+                   "sequence": {"harness": row.get("sequence"), "position": row.get("step")} if row.get("sequence") is not None else None,
+                   "exposure": [], "workflow": {"retrieval": {"history_expansion": "unknown"}},
+                   "failure_categories": ["infrastructure"] if result.get("status") == "infrastructure_error" else [],
+                   "feedback_class": "hidden_grader", "user_accepted": None,
+                   "resources": {"tokens": measured(tokens), "cost_usd": measured(usage.get("cost_usd")), "duration_s": measured(result.get("elapsed_seconds"))},
+                   "limits_of_observation": ["overlay exposure and reads were not observed by the harness", "outcome is the hidden grader's verdict (oracle-adjacent)"]}
+    observation = {k: v for k, v in observation.items() if v is not None}
+    argv = [sys.executable, "-B", str(_helper(config, client, "learning.py")), "observe", "--event", event_id, "--observation-file", "-",
+            "--project", str(workspace), "--identity", index_env["AGENT_DISPATCHER_INDEX_ID"], "--config", index_env["AGENT_DISPATCHER_LEARNING_CONFIG"], "--json"]
+    try:
+        execution = rt.execute(argv, cwd=workspace, env=env, prompt=json.dumps(observation), timeout=120, output_limit=200_000)
+        if execution["returncode"] or execution["timed_out"]:
+            raise ValueError("Learning observation helper failed: " + rt.scrub_text(execution["stderr"][-300:], env).strip())
+        reply = json.loads(execution["stdout"])
+        record.update(stored=reply.get("stored"), task_family=reply.get("task_family"))
+    except (OSError, ValueError, TypeError, KeyError) as error:
+        record["diagnostics"].append(str(error) if isinstance(error, ValueError) else "Learning observation could not be validated: " + type(error).__name__)
+    return record
 
 
 def trial_outcome(result, policy="harness_grader"):

@@ -102,7 +102,8 @@ def _environment(client: str, spec: dict, profile: Path) -> dict[str, str]:
     if spec.get("llm_settings"):
         env["AGENT_DISPATCHER_LLM_CONFIG"] = spec["llm_settings"]
     # Deep-index arms: arm-scoped private state, a sequence identity and a settings path. Paths only, set by the runner.
-    for key in ("XDG_CACHE_HOME", "AGENT_DISPATCHER_INDEX_ID", "AGENT_DISPATCHER_INDEX_CONFIG", "AGENT_DISPATCHER_MEMORY_CONFIG"):
+    for key in ("XDG_CACHE_HOME", "AGENT_DISPATCHER_INDEX_ID", "AGENT_DISPATCHER_INDEX_CONFIG", "AGENT_DISPATCHER_MEMORY_CONFIG",
+                "AGENT_DISPATCHER_LEARNING_CONFIG"):
         value = (spec.get("index_env") or {}).get(key)
         if isinstance(value, str) and value:
             env[key] = value

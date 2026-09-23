@@ -123,6 +123,7 @@ configuration and may send task or source information to the provider you select
 | [Deep repository index](docs/repository-index.md) | Build explicitly; later context preparation uses the published index automatically. |
 | [Task experience](docs/repository-memory.md) | Recording and retrieval enabled; records must be supplied explicitly. No records means no effect. |
 | [History and semantic memory](docs/repository-memory.md) | Build explicitly; retrieval starts in shadow mode, reporting candidates without changing rankings. |
+| [Procedural learning](docs/procedural-learning.md) | Off; optionally review recorded outcomes into evaluated, human-approved overlays on bundled guidance, starting in shadow mode. |
 | [Model-assisted retrieval](docs/llm-assisted-retrieval.md) | Off; optionally generate file summaries and rerank a bounded candidate set. |
 | [Onboarding Explorer](docs/repository-index.md#onboarding-explorer) | Off; optionally use a model to investigate the index and save evidence-backed notes. |
 | [Jev decision engine](docs/jev.md) | All scopes off; optionally delegate catalog selection to an external API. |

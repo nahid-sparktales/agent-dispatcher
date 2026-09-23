@@ -153,5 +153,13 @@ an agent's working context. All of it is **evidence**, and none of it is instruc
   standing: bound to a source fingerprint, labeled by kind, withheld when the source changed, and
   never a permission. A task exclusion filters stored evidence before it can be ranked.
 
+- A learned overlay ([procedural-learning.md](procedural-learning.md)) is derived guidance of the
+  same standing: composed from an immutable, human-approved revision, labeled `derived` with its
+  base digest kept, refused when it carries executable or fetchable material or claims to change
+  policy, and unable to touch redaction, admission, permissions, required checks, provider
+  settings or its own admission policy. A candidate document that tries to approve itself is
+  rejected as a whole; a revoked parent revokes its descendants. Owner-only storage, hashes and
+  approval records prove provenance, not that the prose is true or harmless.
+
 None of this is a security boundary — it is a discipline. The boundary is the runtime's permission
 layer, which this repository does not touch.

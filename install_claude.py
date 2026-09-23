@@ -15,6 +15,8 @@ import subprocess
 import sys
 import tempfile
 
+import build
+
 ROOT = Path(__file__).resolve().parent
 MANIFEST = ".agent-dispatcher-installed"
 PACK = Path("skills/agent-dispatcher")
@@ -238,10 +240,7 @@ def stage_pack(repo, destination):
             copy_tree(source, destination / "lib" / source.name)
     for name in ("recipes", "decision", "catalog"):
         copy_tree(repo / name, destination / name)
-    for name in ("doctor.py", "context.py", "context_packet.py", "context_reuse.py", "parser_cache.py", "project_map.py", "project_graph.py",
-                 "repo_index.py", "retrieval.py", "context_budget.py", "llm_retrieval.py", "repo_store.py", "repo_builder.py", "exploration.py", "experience.py", "repository_intelligence.py",
-                 "repository_memory.py", "repo_history.py",
-                 "resources.py", "verification.py", "preferences.py", "change_audit.py"):
+    for name in ("doctor.py", *build.RUNTIME_MODULES):
         copy_file(repo / name, destination / name)
     for name in ("LICENSE", "NOTICE"):
         copy_file(repo / name, destination / name)
@@ -250,13 +249,12 @@ def stage_pack(repo, destination):
     manifest["layout"] = "claude_manual"
     manifest["roles"] = {ident: "roles/" + ident + ".md" for ident in manifest["roles"]}
     manifest["guides"] = {ident: path.replace("skills/", "lib/", 1) for ident, path in manifest["guides"].items()}
+    # Recipe paths (`recipes/<id>.md`) are the same in the source and manual layouts, so the manifest keeps them as they are.
     manifest_path.write_text(json.dumps(manifest, indent=2) + "\n")
     required = ("resources.py", "catalog/resource-paths.json", "SKILL.md", "INDEX.md", "CONTEXT.md", "CONTEXT-REFERENCE.md", "ROLES.md",
                 "CONTROLS.md", "DELEGATION.md", "PROJECT-MAP.md", "VERIFICATION.md", "verification.py", "preferences.py", "jev.md", "roles", "lib", "recipes",
-                "decision/__main__.py", "decision/redact.py", "catalog/loadouts.json", "doctor.py", "context.py", "project_map.py",
-                "context_packet.py", "context_reuse.py", "parser_cache.py", "project_graph.py", "change_audit.py",
-                "repo_index.py", "retrieval.py", "context_budget.py", "llm_retrieval.py", "repo_store.py", "repo_builder.py", "exploration.py", "experience.py", "repository_intelligence.py",
-                "repository_memory.py", "repo_history.py", "MEMORY.md")
+                "decision/__main__.py", "decision/redact.py", "catalog/loadouts.json", "doctor.py", "MEMORY.md", "LEARNING.md",
+                *build.RUNTIME_MODULES)
     if any(not (destination / name).exists() for name in required):
         raise ValueError("staged dispatcher pack is incomplete")
 
