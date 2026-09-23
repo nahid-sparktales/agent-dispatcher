@@ -20,7 +20,10 @@ CLI = ROOT / "repository_intelligence.py"
 
 
 def git(project, *args):
-    return subprocess.run(["git", "-C", str(project), "-c", "user.email=t@example.com", "-c", "user.name=t", "-c", "commit.gpgsign=false", *args],
+    # No detached auto-maintenance after a commit: it created and removed .git/objects/maintenance.lock while a test
+    # was copying the repository (seen on the macOS runner), and the copy failed on the vanished file.
+    return subprocess.run(["git", "-C", str(project), "-c", "user.email=t@example.com", "-c", "user.name=t", "-c", "commit.gpgsign=false",
+                           "-c", "gc.auto=0", "-c", "maintenance.auto=false", *args],
                           check=True, capture_output=True, text=True).stdout
 
 
