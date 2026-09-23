@@ -437,6 +437,25 @@ class AdmissionAndTrustTests(IndexCase):
         with self.store() as store:
             self.assertEqual(store.stored_terms(), store.recount_terms())
 
+    def test_refused_maintenance_write_is_reported_and_the_packet_still_arrives(self):
+        """A sandbox that forbids writing private state (what an evaluation trial's shell does) must cost the
+        maintenance, not the packet: the store rolls back and reports, the helper goes on."""
+        self.build()
+        self.write("pkg/core.py", "def validate_token(token):\n    return False\n")
+        with self.store(readonly=False) as store:
+            terms = store.stored_terms()
+            # Stand-in for the environment refusing the write: every insert into files aborts inside SQLite.
+            store.connection.execute("CREATE TRIGGER refuse_writes BEFORE INSERT ON files BEGIN SELECT RAISE(ABORT, 'attempt to write a readonly database'); END")
+        result = self.select("Fix validate_token", role="implementer", map_maintain=True)
+        maintenance = result["repository_intelligence"]["index"]["maintenance"]
+        self.assertTrue(maintenance["allowed"])
+        self.assertEqual(maintenance["records_upserted"], 0)
+        self.assertEqual(maintenance["failed"], "Repository index write failed: IntegrityError")
+        self.assertEqual(result["context"][0]["path"], "pkg/core.py")
+        with self.store() as store:
+            self.assertEqual(store.stored_terms(), terms)  # rolled back, nothing half-written
+            self.assertEqual(store.stored_terms(), store.recount_terms())
+
     def test_worktrees_are_isolated_and_an_identity_maps_workspaces_together(self):
         other = self.root / "other"
         shutil.copytree(self.project, other)
