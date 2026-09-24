@@ -8,7 +8,7 @@ or automatic runner is enabled. PACK is the package; PROJECT the workspace. Quot
 `/agent-verify run|show|note` uses:
 
 ```text
-python3 -B PACK/verification.py run --project PROJECT --kind tests -- python3 -B -m unittest discover
+python3 -B PACK/verification.py run --project PROJECT --kind tests -- python3 -B -m unittest TEST_MODULES
 python3 -B PACK/verification.py run --project PROJECT --kind check -- CHECK ARGUMENTS
 python3 -B PACK/verification.py run --project PROJECT --kind check -- python3 -B -c 'assert 1 + 1 == 2'
 python3 -B PACK/verification.py show --project PROJECT --receipt RECEIPT --cleanup --json
@@ -22,6 +22,7 @@ Use `note --receipt RECEIPT --status not_run|denied --reason TEXT` for reported 
 Refused cleanup fails and reports a leftover path. Never sweep shared scratch or unexpected
 files. Forced termination can leave state; this cleanup excludes files a command itself creates.
 
+Test the changed area; run a full suite only for broad changes or on request.
 Run only authorized commands; no shell or permission bypass. Never retry a denial via this
 wrapper. `--timeout` bounds execution, `--label` names checks, `--json` exposes evidence.
 Pass inline code as `python3 -B -c 'CODE'` (each `'` written `'\''`): hosts refuse heredocs
