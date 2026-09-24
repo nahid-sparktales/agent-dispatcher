@@ -76,6 +76,10 @@ class ContextTests(unittest.TestCase):
             self.write(name, "def validateLogin():\n    return True\n")
         self.assertEqual(self.select(), self.select())
         self.assertEqual(self.paths(self.select()), ["a.py", "m.py", "z.py"])
+        status = self.select()["repository_intelligence"]["retrieval_status"]  # the result's standing, apart from its ranking
+        self.assertEqual((status["status"], status["evidence"], status["conditions"]), ("ok", "anchored", []))
+        abstained = self.select("zzzz qqqq")["repository_intelligence"]["retrieval_status"]
+        self.assertEqual(abstained["status"], "abstained_no_sufficient_local_evidence")
 
     def test_exact_paths_outrank_generic_configuration_and_preserve_full_names(self):
         named = ["build.py", "context.py", "project_map.py", "evals/end_to_end/run.py",

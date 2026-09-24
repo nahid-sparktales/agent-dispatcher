@@ -334,6 +334,30 @@ class Reranker(unittest.TestCase):
             self.assertEqual(set(line), {"time", "task_sha256", "deterministic", "llm"})
             self.assertNotIn("slow", log.read_text(encoding="utf-8"))  # The request text is never logged.
 
+    def test_prompt_never_exceeds_its_budget_and_a_forbidden_retry_reports_the_real_error(self):
+        index = build()
+        rows = [{"path": path, "rank": n, "evidence": [{"source": "bm25", "rank": 1, "reason": "r" * 400, "value": "v" * 400}] * 4}
+                for n, path in enumerate(sorted(index.records), 1)]
+        tuning = {"max_prompt_chars": 3000, "content": "role", "order": "hashed", "evidence": True}
+        prompt, ids = llm.rerank_prompt("t" * 6000, rows, index, tuning)
+        self.assertEqual(len(ids), len(rows))
+        room = max(200, (3000 - len(llm._quote("t" * 6000))) // len(rows))
+        self.assertLessEqual(len(prompt), len(llm._quote("t" * 6000)) + 30 + len(rows) * (room + 60))
+        outcome = retrieval.run(self.TASK, index, retrieval.configure("full+rerank"), reranker=llm.make_reranker(settings(lambda s, p: "Sorry, no.")))
+        self.assertNotIn("budget", outcome["trace"]["llm"]["error"])  # one call allowed: the parse failure is the reported reason
+        self.assertEqual(outcome["trace"]["llm"]["usage"]["calls"], 1)
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "store.json"
+            path.write_text(json.dumps({"schema": llm.SCHEMA_VERSION, "entries": {"k": {"rep": "x"}}}))
+            before = path.read_bytes()
+            with mock.patch.object(llm, "MAX_STORE_BYTES", 10):
+                store = llm.Store(path)
+                self.assertTrue(store.frozen)
+                self.assertEqual(store.entries, {})
+                store.put("k2", {"rep": "y"})
+                store.save()
+            self.assertEqual(path.read_bytes(), before)  # a store too large to load is never overwritten with an empty one
+
     def test_query_time_cost_is_bounded_by_the_candidate_limit_not_the_repository(self):
         sizes = {}
         for count in (40, 1200):

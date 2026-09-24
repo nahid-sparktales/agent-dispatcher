@@ -50,7 +50,11 @@ DEFAULTS = {
                               "inherits": 0.8, "inherited_by": 0.8, "tested_by": 0.7, "tests": 0.7,
                               "imports": 0.5, "imported_by": 0.5, "same_module": 0.3}},
     "git": {"enabled": True, "max_commits": 2000, "max_commit_files": 30, "min_support": 2,
-            "min_score": 0.1, "half_life_days": None, "max_candidates": 10},
+            "min_score": 0.1, "half_life_days": None, "max_candidates": 10,
+            # Association measure over the eligible events (repo_index.cochange): "jaccard" (default, measured),
+            # "conditional" (P(partner | seed), `shrinkage` events added to the denominator) or "lift" (gated by
+            # `min_lift`). Ablation switches; the same seeds, support floor and partner cap apply to each.
+            "statistic": "jaccard", "shrinkage": 0.0, "min_lift": 1.0},
     # Implementation-versus-test weighting and other kind priors; lifted when the request asks for that kind.
     "kind_weights": {"source": 1.0, "test": 0.5, "doc": 0.5, "config": 0.7, "manifest": 0.7, "schema": 0.8,
                      "migration": 0.8, "workflow": 0.5, "other": 0.5},
@@ -366,14 +370,16 @@ def legacy_query(task):
 def _ranked(scores, reasons, limit, source):
     rows = sorted(scores.items(), key=lambda item: (-item[1], len(item[0]), item[0]))[:limit]
     return [{"file": path, "rank": rank, "score": round(score, 4), "source": source, "reason": reasons[path][0],
-             "value": reasons[path][1], **({"via": reasons[path][3]} if reasons[path][3] else {})}
+             "value": reasons[path][1], **({"via": reasons[path][3]} if reasons[path][3] else {}),
+             **({"detail": reasons[path][4]} if len(reasons[path]) > 4 and reasons[path][4] else {})}
             for rank, (path, score) in enumerate(rows, 1) if score > 0]
 
 
-def _note(reasons, path, gain, reason, value, via=None):
-    """Keep the single strongest explanation per file for this retriever."""
+def _note(reasons, path, gain, reason, value, via=None, detail=None):
+    """Keep the single strongest explanation per file for this retriever. `detail` (the statistic's
+    denominators, for instance) is shown by explain and never enters a packet."""
     if path not in reasons or gain > reasons[path][2]:
-        reasons[path] = (reason, value, gain, via)
+        reasons[path] = (reason, value, gain, via, detail)
 
 
 def path_retriever(query, index, config):
@@ -654,14 +660,30 @@ def graph_candidates(seeds, index, config, known=()):
 
 
 def git_candidates(seeds, index, config):
-    """Files that historically change with a seed. A modest second opinion, never a first one."""
+    """Files that historically change with a seed. A modest second opinion, never a first one.
+
+    The evidence names its denominators: "changed in n(A,B) of the n(A) eligible events containing A" over
+    N eligible events, so a percentage never travels without its support count and window.
+    """
     tuning, scores, reasons = config["git"], defaultdict(float), {}
+    statistic = tuning.get("statistic", "jaccard")
+    floor = tuning.get("min_lift", 1.0) if statistic == "lift" else tuning["min_score"]
+    stats = getattr(index, "history_stats", None) or {}
     for rank, seed in enumerate(seeds, 1):
         for other, score, support in index.partners.get(seed, ()):
-            if score >= tuning["min_score"] and support >= tuning["min_support"]:
+            if score >= floor and support >= tuning["min_support"]:
                 scores[other] += score / rank
-                _note(reasons, other, score / rank, f"frequently co-changed with {seed}", f"jaccard {score}, {support} commits", seed)
+                _note(reasons, other, score / rank, f"frequently co-changed with {seed}", f"{statistic} {score}, {support} commits", seed,
+                      cochange_evidence(seed, support, stats))
     return _ranked(scores, reasons, tuning["max_candidates"], "git")
+
+
+def cochange_evidence(seed, support, stats):
+    """A partner's denominators spelled out; counts that are unavailable are said to be, never zero."""
+    n_seed, events = (stats.get("changes") or {}).get(seed), stats.get("events")
+    if not n_seed or not events:
+        return "event counts unavailable for this window"
+    return f"changed in {support} of the {n_seed} eligible events containing {seed}; {events} eligible events in the window"
 
 
 _IDENTIFIER_SOURCES = {"path", "symbol_definitions", "symbol_references", "phrases", "explorer"}
@@ -753,6 +775,96 @@ def _integrate(order, rows, lists, evidence, index, query, config, pinned, role)
     return [(path, score) for path, score, _ in sorted(blended, key=lambda row: (row[0] not in fixed, -row[1], row[2]))]
 
 
+_HISTORY_WORDS = re.compile(r"\b(?:before|previously|earlier|again|regress(?:ion|ed|es)?|used to|last time|we fixed|once more)\b", re.I)
+_IMPACT_WORDS = re.compile(r"\b(?:affects?|affected|impact|ripple|depends? on|dependents?|callers?|downstream|consumers?)\b", re.I)
+# Identifier-level evidence: a file named, resolved from a dotted name, frame or exact file name, matched by
+# symbol, or holding a quoted literal. A directory or partial name match is lexical, not an anchor.
+_ANCHOR_SOURCES = {"named", "symbol_definitions", "symbol_references", "phrases"}
+_ANCHOR_PATH_REASONS = ("explicit path", "dotted name", "traceback frame", "exact file name")
+STATUSES = ("ok", "partial_coverage", "abstained_no_sufficient_local_evidence", "unavailable", "stale_only",
+            "budget_exhausted", "provider_failed")
+
+
+def plan_retrieval(task, query, config, *, extra=(), reranker=None):
+    """The deterministic plan for one request: families, reason codes, caps and stop conditions.
+
+    The plan is observational in this release: it names what runs and why, it does not switch a family
+    off (every deterministic family costs milliseconds and keeps the baseline coverage path), and the
+    optional stages keep their own gates, which it reports. `profile` is a label for reading traces
+    and stratifying evaluations, not a probability and not a permission.
+    """
+    reasons = []
+    if query["paths"]:
+        reasons.append("explicit_path")
+    if query.get("frames"):
+        reasons.append("traceback_frames")
+    if query["dotted"] or query["qualified"]:
+        reasons.append("qualified_name")
+    if query["symbols"] or query["identifiers"]:
+        reasons.append("identifier")
+    if query["phrases"]:
+        reasons.append("quoted_literal")
+    if not reasons:
+        reasons.append("concept_terms_only" if query["concept_terms"] else "no_usable_terms")
+    if query["wants"]["test"]:
+        reasons.append("asks_for_tests")
+    if _HISTORY_WORDS.search(task):
+        reasons.append("history_wording")
+    if _IMPACT_WORDS.search(task):
+        reasons.append("impact_wording")
+    anchored = {"explicit_path", "traceback_frames", "qualified_name", "quoted_literal"} & set(reasons)
+    profile = ("exact" if anchored else "history" if "history_wording" in reasons else "impact" if "impact_wording" in reasons
+               else "tests" if "asks_for_tests" in reasons else "behavior" if {"identifier", "concept_terms_only"} & set(reasons)
+               else "vague")
+    tuning = config["llm_rerank"]
+    return {"profile": profile, "reasons": reasons, "policy": "observe",
+            "families": {"deterministic": list(config["retrievers"]), "supplied": sorted(extra),
+                         "expansion": {"graph": bool(config["graph"]["enabled"]), "git": bool(config["git"]["enabled"])},
+                         "assistance": {"reranker": "configured" if reranker is not None and tuning["enabled"] else "off",
+                                        "reranker_policy": tuning["when"],
+                                        "explorer": "deterministic" if config["explorer"]["enabled"] else "off"}},
+            "caps": {"candidates_per_retriever": config["candidate_limit"], "seeds": config["seed_count"],
+                     "graph": {"hops": config["graph"]["max_hops"], "neighbors_per_seed": config["graph"]["max_neighbors_per_seed"],
+                               "candidates": config["graph"]["max_candidates"]},
+                     "git": {"candidates": config["git"]["max_candidates"], "min_support": config["git"]["min_support"],
+                             "statistic": config["git"].get("statistic", "jaccard")},
+                     "reranker_candidates": tuning["candidate_limit"],
+                     "packet": {"files": config["context"]["max_files"], "bytes": config["context"]["max_bytes"]}},
+            "stop_conditions": ["each retriever answers once, capped", "expansion: seeds x hops x per-seed cap",
+                                "reranker: one bounded call or none", f"explorer: at most {config['explorer']['max_iterations']} iterations"]}
+
+
+def _displacement(before, after, evidence, window, stage_sources):
+    """What one stage changed inside the top `window`: files it introduced, with the sources that brought
+    them, files it pushed out, and files it moved. A stage that adds neighbors is not thereby helping."""
+    before_top, after_top = [p for p, _ in before[:window]], [p for p, _ in after[:window]]
+    introduced = [{"path": p, "sources": sorted({e["source"] for e in evidence[p]} & stage_sources)
+                   or sorted({e["source"] for e in evidence[p]})} for p in after_top if p not in before_top]
+    return {"window": window, "introduced": introduced, "displaced": [p for p in before_top if p not in after_top],
+            "moved": sum(1 for p in after_top if p in before_top and before_top.index(p) != after_top.index(p))}
+
+
+def _status(ranked, index, window, llm=None):
+    """The result's standing, kept apart from its ranking: what kind of evidence backs the top files and
+    which conditions a reader must know about. An empty index is unavailable; an empty ranking over a
+    known universe is abstention; a missing summary or history never means no source exists."""
+    top = ranked[:window]
+
+    def anchors(rows):
+        return any(e["source"] in _ANCHOR_SOURCES or (e["source"] == "path" and e["reason"].startswith(_ANCHOR_PATH_REASONS))
+                   for row in rows for e in row["evidence"])
+    anchored, leader = anchors(top), anchors(top[:1])
+    known = len(index.records) + len(index.path_only)
+    status = "unavailable" if not known else "abstained_no_sufficient_local_evidence" if not top else "ok"
+    conditions = []
+    if index.path_only:
+        conditions.append({"condition": "partial_coverage", "unread_files": len(index.path_only)})
+    if llm and llm.get("error") and not llm.get("order"):
+        conditions.append({"condition": "provider_failed", "detail": llm["error"]})
+    return {"status": status, "evidence": "anchored" if anchored else "lexical" if top else "none",
+            "leader": "anchored" if leader else "lexical" if top else "none", "conditions": conditions}
+
+
 def retrieve(task, index, config=None, *, named=(), role=None, extra=None, boost_only=(), fallback=None, reranker=None):  # noqa: C901
     """Run the pipeline once.
 
@@ -786,6 +898,15 @@ def retrieve(task, index, config=None, *, named=(), role=None, extra=None, boost
     semantic = [] if tuning["shadow"] else [row["file"] for row in llm_rows]  # Variant A: the model's order picks the graph seeds.
     seeds = list(dict.fromkeys(pinned + semantic + [path for path, _ in first]))[:config["seed_count"]]
     before = {row["file"] for rows in lists.values() for row in rows}
+    window = config["context"]["max_files"]
+    base_evidence = defaultdict(list)
+    for rows in lists.values():
+        for row in rows:
+            base_evidence[row["file"]].append(row)
+    base_scores = fuse(lists, config)
+    for path in pinned:
+        base_scores.setdefault(path, 0.0)
+    unexpanded = _rerank(base_scores, base_evidence, index, query, config, set(pinned), role)  # The same order without graph/git.
     if config["graph"]["enabled"] and seeds:
         lists["graph"] = graph_candidates(seeds, index, config, before)
     if config["git"]["enabled"] and seeds:
@@ -802,10 +923,13 @@ def retrieve(task, index, config=None, *, named=(), role=None, extra=None, boost
             evidence[path].append({"file": path, "rank": 1, "score": 0.0, "source": "named",
                                    "reason": "explicit project path", "value": path})
     order = _rerank(scores, evidence, index, query, config, set(pinned), role)
+    displacement = {"expansion": _displacement(unexpanded, order, evidence, window, {"graph", "git"})}
     if asking and tuning["placement"] == "post_graph":
         llm, llm_rows = _llm_opinion(task, [path for path, _ in order], evidence, index, config, reranker)
     if llm_rows and not tuning["shadow"]:
+        expanded = order
         order = _integrate(order, llm_rows, lists, evidence, index, query, config, set(pinned), role)
+        displacement["rerank"] = _displacement(expanded, order, evidence, window, {"llm_rerank"})
     for row in fallback or ():
         if row["file"] not in scores and row["file"] in index.records:
             order.append((row["file"], 0.0))
@@ -824,9 +948,12 @@ def retrieve(task, index, config=None, *, named=(), role=None, extra=None, boost
                                   - {r["file"] for r in lists.get("graph", ())}),
              "overlap": {f"{a}&{b}": len({r["file"] for r in lists[a]} & {r["file"] for r in lists[b]})
                          for i, a in enumerate(sources) for b in sources[i + 1:]},
-             "final": len(ranked), "latency_ms": round((time.perf_counter() - started) * 1000, 2)}
+             "final": len(ranked), "displacement": displacement,
+             "latency_ms": round((time.perf_counter() - started) * 1000, 2)}
     result = {"query": query, "lists": lists, "ranked": ranked, "trace": trace,
-              "first": [path for path, _ in first[:50]]}  # Fused candidates before expansion: what a reranker can choose from.
+              "first": [path for path, _ in first[:50]],  # Fused candidates before expansion: what a reranker can choose from.
+              "plan": plan_retrieval(task, query, config, extra=extra or (), reranker=reranker),
+              "status": _status(ranked, index, window, llm)}
     if reranker is not None and tuning["enabled"]:
         trace["confidence"] = confidence
         trace["llm"] = {"asked": asking, "placement": tuning["placement"], "integration": tuning["integration"],
@@ -999,12 +1126,13 @@ class LazyTexts(dict):
 
 
 def build_index(texts, hashes, kind_of, *, cache=None, history=None, config=None, path_only=(), stats=None,
-                store=None, extended=None, partners=None, loader=None, structural=None):
+                store=None, extended=None, partners=None, loader=None, structural=None, history_stats=None):
     """Facts for the admitted universe. `history` is raw `git log` text, or None when unavailable.
 
     `store` (a deep repository index) supplies records whose fingerprint matches the scan, in place of the
     parser-cache shards; `extended` adds records for verified files the scan could not read (their text is
-    loaded on demand through `loader`); `partners` are precomputed co-change rows that replace `history`;
+    loaded on demand through `loader`); `partners` are precomputed co-change rows that replace `history`
+    (`history_stats`, their event population, lets the evidence name its denominators);
     `structural` adds definition-only records ({path: {"record", "sha256"}}) for admitted files over the read
     limit, so they can be matched by symbol and relationship although their text is never retained.
     """
@@ -1039,12 +1167,16 @@ def build_index(texts, hashes, kind_of, *, cache=None, history=None, config=None
                 records[path] = dict(item["record"], structural=True)
                 hashes[path] = item["sha256"]
         stats["structural_files"] = sum(1 for r in records.values() if r.get("structural"))
+    history_stats = dict(history_stats or {})
     if partners is None and history and config["git"]["enabled"]:
         commits = facts["parse_git_log"](history, set(records) | set(path_only), config["git"]["max_commit_files"])
         partners = facts["cochange"](commits, min_support=config["git"]["min_support"],
-                                     half_life_days=config["git"]["half_life_days"])
+                                     half_life_days=config["git"]["half_life_days"],
+                                     statistic=config["git"].get("statistic", "jaccard"),
+                                     shrinkage=config["git"].get("shrinkage", 0.0), stats=history_stats)
         stats["history_commits"] = len(commits)
     index = facts["RepoIndex"](records, kind_of, partners if config["git"]["enabled"] else None, path_only)
+    index.history_stats = history_stats if config["git"]["enabled"] else {}
     index.texts = LazyTexts(texts, loader, extended or ()) if loader is not None and extended else texts
     index.hashes = hashes
     index.extended = set(extended or ())
@@ -1075,6 +1207,9 @@ def run(task, index, config=None, *, anchors=None, explorer=None, findings=None,
     result["trace"].update(context_files=len(result["packet"]["files"]), context_bytes=result["packet"]["bytes"],
                            context_tokens=result["packet"]["tokens"],
                            context_ms=round((time.perf_counter() - started) * 1000, 2))
+    starved = [item["path"] for item in result["packet"]["dropped"] if item["reason"] == "byte budget"]
+    if starved and "status" in result:
+        result["status"]["conditions"].append({"condition": "budget_exhausted", "dropped_for_bytes": len(starved)})
     return result
 
 
@@ -1097,11 +1232,26 @@ def render_explain(result, verbose=False, top=10):
     query, trace, packet = result["query"], result["trace"], result.get("packet")
     kept = {item["path"] for item in packet["files"]} if packet else set()
     dropped = {item["path"]: item["reason"] for item in packet["dropped"]} if packet else {}
-    lines = ["QUERY ANALYSIS", render_query(query), "", "TOP FILES"]
+    lines = ["QUERY ANALYSIS", render_query(query)]
+    plan, status = result.get("plan"), result.get("status")
+    if plan:
+        assistance = plan["families"]["assistance"]
+        lines += ["", f"PLAN               profile {plan['profile']} ({', '.join(plan['reasons'])}); policy {plan['policy']}",
+                  f"                   deterministic: {', '.join(plan['families']['deterministic'])}"
+                  + (f"; supplied: {', '.join(plan['families']['supplied'])}" if plan["families"]["supplied"] else ""),
+                  f"                   expansion: graph {'on' if plan['families']['expansion']['graph'] else 'off'}, "
+                  f"git {'on' if plan['families']['expansion']['git'] else 'off'} ({plan['caps']['git']['statistic']}, "
+                  f"support >= {plan['caps']['git']['min_support']}); reranker {assistance['reranker']} ({assistance['reranker_policy']}); "
+                  f"explorer {assistance['explorer']}"]
+    if status:
+        conditions = "; ".join(", ".join(f"{k} {v}" for k, v in c.items()) for c in status["conditions"]) or "none"
+        lines.append(f"STATUS             {status['status']} ({status['evidence']} evidence); conditions: {conditions}")
+    lines += ["", "TOP FILES"]
     for row in result["ranked"][:top]:
         state = "in context" if row["path"] in kept else "not in context: " + dropped.get(row["path"], "below file limit")
         lines.append(f"{row['rank']}. {row['path']}  [{row['kind']}; fused {row['score']}; {state}]")
-        lines += [f"   + {e['source']} rank #{e['rank']}: {e['reason']} ({e['value']})" for e in row["evidence"]]
+        lines += [f"   + {e['source']} rank #{e['rank']}: {e['reason']} ({e['value']})" + (f" - {e['detail']}" if e.get("detail") else "")
+                  for e in row["evidence"]]
         if verbose and row["path"] in result.get("roles", {}):
             lines.append("   ~ role summary (model-written retrieval aid): " + result["roles"][row["path"]])
     request = (result.get("llm") or {}).get("request")
@@ -1137,6 +1287,10 @@ def render_explain(result, verbose=False, top=10):
                   f"GRAPH EXPANSION    {trace['graph_additions']} additional candidates",
                   f"GIT CO-CHANGE      {trace['git_additions']} additional candidates",
                   f"FINAL RERANK       {trace['final']} files"]
+        for stage, effect in (trace.get("displacement") or {}).items():
+            introduced = ", ".join(f"{i['path']} ({'/'.join(i['sources'])})" for i in effect["introduced"]) or "none"
+            lines.append(f"{stage.upper() + ' EFFECT':<19}top {effect['window']}: introduced {introduced}; "
+                         f"displaced {', '.join(effect['displaced']) or 'none'}; moved {effect['moved']}")
         if packet:
             lines.append(f"CONTEXT            {trace['context_files']} files, {trace['context_bytes'] / 1000:.1f} KB, "
                          f"~{trace['context_tokens']} estimated tokens")
@@ -1185,7 +1339,8 @@ def main(argv=None):
         print(str(exc) if isinstance(exc, context["ContextError"]) else "Retrieval input could not be used; values withheld.", file=sys.stderr)
         return 2
     if args.json:
-        result = {key: result[key] for key in ("query", "ranked", "trace", "packet", "exploration", "llm", "roles", "memory") if key in result}
+        result = {key: result[key] for key in ("query", "plan", "status", "ranked", "trace", "packet", "exploration", "llm", "roles", "memory")
+                  if key in result}
         print(json.dumps(result, indent=2, ensure_ascii=False))
     else:
         print(render_explain(result, args.verbose))

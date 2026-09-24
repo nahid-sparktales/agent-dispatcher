@@ -955,7 +955,7 @@ def _legacy_selection(candidates, texts, cap, budget, excluded, scrub, compact, 
 _MATCHES = (("named", "filename"), ("symbol_definitions", "symbol"), ("path", "path"), ("symbol_references", "identifier"),
             ("phrases", "identifier"), ("bm25", "content"), ("rare_terms", "content"), ("role_summary", "content"),
             ("llm_rerank", "content"), ("experience", "content"), ("inference", "content"),
-            ("memory_git", "content"), ("memory_semantic", "content"), ("memory_experience", "content"), ("rules", "structure"))
+            ("memory_git", "content"), ("memory_semantic", "content"), ("rules", "structure"))
 # Withheld for secrecy or by request, as opposed to size or format: a role summary naming one of these is not used.
 _SENSITIVE_SKIPS = {"explicit task exclusion", "automatic task exclusion", "credential file withheld"}
 
@@ -966,7 +966,7 @@ class _DeepIndex:
 
     def __init__(self):
         self.store = self.generation = self.partners = self.loader = self.settings = None
-        self.extended, self.events, self.corrections, self.inferences = {}, [], [], []
+        self.extended, self.events, self.corrections, self.inferences, self.history_stats = {}, [], [], [], {}
         self.maintain = False
         self.counters = Counter()
         self.report = {"status": "off"}
@@ -1055,6 +1055,7 @@ def _repository_index(root, scrub, paths, texts, excluded, exclusions, increment
         head = builder["git_state"](root)["head"] if history.get("head") else None
         if history.get("head") and head == history["head"]:
             deep.partners = deep.store.partners_map()
+            deep.history_stats = deep.store.history_stats(config["history"]["max_commit_files"])
             deep.counters["history_reused"] = 1
         omitted = 0
         universe = scanned | set(deep.extended)
@@ -1098,7 +1099,7 @@ def _maintain_index(deep, index, stats, texts, hashes, root):
             deep.store.upsert_files(deep.generation["id"], rows)
             for row in rows:
                 deep.store.replace_symbols(deep.generation["id"], row["path"], builder["symbol_rows"](row["path"], row["record"], texts[row["path"]]))
-            deep.store.invalidate_inferences({row["path"]: row["sha256"] for row in rows})
+            deep.store.invalidate_inferences(hashes, only_known=True)  # The whole scan is known; paths outside it are not "changed".
         deep.report["maintenance"].update(records_upserted=len(rows), pending=len(missing) - len(rows),
                                           edges_stale=bool(rows), elapsed_ms=round((time.perf_counter() - started) * 1000, 1))
     except (OSError, ValueError) as exc:
@@ -1161,7 +1162,7 @@ def _intelligent_selection(engine, settings, task, texts, hashes, explicit, role
                if settings["git"]["enabled"] and partners is None else None)
     index = engine["build_index"](texts, hashes, _kind, cache=cache, history=history, config=settings, stats=stats,
                                   path_only=oversized, store=deep.store, extended=deep.extended or None, partners=partners,
-                                  loader=deep.loader, structural=structural)
+                                  loader=deep.loader, structural=structural, history_stats=deep.history_stats)
     hashes = index.hashes
     if deep.inferences:
         index.inferences = deep.inferences
@@ -1239,7 +1240,8 @@ def _intelligent_selection(engine, settings, task, texts, hashes, explicit, role
     telemetry = {key: value for key, value in {**trace, **stats}.items()
                  if explain or not (key.endswith("_ms") or key == "overlap")}
     report = {"strategy": settings["name"], "task_signals": {k: [scrub(v) for v in values] for k, values in packet["task_signals"].items()},
-              "telemetry": dict(telemetry, seeds=[scrub(p) for p in trace["seeds"]]), "index": deep.report}
+              "telemetry": dict(telemetry, seeds=[scrub(p) for p in trace["seeds"]]), "index": deep.report,
+              "retrieval_status": outcome.get("status")}  # ok | abstained_no_sufficient_local_evidence | unavailable, evidence label, conditions
     if memory is not None:
         report["memory"] = memory
     if (outcome.get("llm") or {}).get("request"):  # Host reranking: one bounded round, answered with --rerank-answer.
@@ -1797,7 +1799,7 @@ def explain_retrieval(project, task, *, strategy="full", pack=None, exclude_path
                    if settings["git"]["enabled"] and deep.partners is None else None)
         index = engine["build_index"](texts, hashes, _kind, cache=cache, history=history, config=settings, path_only=oversized,
                                       store=deep.store, extended=deep.extended or None, partners=deep.partners, loader=deep.loader,
-                                      structural=structural)
+                                      structural=structural, history_stats=deep.history_stats)
         if deep.inferences:
             index.inferences = deep.inferences
             if "inference" not in settings["retrievers"]:

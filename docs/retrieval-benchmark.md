@@ -308,6 +308,73 @@ The switches remain for ablation. The OFFSET fixture from the end-to-end suite i
 limit: `sqlglot/planner.py` has no lexical trace of "offset", and summing its three edges from
 `executor/python.py` lifts it only from rank 57 to 32.
 
+## Co-change statistics measured and declined (2026-09-23)
+
+`git.statistic` selects the association measure computed over one eligible event population (commits
+within the 30-file cap, support of at least two shared commits, ten partners per file): the shipped
+Jaccard, `conditional` (P(partner | seed), with `git.shrinkage` events added to the denominator) and
+`lift` (gated by `git.min_lift` 1.0). Same seeds, same half-weight vote, same caps; only the score and
+the ordering inside the git list change. Swept once on the development split with
+`evals/retrieval/run.py --split dev --variant`, then the two conditional variants were run once on the
+held-out split. Paired-bootstrap 95% intervals are over tasks.
+
+| Split | Variant | R@1 | R@3 | R@5 | R@8 | R@10 | R@20 | All@5 | MRR |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| dev (474) | `full` (jaccard) | .346 | .563 | .645 | .729 | .742 | .810 | .576 | .552 |
+| dev | conditional | .345 | .575 | .665 | .730 | .750 | .820 | .599 | .557 |
+| dev | conditional, shrinkage 2 | .345 | .580 | .664 | .728 | .752 | .819 | .597 | .557 |
+| dev | lift | .339 | .568 | .640 | .727 | .737 | .812 | .570 | .548 |
+| dev | lift, support 3 | .337 | .565 | .645 | .730 | .740 | .814 | .576 | .545 |
+| dev | no git at all | .337 | .563 | .639 | .726 | .733 | .807 | .570 | .546 |
+| train (357) | `full` -> conditional | | .570 -> .583 | .654 -> .675 | .734 -> .735 | | .816 -> .829 | .588 -> .611 | .558 -> .564 |
+| validation (117) | `full` -> conditional | | .540 -> .549 | .617 -> .635 | .714 -> .716 | | .789 -> .791 | .538 -> .564 | .534 -> .534 |
+| test (126) | `full` (jaccard) | .373 | .600 | .698 | .791 | .808 | .881 | .619 | .610 |
+| test | conditional | .381 | .624 | .707 | .781 | .808 | .886 | .627 | .634 |
+| test | conditional, shrinkage 2 | .381 | .624 | .707 | .783 | .808 | .886 | .627 | .634 |
+
+Development, conditional against jaccard: R@5 +.020 [+.007, +.034], R@8 +.001 [-.009, +.011], MRR
++.005 [-.006, +.016]; train and validation agree in direction on R@3, R@5 and All@5. Held-out: R@3
++.024 [-.000, +.053], R@5 +.009 [-.013, +.034], R@8 -.011 [-.026, +.004], MRR +.024 [-.003, +.051].
+Per repository on the held-out split, conditional helps zod (R@5 .628 -> .673, MRR .513 -> .588) and
+pip's MRR, costs sqlglot and pip two points of R@8, and moves networkx only at R@1. Lift is worse or
+within noise everywhere, which is the expected instability of a ratio that rewards rare pairs.
+
+Reading: the conditional statistic reorders the git list toward a seed's most frequent partners and
+lifts a target into the top three or five a little more often, at the price of the eighth slot; every
+held-out interval straddles zero and R@8 leans down, so the result is **inconclusive** and Jaccard
+stays the default. The switches remain for ablation, and the evidence lines now name their
+denominators either way. The same runs measured the new expansion report: graph and git together
+introduce 1.4 to 1.5 files into the top ten and displace as many per task on both splits; removing git
+lowers that to 1.1 and costs 0.3 to 0.6 points of R@8, which is what the earlier `full-git` ablation
+found. The evidence label of the top window is `anchored` on 468 of 474 development tasks and on
+every held-out task (issue texts almost always name a symbol some file defines), so the benchmark
+also reports the label of the leading file alone: `lexical` leaders (5 to 6 held-out tasks) score
+R@8 .60 to .67 against .79 to .80 for anchored ones. That is a stratum for reading traces, not a
+calibrated abstention threshold: no no-gold tasks exist in this benchmark.
+
+## Expansion caps by retrieval profile, measured and declined (2026-09-23)
+
+The retrieval plan labels every request with a profile; on the development split the labels are
+`exact` 373 (a path, frame, dotted name or quoted literal in the request), `behavior` 87, `history` 9,
+`tests` 4, `impact` 1, `vague` 0. Issue and PR texts almost always carry an anchor, so only the first
+two strata can decide anything here. Five expansion caps were swept globally with `--variant` and
+read per profile (paired bootstrap over tasks; `*` marks an interval clear of zero):
+
+| Variant | All: R@5 / R@8 / MRR vs `full` | `exact` (373) R@8 | `behavior` (87) R@8 | ms |
+| --- | --- | --- | --- | --- |
+| `git.max_candidates` 20 | -.001 / -.000 / +.001 | +.000 | -.004 | 63 |
+| `rrf_weights.git` 1.0 | -.001 / -.011 / -.003 | -.015 [-.029, -.001]* | +.006 | 63 |
+| `graph.max_hops` 2 | -.001 / -.006 / +.003 | -.008 | +.000 | 99 |
+| `graph.max_neighbors_per_seed` 12 | -.012* / -.016* / -.011* | -.023 [-.039, -.009]* | +.011 [+.000, +.034] | 63 |
+| `seed_count` 8 | +.001 / -.008* / +.002 | -.007 [-.016, -.001]* | -.011 | 69 |
+
+Nothing improves a stratum with an interval clear of zero except twelve neighbors per seed on
+`behavior` requests (+.011 R@8, lower bound at zero), which costs 2.3 points on the `exact` majority
+and would need a profile-specific switch the `history`, `impact` and `tests` strata are far too small
+to validate. A second hop costs half again the latency for nothing. The shipped caps stand, the plan
+stays observational, and a future profile-specific policy needs a benchmark with more behavioral and
+change-impact requests than issue texts provide.
+
 ## LLM-assisted retrieval (Phase 10)
 
 Measured 2026-09-21 with [llm-assisted-retrieval.md](llm-assisted-retrieval.md) enabled. No hosted

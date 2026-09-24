@@ -28,6 +28,7 @@ MODULES = (
     "tests.test_exploration",
     "tests.test_retrieval_sequence",
     "tests.test_repository_memory",
+    "tests.test_memory_lifecycle",
     "tests.test_learning",
     "tests.test_learning_security",
     "tests.test_e2e",

@@ -18,6 +18,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 from pathlib import Path
 import shutil
 import sys
@@ -241,6 +242,8 @@ def _edited_from_git(root, revision):
     git = shutil.which("git")
     if not git:
         raise ValueError("Git is required for --edited-from-git.")
+    if not isinstance(revision, str) or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_./^~@{}-]{0,199}", revision) or ".." in revision:
+        raise ValueError("--edited-from-git takes one revision name or id, never an option or a range.")
     base = [git, "-c", "core.fsmonitor=false"]
     changed, okay, _ = context["_path_command"](base + ["diff", "--name-only", "--relative", "--no-renames", "--no-ext-diff", "--no-textconv",
                                                         "--ignore-submodules=all", "-z", revision, "--", "."], root)
@@ -273,9 +276,12 @@ def experience(args):
         checks = None
         if args.receipt:
             checks = _sibling("verification")["inspect_receipt"](root, args.receipt, pack=args.pack)
+        outcome = None
+        if args.outcome is not None:  # Verified success comes only from a receipt; a harness may label its own oracle outcome.
+            outcome = "grader_passed" if args.outcome == "grader_passed" and args.source == "harness" else module["normalize_outcome"](args.outcome)
         event = module["build_event"](project=root, task_id=args.task_id, task=task, scrub=scrub, role=args.role, config_id=args.config_id,
                                       baseline={"head": builder["git_state"](root)["head"]} if not args.baseline_head else {"head": args.baseline_head},
-                                      retrieved=retrieved, inspected=args.inspected or [], edited=edited, checks=checks, outcome=args.outcome,
+                                      retrieved=retrieved, inspected=args.inspected, edited=edited, checks=checks, outcome=outcome,
                                       source=args.source, resources=json.loads(args.resources) if args.resources else None)
         with store_module["ExperienceStore"](directory, create=True) as store:
             result = module["record"](store, event, tuple(settings["experience"]["eligible_outcomes"]))

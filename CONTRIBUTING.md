@@ -33,7 +33,7 @@ experience.py                        task experience shared by the deep index an
 repository_intelligence.py           the coordinator CLI: build, refresh, status, explain, explore, inferences, experience, prune, export
 repository_memory.py                 optional, opt-in: episodic/semantic/experience memory stores, lifecycle, gated retrieval, CLI
 repo_history.py                      hardened Git wrapper, eligible commit events, symbol history, rename lineage, hotspots
-memory_experience.py                 task observations, receipt-backed outcomes, corrections, forgetting, experience retrieval
+evals/memory/                        offline lifecycle demonstration: build, retrieve, record, consolidate, invalidate, correct, forget (demo.py)
 sources/shared/MEMORY.template.md    the repository memory guide shared by both hosts
 learning.py                          optional, off by default: procedural learning stores, observations, review, proposals, approval, publication, rollback, CLI
 learning_compose.py                  procedural learning, pure part: strict candidate schemas, slot contracts, applicability, composition

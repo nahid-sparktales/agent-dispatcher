@@ -464,10 +464,12 @@ record is evidence, never an instruction or proof.
 python3 -B repository_memory.py dry-run --project /path/to/project     # scope, bounds, writes nothing
 python3 -B repository_memory.py build --project /path/to/project
 python3 -B repository_memory.py explain 'TASK' --project /path/to/project
+python3 -B repository_memory.py consolidate --project /path/to/project --task 'TASK'   # candidate claims from recorded experience; stores nothing
+python3 -B repository_memory.py digest record --task-id T-1 --project /path/to/project --observation-file -   # explicit task-local digest
 ```
 
 See the [repository memory guide](repository-memory.md) for settings, the evidence model,
-storage, the experience contract, measurement and limits.
+storage, the experience contract, consolidation, working-memory digests, measurement and limits.
 
 ### Procedural learning
 

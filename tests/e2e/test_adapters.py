@@ -350,6 +350,11 @@ else:
         errors = adapters.validate_startup("claude", self.spec, parsed, "baseline")
         self.assertGreaterEqual(len(errors), 5)
 
+    def test_learned_conditions_are_treatments(self):
+        for condition in ("learned_skills", "learned_recipes", "learned_global", "learned_full"):
+            self.assertEqual(adapters.validate_startup("claude", self.spec, self.startup(True), condition), [], condition)
+            self.assertTrue(adapters.validate_startup("claude", self.spec, self.startup(False), condition), condition)
+
     def test_startup_missing_catalog_is_unverifiable(self):
         self.assertTrue(adapters.validate_startup("claude", self.spec, {}, "baseline"))
 

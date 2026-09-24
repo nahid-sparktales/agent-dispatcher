@@ -251,16 +251,25 @@ class Explorer:
     def _ask(self, question, claims):
         prompt = self._prompt(question, claims)
         model = dict(self.settings, max_output_tokens=self.settings["max_output_tokens"])
-        parsed, usage = self.llm["_ask"](model, SYSTEM.replace("LINES", str(self.settings["max_snippet_lines"])), prompt, self._parse)
-        self.report["calls"] += usage["calls"]
-        self.report["input_tokens"] += usage["input_tokens"]
-        self.report["output_tokens"] += usage["output_tokens"]
-        self.report["ms"] += usage["ms"]
+        try:
+            parsed, usage = self.llm["_ask"](model, SYSTEM.replace("LINES", str(self.settings["max_snippet_lines"])), prompt, self._parse)
+        except Exception as exc:  # noqa: BLE001 - a failed or rejected call was still paid for
+            self._account(getattr(exc, "usage", None), model)
+            raise
+        self._account(usage, model)
+        return parsed
+
+    def _account(self, usage, model):
+        if not isinstance(usage, dict):
+            return
+        self.report["calls"] += usage.get("calls", 0)
+        self.report["input_tokens"] += usage.get("input_tokens", 0)
+        self.report["output_tokens"] += usage.get("output_tokens", 0)
+        self.report["ms"] += usage.get("ms", 0.0)
         price = self.llm["cost"](usage, model)
         if price is not None:
             self.spend += price
             self.report["cost_usd"] = round(self.spend, 6)
-        return parsed
 
     # ---- the run
 

@@ -173,6 +173,17 @@ reason "frequently co-changed with X". History never finds a file on its own, re
 (`git.half_life_days`) is off by default, and a missing, shallow or non-git history simply
 yields no signal.
 
+Every partner is counted over one eligible event population (the commits that passed the size
+cap), and `explain` spells the denominators out next to the score: "changed in 4 of the 5 eligible
+events containing sqlglot/planner.py; 5 eligible events in the window". A percentage never
+travels without its support count and window; when the counts are unavailable (a deep index
+whose stored history predates this release) the evidence says so instead of showing zero. The
+packet line stays the compact `jaccard 0.8, 4 commits`. Two alternative statistics exist as
+ablation switches over the same population, support floor and partner cap: `git.statistic:
+"conditional"` (P(partner | seed), `git.shrinkage` events added to the denominator) and `"lift"`
+(gated by `git.min_lift`). They were measured on the development split and left off; see
+[the benchmark](retrieval-benchmark.md#co-change-statistics-measured-and-declined-2026-09-23).
+
 ## Context budget
 
 Retrieval ranks; the budget decides what is worth the agent's attention. The packet obeys
@@ -280,6 +291,31 @@ budgeting (and if not, why: file limit, byte budget or a diversity cap). `--verb
 pipeline: tokens, concepts, candidates per retriever, merged size, seeds, graph and git
 additions, final count, context size and latency, plus pairwise candidate overlap.
 
+Two lines precede the ranking. `PLAN` is the deterministic retrieval plan for the request: a
+profile (`exact`, `history`, `impact`, `tests`, `behavior`, `vague`) with the reason codes that
+produced it (`explicit_path`, `traceback_frames`, `qualified_name`, `identifier`,
+`quoted_literal`, `concept_terms_only`, `asks_for_tests`, `history_wording`, `impact_wording`),
+the families that run (the deterministic retrievers, any supplied lists such as the worktree or
+memory layers, graph and git expansion with the co-change statistic and support floor), whether
+the reranker is configured and under which policy, and whether the explorer is on. The plan's
+policy is `observe`: it explains and stratifies, it does not switch a deterministic family off
+(each costs milliseconds and keeps the baseline coverage path) and the optional stages keep the
+gates they already had. `STATUS` is the result's standing, kept apart from its ranking: `ok`,
+`abstained_no_sufficient_local_evidence` (a known universe, nothing ranked), or `unavailable`
+(nothing indexed), with the evidence label of the top window (`anchored`: a named path, a
+resolved dotted name, a frame, an exact file name, a symbol or a quoted literal backs a top file;
+`lexical`: only content similarity, graph or history does) and conditions a reader must know:
+`partial_coverage` with the number of admitted files that could not be read, `budget_exhausted`
+with the files dropped for bytes, `provider_failed` with the reranker's error. A missing
+representation or history never turns into "no relevant source exists".
+
+`--verbose` also prints what each stage did to the top window. `EXPANSION EFFECT` names the files
+graph and git expansion introduced into the top ten (with the source that brought each), the
+baseline files they pushed out, and how many moved; `RERANK EFFECT` does the same for an applied
+model opinion. A stage that adds neighbors is not thereby improving the ranking, and the
+benchmark reports the same numbers per task
+(`--json` rows carry `status` and `displacement`; the report adds a stratum by evidence label).
+
 ## Configuration
 
 Every number lives in `retrieval.DEFAULTS` (weights, `rrf_k`, candidate limits, seed count, hop
@@ -299,9 +335,10 @@ context limits, explorer limits). Named strategies are overlays on it:
 An optional, opt-in LLM layer (model-written role summaries as one more retriever, and a bounded
 candidate reranker) is described in [llm-assisted-retrieval.md](llm-assisted-retrieval.md). With it
 off, which is the default, everything on this page is unchanged and no model is ever called.
-Likewise optional and off: [repository memory](repository-memory.md), whose gated candidates from
-eligible Git history, module summaries and recorded experience enter the same fusion as
-`memory_git`, `memory_semantic` and `memory_experience` voters.
+Likewise optional: [repository memory](repository-memory.md), whose gated candidates from
+eligible Git history, module summaries and recorded experience enter the same fusion as the
+`memory_git`, `memory_semantic` and `experience` voters (history and semantic memory ship in
+shadow mode; experience is on but empty until a record is handed in).
 
 ## Measuring it
 

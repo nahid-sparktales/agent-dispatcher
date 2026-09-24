@@ -510,6 +510,8 @@ class SemanticRecords(MemoryCase):
             refreshed = self.store("semantic")["records"]["module:app"]
             self.assertEqual(refreshed["summary"]["validation_status"], "stale")
             self.assertNotIn("pooling", refreshed["text"])
+            hit = memory.search_semantic(memory._sibling("retrieval")["analyze_query"]("database connect"), self.store("semantic"), index, level="module")[0]
+            self.assertEqual((hit["purpose"], hit["label"]), ("", "derived"))  # stale prose neither shows nor relabels the record
         finally:
             git(self.project, "checkout", "-q", "--", "app/db.py")
 
@@ -587,10 +589,84 @@ class ExperienceCorrectness(MemoryCase):
     def test_unobservable_reads_are_not_invented_and_withheld_paths_are_counted(self):
         done = memory.record_experience(self.project, {"task": TASK, "modified": ["app/db.py", ".env", "../outside.py"], "read": None}, pack=ROOT)
         record = memory.view_experience(self.project, done["record_id"])
-        self.assertEqual(record["inspected"], [])
+        self.assertIsNone(record["inspected"])  # unobserved, not "read nothing"
         self.assertEqual([row["path"] for row in record["edited"] if row["sha256"]], ["app/db.py"])
         self.assertEqual(done["withheld_paths"], {"modified": 1})
         self.assertNotIn("hunter2", json.dumps(record))
+
+    def test_consolidation_counts_families_once_lists_contradictions_and_loses_stale_or_corrected_support(self):
+        self.assertEqual(memory.consolidate(self.project, pack=ROOT)["status"], "unavailable")  # nothing recorded, nothing read
+        retry = memory.record_experience(self.project, {"task": TASK, "modified": ["app/db.py"], "outcome": "partial"}, pack=ROOT)
+        memory.record_experience(self.project, {"task": TASK, "modified": ["app/db.py"], "outcome": "accepted"}, pack=ROOT)
+        memory.record_experience(self.project, {"task": TASK, "modified": ["app/db.py"], "outcome": "accepted", "read": ["app/db.py"]}, pack=ROOT)
+        one_family = memory.consolidate(self.project, pack=ROOT)
+        self.assertEqual((one_family["status"], one_family["supporting"], one_family["contrary"]), ("no_candidates", 1, 1))  # a retry is one family
+        other = memory.record_experience(self.project, {"task": "Pool acquire must release connections on error in db.connect",
+                                                        "modified": ["app/db.py", "app/api/service.py"], "outcome": "accepted"}, pack=ROOT)
+        result = memory.consolidate(self.project, pack=ROOT)
+        self.assertEqual(result["status"], "ok")
+        claim = result["candidates"][0]
+        self.assertEqual(claim["scope"], {"module": "app", "paths": ["app/db.py"], "task_terms": claim["scope"]["task_terms"]})
+        self.assertEqual((claim["support"]["events"], claim["support"]["families"], claim["status"]), (2, 2, "candidate"))
+        self.assertEqual(claim["contradictions"]["events"], 1)
+        self.assertEqual(claim["contradictions"]["examples"][0]["id"], retry["record_id"])
+        self.assertEqual(claim["freshness"]["state"], "current")
+        self.assertIn("no receipt-backed success", " ".join(claim["limitations"]))
+        self.assertIn("learning propose", claim["review"]["promotion"])
+        self.assertNotIn("app/api/service.py", claim["scope"]["paths"])  # one family only: not part of the core
+        scoped = memory.consolidate(self.project, task=TASK, pack=ROOT)["candidates"][0]
+        self.assertEqual(scoped["scope_match"], "exact")
+        self.assertEqual(memory.consolidate(self.project, task="Rewrite the README introduction", pack=ROOT)["candidates"], [])
+        self.assertEqual(memory.consolidate(self.project, task="Rewrite the README introduction", pack=ROOT, include_unmatched=True)["candidates"][0]["scope_match"], "none")
+        self.assertEqual(self.cli("consolidate", "--task", TASK)["candidates"][0]["id"], claim["id"])
+        write(self.project, "app/db.py", DB_FIXED + "\n# touched\n")
+        try:
+            stale = memory.consolidate(self.project, pack=ROOT)["candidates"][0]["freshness"]
+            self.assertEqual((stale["state"], stale["changed"]), ("changed", ["app/db.py"]))
+        finally:
+            git(self.project, "checkout", "-q", "--", "app/db.py")
+        memory.correct_experience(self.project, other["record_id"], outcome="reverted_or_invalidated", note="rolled back", pack=ROOT)
+        withdrawn = memory.consolidate(self.project, pack=ROOT)
+        self.assertEqual(withdrawn["status"], "no_candidates")  # the corrected episode supports nothing, and superseded rows never count
+        self.assertEqual(withdrawn["supporting"], 1)
+        self.assertEqual(self.state_files(), [f for f in self.state_files() if "working-memory" not in f])  # consolidation stores nothing
+
+    def test_working_memory_digest_keeps_obligations_and_negation_and_never_reaches_retrieval(self):
+        before = context.select_context(self.project, TASK, pack=ROOT)
+        observations = [{"kind": "finding", "status": "confirmed", "text": f"finding {n}", "evidence": [f"app/db.py:{n}"]} for n in range(5)]
+        observations += [{"kind": "hypothesis", "status": "contradicted", "text": "the leak is NOT in Pool.acquire", "evidence": ["app/db.py"]},
+                         {"kind": "question", "status": "pending", "text": "callers of connect() not found in this bounded search; may exist elsewhere"},
+                         {"kind": "check", "status": "failed", "text": "python3 -m unittest tests.test_db failed", "evidence": ["tests/test_db.py"]},
+                         {"kind": "action", "status": "succeeded", "text": "added pool.release() in connect"}]
+        recorded = memory.working_memory(self.project, "task-7", "record", observations=observations, objective="stop the leak",
+                                         acceptance=["tests.test_db passes"], window=3, pack=ROOT)
+        self.assertEqual((len(recorded["recent"]), recorded["loss"]["compactions"], recorded["objective"]), (3, 1, "stop the leak"))
+        digest = recorded["digest"]
+        self.assertEqual(len(digest["confirmed"]), 5)
+        self.assertEqual(digest["contradicted"][0]["text"], "the leak is NOT in Pool.acquire")  # verbatim: the negation survives
+        self.assertEqual([item["status"] for item in recorded["recent"]], ["pending", "failed", "succeeded"])
+        shown = memory.working_memory(self.project, "task-7", "show", pack=ROOT)
+        self.assertEqual(shown["snapshot"]["head"], git(self.project, "rev-parse", "HEAD"))
+        compacted = memory.working_memory(self.project, "task-7", "compact", window=1, pack=ROOT)
+        self.assertEqual(compacted["digest"]["unresolved"][0]["text"][:26], "callers of connect() not f")
+        self.assertEqual(compacted["digest"]["attempted"][0]["status"], "failed")
+        with mock.patch.dict(memory.WORKING_MEMORY, {"max_bytes": 900}):
+            squeezed = memory.working_memory(self.project, "task-7", "compact", window=1, pack=ROOT)
+        self.assertGreater(squeezed["loss"]["dropped"], 0)
+        self.assertTrue(squeezed["digest"]["unresolved"] and squeezed["digest"]["attempted"])  # obligations outlive confirmed findings
+        self.assertEqual(squeezed["digest"]["confirmed"], [])
+        path = next(p for p in (Path(self.cache.name) / "agent-dispatcher").rglob("working-memory/*.json"))
+        self.assertEqual(oct(path.stat().st_mode & 0o777), "0o600")
+        with self.assertRaises(memory.RepositoryMemoryError):
+            memory.working_memory(self.project, "../escape", "record", observations=[], pack=ROOT)
+        with self.assertRaises(memory.RepositoryMemoryError):
+            memory.working_memory(self.project, "task-7", "record", observations=[{"kind": "belief", "status": "confirmed", "text": "x"}], pack=ROOT)
+        after = context.select_context(self.project, TASK, pack=ROOT)
+        self.assertEqual([row["path"] for row in after["context"]], [row["path"] for row in before["context"]])
+        self.assertNotIn("digest", json.dumps(after))
+        self.assertEqual(self.cli("digest", "show", "--task-id", "task-7")["objective"], "stop the leak")
+        self.assertTrue(memory.working_memory(self.project, "task-7", "forget", pack=ROOT)["removed"])
+        self.assertFalse(memory.working_memory(self.project, "task-7", "show", pack=ROOT)["exists"])
 
     def test_duplicates_corrections_forgetting_and_freshness(self):
         first = memory.record_experience(self.project, {"task": TASK, "modified": ["app/db.py"], "outcome": "accepted"}, pack=ROOT)
@@ -751,6 +827,7 @@ class CommandLineAndDistribution(MemoryCase):
         observation.write_text(json.dumps({"task": TASK, "modified": ["app/db.py"], "outcome": "accepted"}))
         recorded = self.cli("record", "--observation-file", str(observation))
         self.assertEqual((recorded["status"], recorded["outcome"]), ("recorded", "accepted"))
+        self.assertIsNone(self.cli("view-experience", recorded["record_id"])["inspected"])  # `read` absent: not observed, not empty
         self.assertEqual(self.cli("search-experience", TASK)["items"][0]["id"], recorded["record_id"])
         corrected = self.cli("correct", recorded["record_id"], "--outcome", "abandoned", "--note", "gave up")
         self.assertEqual(self.cli("view-experience", corrected["id"])["outcome"], "cancelled")

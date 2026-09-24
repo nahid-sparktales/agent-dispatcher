@@ -2,6 +2,44 @@
 
 ## Unreleased
 
+- Evidence-backed repository intelligence iteration (audit and decisions in
+  `docs/repository-intelligence-audit.md`). Retrieval results now carry a deterministic plan
+  (profile, reason codes, families, caps, stop conditions; policy `observe`, no family is switched
+  off), a status kept apart from the ranking (`ok`, `abstained_no_sufficient_local_evidence`,
+  `unavailable`, with an evidence label and `partial_coverage`, `budget_exhausted` and
+  `provider_failed` conditions), and a displacement report per stage (files graph/git expansion
+  or a model rerank introduced into the top window, and the baseline files they pushed out);
+  `retrieval.py explain` prints `PLAN`, `STATUS` and `EXPANSION EFFECT`/`RERANK EFFECT`. Co-change
+  evidence names its denominators ("changed in 4 of the 5 eligible events containing X; N eligible
+  events in the window", also for a deep index's stored history) while packet lines stay
+  byte-identical; `git.statistic` (`jaccard` default, `conditional` with `git.shrinkage`, `lift`
+  with `git.min_lift`) exists as an ablation over the same event population and was measured on
+  the development split and left off. The benchmark reports R@20, a stratum by evidence label and
+  the mean expansion effect, and its JSON rows carry `status` and `displacement`.
+- Repository memory gains `consolidate` (candidate descriptive claims derived at read time from
+  recorded experience: files edited together by at least two independent task families, support
+  counted in families so retries and paraphrases count once, contradictions from contrary outcomes,
+  a freshness check of every core file, explicit limitations, and a scope match with backoff
+  `exact`/`module`/`repository` against a request; nothing is stored, votes or is promoted, and the
+  only route to guidance is `learning propose`) and `digest record|compact|show|forget` (explicit,
+  task-local working memory: verbatim bounded observations by kind and status, a recent window,
+  typed digest buckets that drop confirmed findings before failures, contradictions, unresolved
+  questions and pending checks, a loss counter, owner-only 0600 storage, never read by retrieval).
+  `evals/memory/demo.py` runs the offline lifecycle (build, retrieve, receipt-backed record,
+  consolidate, source change, correction, forgetting, digest) and `tests/test_memory_lifecycle.py`
+  keeps it green.
+- Fixes found by the audit: `repository_intelligence.py experience record --outcome` no longer
+  accepts an asserted `checked_success` (a receipt is the only route; a harness may still label
+  `grader_passed` with `--source harness`), and `--edited-from-git` refuses option-like values and
+  ranges; an observation without `read` stores `null` instead of an empty list; task-time index
+  maintenance no longer marks every inference stale (only cited evidence known to have changed);
+  the reranker prompt can no longer exceed its character budget when evidence lines are long, a
+  retry the call budget forbids reports the original parse error instead of "budget spent", and a
+  representation store too large to load is never overwritten with an empty one; the onboarding
+  Explorer counts failed and rejected calls in its accounting; stale model prose no longer shows in
+  semantic memory hits; the end-to-end runner's `learned_*` arms are validated as treatments; the
+  dead `memory_experience` voter label is gone.
+
 - Add optional, off-by-default procedural learning (`learning.py`, `learning_compose.py`,
   `learning_eval.py`, `docs/procedural-learning.md`, `LEARNING.md`, `/agent-learning`,
   `$agent-dispatcher learning`, `repository_intelligence.py learning`): explicit observations keyed
