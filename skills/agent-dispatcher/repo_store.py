@@ -487,6 +487,18 @@ class IndexStore(_Base):
                     break
         return found
 
+    def history_stats(self, max_commit_files):
+        """The event population the stored partners were counted over: eligible commits (2..max files, not
+        capped) and, per path, how many of them contain it. Lets co-change evidence name its denominators."""
+        events, changes = 0, {}
+        for paths, touched in self.connection.execute("SELECT paths, touched FROM commits"):
+            if touched < 0 or not 2 <= touched <= max_commit_files:
+                continue
+            events += 1
+            for path in json.loads(paths):
+                changes[path] = changes.get(path, 0) + 1
+        return {"events": events, "changes": changes, "statistic": "jaccard"}
+
     def partners_map(self):
         out = {}
         for path, other, score, support in self.connection.execute("SELECT path, other, score, support FROM partners ORDER BY path, score DESC, other"):
@@ -521,12 +533,18 @@ class IndexStore(_Base):
             return
         self.connection.executemany("DELETE FROM inferences WHERE id=?", [(i,) for i in ids])
 
-    def invalidate_inferences(self, current_hashes):
-        """An inference whose cited evidence no longer matches the current source is stale, never silently kept."""
+    def invalidate_inferences(self, current_hashes, *, only_known=False):
+        """An inference whose cited evidence no longer matches the current source is stale, never silently kept.
+
+        With `only_known`, a cited path absent from `current_hashes` is unknown rather than changed: a bounded
+        task-time maintenance pass sees one task's scan, not the whole inventory a refresh sees.
+        """
         changed = 0
         for item in self.inferences(status="current"):
             for evidence in item["evidence"]:
                 path = evidence.get("path")
+                if only_known and path and path not in current_hashes:
+                    continue
                 if path and current_hashes.get(path) != evidence.get("sha256"):
                     self.set_inference_status(item["id"], "stale", "evidence changed: " + path)
                     changed += 1

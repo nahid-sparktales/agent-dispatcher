@@ -210,28 +210,50 @@ def parse_git_log(raw, universe, max_commit_files):
     return commits
 
 
-def cochange(commits, *, min_support, half_life_days=None):
-    """Jaccard co-change: commits touching both / commits touching either.
+def cochange(commits, *, min_support, half_life_days=None, statistic="jaccard", shrinkage=0.0, stats=None):
+    """Co-change partners over one eligible event population (the commits given, after the size cap).
 
-    Jaccard normalizes both sides, so a high-churn file does not look related to everything
-    the way raw counts or P(B|A) would make it. `min_support` drops coincidences. With a
-    half-life, each commit counts 0.5 ** (age / half_life) relative to the newest commit.
+    For every pair with at least `min_support` shared commits, over N events, n(A) events containing A:
+
+        jaccard      n(A,B) / (n(A) + n(B) - n(A,B))   symmetric; the shipped default. Normalizes both sides,
+                                                       so a high-churn file does not look related to everything
+        conditional  n(A,B) / (n(A) + shrinkage)        directional P(B | A), listed under A; `shrinkage` (in
+                                                       events) pulls rare denominators toward zero
+        lift         n(A,B) * N / (n(A) * n(B))         symmetric; 1 means independence, above 1 association
+
+    With a half-life every commit counts 0.5 ** (age / half_life) relative to the newest commit, in the
+    numerator and every denominator alike; `support` stays the raw number of shared commits. `stats`, when
+    a dict, receives the population the scores were computed over: {"events": N, "changes": {path: n}}.
     """
+    if statistic not in ("jaccard", "conditional", "lift"):
+        raise ValueError("unknown co-change statistic")
     newest = max((stamp for stamp, _ in commits), default=0)
-    changes, pairs, support = Counter(), Counter(), Counter()
+    changes, pairs, support, raw = Counter(), Counter(), Counter(), Counter()
+    total = 0.0
     for stamp, paths in commits:
         weight = 0.5 ** ((newest - stamp) / 86400 / half_life_days) if half_life_days else 1.0
+        total += weight
         for path in paths:
             changes[path] += weight
+            raw[path] += 1
         for i, first in enumerate(paths):
             for second in paths[i + 1:]:
                 pairs[first, second] += weight
                 support[first, second] += 1
+    if stats is not None:
+        stats.update(events=len(commits), changes=dict(raw), statistic=statistic)
     partners = defaultdict(list)
     for (first, second), both in pairs.items():
         if support[first, second] < min_support:
             continue
-        score = both / (changes[first] + changes[second] - both)
+        if statistic == "conditional":
+            partners[first].append([second, round(both / (changes[first] + shrinkage), 4), support[first, second]])
+            partners[second].append([first, round(both / (changes[second] + shrinkage), 4), support[first, second]])
+            continue
+        if statistic == "lift":
+            score = both * total / (changes[first] * changes[second])
+        else:
+            score = both / (changes[first] + changes[second] - both)
         partners[first].append([second, round(score, 4), support[first, second]])
         partners[second].append([first, round(score, 4), support[first, second]])
     return {path: sorted(rows, key=lambda row: (-row[1], -row[2], row[0]))[:MAX_PARTNERS]
@@ -253,6 +275,7 @@ class RepoIndex:
         known = set(self.paths)
         self.partners = {path: [row for row in rows if row[0] in known]
                          for path, rows in (partners or {}).items() if path in known}
+        self.history_stats = {}  # {"events": N, "changes": {path: n}}: the population the partners were counted over.
         self.path_parts, self.path_df = {}, Counter()
         for path in self.paths:
             pure = PurePosixPath(path)

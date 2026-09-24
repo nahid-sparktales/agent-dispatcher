@@ -159,7 +159,7 @@ def build_event(*, project, task_id, task, scrub, role=None, config_id=None, bas
     final = {"files": {path: hashes[path] for path in edited_paths}, "digest": _digest({path: hashes[path] for path in edited_paths})}
     event = {"version": VERSION, "task_id": task_id, "recorded": int(time.time()), "task": task_representation(task, scrub),
              "role": role, "config_id": config_id, "baseline": baseline, "final": final,
-             "retrieved": clean(retrieved), "inspected": clean(inspected),
+             "retrieved": clean(retrieved), "inspected": clean(inspected) if inspected is not None else None,  # None: reads not observed.
              "edited": [{"path": path, "sha256": hashes[path], "association": association} for path in edited_paths],
              "checks": receipt, "outcome": outcome, "outcome_reason": reason, "source": source,
              "resources": dict(list({k: v for k, v in resources.items() if isinstance(v, (int, float)) and not isinstance(v, bool)}.items())[:20])

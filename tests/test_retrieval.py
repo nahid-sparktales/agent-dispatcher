@@ -341,6 +341,91 @@ class GitHistoryTests(unittest.TestCase):
             self.assertEqual(index.partners, {})
             self.assertEqual(ranked("QueryPlanner is wrong", index)[0], "sqlglot/planner.py")
 
+    def test_cochange_statistics_share_one_population_and_name_their_denominators(self):
+        commits = [(n, ["a.py", "b.py"]) for n in range(6)] + [(n, ["a.py", "c.py"]) for n in range(3)] + [(n, ["c.py", "d.py"]) for n in range(2)]
+        stats = {}
+        jaccard = repo_index.cochange(commits, min_support=2, stats=stats)
+        self.assertEqual(stats, {"events": 11, "changes": {"a.py": 9, "b.py": 6, "c.py": 5, "d.py": 2}, "statistic": "jaccard"})
+        self.assertEqual(jaccard["a.py"][0], ["b.py", round(6 / 9, 4), 6])  # n(A,B) / (n(A) + n(B) - n(A,B))
+        conditional = repo_index.cochange(commits, min_support=2, statistic="conditional")
+        self.assertEqual(dict((o, s) for o, s, _ in conditional["a.py"]), {"b.py": round(6 / 9, 4), "c.py": round(3 / 9, 4)})
+        self.assertEqual(conditional["b.py"][0][1], 1.0)  # directional: every event with b.py also has a.py
+        shrunk = repo_index.cochange(commits, min_support=2, statistic="conditional", shrinkage=2)
+        self.assertEqual(shrunk["b.py"][0][1], round(6 / 8, 4))
+        lift = repo_index.cochange(commits, min_support=2, statistic="lift")
+        self.assertEqual(lift["a.py"][0][1], round(6 * 11 / (9 * 6), 4))
+        self.assertGreater(lift["d.py"][0][1], lift["a.py"][0][1])  # the rare pair scores highest: why lift needs its support floor
+        with self.assertRaises(ValueError):
+            repo_index.cochange(commits, min_support=2, statistic="pmi")
+        history = log(*[["sqlglot/planner.py", "sqlglot/errors.py"]] * 4, ["sqlglot/planner.py", "sqlglot/executor/python.py"])
+        index = build(SQL, history=history)
+        self.assertEqual(index.history_stats["events"], 5)
+        result = retrieval.retrieve("QueryPlanner is wrong", index, retrieval.configure("full"))
+        errors = next(row for row in result["ranked"] if row["path"] == "sqlglot/errors.py")
+        git = errors["evidence"][0]
+        self.assertEqual(git["value"], "jaccard 0.8, 4 commits")  # the packet line is unchanged
+        self.assertEqual(git["detail"], "changed in 4 of the 5 eligible events containing sqlglot/planner.py; 5 eligible events in the window")
+        self.assertIn("4 of the 5 eligible events", retrieval.render_explain(result))
+        self.assertNotIn("eligible events", context_budget.render_packet(retrieval.run("QueryPlanner is wrong", index)["packet"]))
+        lifted = build(SQL, history=history, config=retrieval.configure("full", {"git": {"statistic": "lift", "min_support": 4}}))
+        self.assertEqual([row[0] for row in lifted.partners["sqlglot/planner.py"]], ["sqlglot/errors.py"])
+        self.assertEqual(retrieval.cochange_evidence("x.py", 2, {}), "event counts unavailable for this window")
+
+
+class PlanAndStatusTests(unittest.TestCase):
+    def test_plan_is_deterministic_observational_and_profiles_the_request(self):
+        index = build(SQL)
+        config = retrieval.configure("full")
+        for task, profile, reason in (("Fix sqlglot/planner.py", "exact", "explicit_path"),
+                                      ("Fix sqlglot.planner.QueryPlanner.run", "exact", "qualified_name"),
+                                      ("the planner regressed again like before", "history", "history_wording"),
+                                      ("what does changing QueryPlanner affect downstream", "impact", "impact_wording"),
+                                      ("add a unit test for the executor", "tests", "asks_for_tests"),
+                                      ("make PythonExecutor faster", "behavior", "identifier"),
+                                      ("planner", "behavior", "concept_terms_only")):
+            plan = retrieval.retrieve(task, index, config)["plan"]
+            self.assertEqual((plan["profile"], plan["policy"]), (profile, "observe"), task)
+            self.assertIn(reason, plan["reasons"], task)
+        plan = retrieval.retrieve("Fix sqlglot/planner.py", index, config, extra={"worktree": []})["plan"]
+        self.assertEqual(plan["families"]["deterministic"], config["retrievers"])
+        self.assertEqual(plan["families"]["expansion"], {"graph": True, "git": True})
+        self.assertEqual(plan["families"]["assistance"], {"reranker": "off", "reranker_policy": "always", "explorer": "off"})
+        self.assertEqual(plan["caps"]["git"], {"candidates": 10, "min_support": 2, "statistic": "jaccard"})
+        self.assertEqual(plan, retrieval.retrieve("Fix sqlglot/planner.py", index, config, extra={"worktree": []})["plan"])
+        text = retrieval.render_explain(retrieval.run("Fix sqlglot/planner.py", index, config))
+        self.assertIn("PLAN               profile exact (explicit_path", text)
+        self.assertIn("STATUS             ok (anchored evidence); conditions: none", text)
+
+    def test_status_separates_unavailable_abstention_partial_coverage_and_budget(self):
+        config = retrieval.configure("full")
+        self.assertEqual(retrieval.retrieve("anything", build({}), config)["status"],
+                         {"status": "unavailable", "evidence": "none", "leader": "none", "conditions": []})
+        index = build(SQL)
+        self.assertEqual(retrieval.retrieve("QueryPlanner", index, config)["status"]["evidence"], "anchored")
+        weak = retrieval.retrieve("query plan", index, config)["status"]
+        self.assertEqual((weak["status"], weak["evidence"]), ("ok", "lexical"))
+        abstained = retrieval.retrieve("zzzz qqqq", index, config)["status"]
+        self.assertEqual((abstained["status"], abstained["evidence"]), ("abstained_no_sufficient_local_evidence", "none"))
+        partial = retrieval.retrieve("QueryPlanner", build(SQL, path_only=["sqlglot/huge.py"]), config)["status"]
+        self.assertEqual(partial["conditions"], [{"condition": "partial_coverage", "unread_files": 1}])
+        tight = retrieval.run("QueryPlanner execute PythonExecutor", index, retrieval.configure("full", {"context": {"max_bytes": 300}}))
+        self.assertIn("budget_exhausted", [c["condition"] for c in tight["status"]["conditions"]])
+        self.assertIn("budget_exhausted", retrieval.render_explain(tight))
+
+    def test_displacement_reports_what_expansion_introduced_and_pushed_out(self):
+        history = log(*[["sqlglot/planner.py", "sqlglot/errors.py"]] * 4)
+        with_history, without = build(SQL, history=history), build(SQL)
+        result = retrieval.retrieve("QueryPlanner is wrong", with_history, retrieval.configure("full"))
+        effect = result["trace"]["displacement"]["expansion"]
+        self.assertEqual(effect["window"], 10)
+        introduced = {item["path"]: item["sources"] for item in effect["introduced"]}
+        self.assertEqual(introduced["sqlglot/errors.py"], ["git"])
+        self.assertNotIn("rerank", result["trace"]["displacement"])  # no model was asked
+        baseline = retrieval.retrieve("QueryPlanner is wrong", without, retrieval.configure("full-graph-git" if "full-graph-git" in retrieval.STRATEGIES else "hybrid"))
+        self.assertTrue(set(effect["displaced"]).isdisjoint(p["path"] for p in result["ranked"][:10]))
+        self.assertIn("EXPANSION EFFECT", retrieval.render_explain(retrieval.run("QueryPlanner is wrong", with_history), verbose=True))
+        self.assertTrue(baseline["ranked"])
+
 
 class ContextBudgetTests(unittest.TestCase):
     def packet(self, files, task, **limits):
@@ -521,7 +606,7 @@ class BenchmarkMathTests(unittest.TestCase):
         found = {"ranked": ["a", "t1", "b", "c", "t2"], "candidates": 5, "files": ["a", "t1"], "bytes": 400,
                  "excerpt_bytes": {"a": 300, "t1": 100}, "ms": 1.0}
         row = run._score(found, ["t1", "t2", "missing"])
-        self.assertEqual([row[f"R@{k}"] for k in run.KS], [0, 1 / 3, 2 / 3, 2 / 3, 2 / 3])
+        self.assertEqual([row[f"R@{k}"] for k in run.KS], [0, 1 / 3, 2 / 3, 2 / 3, 2 / 3, 2 / 3])  # k = 1, 3, 5, 8, 10, 20
         self.assertEqual(row["MRR"], 1 / 2)
         self.assertAlmostEqual(row["MAP"], (1 / 2 + 2 / 5 + 0) / 3)
         self.assertEqual((row["density"], row["ctx_recall"], row["tokens"]), (0.25, 1 / 3, 100))

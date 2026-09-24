@@ -37,7 +37,7 @@ import context  # noqa: E402
 import project_map  # noqa: E402
 import retrieval  # noqa: E402
 
-KS = (1, 3, 5, 8, 10)
+KS = (1, 3, 5, 8, 10, 20)
 LADDER = ["current"] + [name for name, _ in retrieval._LADDER]
 LEAVE_ONE_OUT = ["full"] + sorted(name for name in retrieval.STRATEGIES if name.startswith("full-"))
 LEGACY_TIER = "standard"  # The current helper's default size: 8 files, 6000 excerpt tokens.
@@ -191,7 +191,8 @@ def _engine(task, index, config, reranker=None, memory=None):
             "files": list(sizes), "bytes": outcome["packet"]["bytes"], "excerpt_bytes": sizes, "ms": elapsed,
             "lists": {name: [row["file"] for row in rows] for name, rows in outcome["lists"].items()},
             "overlap": outcome["trace"]["overlap"], "additions": (outcome["trace"]["graph_additions"], outcome["trace"]["git_additions"]),
-            "llm": outcome.get("llm"), "confidence": outcome["trace"].get("confidence"), "first": outcome["first"]}
+            "llm": outcome.get("llm"), "confidence": outcome["trace"].get("confidence"), "first": outcome["first"],
+            "status": outcome.get("status"), "displacement": outcome["trace"].get("displacement"), "plan": outcome.get("plan")}
 
 
 def _score(found, targets):
@@ -280,7 +281,8 @@ def evaluate(tasks, clone, strategies, overrides=None, variants=None, progress=T
 
         def index_for(config):
             """One index per distinct co-change and structural setting; every other knob is applied at query time."""
-            key = json.dumps([config["git"][k] for k in ("max_commit_files", "min_support", "half_life_days")] + [config.get("structural_records", True)])
+            key = json.dumps([config["git"].get(k) for k in ("max_commit_files", "min_support", "half_life_days", "statistic", "shrinkage")]
+                             + [config.get("structural_records", True)])
             if key not in indexes:
                 indexes[key] = retrieval.build_index(texts, hashes, context._kind, cache=memo, history=history,
                                                      config=config, stats=stats if not indexes else {}, path_only=oversized,
@@ -327,6 +329,8 @@ def evaluate(tasks, clone, strategies, overrides=None, variants=None, progress=T
                                  "candidates": len(asked["candidates"]), "before": place(asked["candidates"]), "after": place(asked.get("order", [])),
                                  "reasons": asked.get("reasons", {})}
             scored["confidence"] = found.get("confidence")
+            scored["status"], scored["displacement"] = found.get("status"), found.get("displacement")
+            scored["profile"] = (found.get("plan") or {}).get("profile")
             scored["top"] = found["ranked"][:30]
             scored["source_ranks"] = {target: {source: files.index(target) + 1 for source, files in found["lists"].items() if target in files}
                                       for target in task["target_files"]}
@@ -376,6 +380,45 @@ def strata_report(results, strategies):
                 parts.append(f"{label} n={len(rows)}: {statistics.fmean(r['R@8'] for r in rows):.3f} / {statistics.fmean(r['All@8'] for r in rows):.3f}")
         lines.append(f"  {name:<22}" + "   ".join(parts))
     return "\n".join(lines)
+
+
+def evidence_report(results, strategies):
+    """R@8 / MRR by the retrieval status's evidence label (anchored: a named path, resolved name, frame, exact file name,
+    symbol or quoted literal backs a top file; lexical: only content similarity, graph or history does), plus what
+    expansion did to the top window: files introduced by graph/git and baseline files pushed out."""
+    lines = ["By evidence strength (R@8 / MRR); expansion effect per task (introduced by graph+git / displaced)"]
+    for name in strategies:
+        rows = [r["strategies"][name] for r in results if name in r["strategies"] and r["strategies"][name].get("status")]
+        if not rows:
+            continue
+        parts = []
+        for field, prefix in (("evidence", "top-window"), ("leader", "leader")):
+            for label in ("anchored", "lexical", "none"):
+                group = [r for r in rows if r["status"].get(field) == label]
+                if group:
+                    parts.append(f"{prefix} {label} n={len(group)}: {statistics.fmean(r['R@8'] for r in group):.3f} / {statistics.fmean(r['MRR'] for r in group):.3f}")
+        effects = [r["displacement"]["expansion"] for r in rows if r.get("displacement")]
+        if effects:
+            parts.append(f"expansion: +{statistics.fmean(len(e['introduced']) for e in effects):.1f} / -{statistics.fmean(len(e['displaced']) for e in effects):.1f} of top {effects[0]['window']}")
+        lines.append(f"  {name:<22}" + "   ".join(parts))
+    return "\n".join(lines) if len(lines) > 1 else ""
+
+
+def profile_report(results, strategies):
+    """R@8 / MRR by the retrieval plan's profile: what a profile-specific policy would have to beat, per stratum."""
+    profiles = ("exact", "history", "impact", "tests", "behavior", "vague")
+    lines = ["By plan profile (R@8 / MRR)"]
+    for name in strategies:
+        rows = [r["strategies"][name] for r in results if name in r["strategies"] and r["strategies"][name].get("profile")]
+        if not rows:
+            continue
+        parts = []
+        for profile in profiles:
+            group = [r for r in rows if r["profile"] == profile]
+            if group:
+                parts.append(f"{profile} n={len(group)}: {statistics.fmean(r['R@8'] for r in group):.3f} / {statistics.fmean(r['MRR'] for r in group):.3f}")
+        lines.append(f"  {name:<22}" + "   ".join(parts))
+    return "\n".join(lines) if len(lines) > 1 else ""
 
 
 def memory_report(results, strategies):
@@ -552,6 +595,12 @@ def main(argv=None):
               f"scan {statistics.fmean(r['scan_ms'] for r in results):.0f} ms; "
               f"cold first build {max(r['index_ms'] for r in results):.0f} ms (largest)")
     print("\n" + strata_report(results, shown))
+    evidence_lines = evidence_report(results, shown)
+    if evidence_lines:
+        print("\n" + evidence_lines)
+    profile_lines = profile_report(results, shown)
+    if profile_lines:
+        print("\n" + profile_lines)
     memory_lines = memory_report(results, shown)
     if memory_lines:
         print("\n" + memory_lines)

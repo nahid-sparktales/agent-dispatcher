@@ -149,12 +149,14 @@ class Store:
     # ponytail: plain private JSON, no HMAC envelope; reuse parser_cache's signed format if the cache directory stops being trusted.
 
     def __init__(self, path):
-        self.path, self.entries, self.dirty = Path(path).expanduser(), {}, False
+        self.path, self.entries, self.dirty, self.frozen = Path(path).expanduser(), {}, False, None
         try:
             if self.path.stat().st_size <= MAX_STORE_BYTES:
                 loaded = json.loads(self.path.read_text(encoding="utf-8"))
                 if isinstance(loaded, dict) and loaded.get("schema") == SCHEMA_VERSION and isinstance(loaded.get("entries"), dict):
                     self.entries = loaded["entries"]
+            else:  # Too large to read is not empty: never overwrite what could not be loaded.
+                self.frozen = "store over its size limit; loaded as empty and left unchanged"
         except (OSError, ValueError):
             pass
 
@@ -166,7 +168,7 @@ class Store:
         self.dirty = True
 
     def save(self):
-        if not self.dirty:
+        if not self.dirty or self.frozen:
             return
         self.path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
         temporary = self.path.with_name(f".{self.path.name}.{os.getpid()}")
@@ -307,10 +309,17 @@ def _ask(model, system, prompt, parse, budget=None):
     """complete() + parse(), with the bounded retry policy. Returns (parsed, usage summed over attempts)."""
     usage = {"calls": 0, "input_tokens": 0, "output_tokens": 0, "ms": 0.0}
     attempts = 1 + max(0, int(model.get("max_retries", 1)))
+    last = None
     for attempt in range(attempts):
         try:
             if budget is not None:
-                budget.take()
+                try:
+                    budget.take()
+                except LLMUnavailable as spent:
+                    if last is not None:  # The budget forbids the retry: report what was wrong, not the budget.
+                        last.usage = usage
+                        raise last from None
+                    raise spent
             usage["calls"] += 1
             reply = complete(model, system, prompt)
             for name in ("input_tokens", "output_tokens", "ms"):
@@ -322,10 +331,14 @@ def _ask(model, system, prompt, parse, budget=None):
             if attempt + 1 == attempts or not exc.retry:
                 exc.usage = usage
                 raise
+            last = exc
             if isinstance(exc, LLMUnavailable):
                 time.sleep(min(2 ** attempt, 8))
             else:  # The same prompt would earn the same answer; say what was wrong, once.
                 prompt += f"\n\nYour previous reply was rejected ({exc}) Reply again with one smaller, compact, valid JSON object."
+        except Exception as exc:  # A provider callable's own error class: say what was spent, never hide it.
+            exc.usage = usage
+            raise
     raise LLMUnavailable("unreachable")
 
 
@@ -703,8 +716,9 @@ def rerank_prompt(task, rows, index, tuning):
                          "role: (no summary) defines: " + ", ".join(index.symbols_in(path)[:12]))
         evidence = ""
         if tuning["evidence"]:
-            evidence = "\nevidence: " + "; ".join(f"{e['source']} #{e['rank']} ({e['reason']}: {e['value']})" for e in row["evidence"][:4])
-        body = _quote("\n".join(lines))[:room - len(evidence) - 40] + _quote(evidence)
+            evidence = ("\nevidence: " + "; ".join(f"{e['source']} #{e['rank']} ({e['reason']}: {e['value']})"
+                                                   for e in row["evidence"][:4]))[:max(0, room - 40)]
+        body = _quote("\n".join(lines))[:max(0, room - len(evidence) - 40)] + _quote(evidence)  # Never over `room` per candidate.
         blocks.append(f'<candidate id="{label}">\n{body}\n</candidate>')
     return f"<request>\n{request}\n</request>\n\n" + "\n".join(blocks), ids
 

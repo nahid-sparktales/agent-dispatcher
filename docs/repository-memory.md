@@ -241,6 +241,61 @@ never touches experience unless asked. All of this is logical deletion in a loca
 secure erasure. Experience is per project (or per harness identity through
 `AGENT_DISPATCHER_INDEX_ID`); nothing distills it into skills, instructions or other repositories.
 
+## Consolidation: candidate descriptive claims
+
+`consolidate` derives candidate claims from recorded experience at read time; nothing is stored,
+nothing votes, and nothing is promoted:
+
+```bash
+python3 -B repository_memory.py consolidate --project . [--task 'REQUEST'] [--min-families 2] [--all] --json
+```
+
+Grouping is deterministic. Corrections are applied first and superseded records never count. A
+claim's core is the set of current admitted files that eligible tasks from at least
+`min_families` independent task families edited together, where a family is the same
+term-fingerprint the learning layer uses, so paraphrases, retries and a task recorded twice
+support a claim once. Each candidate carries its scope (the enclosing module and the core paths),
+the task terms shared by its supporters, support counted in events and in families with the
+outcome breakdown and every supporting record id, contradictions (records with `failed_checks`,
+`reverted_or_invalidated`, `unresolved` or `stale_checks` on the same files, with examples), a
+freshness check of every core file against the current index (`current`, `changed` with the
+paths, or `unknown`), explicit limitations (families are a fingerprint, not verified identity;
+experience is the only evidence; reads were not observed; no receipt-backed success), and a
+review pointer: a candidate is a `descriptive_claim` whose only route to guidance is
+`learning propose --from-file` with these record ids, through the governed lifecycle.
+
+With `--task`, candidates are matched to the request by scope with one backoff each: `exact`
+(a core file is named by the request or ranked in the deterministic top five), `module` (a top
+file shares the claim's module), `repository` (the request shares at least two task terms), and
+otherwise omitted unless `--all`. A corrected or forgotten record withdraws its support on the
+next call, because candidates are recomputed from surviving records; a changed source marks the
+claim `changed` rather than silently keeping it current. No candidate enters a packet or a ranking.
+
+## Working memory: explicit task-local digests
+
+Hosts that do not expose observation hooks can still keep a bounded, observable record of one
+task's work:
+
+```bash
+python3 -B repository_memory.py digest record --task-id T-42 --project . --objective '...' --acceptance '...' --observation-file -
+python3 -B repository_memory.py digest compact --task-id T-42 --project . --window 6
+python3 -B repository_memory.py digest show --task-id T-42 --project .
+python3 -B repository_memory.py digest forget --task-id T-42 --project .
+```
+
+An observation is `{"kind": finding|action|hypothesis|check|question, "status": confirmed|contradicted|
+unresolved|pending|failed|succeeded, "text": ..., "evidence": [...]}`; text is scrubbed and kept
+verbatim (a negation stays a negation, and "not found in this bounded search" is not "does not
+exist"), bounded to 400 characters and 8 evidence entries. The newest `window` observations stay
+as written; older ones move into typed digest buckets (`confirmed`, `contradicted`, `unresolved`,
+`attempted`, `pending`) by kind and status, at most 40 per bucket, in a file capped at 64 KiB.
+When room runs out, confirmed findings and succeeded actions go first; failures, contradictions,
+unresolved questions and pending checks are dropped last, and every drop or truncation is counted
+in `loss`. The digest records the objective, the acceptance criteria and the HEAD it was written
+under. It lives in the private state directory (`working-memory/`, owner-only, 0600), is never read
+by retrieval, never enters a packet, is never promoted into durable memory, and captures no
+conversation, terminal output or hidden reasoning: only what a host or user chose to write.
+
 ## Packet contract
 
 ```json
@@ -308,6 +363,7 @@ model are separate, paid experiments (`evals/end_to_end`, `memory_settings`).
 - Symbol history covers Python precisely; other languages use declaration heuristics.
 - Issue and PR bodies are never fetched; only references found in commit messages are stored.
 - Subsystems are directories; there is no inferred architecture beyond module aggregates.
-- Experience records are only as good as the observations handed in; hosts that cannot observe reads leave `read` null. Experience is on by default, but nothing is recorded until a host or user hands an observation to `record`.
+- Experience records are only as good as the observations handed in; hosts that cannot observe reads leave `read` null (stored as `null`, never as an empty list). Experience is on by default, but nothing is recorded until a host or user hands an observation to `record`.
+- Consolidation candidates are derived from experience alone; families are a term fingerprint, and a candidate is a review aid, not a rule. Working-memory digests are explicit and task-local; no host observation hook exists, so nothing is captured automatically.
 - Deletion and reset are local logical deletions.
 - Memory does not guarantee better localization, lower cost or improvement on any future task; the benchmark makes that measurable per layer.

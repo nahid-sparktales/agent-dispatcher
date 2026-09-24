@@ -178,6 +178,27 @@ class RuntimeTests(unittest.TestCase):
         return subprocess.run([sys.executable, "-B", str(CLI), *arguments, "--project", str(self.project), "--pack", str(ROOT)],
                               capture_output=True, text=True, env=env or dict(os.environ))
 
+    def test_asserted_verified_success_option_like_revisions_and_unobserved_reads(self):
+        base = ("experience", "record", "--task-id", "t", "--task", "refresh_token drops the session", "--edited", "app/tokens.py")
+        for outcome, source in (("checked_success", "explicit"), ("grader_passed", "explicit"), ("verified_scoped_success", "harness")):
+            done = self.cli(*base, "--outcome", outcome, "--source", source, "--json")
+            self.assertEqual(done.returncode, 2, outcome)
+            self.assertIn("receipt", done.stderr)
+        done = self.cli(*base, "--outcome", "grader_passed", "--source", "harness", "--json")
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertEqual(json.loads(done.stdout)["outcome"], "grader_passed")  # a harness labels its own oracle outcome, and says so
+        done = self.cli(*base, "--task-id", "t2", "--outcome", "partial", "--json")
+        self.assertEqual(json.loads(done.stdout)["outcome"], "unresolved")  # the memory vocabulary is mapped, never stored raw
+        for revision in ("--output=/tmp/x", "HEAD..main", "-p"):
+            done = self.cli(*base, "--task-id", "t3", "--edited-from-git", revision, "--json")
+            self.assertEqual(done.returncode, 2, revision)
+        done = self.cli(*base, "--task-id", "t4", "--outcome", "accepted", "--json")
+        shown = json.loads(self.cli("experience", "show", json.loads(done.stdout)["id"], "--json").stdout)
+        self.assertIsNone(shown["inspected"])  # reads the host could not observe stay unknown, never an empty list
+        done = self.cli(*base, "--task-id", "t5", "--outcome", "accepted", "--inspected", "app/tokens.py", "--json")
+        shown = json.loads(self.cli("experience", "show", json.loads(done.stdout)["id"], "--json").stdout)
+        self.assertEqual(shown["inspected"], ["app/tokens.py"])
+
     def test_recording_from_a_real_receipt_and_using_it_only_when_enabled(self):
         task = "refresh_token drops the session when tokens expire"
         (self.project / "tests/test_tokens.py").write_text("import unittest\nfrom app.tokens import refresh_token\n\n\nclass T(unittest.TestCase):\n    def test_it(self):\n        self.assertEqual(refresh_token('x'), 'x')\n")

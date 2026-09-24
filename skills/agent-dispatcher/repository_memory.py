@@ -1011,10 +1011,11 @@ def search_semantic(query, semantic, index, *, level=None, top_k=8, k1=1.2, b=0.
             continue
         files = [p for p in record["files"] if p in current]
         weak = support == 0 and len(matched) - support < 2
+        summary = record.get("summary") if (record.get("summary") or {}).get("validation_status", "current") == "current" else None
         items.append({"id": rid, "level": record["level"], "score": round(score, 4), "matched": matched[:8], "identifier_support": support,
                       "concept_matches": len(matched) - support, "weak": weak, "files": files if not weak else [], "origin": record["origin"],
-                      "label": record.get("summary", {}).get("confidence_label", record["confidence_label"]),
-                      "purpose": (record.get("summary") or {}).get("fields", {}).get("purpose", "")[:200],
+                      "label": (summary or {}).get("confidence_label", record["confidence_label"]),
+                      "purpose": (summary or {}).get("fields", {}).get("purpose", "")[:200],
                       "resolved": [{"path": p, "label": "exact"} for p in files[:6]]})
     items.sort(key=lambda item: (-item["score"], item["id"]))
     items = items[:top_k]
@@ -1356,6 +1357,8 @@ def _observation_event(root, observation, *, scrub, inspection, pack):
     info = history["repository"](root)
     lists = {key: [p for p in (observation.get(key) or []) if isinstance(p, str)] if isinstance(observation.get(key), list) else []
              for key in ("retrieved", "read", "modified")}
+    if observation.get("read") is None:
+        lists["read"] = None  # Not observed is not "read nothing".
     assertions = [a for a in (observation.get("assertions") or []) if isinstance(a, dict)]
     notes = {"hypotheses": observation.get("hypotheses") or [], "limitations": observation.get("limitations") or [],
              "assertions": [f"{a.get('by', 'agent')}: {a.get('claim', '')}" for a in assertions]}
@@ -1469,6 +1472,267 @@ def view_experience(project, record_id):
 # ---------------------------------------------------------------- command line
 
 
+# ---------------------------------------------------------------- consolidation: candidate descriptive claims
+
+CONSOLIDATION = {"min_families": 2, "max_candidates": 20, "max_files": 8, "max_terms": 8}
+_CONTRARY_OUTCOMES = ("failed_checks", "reverted_or_invalidated", "unresolved", "stale_checks")
+
+
+def _family(event):
+    """The same term-fingerprint family the learning layer uses: paraphrases and retries of one task count once."""
+    terms = sorted(event["task"]["terms"].items(), key=lambda kv: (-kv[1], kv[0]))[:12]
+    return "family-" + _digest([t for t, _ in terms])[:16]
+
+
+def _scope_of(paths):
+    common = []
+    for level in zip(*[PurePosixPath(p).parent.parts for p in paths]):
+        if len(set(level)) != 1:
+            break
+        common.append(level[0])
+    return "/".join(common) or "."
+
+
+def consolidate(project, *, task=None, settings=None, pack=None, exclude_paths=(), min_families=None, include_unmatched=False):
+    """Candidate descriptive claims from recorded experience, derived at read time and never stored.
+
+    Deterministic grouping: a claim's core is the set of files that eligible tasks from at least `min_families`
+    independent task families edited together; superseded events never count, corrections are applied first,
+    and a family (paraphrases, retries, one task recorded twice) supports a claim once. Contrary outcomes on the
+    same files are listed as counterexamples, and every core file is checked against the current index, so a
+    claim says whether its evidence is current. A candidate has no authority: it does not vote, it is not a
+    rule, and promotion goes through `learning propose` and the governed lifecycle.
+    """
+    root, index, scrub, exclusions, _ = _scan(project, pack=pack, exclude_paths=exclude_paths)
+    settings = settings or load_settings(project=root)
+    floor = min_families or CONSOLIDATION["min_families"]
+    store = experience_store(root)
+    if store is None:
+        return {"status": "unavailable", "candidates": [], "events": 0, "policy": {"min_families": floor}, "diagnostics": ["no experience records"]}
+    experience = _sibling("experience")
+    with store:
+        events, corrections = store.events(), store.corrections()
+    eligible = tuple(settings["experience"]["eligible_outcomes"])
+    prepared = {row["id"]: row for row in experience["prepare"](events, corrections, eligible)}
+    current = [e for e in events if e.get("status", "current") == "current"]
+    supporting, contrary = [], []
+    for event in current:
+        if event["id"] in prepared:
+            files = [row["path"] for row in prepared[event["id"]]["files"] if row["path"] in index.kinds]
+            if files:
+                supporting.append((event, files))
+        elif event.get("outcome") in _CONTRARY_OUTCOMES:
+            files = [row["path"] for row in event.get("edited", []) if row["path"] in index.kinds]
+            if files:
+                contrary.append((event, files))
+    families_of = defaultdict(set)
+    for event, files in supporting:
+        for path in files:
+            families_of[path].add(_family(event))
+    groups = defaultdict(list)
+    for event, files in supporting:
+        core = tuple(sorted(p for p in files if len(families_of[p]) >= floor))
+        if core:
+            groups[core].append((event, files))
+    query = _sibling("retrieval")["analyze_query"](scrub(_task(task))) if task else None
+    named = set(query["paths"]) if query else set()
+    top = ([row["path"] for row in _sibling("retrieval")["retrieve"](scrub(_task(task)), index, _sibling("retrieval")["STRATEGIES"]["full"])["ranked"][:5]]
+           if query else [])
+    candidates = []
+    for core, members in groups.items():
+        families = {_family(event) for event, _ in members}
+        counts = Counter(event["outcome"] for event, _ in members)
+        vocabulary = Counter()
+        for event, _ in members:
+            vocabulary.update({t for t, w in event["task"]["terms"].items() if w >= 3.0} or set(list(event["task"]["terms"])[:12]))
+        terms = [t for t, n in vocabulary.most_common(CONSOLIDATION["max_terms"])]
+        latest = {}
+        for event, _ in sorted(members, key=lambda item: item[0]["recorded"]):
+            for row in event.get("edited", []):
+                if row["path"] in core and row.get("sha256"):
+                    latest[row["path"]] = row["sha256"]
+        changed = sorted(p for p in core if p in latest and index.hashes.get(p) != latest[p])
+        unknown = sorted(p for p in core if p not in latest)
+        against = [{"id": event["id"], "outcome": event["outcome"], "files": sorted(set(files) & set(core))[:CONSOLIDATION["max_files"]],
+                    "family": _family(event)} for event, files in contrary if set(files) & set(core)]
+        scope = _scope_of(core)
+        match = "none"
+        if query:
+            if named & set(core) or set(top[:5]) & set(core):
+                match = "exact"
+            elif any(_scope_of([p]) == scope or _scope_of([p]).startswith(scope + "/") for p in top):
+                match = "module"
+            elif len(set(query["terms"]) & set(terms)) >= 2:
+                match = "repository"
+        limitations = ["support counts task families by term fingerprint, not verified task identity",
+                       "experience only: no independent corroboration from history or source"]
+        if any(event.get("inspected") is None for event, _ in members):
+            limitations.append("reads were not observed for some supporting tasks")
+        if counts.get("checked_success", 0) == 0:
+            limitations.append("no receipt-backed success among the supporting tasks")
+        candidate = {"id": "claim-" + _digest(list(core))[:16], "status": "candidate",
+                     "claim": f"Tasks about {', '.join(terms) or 'these files'} changed {', '.join(core[:CONSOLIDATION['max_files']])} together",
+                     "scope": {"module": scope, "paths": list(core[:CONSOLIDATION["max_files"]]), "task_terms": terms},
+                     "support": {"events": len(members), "families": len(families), "by_outcome": dict(counts),
+                                 "event_ids": sorted(event["id"] for event, _ in members)},
+                     "contradictions": {"events": len(against), "families": len({a["family"] for a in against}), "examples": against[:5]},
+                     "freshness": {"state": "current" if not changed and not unknown else "changed" if changed else "unknown",
+                                   "changed": changed, "unverified": unknown},
+                     "limitations": limitations,
+                     "review": {"kind": "descriptive_claim", "promotion": "learning propose --from-file: a reviewed skill_overlay "
+                                "applicability_note or repository_procedure citing these event ids; never automatic"}}
+        if query:
+            candidate["scope_match"] = match
+        if not query or match != "none" or include_unmatched:
+            candidates.append(candidate)
+    order = {"exact": 0, "module": 1, "repository": 2, "none": 3}
+    candidates.sort(key=lambda c: (order[c.get("scope_match", "none")], -c["support"]["families"], -c["support"]["events"], c["id"]))
+    candidates = candidates[:CONSOLIDATION["max_candidates"]]
+    return {"status": "ok" if candidates else "no_candidates", "candidates": candidates,
+            "events": len(current), "supporting": len(supporting), "contrary": len(contrary),
+            "policy": {"min_families": floor, "eligible_outcomes": list(eligible), "scope_backoff": ["exact", "module", "repository"]},
+            "diagnostics": [] if supporting else ["no eligible experience with current files"]}
+
+
+# ---------------------------------------------------------------- working memory: explicit task-local digests
+
+WORKING_MEMORY = {"window": 12, "max_text": 400, "max_evidence": 8, "max_kept": 40, "max_bytes": 64 * 1024, "max_acceptance": 12}
+_OBSERVATION_KINDS = ("finding", "action", "hypothesis", "check", "question")
+_OBSERVATION_STATES = ("confirmed", "contradicted", "unresolved", "pending", "failed", "succeeded")
+_DIGEST_BUCKETS = {("finding", "confirmed"): "confirmed", ("action", "succeeded"): "attempted", ("action", "failed"): "attempted",
+                   ("action", "pending"): "pending", ("check", "pending"): "pending", ("check", "succeeded"): "attempted",
+                   ("check", "failed"): "attempted", ("question", "pending"): "unresolved"}
+
+
+def _working_path(root, task_id):
+    if not isinstance(task_id, str) or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,119}", task_id):
+        raise RepositoryMemoryError("A task id of 1-120 characters (letters, digits, . _ : -) is required.")
+    directory = state_directory(root) / "working-memory"
+    try:
+        with _sibling("parser_cache")["private_directory"](directory, create=True):  # owner-only, no symlinked component
+            pass
+    except (OSError, ValueError):
+        raise RepositoryMemoryError("The private state directory is unavailable or not owner-only.") from None
+    return directory / (_digest(task_id)[:24] + ".json")
+
+
+def _load_working(path, task_id, scrub):
+    if not path.exists():
+        return {"schema": 1, "task_id": task_id, "objective": None, "acceptance": [], "recent": [],
+                "digest": {"confirmed": [], "contradicted": [], "unresolved": [], "attempted": [], "pending": []},
+                "loss": {"dropped": 0, "truncated": 0, "compactions": 0}, "snapshot": None}
+    try:
+        descriptor = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+        with os.fdopen(descriptor, "r", encoding="utf-8") as handle:
+            data = json.loads(handle.read(1 << 20))  # a bounded read; the write side keeps the file under max_bytes
+    except (OSError, ValueError):
+        raise RepositoryMemoryError("Working memory for this task is unreadable; record again after forgetting it.") from None
+    if not isinstance(data, dict) or data.get("schema") != 1 or data.get("task_id") != task_id or not isinstance(data.get("recent"), list):
+        raise RepositoryMemoryError("Working memory for this task does not match its schema.")
+    return data
+
+
+def _save_working(path, data):
+    serialized = json.dumps(data, ensure_ascii=False, separators=(",", ":"))
+    while len(serialized.encode("utf-8")) > WORKING_MEMORY["max_bytes"]:
+        if not _drop_one(data):
+            raise RepositoryMemoryError("Working memory would exceed its size limit even after compaction.")
+        serialized = json.dumps(data, ensure_ascii=False, separators=(",", ":"))
+    temporary = path.with_name(path.name + ".tmp")
+    descriptor = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | getattr(os, "O_NOFOLLOW", 0), 0o600)
+    with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+        handle.write(serialized)
+    os.replace(temporary, path)
+
+
+def _drop_one(data):
+    """Make room by dropping the oldest item that carries the least obligation: confirmed findings and succeeded
+    actions first; failures, contradictions, unresolved questions and pending checks only when nothing else is left."""
+    digest = data["digest"]
+    for bucket, predicate in (("confirmed", lambda i: True), ("attempted", lambda i: i["status"] == "succeeded"),
+                              ("attempted", lambda i: True), ("contradicted", lambda i: True), ("unresolved", lambda i: True),
+                              ("pending", lambda i: True)):
+        for position, item in enumerate(digest[bucket]):
+            if predicate(item):
+                del digest[bucket][position]
+                data["loss"]["dropped"] += 1
+                return True
+    return False
+
+
+def _compact(data, window):
+    """Move observations older than the window into the digest, verbatim, by kind and status; count every loss."""
+    digest = data["digest"]
+    while len(data["recent"]) > window:
+        item = data["recent"].pop(0)
+        bucket = _DIGEST_BUCKETS.get((item["kind"], item["status"]))
+        if bucket is None:
+            bucket = ("contradicted" if item["status"] == "contradicted" else "unresolved" if item["status"] in ("unresolved", "pending")
+                      else "attempted" if item["status"] == "failed" else "confirmed")
+        digest[bucket].append({key: item[key] for key in ("kind", "status", "text", "evidence", "recorded")})
+        while len(digest[bucket]) > WORKING_MEMORY["max_kept"]:
+            del digest[bucket][0]
+            data["loss"]["dropped"] += 1
+    data["loss"]["compactions"] += 1
+    return data
+
+
+def _observation(raw, scrub, loss):
+    if not isinstance(raw, dict) or raw.get("kind") not in _OBSERVATION_KINDS or raw.get("status") not in _OBSERVATION_STATES:
+        raise RepositoryMemoryError(f"An observation needs kind in {_OBSERVATION_KINDS} and status in {_OBSERVATION_STATES}.")
+    text = raw.get("text")
+    if not isinstance(text, str) or not text.strip():
+        raise RepositoryMemoryError("An observation needs text.")
+    text = scrub(text.strip())
+    if len(text) > WORKING_MEMORY["max_text"]:
+        loss["truncated"] += 1
+        text = text[:WORKING_MEMORY["max_text"]]
+    evidence = [scrub(str(e))[:200] for e in (raw.get("evidence") or []) if isinstance(e, (str, int))][:WORKING_MEMORY["max_evidence"]]
+    return {"kind": raw["kind"], "status": raw["status"], "text": text, "evidence": evidence, "recorded": int(time.time())}
+
+
+def working_memory(project, task_id, action, *, observations=(), objective=None, acceptance=(), window=None, pack=None):
+    """Explicit record / compact / show / forget for one task's observable working memory.
+
+    Nothing here is read by retrieval or promoted into durable memory; a digest is task-local and holds what a host
+    or user chose to write: findings with their evidence, attempted actions and their outcomes, hypotheses still
+    open or contradicted, pending checks and questions. Text is kept verbatim (a negation stays a negation; "not
+    found in this search" is not "does not exist"); compaction moves older items into typed buckets and reports
+    what it dropped. No conversation, transcript or hidden reasoning is captured, and nothing is automatic.
+    """
+    root = _root(project)
+    scrub = _sibling("context")["_scrubber"](_sibling("context")["find_pack"](pack))
+    path = _working_path(root, task_id)
+    window = window or WORKING_MEMORY["window"]
+    if not isinstance(window, int) or not 1 <= window <= 100:
+        raise RepositoryMemoryError("window must be an integer between 1 and 100.")
+    if action == "forget":
+        existed = path.exists()
+        if existed:
+            path.unlink()
+        return {"task_id": task_id, "removed": existed, "note": "local logical deletion; not secure erasure"}
+    data = _load_working(path, task_id, scrub)
+    if action == "show":
+        return dict(data, exists=path.exists())
+    if action == "record":
+        if objective:
+            data["objective"] = scrub(str(objective))[:WORKING_MEMORY["max_text"]]
+        if acceptance:
+            data["acceptance"] = [scrub(str(a))[:WORKING_MEMORY["max_text"]] for a in acceptance][:WORKING_MEMORY["max_acceptance"]]
+        for raw in observations:
+            data["recent"].append(_observation(raw, scrub, data["loss"]))
+        info = _sibling("repo_history")["repository"](root)
+        data["snapshot"] = {"head": info["boundary"] if info["available"] else None, "recorded": int(time.time())}
+        if len(data["recent"]) > window:
+            _compact(data, window)
+    elif action == "compact":
+        _compact(data, window)
+    else:
+        raise RepositoryMemoryError("Unknown working-memory action.")
+    _save_working(path, data)
+    return dict(data, exists=True, window=window)
+
+
 def render(result):
     return json.dumps(result, indent=2, ensure_ascii=False, default=str)
 
@@ -1517,10 +1781,21 @@ def main(argv=None):
     correct.add_argument("--verdict", choices=("relevant", "irrelevant"))
     correct.add_argument("--note", required=True)
     common(sub.add_parser("forget")).add_argument("record")
+    consolidate_cmd = common(sub.add_parser("consolidate"))
+    consolidate_cmd.add_argument("--task", help="Rank candidates by scope against this request (exact file, module, repository)")
+    consolidate_cmd.add_argument("--min-families", type=int, help=f"Independent task families a claim needs (default {CONSOLIDATION['min_families']})")
+    consolidate_cmd.add_argument("--all", action="store_true", help="With --task, also list candidates outside every scope")
+    digest = common(sub.add_parser("digest"))
+    digest.add_argument("action", choices=("record", "compact", "show", "forget"))
+    digest.add_argument("--task-id", required=True)
+    digest.add_argument("--observation-file", help="JSON: one observation or a list of them, or - for standard input (record)")
+    digest.add_argument("--objective")
+    digest.add_argument("--acceptance", action="append", default=[])
+    digest.add_argument("--window", type=int, help=f"Recent observations kept verbatim (default {WORKING_MEMORY['window']})")
     common(sub.add_parser("explain"), task=True)
     args = parser.parse_args(argv)
     try:
-        settings = load_settings(args.config, project=args.project) if args.command != "view-summary" else None
+        settings = load_settings(args.config, project=args.project) if args.command not in ("view-summary", "digest") else None
         if args.command == "dry-run":
             result = dry_run(args.project, settings, pack=args.pack, exclude_paths=args.exclude_path)
         elif args.command in ("build", "refresh"):
@@ -1566,6 +1841,19 @@ def main(argv=None):
             result = correct_experience(args.project, args.record, outcome=args.outcome, note=args.note, path=args.path, verdict=args.verdict, pack=args.pack)
         elif args.command == "forget":
             result = forget_experience(args.project, args.record)
+        elif args.command == "consolidate":
+            result = consolidate(args.project, task=args.task, settings=settings, pack=args.pack, exclude_paths=args.exclude_path,
+                                 min_families=args.min_families, include_unmatched=args.all)
+        elif args.command == "digest":
+            observations = []
+            if args.observation_file:
+                raw = sys.stdin.read(64 * 1024 + 1) if args.observation_file == "-" else Path(args.observation_file).read_text(encoding="utf-8")
+                if len(raw) > 64 * 1024:
+                    raise RepositoryMemoryError("Observations exceed 64 KiB.")
+                loaded = json.loads(raw)
+                observations = loaded if isinstance(loaded, list) else [loaded]
+            result = working_memory(args.project, args.task_id, args.action, observations=observations, objective=args.objective,
+                                    acceptance=args.acceptance, window=args.window, pack=args.pack)
         else:
             root, index, scrub, exclusions, _ = _scan(args.project, pack=args.pack, exclude_paths=args.exclude_path)
             result = layer(root, index, scrub(_task(args.task)), exclusions=exclusions, scrub=scrub, settings=settings, pack=args.pack)["report"]

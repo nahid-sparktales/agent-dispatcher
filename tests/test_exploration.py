@@ -136,12 +136,13 @@ class ExplorerCase(unittest.TestCase):
 
         def down(system, prompt):
             raise llm_retrieval.LLMUnavailable("Provider could not be reached or timed out.")
-        with repo_store.IndexStore(self.directory) as store:
+        with repo_store.IndexStore(self.directory) as store, mock.patch.object(llm_retrieval.time, "sleep"):
             universe, loader = self.universe(store)
             explorer = exploration.Explorer(store, universe, loader, settings(down), self.scrub)
             report = explorer.run(["What are the main subsystems?"])
         self.assertTrue(report["diagnostics"])
         self.assertEqual(report["stored"], 0)
+        self.assertGreaterEqual(report["calls"], 1)  # a failed attempt was still paid for, so it is counted
         garbage = lambda number, prompt: {"operations": "not a list", "claims": "no", "done": "yes"}  # noqa: E731
         with mock.patch.object(llm_retrieval.time, "sleep"):
             report, _, _ = self.run_explorer(lambda n, p: ["not", "an", "object"] if n == 1 else garbage(n, p))
@@ -158,6 +159,11 @@ class ExplorerCase(unittest.TestCase):
         self.assertEqual(index["inferences"]["attached"], 1)
         self.assertEqual(result["context"][0]["path"], "app/billing.py")
         self.assertIn("architectural inference", result["repository_intelligence"]["explain"])
+        (self.project / "app/new_report.py").write_text("def report(invoices):\n    return invoices\n")
+        context.select_context(self.project, "report invoices charged", pack=ROOT, map_maintain=True)  # maintenance upserts the new file only
+        with repo_store.IndexStore(self.directory, readonly=True) as store:
+            self.assertEqual([i["status"] for i in store.inferences(status=None)], ["current"])  # an unchanged citation is not "changed"
+            self.assertEqual(store.invalidate_inferences({"app/new_report.py": "x"}, only_known=True), 0)
         (self.project / "app/billing.py").write_text("def charge(amount, retries=1):\n    return amount\n")
         with repo_store.IndexStore(self.directory) as store:
             report = repo_builder.Builder(self.project, store, self.scrub).run(mode="refresh")

@@ -33,6 +33,8 @@ commands marked *writes* change anything, and only in private state.
 | search experience | `{{MEMORY_COMMAND}} search-experience 'REQUEST' --project PROJECT`; `view-experience <id>` |
 | record a task (*writes*) | `{{MEMORY_COMMAND}} record --project PROJECT --observation-file - [--receipt RECEIPT]` |
 | correct / forget (*writes*) | `{{MEMORY_COMMAND}} correct <id> --outcome partial --note '...'`; `forget <id>`; `prune` |
+| review candidate claims | `{{MEMORY_COMMAND}} consolidate --project PROJECT [--task 'REQUEST']` (derived from recorded experience; nothing stored, nothing promoted) |
+| task-local digest (*writes*) | `{{MEMORY_COMMAND}} digest record\|compact\|show\|forget --task-id ID --project PROJECT [--observation-file -]` (never read by retrieval) |
 | remove rebuildable state (*writes*) | `{{MEMORY_COMMAND}} reset --project PROJECT` (experience only with `--forget-experience`) |
 
 Add `--json` for structured output. `examine-commit` accepts only a full indexed commit id from

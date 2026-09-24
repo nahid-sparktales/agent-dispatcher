@@ -695,7 +695,7 @@ def validate_startup(client: str, spec: dict, parsed: dict, condition: str) -> l
             errors.append(f"Native startup {key} contains a non-string entry")
     if errors:
         return errors
-    treatment = condition in ("dispatcher", "treatment", "on", "indexed", "warm_experience")
+    treatment = condition in ("dispatcher", "treatment", "on", "indexed", "warm_experience") or condition.startswith("learned_")
     if client == "codex":
         if not startup.get("thread_started"):
             errors.append("Missing Codex thread.started evidence")

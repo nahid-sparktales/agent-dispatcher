@@ -33,6 +33,8 @@ commands marked *writes* change anything, and only in private state.
 | search experience | `python3 -B PACK/repository_memory.py search-experience 'REQUEST' --project PROJECT`; `view-experience <id>` |
 | record a task (*writes*) | `python3 -B PACK/repository_memory.py record --project PROJECT --observation-file - [--receipt RECEIPT]` |
 | correct / forget (*writes*) | `python3 -B PACK/repository_memory.py correct <id> --outcome partial --note '...'`; `forget <id>`; `prune` |
+| review candidate claims | `python3 -B PACK/repository_memory.py consolidate --project PROJECT [--task 'REQUEST']` (derived from recorded experience; nothing stored, nothing promoted) |
+| task-local digest (*writes*) | `python3 -B PACK/repository_memory.py digest record\|compact\|show\|forget --task-id ID --project PROJECT [--observation-file -]` (never read by retrieval) |
 | remove rebuildable state (*writes*) | `python3 -B PACK/repository_memory.py reset --project PROJECT` (experience only with `--forget-experience`) |
 
 Add `--json` for structured output. `examine-commit` accepts only a full indexed commit id from
