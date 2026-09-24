@@ -759,7 +759,7 @@ def _cost(trials: list[dict], ratings: dict | None = None, auth: str | None = No
             "cost_usd_per_verified_success": (total / verified) if total is not None and verified and not pending else None,
             "cost_usd_per_verified_success_reason": ("outcomes_pending" if pending else "zero_verified_successes" if not verified
                                                      else "cost_unknown" if total is None else None),
-            "billing_basis": auth, "cost_basis": sorted({value for trial in trials if isinstance(value := (trial.get("usage") or {}).get("cost_basis"), str)}),
+            "pricing_mode": auth, "cost_basis": sorted({value for trial in trials if isinstance(value := (trial.get("usage") or {}).get("cost_basis"), str)}),
             "note": f"Runtime-reported list-price estimates (total_cost_usd), not billed spend; {basis}. A null value is unknown or undefined "
                     "(zero denominator), never zero; a known partial total is a lower bound."}
 
@@ -921,7 +921,7 @@ def report(batch_dir: Path) -> dict:
             lines.append(f"| {title} | " + " | ".join(cells) + " |")
         costs = [groups[c]["cost_accounting"] for c in conditions]
         lines.extend([
-            "| Billing basis (auth; runtime costBasis) | " + " | ".join(f"{cost['billing_basis'] or 'unknown'}; {', '.join(cost['cost_basis']) or 'unknown'}" for cost in costs) + " |",
+            "| Billing basis (auth; runtime costBasis) | " + " | ".join(f"{cost['pricing_mode'] or 'unknown'}; {', '.join(cost['cost_basis']) or 'unknown'}" for cost in costs) + " |",
             "| Arm total (USD, runtime-reported estimate) | " + " | ".join(
                 _usd(cost["measured_cost_usd_total"]) if cost["known_partial_cost_usd_total"] is None
                 else f"at least {_usd(cost['known_partial_cost_usd_total'])} (lower bound; {cost['cost_unknown_for']} unknown)" for cost in costs) + " |",
@@ -1141,7 +1141,7 @@ def audit(batch_dirs: list[Path]) -> dict:
                         "totals": {"provenance": "derived", **_totals(resolved)},
                         "discrepancies": [{"trial": row["id"], "fields": row["discrepancies"]} for row in rows if row["discrepancies"]]})
     result = {"schema_version": 1, "read_only": True, "provenance_labels": PROVENANCE,
-              "note": "Costs are runtime-reported list-price estimates (total_cost_usd), not billed spend; see each arm's cost.billing_basis. "
+              "note": "Costs are runtime-reported list-price estimates (total_cost_usd), not billed spend; see each arm's cost.pricing_mode. "
                       "JSON numbers are unrounded.", "batches": batches}
     if len(batches) > 1:
         result["combined"] = {"label": "sum across batches; not an experimental estimate", "provenance": "derived",

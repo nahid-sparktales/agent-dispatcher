@@ -301,7 +301,7 @@ class ReportingTests(unittest.TestCase):
         self.assertEqual((baseline["invalid_attempts"], baseline["invalid_known_cost_usd"], baseline["invalid_cost_unknown_for"]), (1, 0.2, 0))
         self.assertEqual((baseline["verified_successes"], baseline["cost_usd_per_verified_success_reason"]), (1, None))
         self.assertEqual(baseline["cost_usd_per_verified_success"], math.fsum([0.1, 0.2]))
-        self.assertEqual((baseline["billing_basis"], baseline["cost_basis"]), ("subscription", ["list"]))
+        self.assertEqual((baseline["pricing_mode"], baseline["cost_basis"]), ("subscription", ["list"]))
         self.assertIn("not billed spend", baseline["note"])
         self.assertIn("API-equivalent", baseline["note"])
         self.assertIsNone(dispatcher["measured_cost_usd_total"])  # one unknown keeps the total null...
@@ -311,7 +311,7 @@ class ReportingTests(unittest.TestCase):
         self.assertEqual((dispatcher["invalid_attempts"], dispatcher["invalid_known_cost_usd"]), (0, 0))  # nothing invalid costs exactly 0
         unknown = self.group(result, client="claude")["cost_accounting"]
         self.assertEqual((unknown["cost_usd_per_verified_success"], unknown["cost_usd_per_verified_success_reason"]), (None, "cost_unknown"))
-        self.assertIsNone(unknown["billing_basis"])
+        self.assertIsNone(unknown["pricing_mode"])
         usage = self.group(result)["usage"]
         self.assertEqual((usage["cache_creation_input_tokens"]["observed"], usage["cache_creation_input_tokens"]["median"]), (2, 40))
         self.assertEqual(self.group(result, "dispatcher")["usage"]["cache_read_input_tokens"]["missing"], 2)  # old trials: missing, not zero
@@ -745,7 +745,7 @@ class AuditTests(unittest.TestCase):
         self.assertTrue(helper_row["resolved_by_current_attribution"])
         self.assertEqual(one["discrepancies"], [{"trial": "claude-fx-1-dispatcher", "fields": ["helper_successes"]}])
         arm = one["clients"]["claude"]["arms"]["dispatcher"]
-        self.assertEqual((arm["cost"]["cost_usd_per_verified_success"], arm["cost"]["billing_basis"]), (0.2, "subscription"))
+        self.assertEqual((arm["cost"]["cost_usd_per_verified_success"], arm["cost"]["pricing_mode"]), (0.2, "subscription"))
         self.assertEqual(arm["totals"]["cost_input_provenance"], {"verified": 1})
         self.assertEqual(arm["medians"]["duration_api_ms"], 1500)
         self.assertEqual(one["clients"]["claude"]["pairs"]["vs_baseline"]["dispatcher"]["both_pass"], 1)
