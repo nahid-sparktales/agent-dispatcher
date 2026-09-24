@@ -21,6 +21,8 @@ import warnings
 
 SCHEMA = 1
 MAX_FILE_BYTES = 256 * 1024
+SNIFF_BYTES = 8192  # context.SNIFF_BYTES: every file is checked this far for NUL bytes before it is read whole.
+VERDICTS = ("binary file withheld", "file exceeds 256 KiB limit")  # context.RULE_SKIPS; control tokens, keep verbatim.
 MAX_BYTES = 64 * 1024 * 1024
 MAX_ITEM_BYTES = 16 * 1024 * 1024
 MAX_ENTRIES = 12000
@@ -283,11 +285,20 @@ class Cache:
         consumed = 0
         try:
             with _source(self.project, relative) as (descriptor, before):
-                if before.st_size > MAX_FILE_BYTES:
-                    return None, 0, "file exceeds 256 KiB limit", None
-                if before.st_size > remaining:
+                if MAX_FILE_BYTES >= before.st_size > remaining:
                     return None, 0, "scan byte budget exhausted", None
                 identity = [relative, _signature(before)]
+                verdict = self._verdict(identity, descriptor, before)
+                if verdict:
+                    return verdict
+                if before.st_size > MAX_FILE_BYTES:
+                    self.stats["source_misses"] += 1
+                    head = os.read(descriptor, SNIFF_BYTES)  # Binary before oversize; read, never charged.
+                    self.stats["source_bytes_read"] += len(head)
+                    reason = "binary file withheld" if b"\0" in head else "file exceeds 256 KiB limit"
+                    if _signature(before) == _signature(os.fstat(descriptor)):
+                        self.put("verdict", identity, {"reason": reason, "used": 0})
+                    return None, 0, reason, None
                 cached = self.get("source", identity)
                 if (isinstance(cached, dict) and set(cached) == {"text", "sha256", "size"}
                         and isinstance(cached["text"], str) and type(cached["size"]) is int
@@ -300,22 +311,37 @@ class Cache:
                 limit = min(MAX_FILE_BYTES, remaining)
                 chunks = []
                 while consumed <= limit:
-                    chunk = os.read(descriptor, min(65536, limit + 1 - consumed))
+                    chunk = os.read(descriptor, min(65536 if chunks else SNIFF_BYTES, limit + 1 - consumed))
                     if not chunk:
                         break
                     chunks.append(chunk)
                     consumed += len(chunk)
+                    if len(chunks) == 1 and b"\0" in chunk:  # Sniffed first, so a binary is never read whole.
+                        break
                 self.stats["source_bytes_read"] += consumed
                 if consumed > limit or _signature(before) != _signature(os.fstat(descriptor)):
                     return None, consumed, "file changed or exceeds read budget", None
                 data = b"".join(chunks)
             if b"\0" in data:
-                return None, consumed, "binary file withheld", None
+                # The sniff is never charged to the scan; a NUL found past it was read whole and is. Either way once.
+                used = 0 if b"\0" in chunks[0] else consumed
+                self.put("verdict", identity, {"reason": "binary file withheld", "used": used})
+                return None, used, "binary file withheld", None
             text, sha = redact(data.decode("utf-8")), hashlib.sha256(data).hexdigest()
             self.put("source", identity, {"text": text, "sha256": sha, "size": consumed})
             return text, consumed, None, sha
         except (OSError, UnicodeError, ValueError):
             return None, consumed, "unreadable or unsafe source withheld", None
+
+    def _verdict(self, identity, descriptor, before):
+        """The saved rule verdict for this exact file signature: an unchanged binary or oversized file costs no read."""
+        cached = self.get("verdict", identity)
+        if (isinstance(cached, dict) and set(cached) == {"reason", "used"} and cached["reason"] in VERDICTS
+                and type(cached["used"]) is int and 0 <= cached["used"] <= before.st_size
+                and _signature(before) == _signature(os.fstat(descriptor))):
+            self.stats["source_hits"] += 1
+            return None, cached["used"], cached["reason"], None
+        return None
 
     def parse(self, path, text):
         """Always parse: trees are not cached. On a 585-file corpus ast.parse took 1.3 s while

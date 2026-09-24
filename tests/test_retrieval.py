@@ -2,6 +2,8 @@
 import hashlib
 import importlib.util
 from pathlib import Path
+import subprocess
+import tempfile
 import unittest
 from collections import Counter
 
@@ -160,6 +162,89 @@ class RetrieverTests(unittest.TestCase):
         plain = retrieval.build_index(files, hashes, context._kind, path_only=["sqlglot/generator.py"], structural=structural,
                                       config=retrieval.configure("full-structure"))
         self.assertEqual(plain.symbols_in("sqlglot/generator.py"), [])
+
+    def test_oversized_records_rank_by_terms_and_excerpt_only_verified_spans(self):
+        big = "".join(f"def helper_{n}():\n    return {n}\n\n" for n in range(40)) + "def offset_clause_rewrite(node):\n    return node.limit\n"
+        record = dict(repo_index.file_record("sqlglot/generator.py", big), coverage="partial_lexical", covered_lines=[1, 122])
+        structural = {"sqlglot/generator.py": {"record": record, "sha256": "a" * 64, "cap": 1}}
+        hashes = {path: hashlib.sha256(text.encode()).hexdigest() for path, text in SQL.items()}
+        served = {"sqlglot/generator.py": big}
+
+        def index_with(strategy="full"):
+            return retrieval.build_index(SQL, hashes, context._kind, path_only=["sqlglot/generator.py"], structural=structural,
+                                         loader=served.get, config=retrieval.configure(strategy))
+
+        task = "the limit rewrite of an offset clause is wrong"
+        index = index_with()
+        self.assertNotIn("sqlglot/generator.py", index.path_only)
+        outcome = retrieval.run(task, index, retrieval.configure("full"))
+        top = outcome["ranked"][0]
+        self.assertEqual(top["path"], "sqlglot/generator.py")
+        self.assertIn("bm25", {e["source"] for e in top["evidence"]})
+        item = outcome["packet"]["files"][0]
+        self.assertTrue(any("def offset_clause_rewrite" in e["content"] for e in item["excerpts"]))
+        self.assertLessEqual(len(item["excerpts"]), retrieval.DEFAULTS["context"]["max_excerpts_per_file"])
+        self.assertIn("only lines 1-122 were indexed", item["note"])
+        self.assertEqual(outcome["status"]["conditions"][0], {"condition": "partial_coverage", "unread_files": 0,
+                                                              "by_state": {"complete": 7, "partial_lexical": 1}, "paths": ["sqlglot/generator.py"]})
+        # The ablation switch restores the structural-only record: definitions, no terms, never loaded.
+        plain = index_with("full-oversized-structural")
+        self.assertEqual((plain.records["sqlglot/generator.py"]["terms"], plain.coverage["sqlglot/generator.py"]), ({}, "structural_only"))
+        self.assertIn("sqlglot/generator.py", plain.path_only)
+        self.assertNotIn("sqlglot/generator.py", plain.texts)
+        # Bytes that no longer match the record are never served: the file is reported stale instead.
+        served.clear()
+        stale = index_with()
+        outcome = retrieval.run(task, stale, retrieval.configure("full"))
+        self.assertFalse(any(item["excerpts"] for item in outcome["packet"]["files"] if item["path"] == "sqlglot/generator.py"))
+        self.assertEqual(stale.texts.failed, {"sqlglot/generator.py"})
+        self.assertEqual(outcome["status"]["conditions"][0]["by_state"], {"complete": 7, "stale": 1})
+
+    def test_a_precise_small_file_outranks_many_weak_matches_in_a_large_file(self):
+        files = dict(SQL, **{"sqlglot/grouping.py": "def merge_group_order(groups):\n    return sorted(groups)\n"})
+        big = "".join(f"def rows_{n}(rows, order, group):\n    # keep the group order of the rows\n    return [row for row in rows if row in group and order]\n\n"
+                      for n in range(3000))
+        structural = {"sqlglot/dataframe.py": {"record": dict(repo_index.file_record("sqlglot/dataframe.py", big), coverage="complete"),
+                                               "sha256": "b" * 64, "cap": len(big)}}
+        hashes = {path: hashlib.sha256(text.encode()).hexdigest() for path, text in files.items()}
+        index = retrieval.build_index(files, hashes, context._kind, path_only=["sqlglot/dataframe.py"], structural=structural)
+        result = retrieval.retrieve("merge_group_order loses the group order of rows", index, retrieval.configure("full"))
+        self.assertEqual(result["ranked"][0]["path"], "sqlglot/grouping.py")
+        # Length normalization and vocabulary damping keep the large file from winning the lexical voters by volume.
+        for source in ("bm25", "rare_terms"):
+            self.assertEqual(result["lists"][source][0]["file"], "sqlglot/grouping.py", source)
+
+    def test_an_oversized_file_matches_by_terms_but_is_no_reference_hub(self):
+        # A large file that mentions every rewrite rule weakly, next to the small files that define them.
+        rules = {f"sqlglot/optimizer/rule_{name}.py": f"def rewrite_{name}(node):\n    return node\n" for name in ("alpha", "beta", "gamma")}
+        files = dict(SQL, **rules)
+        big = "".join(f"def emit_offset_{n}(node):\n    # offset clause, see rewrite_alpha, rewrite_beta and rewrite_gamma\n    return node\n\n"
+                      for n in range(2000))
+        record = dict(repo_index.file_record("sqlglot/generator.py", big), coverage="complete")
+        structural = {"sqlglot/generator.py": {"record": record, "sha256": "d" * 64, "cap": len(big)}}
+        hashes = {path: hashlib.sha256(text.encode()).hexdigest() for path, text in files.items()}
+
+        def index_with(strategy):
+            return retrieval.build_index(files, hashes, context._kind, path_only=["sqlglot/generator.py"], structural=structural,
+                                         config=retrieval.configure(strategy))
+
+        index, hub = index_with("full"), index_with("full-oversized-references")
+        self.assertEqual(retrieval.DEFAULTS["oversized"], {"lexical": True, "references": False})
+        # Default: its terms still match a request, but they are no reference edges, so as the leading seed it pulls no rule in.
+        self.assertFalse(any("references" in kinds for kinds in index.edges["sqlglot/generator.py"].values()))
+        task = "the offset clause is emitted twice"
+        result = retrieval.retrieve(task, index, retrieval.configure("full"))
+        self.assertEqual(result["ranked"][0]["path"], "sqlglot/generator.py")
+        self.assertIn("bm25", {e["source"] for e in result["ranked"][0]["evidence"]})
+        self.assertFalse(set(rules) & {row["file"] for row in result["lists"].get("graph", ())})
+        # The ablation is the behavior before the switch: the record as indexed, its term references as edges.
+        self.assertIs(hub.records["sqlglot/generator.py"], record)
+        self.assertEqual({t for t, kinds in hub.edges["sqlglot/generator.py"].items() if "references" in kinds}, set(rules))
+        hubbed = retrieval.retrieve(task, hub, retrieval.configure("full-oversized-references"))
+        self.assertTrue(set(rules) <= {row["file"] for row in hubbed["lists"]["graph"]})
+        # Files within the read limit keep exactly the same edges under both settings.
+        edges = lambda built: {p: {t: dict(k) for t, k in built.edges[p].items()} for p in files}  # noqa: E731
+        self.assertEqual(edges(index), edges(hub))
 
     def test_file_over_the_read_limit_is_ranked_by_name_imports_and_history_but_never_read(self):
         files = {"pkg/lexer.py": "from pkg.parser import Parser\n\n\ndef tokens():\n    return Parser()\n", "pkg/other.py": "value = 1\n"}
@@ -407,7 +492,8 @@ class PlanAndStatusTests(unittest.TestCase):
         abstained = retrieval.retrieve("zzzz qqqq", index, config)["status"]
         self.assertEqual((abstained["status"], abstained["evidence"]), ("abstained_no_sufficient_local_evidence", "none"))
         partial = retrieval.retrieve("QueryPlanner", build(SQL, path_only=["sqlglot/huge.py"]), config)["status"]
-        self.assertEqual(partial["conditions"], [{"condition": "partial_coverage", "unread_files": 1}])
+        self.assertEqual(partial["conditions"], [{"condition": "partial_coverage", "unread_files": 1,
+                                                  "by_state": {"complete": 7, "structural_only": 1}, "paths": ["sqlglot/huge.py"]}])
         tight = retrieval.run("QueryPlanner execute PythonExecutor", index, retrieval.configure("full", {"context": {"max_bytes": 300}}))
         self.assertIn("budget_exhausted", [c["condition"] for c in tight["status"]["conditions"]])
         self.assertIn("budget_exhausted", retrieval.render_explain(tight))
@@ -425,6 +511,174 @@ class PlanAndStatusTests(unittest.TestCase):
         self.assertTrue(set(effect["displaced"]).isdisjoint(p["path"] for p in result["ranked"][:10]))
         self.assertIn("EXPANSION EFFECT", retrieval.render_explain(retrieval.run("QueryPlanner is wrong", with_history), verbose=True))
         self.assertTrue(baseline["ranked"])
+
+
+# Two dialect families (NovaDB, SkyQL: a class plus same-stem generator and parser), a core module, and a class with
+# only a paired test. Names are invented; what matters is the shape a real multi-dialect project has.
+VARIANTS = {
+    "sqlkit/__init__.py": "from sqlkit.core.grouping import parse_group\n",
+    "sqlkit/core/grouping.py": ("def parse_group(tokens):\n    \"\"\"GROUP BY keeps the written order of ROLLUP and CUBE groupings.\"\"\"\n"
+                                "    return [parse_rollup(t) if t == 'ROLLUP' else parse_cube(t) for t in tokens]\n\n\n"
+                                "def parse_rollup(token):\n    return ('rollup', token)\n\n\ndef parse_cube(token):\n    return ('cube', token)\n"),
+    "sqlkit/dialects/novadb.py": "class NovaDB:\n    \"\"\"The NovaDB dialect: quoting, types and functions.\"\"\"\n\n    quote = '\"'\n",
+    "sqlkit/generators/novadb.py": "from sqlkit.dialects.novadb import NovaDB\n\n\ndef generate_settings(node):\n    return NovaDB.quote + 'SETTINGS ' + node + ' FORMAT'\n",
+    "sqlkit/parsers/novadb.py": "from sqlkit.dialects.novadb import NovaDB\n\n\ndef parse_settings(tokens):\n    return [NovaDB.quote + t for t in tokens if t != 'SETTINGS']\n",
+    "sqlkit/dialects/skyql.py": "class SkyQL:\n    \"\"\"The SkyQL dialect: quoting, types and functions.\"\"\"\n\n    quote = '`'\n",
+    "sqlkit/generators/skyql.py": "from sqlkit.dialects.skyql import SkyQL\n\n\ndef generate_concat(node):\n    return SkyQL.quote + 'GROUP_CONCAT(' + node + ' SEPARATOR)'\n",
+    "sqlkit/parsers/skyql.py": "from sqlkit.dialects.skyql import SkyQL\n\n\ndef parse_concat(tokens):\n    return [SkyQL.quote + t for t in tokens if t != 'SEPARATOR']\n",
+    "sqlkit/tableview.py": "class TableView:\n    def render(self):\n        return []\n",
+    "tests/test_tableview.py": "from sqlkit.tableview import TableView\n\n\ndef test_render():\n    assert TableView().render() == []\n",
+    "tests/test_novadb.py": "from sqlkit.dialects.novadb import NovaDB\n\n\ndef test_quote():\n    assert NovaDB.quote\n",
+    "tests/test_skyql.py": "from sqlkit.dialects.skyql import SkyQL\n\n\ndef test_quote():\n    assert SkyQL.quote\n",
+    "tests/test_grouping.py": "from sqlkit.core.grouping import parse_group\n\n\ndef test_order():\n    assert parse_group(['CUBE', 'ROLLUP'])\n",
+}
+CORE_TASK = "Preserve GROUP BY order for ROLLUP and CUBE groupings, keeping NovaDB and SkyQL output unchanged"
+RESOLVED = {"names": {"case_only": "resolved", "slash_words": "resolved"}}
+
+
+class NameCalibrationTests(unittest.TestCase):
+    def setUp(self):
+        self.index = build(VARIANTS)
+        self.default, self.resolved = retrieval.configure("full"), retrieval.configure("full", RESOLVED)
+
+    def run_both(self, task):
+        return [retrieval.retrieve(task, self.index, config) for config in (self.default, self.resolved)]
+
+    def test_defaults_and_index_free_analysis_are_unchanged(self):
+        tasks = [CORE_TASK, "NovaDB drops the SETTINGS clause", "GraphQL names", "keep NovaDB/SkyQL WITH ROLLUP/WITH working",
+                 "Fix sqlglot/planner.py", "Client.connect() ignores MAX_RETRIES in HTTPClient", "QueryPlanner is wrong"]
+        for task in tasks:
+            self.assertEqual(retrieval.analyze_query(task, self.default, self.index), retrieval.analyze_query(task, self.default), task)
+            self.assertEqual(retrieval.analyze_query(task, self.resolved), retrieval.analyze_query(task), task)  # no index: text only
+        self.assertEqual(retrieval.DEFAULTS["names"], {"case_only": "shape", "slash_words": "path"})
+        default, resolved = self.run_both(CORE_TASK)
+        self.assertNotIn("calibration", default["query"])
+        self.assertEqual((default["plan"]["caps"]["names"], resolved["plan"]["caps"]["names"]),
+                         (retrieval.DEFAULTS["names"], RESOLVED["names"]))
+        self.assertIn("names: case-only shape, slash words path", retrieval.render_explain(retrieval.run(CORE_TASK, self.index)))
+
+    def test_comparison_variants_no_longer_outrank_the_core_file(self):
+        default, resolved = self.run_both(CORE_TASK)
+        order = lambda result: [row["path"] for row in result["ranked"]]  # noqa: E731
+        self.assertLess(order(default).index("sqlkit/dialects/skyql.py"), order(default).index("sqlkit/core/grouping.py"))  # shipped
+        self.assertEqual(order(resolved)[0], "sqlkit/core/grouping.py")
+        calibration = resolved["query"]["calibration"]
+        for name in ("NovaDB", "SkyQL"):  # a tie: neither is the task's subject
+            self.assertEqual((calibration[name]["defines"], calibration[name]["family"], calibration[name]["mentions"]), (1, 3, 1))
+            self.assertAlmostEqual(calibration[name]["weight"], 1.0 + 2.0 / 3 ** 0.5)
+            self.assertLess(resolved["query"]["symbol_names"][name], 3.0)
+        self.assertIn("NovaDB: weight 2.15 (ambiguous: denotes 3 files; defines 1, family 3, mentions 1)",
+                      retrieval.render_explain(retrieval.run(CORE_TASK, self.index, self.resolved)))
+
+    def test_a_sole_variant_target_still_ranks_its_family_first(self):
+        default, resolved = self.run_both("NovaDB drops the SETTINGS clause after FORMAT when generating SQL")
+        family = {"sqlkit/dialects/novadb.py", "sqlkit/generators/novadb.py", "sqlkit/parsers/novadb.py"}
+        for result in (default, resolved):
+            self.assertEqual({row["path"] for row in result["ranked"][:3]}, family)
+        self.assertLess(resolved["query"]["calibration"]["NovaDB"]["weight"], 3.0)
+
+    def test_the_most_mentioned_ambiguous_name_keeps_full_weight_and_its_family_term(self):
+        task = "SkyQL GROUP_CONCAT loses the SEPARATOR: SkyQL should parse it like NovaDB does, and SkyQL output must round-trip"
+        _, resolved = self.run_both(task)
+        query, order = resolved["query"], [row["path"] for row in resolved["ranked"]]
+        self.assertEqual((query["calibration"]["SkyQL"]["weight"], query["calibration"]["SkyQL"]["mentions"]), (3.0, 3))
+        self.assertEqual(query["calibration"]["SkyQL"]["reason"], "most mentioned of the ambiguous names")
+        self.assertLess(query["calibration"]["NovaDB"]["weight"], 3.0)
+        self.assertEqual(query["terms"]["skyql"], 1.0)  # the family bridge: the path retriever can now match skyql.py files
+        self.assertEqual(set(order[:3]), {"sqlkit/dialects/skyql.py", "sqlkit/generators/skyql.py", "sqlkit/parsers/skyql.py"})
+        self.assertLess(order.index("sqlkit/parsers/skyql.py"), order.index("sqlkit/generators/novadb.py"))
+
+    def test_a_class_with_one_file_keeps_identifier_weight(self):
+        outcomes = {}
+        for index, task, top in ((self.index, "TableView render returns nothing", "sqlkit/tableview.py"),
+                                 (build(SQL), "QueryPlanner is wrong", "sqlglot/planner.py")):
+            name = task.split()[0]
+            default, resolved = outcomes[name] = [retrieval.retrieve(task, index, config) for config in (self.default, self.resolved)]
+            self.assertEqual((resolved["query"]["calibration"][name]["weight"], resolved["query"]["calibration"][name]["reason"]),
+                             (3.0, "denotes one file"))
+            self.assertEqual(resolved["query"]["symbol_names"][name], 3.0)
+            self.assertEqual((default["ranked"][0]["path"], resolved["ranked"][0]["path"]), (top, top))
+        # A paired test is not a family, so TableView denotes one file; that file's stem joins as a concept term.
+        self.assertEqual(outcomes["TableView"][1]["query"]["calibration"]["TableView"]["family"], 1)
+        self.assertEqual(outcomes["TableView"][1]["query"]["terms"]["tableview"], 1.0)
+        # QueryPlanner has no same-stem file: nothing but the record changes.
+        default, resolved = outcomes["QueryPlanner"]
+        self.assertEqual(resolved["query"]["calibration"]["QueryPlanner"]["family"], 0)
+        self.assertEqual([r["path"] for r in default["ranked"]], [r["path"] for r in resolved["ranked"]])
+
+    def test_an_unresolved_camel_word_is_a_concept(self):
+        default, resolved = self.run_both("GraphQL style names should not boost anything in grouping")
+        self.assertEqual(default["query"]["symbol_names"]["GraphQL"], 3.0)
+        query = resolved["query"]
+        self.assertEqual((query["calibration"]["GraphQL"]["weight"], query["calibration"]["GraphQL"]["reason"]), (1.0, "no definition"))
+        self.assertNotIn("GraphQL", query["identifiers"])
+        self.assertNotIn("GraphQL", query["symbol_names"])
+        self.assertIn("graphql", query["concept_terms"])
+        self.assertIn("sqlkit/dialects/skyql.py", [row["path"] for row in default["ranked"]])  # via the `ql` subtoken
+        self.assertNotIn("sqlkit/dialects/skyql.py", [row["path"] for row in resolved["ranked"]])
+        self.assertEqual(query["terms"]["GraphQL"], 1.0)  # the exact spelling the index holds, without its subtokens
+        self.assertNotIn("ql", query["terms"])
+
+    def test_a_library_name_without_a_definition_still_finds_the_files_that_use_it(self):
+        index = build({"src/Dashboard.tsx": "import { useEffect } from 'react';\nexport function Dashboard() {\n  useEffect(() => stop(), []);\n}\n",
+                       "src/Header.tsx": "export function Header() { return title(); }\n",
+                       "src/cleanup.ts": "export function cleanup() { return 0; }\n"})
+        result = retrieval.retrieve("the useEffect cleanup never runs", index, self.resolved)
+        self.assertEqual(result["query"]["calibration"]["useEffect"]["reason"], "no definition")
+        self.assertEqual(result["query"]["terms"]["useEffect"], 1.0)
+        self.assertNotIn("useEffect", result["query"]["symbol_names"])
+        rows = {row["path"]: {e["source"] for e in row["evidence"]} for row in result["ranked"]}
+        self.assertIn("bm25", rows.get("src/Dashboard.tsx", set()))
+
+    def test_a_name_to_preserve_stays_in_the_query_and_its_tests_stay_reachable(self):
+        _, resolved = self.run_both("Change the SkyQL GROUP_CONCAT separator while preserving NovaDB quoting")
+        self.assertGreaterEqual(resolved["query"]["symbol_names"]["NovaDB"], 1.0)
+        self.assertGreaterEqual(resolved["query"]["terms"]["NovaDB"], 1.0)
+        self.assertIn("NovaDB", resolved["query"]["identifiers"])
+        self.assertIn("tests/test_novadb.py", [row["path"] for row in resolved["ranked"]])
+
+    def test_explicit_code_signals_are_never_calibrated(self):
+        for task in ("NovaDB() drops SETTINGS", "`NovaDB` drops SETTINGS", "sqlkit.dialects.novadb.NovaDB drops SETTINGS",
+                     "Traceback (most recent call last):\n  File \"sqlkit/dialects/novadb.py\", line 1, in NovaDB\nKeyError: 'SETTINGS'"):
+            query = retrieval.analyze_query(task, self.resolved, self.index)
+            self.assertNotIn("NovaDB", query.get("calibration", {}), task)
+            self.assertEqual(query["symbol_names"]["NovaDB"], 3.0, task)
+        for task, name in (("render_settings drops SETTINGS in NovaDB", "render_settings"), ("HTTP2 frames break NovaDB", "HTTP2")):
+            query = retrieval.analyze_query(task, self.resolved, self.index)
+            self.assertIn("NovaDB", query["calibration"], task)  # calibration ran, and passed the code-shaped name by
+            self.assertNotIn(name, query["calibration"], task)
+            self.assertEqual((query["symbol_names"][name], query["terms"][name]), (3.0, 3.0), task)
+        index = build({"src/components/UserProfile.tsx": "export function UserProfile(props) {\n  return props.user;\n}\n",
+                       "src/components/UserProfile.module.css": ".root { color: red; }\n",
+                       "src/pages/Home.tsx": "import { UserProfile } from '../components/UserProfile';\nexport function Home() { return UserProfile({}); }\n"})
+        result = retrieval.retrieve("Callers of src/components/UserProfile.tsx pass the wrong props", index, self.resolved)
+        self.assertNotIn("UserProfile", result["query"].get("calibration", {}))  # a named file is not a capitalization guess
+        self.assertEqual(result["query"]["symbol_names"]["UserProfile"], 3.0)
+        home = next(row for row in result["ranked"] if row["path"] == "src/pages/Home.tsx")
+        self.assertIn("symbol_references", {e["source"] for e in home["evidence"]})
+
+    def test_slash_words_become_paths_only_when_they_resolve(self):
+        task = "see dialects/novadb and sqlkit/parsers, plus generators/skyql.py"
+        self.assertEqual(retrieval.analyze_query(task, self.resolved, self.index)["paths"],
+                         ["dialects/novadb", "sqlkit/parsers", "generators/skyql.py"])
+        self.assertEqual(retrieval.analyze_query("Fix sqlglot/planner.py", self.resolved, build(SQL))["paths"], ["sqlglot/planner.py"])
+        default, resolved = self.run_both("keep NovaDB/SkyQL WITH ROLLUP/WITH working")
+        self.assertEqual(default["query"]["paths"], ["NovaDB/SkyQL", "ROLLUP/WITH"])
+        self.assertEqual((default["plan"]["profile"], default["query"]["terms"]["WITH"]), ("exact", 3.0))
+        self.assertEqual(resolved["query"]["paths"], [])
+        self.assertNotIn("explicit_path", resolved["plan"]["reasons"])
+        self.assertNotIn("WITH", resolved["query"]["terms"])
+        self.assertTrue({"NovaDB", "SkyQL"} <= set(resolved["query"]["identifiers"]))  # the parts are read as words
+        dotted = build({"scripts/deploy": "#!/bin/sh\nrsync build/ server:/srv\n", ".github/workflows/ci.yml": "name: ci\non: push\n",
+                        "src/app.py": "def main():\n    return 1\n"})
+        for task in ("./scripts/deploy fails on the second run", "../scripts/deploy fails", "the .github/workflows jobs time out",
+                     "see scripts/deploy."):
+            default_paths = retrieval.analyze_query(task, self.default, dotted)["paths"]
+            self.assertTrue(default_paths, task)
+            self.assertEqual(retrieval.analyze_query(task, self.resolved, dotted)["paths"], default_paths, task)
+        only_slash = retrieval.retrieve("keep NovaDB/SkyQL WITH ROLLUP/WITH working", self.index,
+                                        retrieval.configure("full", {"names": {"slash_words": "resolved"}}))
+        self.assertNotIn("calibration", only_slash["query"])  # the two switches are independent
 
 
 class ContextBudgetTests(unittest.TestCase):
@@ -611,6 +865,35 @@ class BenchmarkMathTests(unittest.TestCase):
         self.assertAlmostEqual(row["MAP"], (1 / 2 + 2 / 5 + 0) / 3)
         self.assertEqual((row["density"], row["ctx_recall"], row["tokens"]), (0.25, 1 / 3, 100))
         self.assertEqual(run.parse_overrides(["graph.max_hops=2", "rrf_k=30"]), {"graph": {"max_hops": 2}, "rrf_k": 30})
+
+    def test_oversized_coverage_gets_its_own_index_and_a_lexically_indexed_target_is_reachable(self):
+        run = load("run")
+        with tempfile.TemporaryDirectory() as folder:
+            clone = Path(folder).resolve()
+            git = lambda *args: subprocess.run(["git", "-C", str(clone), "-c", "user.email=t@example.com", "-c", "user.name=t",  # noqa: E731
+                                                "-c", "commit.gpgsign=false", *args], check=True, capture_output=True, text=True).stdout.strip()
+            git("init", "-q", "-b", "main")
+            (clone / "pkg").mkdir()
+            filler = "".join(f"value_{n} = {n}\n" for n in range(24000))  # over the 256 KiB read limit, under the lexical cap
+            (clone / "pkg/big.py").write_text(f"def zebra_marker_fn():\n    return 'quokka ledger'\n\n{filler}")
+            (clone / "pkg/small.py").write_text("def charge(amount):\n    return amount\n")
+            git("add", "-A")
+            git("commit", "-q", "-m", "initial")
+            task = {"id": "demo-1", "repo": "demo", "split": "train", "query_source": "issue", "names_target": False,
+                    "base_commit": git("rev-parse", "HEAD"), "fix_commit": "", "query": "the quokka ledger total is wrong",
+                    "target_files": ["pkg/big.py"]}
+            built, original = [], run.retrieval.build_index
+            run.retrieval.build_index = lambda *args, **kwargs: built.append(kwargs["config"]["oversized"]) or original(*args, **kwargs)
+            try:
+                [row] = run.evaluate([task], clone, ["full", "full-oversized-structural", "full-oversized-references"], progress=False)
+            finally:
+                run.retrieval.build_index = original
+        self.assertEqual((row["unreachable"], row["name_only"]), ([], []))  # the default index covers it lexically
+        ranks = {name: row["strategies"][name]["ranks"]["pkg/big.py"] for name in row["strategies"]}
+        self.assertEqual((ranks["full"], ranks["full-oversized-references"]), (1, 1))
+        self.assertNotEqual(ranks["full-oversized-structural"], 1)  # the ablation built its own, structural-only index
+        self.assertEqual(built, [{"lexical": True, "references": False}, {"lexical": False, "references": False},
+                                 {"lexical": True, "references": True}])  # one index per coverage/reference setting
 
     def test_split_depends_only_on_the_task_id(self):
         mine = load("mine")

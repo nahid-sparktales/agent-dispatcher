@@ -49,6 +49,8 @@ A reproducible diagnosis, a focused fix when authorized, regression coverage, an
 DEFINITION OF DONE
 The causal explanation fits the observed failure and the correction resolves the reproduction without a known regression, or the investigation ends at an explicit evidence gap.
 
+{{VERIFY_CONTRACT}}
+
 ROLE BOUNDARIES
 Do not claim root cause from correlation alone, scatter unrelated changes, expose sensitive logs, or mark a non-reproducible intermittent issue definitively fixed.
 

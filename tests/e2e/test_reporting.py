@@ -1,12 +1,17 @@
 """Offline tests for blinded review and paired report denominators."""
 
+import contextlib
 import copy
+import hashlib
+import io
 import json
+import math
 from pathlib import Path
 import tempfile
 import unittest
 
-from evals.end_to_end.reporting import DIMENSIONS, create_review, import_review, report
+from evals.end_to_end import run as runner
+from evals.end_to_end.reporting import DIMENSIONS, audit, create_review, import_review, report
 
 
 class ReportingTests(unittest.TestCase):
@@ -38,11 +43,14 @@ class ReportingTests(unittest.TestCase):
         self.save()
         return trial
 
-    def save(self, extra_schedule=None):
+    def save(self, extra_schedule=None, config=None):
         schedule = [{k: trial[k] for k in ("client", "condition", "fixture_id", "repetition")} for trial in self.trials]
         schedule.extend(extra_schedule or [])
         (self.root / "results.json").write_text(json.dumps({"schema_version": 1, "trials": self.trials}))
-        (self.root / "batch.json").write_text(json.dumps({"schema_version": 1, "suite": "smoke", "seed": 7, "provenance": {"digest": "fixture"}, "schedule": schedule}))
+        batch = {"schema_version": 1, "suite": "smoke", "seed": 7, "provenance": {"digest": "fixture"}, "schedule": schedule}
+        if config:
+            batch["config"] = config
+        (self.root / "batch.json").write_text(json.dumps(batch))
 
     def packets(self):
         return json.loads((self.root / "review" / "packets.json").read_text())["packets"]
@@ -275,6 +283,76 @@ class ReportingTests(unittest.TestCase):
         self.assertEqual(1, usage["input_tokens"]["observed"])
         self.assertIsNone(usage["output_tokens"]["median"])
         self.assertIsNone(usage["cached_input_tokens"]["median"])
+
+    def usage(self, cost, **split):
+        return {"input_tokens": 5, "output_tokens": 1, "cached_input_tokens": 9, "cost_usd": cost, **split}
+
+    def test_cost_is_labelled_estimate_with_lower_bounds_and_explicit_undefined_reasons(self):
+        list_basis = {"cost_basis": "list", "cost_source": "runtime_reported_estimate", "cache_creation_input_tokens": 40}
+        self.add_trial(fixture="one", usage=self.usage(0.1, **list_basis))
+        self.add_trial(fixture="two", status="infrastructure_error", task_success=None, usage=self.usage(0.2, **list_basis))
+        self.add_trial(fixture="one", condition="dispatcher", status="task_failure", task_success=False, usage=self.usage(2.0))
+        self.add_trial(fixture="two", condition="dispatcher", status="timeout", task_success=False)
+        self.add_trial(fixture="one", client="claude")  # a verified success with unknown cost
+        self.save(config={"clients": {"codex": {"auth": "subscription"}}})
+        result = report(self.root)
+        baseline, dispatcher = (self.group(result, name)["cost_accounting"] for name in ("baseline", "dispatcher"))
+        self.assertEqual(baseline["measured_cost_usd_total"], math.fsum([0.1, 0.2]))  # unrounded in JSON
+        self.assertEqual((baseline["invalid_attempts"], baseline["invalid_known_cost_usd"], baseline["invalid_cost_unknown_for"]), (1, 0.2, 0))
+        self.assertEqual((baseline["verified_successes"], baseline["cost_usd_per_verified_success_reason"]), (1, None))
+        self.assertEqual(baseline["cost_usd_per_verified_success"], math.fsum([0.1, 0.2]))
+        self.assertEqual((baseline["pricing_mode"], baseline["cost_basis"]), ("subscription", ["list"]))
+        self.assertIn("not billed spend", baseline["note"])
+        self.assertIn("API-equivalent", baseline["note"])
+        self.assertIsNone(dispatcher["measured_cost_usd_total"])  # one unknown keeps the total null...
+        self.assertEqual((dispatcher["known_partial_cost_usd_total"], dispatcher["cost_unknown_for"]), (2.0, 1))  # ...beside a lower bound
+        self.assertIsNone(dispatcher["cost_usd_per_verified_success"])
+        self.assertEqual(dispatcher["cost_usd_per_verified_success_reason"], "zero_verified_successes")
+        self.assertEqual((dispatcher["invalid_attempts"], dispatcher["invalid_known_cost_usd"]), (0, 0))  # nothing invalid costs exactly 0
+        unknown = self.group(result, client="claude")["cost_accounting"]
+        self.assertEqual((unknown["cost_usd_per_verified_success"], unknown["cost_usd_per_verified_success_reason"]), (None, "cost_unknown"))
+        self.assertIsNone(unknown["pricing_mode"])
+        usage = self.group(result)["usage"]
+        self.assertEqual((usage["cache_creation_input_tokens"]["observed"], usage["cache_creation_input_tokens"]["median"]), (2, 40))
+        self.assertEqual(self.group(result, "dispatcher")["usage"]["cache_read_input_tokens"]["missing"], 2)  # old trials: missing, not zero
+        text = (self.root / "report.md").read_text()
+        self.assertIn("| Arm total (USD, runtime-reported estimate) | 0.3000 | at least 2.0000 (lower bound; 1 unknown) |", text)
+        self.assertIn("| Cost per verified success (USD, runtime-reported estimate) | 0.3000 | unavailable (zero_verified_successes) |", text)
+        self.assertIn("| Billing basis (auth; runtime costBasis) | subscription; list | subscription; unknown |", text)
+        self.assertIn("| Invalid attempts (known cost USD) | 1 (0.2000; 0 unknown) | 0 (0.0000; 0 unknown) |", text)
+        self.assertIn("| Median cache_read_input_tokens | unavailable (0 observed; 2 missing) |", text)
+        self.assertNotIn("Measured cost", text)
+
+    def test_pending_outcomes_leave_cost_per_success_undefined(self):
+        human = {"passed": True, "checks": [], "human_required": True}  # passing, awaiting a required review
+        self.add_trial(fixture="auto", usage=self.usage(1.0))
+        self.add_trial(fixture="review", usage=self.usage(2.0), auto_grade=human)
+        self.add_trial(fixture="review", condition="dispatcher", usage=self.usage(2.0), auto_grade=human)
+        result = report(self.root)
+        for condition, verified in (("baseline", 1), ("dispatcher", 0)):
+            cost = self.group(result, condition)["cost_accounting"]
+            self.assertEqual((cost["verified_successes"], cost["cost_usd_per_verified_success"], cost["cost_usd_per_verified_success_reason"]),
+                             (verified, None, "outcomes_pending"))
+        self.assertIn("| Cost per verified success (USD, runtime-reported estimate) | unavailable (outcomes_pending) | unavailable (outcomes_pending) |",
+                      (self.root / "report.md").read_text())
+
+    def test_cost_per_success_counts_the_same_outcomes_as_successful_row(self):
+        self.add_trial(usage=self.usage(1.0))
+        create_review(self.root)
+        self.submit([self.rating(self.packets()[0]["packet_id"], scope=False)])
+        group = self.group(report(self.root))
+        self.assertEqual((group["successful"], group["cost_accounting"]["verified_successes"]), (0, 0))
+        self.assertEqual(group["cost_accounting"]["cost_usd_per_verified_success_reason"], "zero_verified_successes")
+
+    def test_helper_execution_is_separate_from_treatment_compliance(self):
+        self.add_trial(fixture="ran", condition="dispatcher", activity=self.activity(count=1))
+        self.add_trial(fixture="missed", condition="dispatcher", activity=self.activity(count=0))
+        self.add_trial(fixture="partial", condition="dispatcher", activity=self.activity("partial", count=0))
+        group = self.group(report(self.root), "dispatcher")
+        self.assertEqual(group["treatment_compliance"], {"numerator": 3, "denominator": 3, "missing": 0, "rate": 1})
+        self.assertEqual(group["helper_execution"], {"numerator": 1, "denominator": 2, "missing": 1, "rate": 0.5})
+        self.assertEqual(group["successful"], 3)  # a diagnostic, never a grade
+        self.assertIn("| Helper execution (activity helper successes) | 0/0 observed; 0 missing | 1/2 observed; 1 missing |", (self.root / "report.md").read_text())
 
     def test_timeout_counts_failure_invalid_attempts_visible(self):
         self.add_trial(fixture="one", status="timeout", task_success=None)
@@ -582,6 +660,152 @@ class ReportingTests(unittest.TestCase):
         self.save()
         create_review(self.root)
         self.assertEqual(self.packets(), old)
+
+
+class AuditTests(unittest.TestCase):
+    """Read-only re-derivation from raw events; synthetic batches in the runner's own layout."""
+
+    CWD = "/recorded/trial/project"
+    PACK = "/recorded/profile/skills/agent-dispatcher"
+
+    def setUp(self):
+        temp = tempfile.TemporaryDirectory()
+        self.addCleanup(temp.cleanup)
+        self.output = Path(temp.name) / "output"
+        package = self.output / "packages/claude"
+        package.mkdir(parents=True)
+        (package / "SKILL.md").write_text("# Agent Dispatcher\n")
+        (package / "context.py").write_text("print('{}')\n")
+
+    def terminal(self, cost):
+        return {"type": "result", "subtype": "success", "result": "done", "total_cost_usd": cost, "duration_ms": 2000,
+                "duration_api_ms": 1500, "num_turns": 4, "modelUsage": {"m": {"costBasis": "list"}},
+                "usage": {"input_tokens": 10, "output_tokens": 5, "cache_read_input_tokens": 100, "cache_creation_input_tokens": 40,
+                          "cache_creation": {"ephemeral_1h_input_tokens": 40, "ephemeral_5m_input_tokens": 0}}}
+
+    def batch(self, name, rows):
+        batch = self.output / "batches" / name
+        trials = []
+        for condition, status, success, cost, events, extra in rows:
+            ident = f"claude-fx-1-{condition}"
+            trial = {"id": ident, "client": "claude", "condition": condition, "fixture_id": "fx", "repetition": 1, "category": "edit",
+                     "status": status, "task_success": success, "artifact_dir": "trials/" + ident,
+                     "auto_grade": {"passed": success is True, "human_required": False,
+                                    "checks": [{"name": "behavior", "passed": success is True}]},
+                     "treatment_invoked": None if condition == "baseline" else True, "elapsed_seconds": 3.0,
+                     # Stored the way older runs stored it: four keys, no split.
+                     "usage": {"input_tokens": 10 if cost else None, "output_tokens": 5 if cost else None,
+                               "cached_input_tokens": 100 if cost else None, "cost_usd": cost},
+                     "effective_settings": {"auth": "subscription"}, **extra}
+            trials.append(trial)
+            (batch / trial["artifact_dir"]).mkdir(parents=True)
+            init = {"type": "system", "subtype": "init", "cwd": self.CWD}
+            (batch / trial["artifact_dir"] / "events.jsonl").write_text("\n".join(json.dumps(event) for event in [init, *events]) + "\n")
+        schedule = [{k: trial[k] for k in ("client", "condition", "fixture_id", "repetition")} for trial in trials]
+        (batch / "batch.json").write_text(json.dumps({"schema_version": 1, "suite": name, "schedule": schedule, "config": {
+            "conditions": ["baseline", "dispatcher"], "clients": {"claude": {"auth": "subscription", "profile_dir": "/recorded/profile"}}}}))
+        (batch / "results.json").write_text(json.dumps({"schema_version": 1, "trials": trials}))
+        return batch
+
+    def test_audit_rederives_totals_flags_helper_gap_and_writes_nothing(self):
+        helper = (f'cd "{self.CWD}" && python3 -B "{self.PACK}/context.py" --project "{self.CWD}" --task=x --json 2>&1 | head -200')
+        replay = {"type": "user", "isReplay": True, "message": {"role": "user", "content":
+                  "<command-message>agent-dispatcher</command-message>\n<command-name>/agent-dispatcher</command-name>"}}
+        helper_events = [replay, {"type": "assistant", "message": {"content": [{"type": "tool_use", "id": "h1", "name": "Bash", "input": {"command": helper}}]}},
+                         {"type": "user", "message": {"content": [{"type": "tool_result", "tool_use_id": "h1", "is_error": False,
+                                                                   "content": json.dumps({"schema_version": 1})}]}}]
+        missed = {"activity": {"schema_version": 1, "availability": "partial", "summary": {"helper_attempts": 0, "helper_successes": 0}}}
+        first = self.batch("first", [("baseline", "completed", True, 0.1, [self.terminal(0.1)], {}),
+                                     ("dispatcher", "completed", True, 0.2, [*helper_events, self.terminal(0.2)], missed)])
+        second = self.batch("second", [("baseline", "task_failure", False, 0.3, [self.terminal(0.3)], {}),
+                                       ("dispatcher", "timeout", False, None, helper_events[:1], {})])  # no terminal event: usage unknown
+        digests = lambda: {str(path): hashlib.sha256(path.read_bytes()).hexdigest() for path in sorted(self.output.rglob("*")) if path.is_file()}  # noqa: E731
+        before = digests()
+        stdout = io.StringIO()
+        with contextlib.redirect_stdout(stdout):
+            self.assertEqual(runner.main(["audit", "--batch", str(first), "--batch", str(second)]), 0)
+        self.assertEqual(digests(), before)  # read-only: every file byte-identical and nothing added
+        printed = stdout.getvalue()
+        result = json.loads(printed)
+        self.assertEqual(result, audit([first, second]))
+        one, two = result["batches"]
+        self.assertEqual(one["totals"]["cost_usd"]["total"], math.fsum([0.1, 0.2]))
+        self.assertIn(repr(math.fsum([0.1, 0.2])), printed)  # JSON keeps the unrounded value
+        self.assertEqual(one["totals"]["cache_creation_input_tokens"]["total"], 80)
+        trial = one["trials"][1]
+        self.assertEqual(trial["usage"]["cost_usd"], {"value": 0.2, "provenance": "verified"})
+        self.assertEqual(trial["usage"]["cache_creation_input_tokens"], {"value": 40, "provenance": "derived"})  # not stored by old runs
+        self.assertEqual(trial["usage"]["cost_basis"]["value"], "list")
+        self.assertEqual(trial["runtime"]["num_turns"], {"value": 4, "provenance": "derived"})
+        self.assertEqual(trial["auth"], {"value": "subscription", "provenance": "stored_only"})
+        self.assertEqual(trial["treatment_invoked"]["provenance"], "verified")
+        helper_row = trial["helper_successes"]
+        self.assertEqual((helper_row["linked_events"]["value"], helper_row["stored_activity"]["value"], helper_row["current_attribution"]["value"]), (1, 0, 1))
+        self.assertTrue(helper_row["discrepancy"])
+        self.assertTrue(helper_row["resolved_by_current_attribution"])
+        self.assertEqual(one["discrepancies"], [{"trial": "claude-fx-1-dispatcher", "fields": ["helper_successes"]}])
+        arm = one["clients"]["claude"]["arms"]["dispatcher"]
+        self.assertEqual((arm["cost"]["cost_usd_per_verified_success"], arm["cost"]["pricing_mode"]), (0.2, "subscription"))
+        self.assertEqual(arm["totals"]["cost_input_provenance"], {"verified": 1})
+        self.assertEqual(arm["medians"]["duration_api_ms"], 1500)
+        self.assertEqual(one["clients"]["claude"]["pairs"]["vs_baseline"]["dispatcher"]["both_pass"], 1)
+        # Missing usage stays unknown; zero successes leave cost per success undefined with a reason, never 0.
+        self.assertEqual(two["trials"][1]["usage"]["cost_usd"], {"value": None, "provenance": "unavailable"})
+        self.assertEqual(two["totals"]["cost_usd"], {"total": None, "known_partial_total": 0.3, "unknown_for": 1})
+        for name in ("baseline", "dispatcher"):
+            cost = two["clients"]["claude"]["arms"][name]["cost"]
+            self.assertEqual((cost["cost_usd_per_verified_success"], cost["cost_usd_per_verified_success_reason"]), (None, "zero_verified_successes"))
+        self.assertEqual(two["clients"]["claude"]["arms"]["dispatcher"]["counts"]["verified_successes"], 0)
+        combined = result["combined"]
+        self.assertEqual(combined["label"], "sum across batches; not an experimental estimate")
+        self.assertEqual((combined["trials"], combined["cost_usd"]["total"], combined["cost_usd"]["known_partial_total"]), (4, None, math.fsum([0.1, 0.2, 0.3])))
+        self.assertNotIn("combined", audit([first]))
+
+    def test_audit_flags_stored_mismatches_and_links_helpers_by_the_attribution_rule(self):
+        replay = {"type": "user", "isReplay": True, "message": {"role": "user", "content":
+                  "<command-message>agent-dispatcher</command-message>\n<command-name>/agent-dispatcher</command-name>"}}
+
+        def tool(ident, name, inputs, content, error=False):
+            return [{"type": "assistant", "message": {"content": [{"type": "tool_use", "id": ident, "name": name, "input": inputs}]}},
+                    {"type": "user", "message": {"content": [{"type": "tool_result", "tool_use_id": ident, "is_error": error, "content": content}]}}]
+
+        def dispatcher(name, events, stored, **extra):
+            record = {"activity": {"schema_version": 1, "availability": "complete", "summary": {"helper_attempts": stored, "helper_successes": stored}}}
+            batch = self.batch(name, [("dispatcher", "completed", True, 0.2, [replay, *events, self.terminal(0.2)], {**record, **extra})])
+            return audit([batch])["batches"][0]
+
+        # Documented text mode and the cd-into-package form succeed on exit status, as attribution counts them.
+        # Stored usage, runtime and treatment values that differ from the events are kept beside them and flagged.
+        text = dispatcher("text", tool("t", "Bash", {"command": f'python3 -B "{self.PACK}/context.py" --project . --task=x --explain'}, "Context: 3 files")
+                          + tool("c", "Bash", {"command": f"cd {self.PACK} && python3 context.py --project {self.CWD} --task x --json"}, '{"schema_version": 1}'),
+                          2, usage={"input_tokens": 10, "output_tokens": 5, "cached_input_tokens": 100, "cost_usd": 0.5},
+                          runtime={"num_turns": 9}, treatment_invoked=False)
+        row = text["trials"][0]
+        self.assertEqual(row["usage"]["cost_usd"], {"value": 0.2, "stored": 0.5, "provenance": "derived", "discrepancy": True})
+        self.assertEqual(row["runtime"]["num_turns"], {"value": 4, "stored": 9, "provenance": "derived", "discrepancy": True})
+        self.assertEqual(row["treatment_invoked"], {"value": True, "stored": False, "provenance": "derived", "discrepancy": True})
+        self.assertEqual(text["totals"]["cost_usd"]["total"], 0.2)  # totals use the re-derived value
+        helper = row["helper_successes"]
+        self.assertEqual([helper[key]["value"] for key in ("linked_events", "stored_activity", "current_attribution")], [2, 2, 2])
+        self.assertEqual((helper["discrepancy"], helper["resolved_by_current_attribution"]), (False, None))
+        self.assertEqual(text["discrepancies"], [{"trial": "claude-fx-1-dispatcher", "fields": ["usage.cost_usd", "runtime.num_turns", "treatment_invoked"]}])
+        # A piped helper's traceback is not a success, and another tool's versioned JSON is not linked to a helper.
+        piped = dispatcher("piped", tool("h", "Bash", {"command": f'python3 "{self.PACK}/context.py" --json 2>&1 | head -200'}, "Traceback (most recent call last):\n  ValueError: boom")
+                           + tool("r", "Read", {"file_path": f"{self.CWD}/status.json"}, '{"schema_version": 1}'), 0)
+        helper = piped["trials"][0]["helper_successes"]
+        self.assertEqual([helper[key]["value"] for key in ("linked_events", "stored_activity", "current_attribution")], [0, 0, 0])
+        self.assertEqual((helper["discrepancy"], piped["discrepancies"]), (False, []))
+        # Linked evidence that neither stored nor current attribution matches (a helper the staged package lacks) stays unresolved.
+        unstaged = dispatcher("unstaged", tool("m", "Bash", {"command": f'python3 "{self.PACK}/project_map.py" show --project .'}, "Project map: fresh"), 0)
+        helper = unstaged["trials"][0]["helper_successes"]
+        self.assertEqual([helper[key]["value"] for key in ("linked_events", "stored_activity", "current_attribution")], [1, 0, 0])
+        self.assertEqual((helper["discrepancy"], helper["resolved_by_current_attribution"]), (True, False))
+        # Redaction of the saved events broke a piped helper's JSON: no linked verdict, so nothing is flagged.
+        broken = '{"schema_version":1,"excerpt":"url = f\\"https://x?[redacted]""}'
+        redacted = dispatcher("redacted", tool("x", "Bash", {"command": f'python3 "{self.PACK}/context.py" --json | head -50'}, broken), 1)
+        helper = redacted["trials"][0]["helper_successes"]
+        self.assertEqual(helper["linked_events"], {"value": None, "provenance": "unavailable", "reason": "redacted"})
+        self.assertEqual((helper["discrepancy"], helper["resolved_by_current_attribution"], redacted["discrepancies"]), (False, None, []))
 
 
 if __name__ == "__main__":

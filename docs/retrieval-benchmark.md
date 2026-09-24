@@ -600,6 +600,164 @@ Two deterministic additions from the failure analysis above, measured with `full
   from a 400 KB file competing at the top rank; net positive at R@8 and All@8 on every split
   where it applies, so the feature stays on (`structural_records: false` restores name-only).
 
+## Oversized lexical coverage, oversized term references and name calibration: development split (2026-09-23)
+
+Four switches, measured on the development split only (see
+[repository-intelligence.md](repository-intelligence.md)). Every number in this section is
+in-sample development evidence; the held-out split was not run for any of them. Oversized files
+are indexed lexically by default but add no term-reference edges; the two `names` switches are
+off and change nothing until a variant selects them.
+
+- `oversized.lexical` (default `true`, strategy `full-oversized-structural` for `false`): files over
+  the read limit are indexed by their terms, not only their definitions. `run.py` builds one index
+  per value of this switch. A target counts as unreachable only when the default index has no
+  lexical coverage for it, and as `name_only` when that index still knows it by name
+  (`index.coverage` `structural_only` or `unreadable`); a lexically indexed oversized target
+  (`complete` or `partial_lexical`) is ranked like any file.
+- `oversized.references` (default `false`, strategy `full-oversized-references` for `true`): a
+  lexically indexed file over 256 KiB adds no term-reference graph edges. Its terms still count
+  for BM25, rare terms and symbol references, and its import, call, definition and inheritance
+  edges are unchanged. `run.py` builds one index per value of this switch too.
+- `names.case_only` (`shape` default, `resolved`): capitalization-only names weighed by what they
+  denote in the index.
+- `names.slash_words` (`path` default, `resolved`): `A/B` prose is a path only when it resolves.
+
+The two `names` switches came out of the five end-to-end fixtures, where dialect names typed in
+CamelCase (and slash lists of them) pulled whole dialect families above the edited core files. That
+evidence is in-sample (15 correlated task strings) and decides nothing. Protocol, fixed before the
+first run: one development run of the arms below; every delta against `full` is a paired bootstrap
+over tasks (10,000 resamples, 95% interval); profile strata use `full`'s label for each task. Plain
+`run.py`'s "By plan profile" section labels each arm by its own plan instead, so for `names-slash`
+and `names-both` it prints exact n=362 and behavior n=95 where the columns below, relabelled by
+`full`'s plan in the analysis script, use 373 and 87. A `names` arm would become the default only
+if its R@8 delta had an interval above zero and no profile stratum lost more than .02 R@8. Coverage
+would be re-checked on the held-out split only if `full` lost R@8 to `full-oversized-structural`
+with an interval clear of zero. Neither condition held, so the held-out split was not run.
+`full-oversized-references` joined the final run as the ablation of the `oversized.references`
+default; neither rule was changed for it.
+
+```text
+python3 -B evals/retrieval/run.py --split dev \
+  --dataset dist/retrieval-datasets/networkx.jsonl --dataset dist/retrieval-datasets/pip.jsonl \
+  --dataset dist/retrieval-datasets/sqlglot.jsonl --dataset dist/retrieval-datasets/zod.jsonl \
+  --strategy full,full-oversized-references,full-oversized-structural \
+  --variant 'names-case=full:names.case_only="resolved"' \
+  --variant 'names-slash=full:names.slash_words="resolved"' \
+  --variant 'names-both=full:names.case_only="resolved";names.slash_words="resolved"'
+```
+
+The run went through a thin wrapper around `run.py`'s `main`, on a snapshot of the final code. The
+wrapper also recorded each arm's query calibration, its path tokens and each target's coverage
+state; on a six-task check the scored output was identical to plain `run.py`. One process ran all
+six arms: 474 s for 474 tasks. Per task, that covers the checkout, a 130 ms scan, the default index
+(133 ms, shared by `full` and the `names` arms), the references-on index (101 ms), the coverage-off
+index (100 ms) and 59-66 ms of ranking per arm. Arms run in a fixed order inside one process, and
+the default index is built first, so the latency differences between them are not a controlled
+comparison.
+
+**Earlier runs are superseded.** The tables below come from the final code. Two earlier
+development runs of the same protocol are superseded: the first run (five arms) and a rerun after
+three fixes to the `names` switches (a capitalization-only name without a definition keeps its
+exact spelling at concept weight, the slash gate tests `./x`, `../x` and `.github/x` with the dot,
+and a path's file name given in the request is not calibrated as a name). After the rerun, two
+review fixes landed (the sniff read is no longer charged to the scan budget; span priority in
+evidence mode) and `oversized.references` became `false` by default. Against the rerun, this run's
+`full-oversized-references` (the rerun's default) and `full-oversized-structural` reproduce every
+target rank, plan profile, query path and coverage stratum. `full` differs from the rerun's `full`
+only through `oversized.references`. Raw outputs, the pre-declared analysis plan and the scripts are
+in `dist/evals/optimization-2026-09-23/benchmark/` (first run), its `rerun-after-fixes/` folder
+(rerun) and `dist/evals/optimization-2026-09-23/final/benchmark/` (this run) of the worktree that
+ran them.
+
+| Split | Arm | R@1 | R@5 | R@8 | R@20 | All@8 | MRR | `exact` R@8 (373) | `behavior` R@8 (87) |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| dev (474) | `full` | .352 | .667 | .727 | .820 | .667 | .561 | .741 | .647 |
+| dev | `full-oversized-references` | .352 | .667 | .725 | .818 | .665 | .561 | .738 | .647 |
+| dev | `full-oversized-structural` | .346 | .643 | .725 | .810 | .667 | .552 | .744 | .624 |
+| dev | `names-case` | .361 | .668 | .722 | .820 | .662 | .565 | .737 | .639 |
+| dev | `names-slash` | .350 | .670 | .727 | .822 | .665 | .560 | .741 | .647 |
+| dev | `names-both` | .354 | .670 | .718 | .820 | .656 | .562 | .731 | .639 |
+
+Paired deltas against `full` (arm minus `full`; `*` marks an interval clear of zero):
+
+| Arm | R@1 | R@5 | R@8 | R@20 | MRR | Tasks with a target rank changed |
+| --- | --- | --- | --- | --- | --- | --- |
+| `full-oversized-references` | +.000 [+.000, +.000] | +.000 [+.000, +.000] | -.002 [-.006, +.000] | -.002 [-.006, +.000] | +.000 [-.000, +.001] | 17 |
+| `full-oversized-structural` | -.007 [-.019, +.005] | -.024 [-.040, -.010]* | -.002 [-.019, +.014] | -.010 [-.021, +.001] | -.009 [-.020, +.001] | 106 |
+| `names-case` | +.008 [+.000, +.018]* | +.002 [-.009, +.012] | -.005 [-.014, +.004] | +.001 [-.006, +.007] | +.004 [-.003, +.012] | 79 |
+| `names-slash` | -.002 [-.006, +.000] | +.004 [-.004, +.012] | -.000 [-.004, +.003] | +.002 [+.000, +.006] | -.001 [-.004, +.001] | 40 |
+| `names-both` | +.002 [-.009, +.013] | +.004 [-.007, +.015] | -.009 [-.019, -.001]* | +.000 [-.008, +.009] | +.001 [-.007, +.009] | 103 |
+
+R@8 by stratum (`full`'s mean, then each arm's paired delta against `full`):
+
+| Stratum (tasks) | `full` | `full-oversized-references` | `full-oversized-structural` | `names-case` | `names-slash` | `names-both` |
+| --- | --- | --- | --- | --- | --- | --- |
+| oversized target (20) | .782 | +.000 [+.000, +.000] | -.445 [-.620, -.278]* | -.017 [-.050, +.000] | -.033 [-.100, +.000] | -.050 [-.133, +.000] |
+| no oversized target (454) | .725 | -.002 [-.007, +.000] | +.017 [+.005, +.031]* | -.004 [-.013, +.004] | +.001 [+.000, +.003] | -.008 [-.018, +.000] |
+| case-only name (202) | .749 | +.000 [+.000, +.000] | +.001 [-.021, +.025] | -.012 [-.033, +.007] | +.002 [+.000, +.007] | -.019 [-.041, +.000] |
+| unresolved slash token (135) | .701 | +.000 [+.000, +.000] | -.004 [-.035, +.027] | -.012 [-.040, +.012] | -.001 [-.015, +.011] | -.028 [-.059, -.004]* |
+
+**Oversized term references are off by default.** The switch was adopted under a rule written
+before any variant ran (`rule.json` in `dist/evals/optimization-2026-09-23/dominance/`): design on
+train only, one validation run per train survivor, adoption only if on validation, against the
+previous default and by point estimate, overall R@8 did not drop, the no-oversized-target stratum
+did not drop, the oversized-target stratum dropped by at most .05, and sqlglot's `parser.py` stayed
+at rank 10 or better on each of the three `group_by_order` queries of the five-fixture snapshot
+check. Deltas below are references off minus references on.
+
+| Evidence | Tasks | R@8 on -> off | R@8 delta | Tasks whose R@8 changed | Oversized-target stratum | Other tasks |
+| --- | --- | --- | --- | --- | --- | --- |
+| train (design) | 357 | .728 -> .731 | +.003 [+.000, +.008] | 1 (up) | +.000 (14 tasks) | +.003 [+.000, +.009] |
+| validation (one run) | 117 | .716 -> .716 | +.000 [+.000, +.000] | 0 | +.000 (6 tasks) | +.000 [+.000, +.000] |
+| dev, final code (this run) | 474 | .725 -> .727 | +.002 [+.000, +.006] | 1 (up, train) | +.000 (20 tasks) | +.002 [+.000, +.007] |
+
+- On train, oversized files that are not targets appear 43 times in the graph retriever's own
+  top 10 with references on and 4 times with them off. In the fused top 8 they fall only from 65
+  to 63 instances. On validation R@20 moves by +.009 [+.000, +.026] and MRR by -.001
+  [-.002, +.000]; the fixture ranks of `parser.py` are 7, 8 and 8 with and without the switch.
+- In this run, 17 tasks have a target rank changed (14 sqlglot, 3 zod), each by one place.
+  Going from references on to off, R@8 changes on one train task (rank 9 -> 8), R@3 on two tasks
+  (both 3 -> 4) and R@20 on one validation task (21 -> 20). Oversized files sit in the top 8 of
+  61 of the 454 tasks without an oversized target with references off, and of 60 with them on.
+- Rejected on train, never run on validation: span documents of 16, 32 and 64 KiB (overall R@8
+  -.002, -.002 and -.000; other tasks -.003 each; oversized non-targets in the top 8 rise from 65
+  to 98, 109 and 104 instances) and capped span scoring at 16 KiB (overall R@8 -.003;
+  oversized-target stratum -.094 over 14 tasks). The per-task outputs, the train and validation
+  decisions and the scripts are in `dist/evals/optimization-2026-09-23/dominance/`.
+
+**Oversized coverage stays on.** 20 development tasks have an oversized target: 23 targets, all
+sqlglot's `parser.py` or `generator.py`, each indexed `complete`. The unreachable and `name_only`
+strata are empty on this split. Coverage ranks every one of these 23 targets higher. With coverage,
+19 of them are in the top 8; without it, 3 are in the top 8 and 4 are not ranked at all. On those 20
+tasks, R@8 is .782 with coverage and .337 without (-.445 [-.620, -.278] for coverage off), and MRR
+is .701 against .377.
+
+The other 454 tasks pay for it: turning coverage off raises their R@8 from .725 to .742 (+.017
+[+.005, +.031]). With coverage, `parser.py` sits in the top 8 of 53 and `generator.py` of 51 of the
+117 sqlglot development tasks. On 61 of the 454 tasks without an oversized target, an oversized
+file is in the top 8; without coverage, 5 are. On 4 of the 10 tasks where coverage lowers R@8, no
+oversized file is in `full`'s top 8, so the effect also runs through something other than a top-8
+slot; this run does not isolate what.
+
+Across all tasks, R@8 is .727 with coverage and .725 without (-.002 [-.019, +.014] for coverage
+off), and coverage leads at R@5 and MRR. That is no regression under the rule above, so the
+held-out split was not consulted.
+
+**No `names` arm clears the rule; the defaults stay.** No R@8 interval lies above zero, every point
+estimate is at or below zero, and `names-both`'s interval lies below zero. No profile stratum loses
+more than .02 R@8 (the largest drop is `names-both` on `exact`, -.010), so the R@8 interval alone
+decides. `names-case` gains at R@1 (+.008, lower bound +.0004), which the rule does not consider.
+Capitalization-only names are not rare in these requests: 202 of 474 carry at least one. 186 of
+those have a name that calibration weighs below identifier weight or turns into a concept. Of the
+416 calibrated name occurrences, 256 have no definition in the repository. The most frequent names
+are product names (NetworkX, DuckDB, PostgreSQL, TypeScript, GitHub) and exception names. On the
+202, `names-case` moves MRR by +.010 [-.007, +.028] and R@1 from .290 to .309; `names-both` moves
+MRR by +.005 [-.013, +.024] and R@1 to .299.
+
+135 requests carry a slash token that does not resolve to an indexed path, for example `zod/mini`,
+`before/after`, `and/or` and `n/a`. Resolving these tokens moves 11 requests out of the `exact`
+profile. On the validation part alone (117 tasks), `names-case` moves R@8 by -.026 [-.060, +.000].
+
 ## Repository memory
 
 Measured on 2026-09-22 with `evals/retrieval/run.py --memory` (see

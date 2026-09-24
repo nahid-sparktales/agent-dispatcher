@@ -479,6 +479,19 @@ def load():
 
 # ------------------------------------------------------------------ generating
 
+# One contract for every role that changes or checks behavior; a template opts in with a
+# {{VERIFY_CONTRACT}} line. It rides in the inlined role text, so every byte displaces packet
+# evidence, and it stays generic: no wording may mirror an evaluation fixture. The interaction
+# list in item 3 was requested as a general principle after a development-suite failure
+# (sqlglot executor_offset), so that task is in-sample for any claim about this contract.
+VERIFY_CONTRACT = """VERIFICATION
+Minimal verification is a floor, not a stopping point: never skip a stated requirement to keep work small; skip unrelated tests and full suites for small changes.
+1. Give each stated requirement its own check, including required compatibility or unchanged behavior; reuse a test only if you know what it asserts.
+2. Check the nearest way the change could still be wrong: a boundary, bad input, a case to reject.
+3. Check the riskiest behavior sharing the changed path; where filtering, ordering, pagination, aggregation or early termination interact, vary each alone and combined.
+4. A pre-existing defect that blocks a stated requirement is in scope; report any other."""
+
+
 def loadout_block(r, d):
     """Loadout ids remain in frontmatter; exact locations come from trusted metadata."""
     return """## Skills for this role
@@ -518,6 +531,7 @@ def write_roles(d):
             if v:
                 fm.append(f"{k}: {', '.join(v)}")
         body = re.sub(r"\n## Carrying context\n.*?(?=\n## |\Z)", "\n", r["body"], flags=re.S)
+        body = body.replace("{{VERIFY_CONTRACT}}", VERIFY_CONTRACT)
         block = loadout_block(r, d)
         if block:
             marker = "\n## Tool posture"

@@ -28,7 +28,9 @@ CONDITIONS = ("baseline", "dispatcher")
 # Every condition the runner can schedule, in canonical order. `indexed` and `warm_experience` add the deep
 # repository index (built or refreshed before each task, outside timing) and, for the warm arm only, the
 # experience its own earlier tasks recorded. A configuration selects a subset that must include baseline.
-ALL_CONDITIONS = ("baseline", "dispatcher", "indexed", "warm_experience", "learned_skills", "learned_recipes", "learned_global", "learned_full")
+ALL_CONDITIONS = ("baseline", "dispatcher", "dispatcher_lean", "dispatcher_evidence", "indexed", "warm_experience", "learned_skills", "learned_recipes", "learned_global", "learned_full")
+# Packet-mode arms: exactly the static `dispatcher` arm plus the helper's packet mode (AGENT_DISPATCHER_PACKET).
+PACKET_CONDITIONS = {"dispatcher_lean": "lean", "dispatcher_evidence": "evidence"}
 # Learned arms: warm_experience plus a frozen, explicitly authorized overlay library of increasing kinds (skills, recipes,
 # a frozen user-global library, the full bundle). Each arm keeps its own library, learning store and observations.
 LEARNED_CONDITIONS = ("learned_skills", "learned_recipes", "learned_global", "learned_full")
@@ -57,6 +59,16 @@ def selected_clients(clients=CLIENTS):
             or len(set(names)) != len(names)):
         raise ValueError("clients must be a nonempty, unique selection of codex and/or claude")
     return tuple(client for client in CLIENTS if client in names)
+
+
+def check_packet_tokens(tokens, conditions):
+    """One soft packet target for both packet arms (AGENT_DISPATCHER_PACKET_TOKENS), in the helper's accepted range."""
+    if tokens is None:
+        return
+    if type(tokens) is not int or not 256 <= tokens <= 100000:
+        raise ValueError("packet_tokens must be an integer between 256 and 100000")
+    if not any(c in PACKET_CONDITIONS for c in conditions):
+        raise ValueError("packet_tokens is only meaningful with dispatcher_lean or dispatcher_evidence")
 
 
 def validate_config(config, live=False):
@@ -90,6 +102,7 @@ def validate_config(config, live=False):
             raise ValueError("learning_global_library must be an absolute path to a frozen global library")
     elif config.get("learning_library") or config.get("learning_global_library"):
         raise ValueError("learning_library is only meaningful with a learned condition")
+    check_packet_tokens(config.get("packet_tokens"), chosen)
     eligible = config.get("warm_experience_eligible", ["grader_passed"])
     if not isinstance(eligible, list) or any(not isinstance(v, str) for v in eligible):
         raise ValueError("warm_experience_eligible must be a list of outcome names")
@@ -171,10 +184,11 @@ def stage_packages(destination, clients=CLIENTS):
 
 
 def prepare(output, suite_path=None, models=None, efforts=None, auth=None, seed=20260919, clients=CLIENTS,
-            warm_project_index=False, conditions=CONDITIONS):
+            warm_project_index=False, conditions=CONDITIONS, packet_tokens=None):
     from evals.end_to_end.grading import load_suite
     if type(warm_project_index) is not bool:
         raise ValueError("warm_project_index must be a boolean")
+    check_packet_tokens(packet_tokens, conditions)  # before the output directory exists
     clients = selected_clients(clients)
     output = Path(output).absolute()
     if output.exists():
@@ -207,6 +221,8 @@ def prepare(output, suite_path=None, models=None, efforts=None, auth=None, seed=
               "warm_project_index": warm_project_index, "conditions": list(conditions),
               "experience_outcome": "harness_grader", "warm_experience_eligible": ["grader_passed"],
               "output_dir": str(output), "provenance": provenance, "clients": {}}
+    if packet_tokens is not None:
+        config["packet_tokens"] = packet_tokens  # absent otherwise, so configurations without it keep their shape
     for client in clients:
         profile = profile_root / client
         profile.mkdir(parents=True, mode=0o700)
@@ -409,7 +425,7 @@ def run_trial(config, batch, row, fixture):
               "task_success": None, "auto_grade": {"passed": False, "checks": [],
                                                     "human_required": fixture["human_required"]},
               "treatment_invoked": None, "elapsed_seconds": None,
-              "usage": {k: None for k in ("input_tokens", "output_tokens", "cached_input_tokens", "cost_usd")},
+              "usage": dict.fromkeys(adapters.USAGE_KEYS), "runtime": dict.fromkeys(adapters.RUNTIME_KEYS),
               "final_answer": "", "artifact_dir": str(artifacts.relative_to(batch)),
               "prompt": fixture["prompt"], "acceptance": fixture["acceptance"],
               "rubric": fixture["rubric"], "diagnostics": [], "startup_valid": False}
@@ -419,7 +435,10 @@ def run_trial(config, batch, row, fixture):
     if row.get("sequence") is not None:
         result.update(sequence=row["sequence"], step=row["step"])
     try:
-        with workspace_for(config, client, condition, fixture) as (workspace, skill):
+        with workspace_for(config, client, condition, fixture) as (workspace, skill), \
+                tempfile.TemporaryDirectory(prefix="dispatcher-eval-config-") as config_home:
+            # Outside the audited trial directory, so it is never scope residue; identical (empty) for every condition.
+            spec = dict(spec, config_home=config_home)
             if config.get("warm_project_index", False):
                 from evals.end_to_end.warmup import warm_project_indexes
                 result["index_setup"] = warm_project_indexes(config, client, workspace)
@@ -441,9 +460,14 @@ def run_trial(config, batch, row, fixture):
                     rt.write_json(artifacts / "learning-setup.json", learning)
                     if not learning["ok"]:
                         raise ValueError("Learning library setup failed; no model task started. " + " ".join(learning["diagnostics"]))
-            elif condition == "dispatcher":
-                # The static arm never reads the user's own learning configuration or stores.
-                spec = dict(spec, index_env={"AGENT_DISPATCHER_LEARNING_CONFIG": str(warmup.disabled_learning_settings(config))})
+            elif condition == "dispatcher" or condition in PACKET_CONDITIONS:
+                # The static arms never read the user's own learning configuration or stores; packet arms add only the packet mode.
+                index_env = {"AGENT_DISPATCHER_LEARNING_CONFIG": str(warmup.disabled_learning_settings(config))}
+                if condition in PACKET_CONDITIONS:
+                    index_env["AGENT_DISPATCHER_PACKET"] = PACKET_CONDITIONS[condition]
+                    if config.get("packet_tokens") is not None:  # the same target for both packet arms
+                        index_env["AGENT_DISPATCHER_PACKET_TOKENS"] = str(config["packet_tokens"])
+                spec = dict(spec, index_env=index_env)
             initial = rt.tree_files(workspace, rt.EXCLUDED)
             if config.get("warm_project_index", False):
                 validate_final_artifacts(initial, {})
@@ -480,6 +504,7 @@ def run_trial(config, batch, row, fixture):
                 rt.write_json(artifacts / "activity.json", result["activity"])
                 parsed = adapters.parse_events(client, execution["stdout"])
                 result["usage"] = parsed["usage"]
+                result["runtime"] = parsed["runtime"]
                 result["usage_observed"] = parsed.get("usage_observed", False)
                 result["startup"] = parsed.get("startup", {})
                 result["final_answer"] = rt.scrub_text(parsed["final_answer"], launch["env"])
@@ -660,7 +685,10 @@ def main(argv=None):
     p.add_argument("--clients", nargs="+", choices=CLIENTS, default=list(CLIENTS),
                    help="clients to evaluate (default: codex claude); selection persists in config")
     p.add_argument("--conditions", nargs="+", choices=ALL_CONDITIONS, default=list(CONDITIONS),
-                   help="conditions to schedule (default: baseline dispatcher); indexed and warm_experience add the deep index")
+                   help="conditions to schedule (default: baseline dispatcher); indexed and warm_experience add the deep index; "
+                        "dispatcher_lean and dispatcher_evidence set the helper's packet mode")
+    p.add_argument("--packet-tokens", type=int,
+                   help="soft packet target (AGENT_DISPATCHER_PACKET_TOKENS, 256-100000) for both packet-mode arms; default: the helper's own")
     for client in CLIENTS:
         p.add_argument(f"--{client}-model")
         p.add_argument(f"--{client}-effort")
@@ -675,6 +703,8 @@ def main(argv=None):
     p.add_argument("--import", dest="ratings", type=Path)
     p = commands.add_parser("report")
     p.add_argument("--batch", type=Path, required=True)
+    p = commands.add_parser("audit", help="re-derive cost, usage and helper evidence from saved events; prints JSON, writes nothing into the batch")
+    p.add_argument("--batch", type=Path, action="append", required=True)
     args = parser.parse_args(argv)
     try:
         if args.command == "prepare":
@@ -683,7 +713,8 @@ def main(argv=None):
                                   {c: getattr(args, c + "_effort") for c in CLIENTS},
                                   {c: getattr(args, c + "_auth") for c in CLIENTS}, args.seed, clients=args.clients,
                                   warm_project_index=args.warm_project_index,
-                                  conditions=[c for c in ALL_CONDITIONS if c in args.conditions or c == "baseline"])
+                                  conditions=[c for c in ALL_CONDITIONS if c in args.conditions or c == "baseline"],
+                                  packet_tokens=args.packet_tokens)
             print(f"Prepared {config_path}; no model runs started.")
             print("Use native login with the dedicated profile directories in this configuration, or provider API environment variables.")
         elif args.command in ("doctor", "run"):
@@ -706,6 +737,9 @@ def main(argv=None):
         elif args.command == "review":
             from evals.end_to_end.reporting import create_review, import_review
             print(import_review(args.batch, args.ratings) if args.ratings else create_review(args.batch))
+        elif args.command == "audit":
+            from evals.end_to_end.reporting import audit
+            print(json.dumps(audit(args.batch), indent=2, allow_nan=False))
         else:
             from evals.end_to_end.reporting import report
             report(args.batch)

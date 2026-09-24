@@ -6,7 +6,9 @@ OS audit. Package identity is captured before a trial from its staged file tree.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 import json
+import math
 import os
 from pathlib import Path
 import re
@@ -336,6 +338,9 @@ def _literal_helper_pipeline(command, binding, cwd):
             return [], False
         tokens = tokens[4:]
         piped = True
+    stripped = _without_output_filter(tokens)
+    # Only a stripped `| head|tail` takes the exit status; a bare `2>&1` leaves it with the helper.
+    filtered, tokens = ("operator", "|") in tokens[len(stripped):], stripped
     if not tokens or any(kind != "word" for kind, _ in tokens):
         return [], False
     words = [value for _, value in tokens]
@@ -351,7 +356,29 @@ def _literal_helper_pipeline(command, binding, cwd):
         return [], False
     if piped and not any(args[index:index + 2] == ["--task-file", "-"] for index in range(len(args) - 1)):
         return [], False
-    return [{"kind": "helper", "target": target, "helper": Path(relative).stem}], True
+    row = {"kind": "helper", "target": target, "helper": Path(relative).stem}
+    if filtered:
+        row["output_filtered"] = True
+    return [row], True
+
+
+def _without_output_filter(tokens):
+    """Drop one trailing `[2>&1] | tail|head -N` (or `-n N`): a bounded view of the same helper's output, not another
+    command. Anything else after the helper stays unattributable, as before."""
+    operators = [index for index, (kind, _) in enumerate(tokens) if kind == "operator"]
+    if not operators:
+        return tokens
+    head, rest = tokens[:operators[0]], tokens[operators[0]:]
+    if rest[:2] == [("operator", ">&"), ("word", "1")] and head and head[-1] == ("word", "2"):
+        head, rest = head[:-1], rest[2:]
+    if not rest:
+        return head
+    words = [value for kind, value in rest[1:] if kind == "word"]
+    if (rest[0] != ("operator", "|") or len(words) != len(rest) - 1 or not words or words[0] not in ("tail", "head")
+            or not (len(words) == 2 and re.fullmatch(r"-\d+", words[1])
+                    or len(words) == 3 and words[1] == "-n" and words[2].isdigit())):
+        return []
+    return head
 
 
 def _shell_calls(command, binding, depth=0, cwd=None):
@@ -430,6 +457,36 @@ def _outcome(call):
     if call["name"] == "command_execution":
         return "unknown"
     return "succeeded" if call.get("error") is False or call.get("result_received") else "unknown"
+
+
+def _payload(output):
+    try:
+        payload = json.loads(output)
+    except ValueError:
+        return None
+    return payload if isinstance(payload, dict) else None
+
+
+def _wall_ms(call):
+    """Tool-call to tool-result span from native event timestamps; unknown when either is missing."""
+    try:
+        start, end = (datetime.fromisoformat(call[key].replace("Z", "+00:00")) for key in ("started_at", "finished_at"))
+        elapsed = round((end - start).total_seconds() * 1000)
+    except (KeyError, AttributeError, TypeError, ValueError):
+        return None
+    return elapsed if elapsed >= 0 else None
+
+
+def _timing(value, depth=0):
+    """Numeric leaves and short labels from the helper's own timing object; never paths or free text."""
+    if isinstance(value, dict) and depth < 3:
+        kept = {key: _timing(item, depth + 1) for key, item in list(value.items())[:64] if isinstance(key, str) and len(key) <= 64}
+        return {key: item for key, item in kept.items() if item is not None}
+    if type(value) in (int, float) and math.isfinite(value):
+        return value
+    if isinstance(value, str) and re.fullmatch(r"[\w.:-]{0,32}", value):
+        return value
+    return None
 
 
 def _context_exclusions(payload):
@@ -634,7 +691,9 @@ def analyze(client, stdout, binding, *, interrupted=False):
                 if kind == "assistant" and block.get("type") == "text":
                     declare(_text(block.get("text")), line_number)
                 elif kind == "assistant" and block.get("type") == "tool_use":
-                    add(block.get("id"), block.get("name"), block.get("input", {}), line_number)
+                    call = add(block.get("id"), block.get("name"), block.get("input", {}), line_number)
+                    if call:
+                        call["started_at"] = event.get("timestamp")
                 elif kind == "user" and block.get("type") == "tool_result":
                     ident = block.get("tool_use_id")
                     call = calls.get(ident) if isinstance(ident, str) else None
@@ -643,7 +702,7 @@ def analyze(client, stdout, binding, *, interrupted=False):
                         uncertain_lines.append(line_number)
                         continue
                     extra = event.get("tool_use_result", {})
-                    call.update(complete=True, result_received=True, result_line=line_number, output=_text(block.get("content")),
+                    call.update(complete=True, result_received=True, result_line=line_number, output=_text(block.get("content")), finished_at=event.get("timestamp"),
                                 error=block.get("is_error"), exit_code=block.get("exit_code", extra.get("exit_code") if isinstance(extra, dict) else None))
     trace_partial = partial or not terminal
     guidance = []
@@ -673,6 +732,10 @@ def analyze(client, stdout, binding, *, interrupted=False):
                 rows = _investigation([path], binding, cwd, "search" if name in SEARCH_TOOLS else "explore", instructions_only=exempt)
         elif name in SHELL_TOOLS:
             rows, attributable = _shell_calls(inputs.get("command", inputs.get("cmd")), binding, cwd=cwd)
+            if outcome in {"succeeded", "failed"} and any(row.get("output_filtered") for row in rows):
+                # head/tail own the exit status: only the helper's own versioned JSON establishes its success.
+                payload = _payload(call["output"])
+                outcome = "succeeded" if payload is not None and type(payload.get("schema_version")) is int else "unknown"
         elif name in WRITE_TOOLS:
             target, _ = _path(inputs.get("file_path", inputs.get("path")), binding, cwd)
             rows = [{"kind": "write", "target": target}] if target else []
@@ -708,13 +771,12 @@ def analyze(client, stdout, binding, *, interrupted=False):
                 row["path_error"] = True
             if row["kind"] == "helper":
                 summary["helper_attempts"] += 1
+                payload = _payload(call["output"])
+                row.update(payload_chars=len(call["output"]) if call["complete"] else None, wall_ms=_wall_ms(call),
+                           helper_timing=_timing(payload["timing"]) if payload and isinstance(payload.get("timing"), dict) else None)
                 if outcome == "succeeded":
                     summary["helper_successes"] += 1
-                    try:
-                        payload = json.loads(call["output"])
-                    except ValueError:
-                        payload = None
-                    if isinstance(payload, dict):
+                    if payload is not None:
                         if row["helper"] == "context":
                             row["context_exclusions"] = _context_exclusions(payload)
                         mapping = payload.get("project_map", payload)

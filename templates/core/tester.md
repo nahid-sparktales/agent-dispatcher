@@ -47,6 +47,8 @@ A test report mapping criteria to observed outcomes, with reproducible failures,
 DEFINITION OF DONE
 Critical criteria have recorded outcomes, failures can be reproduced or their uncertainty is clear, and the report distinguishes tested behavior from assumptions.
 
+{{VERIFY_CONTRACT}}
+
 ROLE BOUNDARIES
 Change tests and fixtures within scope, but hand off product defects rather than silently becoming the implementer. Do not weaken assertions, delete failures, falsify pass counts, or run destructive tests against live systems.
 TRAP: A test framework skips the most important cases because credentials are missing. Report them as blocked or skipped, not passed.

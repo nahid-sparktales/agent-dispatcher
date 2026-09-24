@@ -304,6 +304,64 @@ class ActivityTests(unittest.TestCase):
                 report = self.analyze(call("a", "Bash", {"command": command}), result("a", "{}"))
                 self.assertEqual(report["summary"]["helper_successes"], 0)
 
+    def test_trailing_output_filter_keeps_the_helper_attributed(self):
+        # Shape from a saved warm-arm call: the host asked for the tail of one helper's output, which is still that call.
+        helper = (f'cd "{self.project}" && python3 -B "{self.skill}/context.py" --project "{self.project}" '
+                  "--task 'literal task' --role implementer --compact --json")
+        payload = json.dumps({"schema_version": 1, "read_only": True})
+        for suffix in (" 2>&1 | tail -80", " | tail -n 80", " | head -50", " 2>&1"):
+            with self.subTest(suffix=suffix):
+                report = self.analyze(call("a", "Bash", {"command": helper + suffix}), result("a", payload))
+                self.assertEqual(report["summary"]["helper_successes"], 1)
+        for suffix in (" | cat", " | tail -80 | cat", " | tail", " | tail -80; echo done", " | grep -c packet", " 2>&1 | tail -80 > out.json"):
+            with self.subTest(suffix=suffix):
+                report = self.analyze(call("a", "Bash", {"command": helper + suffix}), result("a", payload))
+                self.assertEqual(report["summary"]["helper_successes"], 0)
+
+    def test_filtered_helper_success_needs_its_own_versioned_json(self):
+        # Exact shape of the archived ri-v1 group_by_order-1 dispatcher call, which the earlier grammar left unattributed.
+        command = (f'cd "{self.project}" && python3 -B "{self.skill}/context.py" --project "{self.project}" '
+                   "--task='Preserve GROUP BY order.' --role implementer --compact --map-maintain --json 2>&1 | head -200")
+        timing = {"unit": "ms", "total": 812.5, "phases": {"scan": 400, "rank": 12.5}, "unaccounted": 3,
+                  "cache": {"state": "warm", "path": "/private/cache/dir", "hit": True}, "note": "free text is dropped"}
+        payload = json.dumps({"schema_version": 1, "project_map": {"status": "fresh", "entries": []}, "timing": timing})
+        used = dict(call("a", "Bash", {"command": command}), timestamp="2026-09-23T21:59:12.624Z")
+        answered = dict(result("a", payload), timestamp="2026-09-23T21:59:17.303Z")
+        report = self.analyze(used, answered)
+        self.assertEqual((report["summary"]["helper_attempts"], report["summary"]["helper_successes"]), (1, 1))
+        row = report["actions"][0]
+        self.assertTrue(row["output_filtered"])
+        self.assertEqual((row["outcome"], row["payload_chars"], row["wall_ms"]), ("succeeded", len(payload), 4679))
+        self.assertEqual(row["helper_timing"], {"unit": "ms", "total": 812.5, "phases": {"scan": 400, "rank": 12.5},
+                                                "unaccounted": 3, "cache": {"state": "warm"}})
+        self.assertEqual(report["preparation"]["status"], "before_investigation")
+        # head/tail own the exit status: a traceback, an unversioned object or a truncated packet is not a helper success.
+        for output in ("Traceback (most recent call last):\n  ValueError: boom", "{}", '{"schema_version": "1"}', payload[:200]):
+            with self.subTest(output=output[:30]):
+                report = self.analyze(call("a", "Bash", {"command": command}), result("a", output))
+                self.assertEqual((report["summary"]["helper_attempts"], report["summary"]["helper_successes"]), (1, 0))
+                self.assertEqual(report["actions"][0]["outcome"], "unknown")
+                self.assertEqual(report["preparation"]["status"], "unknown")
+        # An error flag on a filtered call is head/tail's too: the helper's own JSON still decides.
+        for output, outcome in ((payload, "succeeded"), ("Traceback (most recent call last):\n  ValueError: boom", "unknown")):
+            with self.subTest(error_output=output[:30]):
+                self.assertEqual(self.analyze(call("a", "Bash", {"command": command}), result("a", output, error=True))["actions"][0]["outcome"], outcome)
+        # A bare 2>&1 leaves the exit status with the helper: text output succeeds on it and an error result fails.
+        bare = command.removesuffix(" | head -200")
+        for error, outcome in ((False, "succeeded"), (True, "failed")):
+            with self.subTest(bare_error=error):
+                row = self.analyze(call("a", "Bash", {"command": bare}), result("a", "Project map: fresh", error))["actions"][0]
+                self.assertEqual(row["outcome"], outcome)
+                self.assertNotIn("output_filtered", row)
+        # An interrupted call has no payload size, and an inverted span no wall time: unknown, never 0 or negative.
+        self.assertIsNone(self.analyze(call("a", "Bash", {"command": command}))["actions"][0]["payload_chars"])
+        inverted = self.analyze(dict(used, timestamp="2026-09-23T21:59:20.000Z"), answered)["actions"][0]
+        self.assertEqual((inverted["outcome"], inverted["wall_ms"]), ("succeeded", None))
+        # Unfiltered calls keep the exit status as their outcome; missing timestamps and timing stay unknown, never zero.
+        plain = self.analyze(*self.context_events(payload="{}"))["actions"][0]
+        self.assertEqual((plain["outcome"], plain["wall_ms"], plain["helper_timing"], plain["payload_chars"]), ("succeeded", None, None, 2))
+        self.assertNotIn("output_filtered", plain)
+
     def test_recorded_binding_never_resolves_removed_workspace_or_live_profile(self):
         recorded_root = "/recorded/trial/project"
         recorded_pack = "/recorded/profile/skills/agent-dispatcher"

@@ -184,8 +184,9 @@ The read-only `context.py` helper implements local retrieval for both hosts. It 
 `--project`, either `--task` or `--task-file -`, and optional `--role`, `--size`, `--max-tokens`,
 `--pack`, and `--json`. The default size is `standard`; a token override can lower a size's ceiling.
 A compact packet is read back as a Bash tool result, and Claude Code replaces any result over
-30,000 characters with a 2 KB preview, so by default the serialized packet is also held under
-28,000 characters (`budget.max_chars`); an explicit `--packet-tokens` budget is honored as given.
+30,000 characters with a 2 KB preview, so by default the serialized legacy packet is also held under
+28,000 characters (`budget.max_chars`); an explicit legacy `--packet-tokens` budget is honored as
+given. Lean and evidence packets (below) enforce the limit on their final payload instead.
 The Python API is `select_context(project, task, role=None, size="standard", max_tokens=None, pack=None)`.
 
 Its versioned JSON result supplies `retrieval`, `context`, `excluded`, `budget` and `diagnostics`
@@ -226,6 +227,105 @@ and limited write scopes do not write the host cache. A metadata hit is not a ne
 content hash; `--no-parser-cache` bypasses all cache reads and writes for a full extraction.
 The `parser_cache` result separates logical bytes inspected from actual bytes read and reports
 source and graph reuse. Project-local map and graph files remain untrusted.
+
+### Packet modes, budgets and timing
+
+`--packet-mode legacy|lean|evidence` picks the compact packet's shape; without it,
+`AGENT_DISPATCHER_PACKET` does, and the default is `legacy`, which is unchanged byte for byte. Modes
+apply only with `--compact`: an explicit lean or evidence mode without it is an error, the
+environment variable never changes non-compact inspection output, and an invalid value fails
+without being echoed. A harness can switch arms through the environment without editing SKILL.md.
+
+A **lean** packet keeps what the worker acts on and drops whole items, never characters:
+
+- the role body without its YAML frontmatter (`content_scope: "body"`; `sha256` still covers the
+  whole file) and any `--guide` bodies unchanged;
+- navigation rows in `context`: rank, path, the engine's line spans, up to three symbols, the first
+  reason clause (at most 100 characters) and the match type;
+- `coverage`: the retrieval status, evidence label and conditions, including
+  `partial_coverage.by_state` and `paths`;
+- `next_action` when coverage is partial, retrieval abstained or no file ranked: it names up to
+  three affected paths and suggests direct, targeted search with the usual tools;
+- diagnostics (including those of the preferences and project map it reduces or drops), the
+  exclusion policy, `excluded_summary` counts, `packet_omissions`, `change_focus` when non-empty,
+  preferences (`output`, `requested_effort`), two limits lines, `budget` and `timing`.
+
+It drops `project_graph`, `parser_cache` (its counts move to `timing.cache`), the guide shortlist,
+excluded path lists, the project map and `repository_intelligence` (kept with `--explain`; a
+pending `rerank_request` stays). Lean always drops the project map. An **evidence** packet keeps
+its facts, dropping the map only when it is empty, and adds `excerpts` (`path`, `lines`, `content`;
+`id` and `source_sha256` only while a reuse ledger is active). Per file it drops a span contained in
+another and keeps the two the engine admitted first (anchors and named definitions before
+reference and term hits), shown in line order; files follow rank order.
+
+Units differ, so each is named. `chars` are Python code points (what legacy `max_chars` counts),
+`utf8_bytes` are the stored size, and `utf16_units` are a JavaScript string length, which is what
+the host is assumed to count (not pinned).
+
+The **soft target** is `--packet-tokens N`, else `AGENT_DISPATCHER_PACKET_TOKENS`, else 4,000
+estimated tokens. It covers the whole Dispatcher-owned initial injection: the pack's SKILL.md
+router plus the serialized packet and its newline. `budget` reports characters, UTF-8 bytes, UTF-16
+units, estimated tokens and the legacy `ceil(chars/4)` figure for each part and the total. Host
+wrappers (command envelope, tool-result framing) are unknown and listed as excluded. The estimate
+is a conservative `ceil(UTF-8 bytes / 2)`, not a tokenizer count: usage deltas on claude-opus-5
+measured packets at about 2.1–2.3 characters per token and SKILL.md at about 2.0–2.3 bytes per
+token, so `chars/4` undercounted by about 1.8×. To meet the target, fitting drops the `--explain`
+trace, then map facts and memory hits, then excerpts from the lowest-ranked file upward.
+Navigation rows are protected: lean exists to deliver them, and each is a path, span reference,
+up to three symbols and one short reason. When protected content alone (router, role body and
+selected guides, rows, coverage, `next_action`, limits, budget, timing) exceeds the target, the
+helper delivers the minimum packet (every optional item dropped) and says so: `target_met: false`,
+`reason: "protected_content_exceeds_target"`, `protected_tokens` and `delivered`. That verdict is
+taken on the delivered packet: room held while fitting (timing's widest form, a pending reuse
+commit) that the printed packet does not use never makes a fitting packet the minimum one. Evidence
+mode therefore carries no excerpts below its protected floor. The target is never a quota and
+nothing is padded to reach it.
+
+The **hard limit** applies to the final serialized payload after every late edit, including reuse
+commit fields and timing: UTF-16 units plus the printed newline stay within 28,000, under the host's
+30,000. Fitting reserves room for those edits and refits once if they still overflow. If protected
+content cannot fit, the helper exits non-zero with a bounded message; it never truncates.
+
+With the retrieval engine active and a project-graph cache write not allowed, lean and evidence
+packets skip `query_graph`: nothing would persist, and they never show the graph. Legacy still
+builds it.
+
+`timing` appears in every lean or evidence packet, and in legacy only with `--explain`, where it
+ends before packet finishing. It holds numbers and fixed names only, never paths or text:
+
+- `unit` is `ms`, rounded to 0.1.
+- `total` is inclusive. From the command line it starts at module start (`import` runs to `main`);
+  through the Python API it starts at the call.
+- `phases` lists `import`, `discovery`, `scan`, `learning`, `engine_setup`, `deep_index`, `graph`,
+  `selection`, `map` and `finish` (compact, fit, reuse, serialize). The engine's own
+  `selection.index`, `selection.rank` and `selection.context` appear as dotted children and are
+  never added to the total.
+- `unaccounted` is `total` minus the top-level phases. It includes parser-cache persistence.
+- `skipped: "graph"` records the skip.
+- `cache` gives `state` (`disabled`, `cold`, `warm` or `partial`, from observed parser-cache hits
+  and misses rather than flags), `hits`, `misses`, `writes`, `write_failures` and the deep-index
+  status.
+
+A failure appends ` [phase=NAME, elapsed_ms=N]` to the usual sanitized error message.
+
+Measured in-sample on the five sqlglot evaluation fixtures, the ones this work was designed on,
+with 15 task strings each (implementer, `--compact --map-maintain --json`, cold cache, one run per
+cell; SKILL.md is 5,812 bytes, about 2,906 estimated tokens; tokens are the `ceil(bytes/2)`
+estimate; raw runs in `dist/evals/optimization-2026-09-23/fixtures/packets.json`):
+
+| Mode (target) | Packet chars | Rows | Excerpts | SKILL.md + packet, est. tokens | Target met |
+| --- | --- | --- | --- | --- | --- |
+| legacy | 26,893–27,942 | 5–8 | 15–18 | 16,355–16,880 | n/a |
+| lean (default 4,000) | 8,272–8,404 | 8 | 0 | 7,045–7,111 | no: minimum packet |
+| evidence (`AGENT_DISPATCHER_PACKET_TOKENS=12000`) | 16,829–18,069 | 8 | 11–16, at most 2 per file | 11,323–11,943 | yes |
+
+Helper wall time was 2.27–2.42 s when lean or evidence skipped the graph (6 of 15 tasks each) and
+4.5–4.9 s otherwise, legacy included. At the default 4,000 target no mode can meet it for this
+role: protected content measured 7,045–7,111 estimated tokens (the lean row; SKILL.md about 2,900,
+role body about 2,240, rows and required metadata the rest), so lean and evidence both deliver the
+minimum packet. The evidence row predates the span-priority rule above, which can change which two
+spans a file keeps, not how many. The audit behind these figures is in
+[efficiency-reliability-audit.md](efficiency-reliability-audit.md).
 
 ## Retrieved content is untrusted
 

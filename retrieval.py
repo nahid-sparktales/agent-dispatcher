@@ -15,7 +15,7 @@ symbol, edge, co-change pair or explorer request cannot reach an excluded file.
 from __future__ import annotations
 
 import argparse
-from collections import defaultdict
+from collections import Counter, defaultdict
 import copy
 import json
 import math
@@ -36,6 +36,11 @@ DEFAULTS = {
     # "symbol_references"], "weight": 1.0}}.
     "fusion_groups": None,
     "query_weights": {"path": 4.0, "symbol": 3.0, "identifier": 3.0, "concept": 1.0, "subtoken_factor": 0.5},
+    # How a request word earns identifier weight; benchmark ablation switches, the defaults are the shipped behavior.
+    # case_only "shape": a word whose only code signal is its capitalization (MySQL, GraphQL) is an identifier;
+    # "resolved": weighed by what it denotes in the index (analyze_query). slash_words "path": every A/B token is a
+    # query path; "resolved": only one that names indexed files, other A/B prose is read as words.
+    "names": {"case_only": "shape", "slash_words": "path"},
     "path": {"explicit": 10.0, "module": 6.0, "package": 1.5, "stem_exact": 3.0, "stem_token": 2.0,
              "directory": 1.0, "partial": 0.5, "partial_min_chars": 5},
     "bm25": {"k1": 1.2, "b": 0.75},
@@ -66,6 +71,12 @@ DEFAULTS = {
     # Admitted files over the read limit contribute their definitions, imports and calls (structural records
     # computed without retaining the text) instead of their name alone.
     "structural_records": True,
+    # ...and their terms from the same bounded read, with excerpts re-read on demand. Ablation switch: False keeps only
+    # the definitions (the structural-only behavior before lexical coverage), with no excerpt.
+    # `references`: whether those terms also become term-reference graph edges. A file read up to 4 MiB mentions nearly
+    # every name in the repository, so as a graph seed it expanded into unrelated files; off, its terms still match requests
+    # and its imports, calls and definitions keep their edges (strategy `full-oversized-references` turns it back on).
+    "oversized": {"lexical": True, "references": False},
     # Fused scores within this relative distance of their group's leader count as a tie, settled by evidence
     # (definition, then named path, then identifier, then structure) instead of by a hair of lexical rank.
     # Benchmark-neutral at 0.05 (0.10 and 0.20 cost recall); 0 compares exact scores only.
@@ -141,6 +152,8 @@ def _strategies():
     out["full-rrf"] = _merge(full, {"fusion": "combsum"})
     out["full-frames"] = _merge(full, {"frames": {"enabled": False}})
     out["full-structure"] = _merge(full, {"structural_records": False})
+    out["full-oversized-structural"] = _merge(full, {"oversized": {"lexical": False}})
+    out["full-oversized-references"] = _merge(full, {"oversized": {"references": True}})
     # Representation experiments: raw source (`+query-analysis`) against role summaries, alone and fused.
     out["role-only"] = _merge(out["+query-analysis"], {"retrievers": ["role_summary"]})
     out["bm25+role"] = _merge(out["+query-analysis"], {"retrievers": ["bm25", "role_summary"], "fusion": "rrf"})
@@ -265,18 +278,66 @@ def frame_anchors(query, index, config):
     return anchors
 
 
-def analyze_query(task, config=None):
-    """Split a request into what it names (paths, modules, symbols, identifiers) and what it talks about."""
+def _names_files(value, index):
+    """A slash token names indexed files: it ends an indexed path (extension optional) or is a run of its directories.
+    `value` is the raw token: trailing dots (sentence end) and leading ./ or ../ are dropped, a leading dot (.github) kept."""
+    value = re.sub(r"^(?:\.{1,2}/)+", "", value.rstrip("."))
+    # ponytail: one scan of the paths per slash token; index path suffixes if pasted logs with many tokens get slow.
+    return any(("/" + p).endswith("/" + value) or ("/" + re.sub(r"\.[^./]*$", "", p)).endswith("/" + value)
+               or ("/" + value + "/") in ("/" + p) for p in index.paths)
+
+
+def _calibrate(identifiers, explicit, raw, index, weights):
+    """names.case_only "resolved": a word that looks like code only by its capitalization is weighed by what it denotes
+    in the index. No definition: a concept. Its definitions plus same-stem non-test files (its family) count n: one file
+    keeps identifier weight, n files get concept + (identifier - concept) / sqrt(n), except that the strictly
+    most-mentioned of two or more such ambiguous names keeps identifier weight. Never below concept weight."""
+    facts = _sibling("repo_index")
+    names = [n for n in identifiers if n not in explicit and "_" not in n.strip("_") and not (n.isupper() and any(c.isdigit() for c in n))]
+    if not names:
+        return {}
+    stems = defaultdict(set)
+    for path in index.paths:
+        if index.kinds[path] != "test":
+            stems[index.path_parts[path][0]].add(path)
+    found = {name: ({row[0] for row in index.definitions.get(name, ())}, stems.get(facts["normalize"](name.lower()), set()),
+                    raw.count(name)) for name in names}
+    # ponytail: dominance counts exact-case mentions in the request; a tie demotes every tied name.
+    counts = sorted((m for d, f, m in found.values() if d and len(d | f) > 1), reverse=True)
+    out = {}
+    for name, (defines, family, mentions) in found.items():
+        n = len(defines | family)
+        if not defines:
+            weight, reason = weights["concept"], "no definition"
+        elif n == 1:
+            weight, reason = weights["identifier"], "denotes one file"
+        elif len(counts) > 1 and mentions == counts[0] > counts[1]:
+            weight, reason = weights["identifier"], "most mentioned of the ambiguous names"
+        else:
+            weight, reason = weights["concept"] + (weights["identifier"] - weights["concept"]) / math.sqrt(n), f"ambiguous: denotes {n} files"
+        out[name] = {"weight": weight, "defines": len(defines), "family": len(family), "mentions": mentions, "reason": reason}
+    return out
+
+
+def analyze_query(task, config=None, index=None):
+    """Split a request into what it names (paths, modules, symbols, identifiers) and what it talks about.
+
+    `index` (a RepoIndex) is consulted only by the `names` switches set to "resolved"; without it, or with the
+    default switches, the analysis depends on the request text alone."""
     config = config or DEFAULTS
-    index = _sibling("repo_index")
+    facts = _sibling("repo_index")
     weights = config["query_weights"]
+    names = config.get("names", DEFAULTS["names"])
+    resolve_slashes, resolve_case = (index is not None and names[key] == "resolved" for key in ("slash_words", "case_only"))
     text = _URL.sub(" ", task)
     raw = _WORD.findall(text)
     paths, dotted, symbols, qualified, identifiers = [], [], [], [], []
     for value in _SLASHED.findall(text) + _PATHISH.findall(text):
-        value = re.sub(r"(?::\d+(?:[:-]\d+)?|#L\d+(?:-L?\d+)?)$", "", value).strip(".")
+        token = re.sub(r"(?::\d+(?:[:-]\d+)?|#L\d+(?:-L?\d+)?)$", "", value)
+        value = token.strip(".")
         suffix = value.rsplit(".", 1)[-1].lower() if "." in value else ""
-        if ("/" in value or suffix in KNOWN_SUFFIXES) and value not in paths:
+        if (("/" in value or suffix in KNOWN_SUFFIXES) and value not in paths
+                and (suffix in KNOWN_SUFFIXES or not resolve_slashes or _names_files(token, index))):
             paths.append(value)
     for value in _DOTTED.findall(text):
         parts = value.split(".")
@@ -307,6 +368,12 @@ def analyze_query(task, config=None):
         camel = any(c.isupper() for c in word[1:]) and any(c.islower() for c in word)
         if ("_" in word.strip("_") or camel or (word.isupper() and any(c.isdigit() for c in word))) and word not in identifiers:
             identifiers.append(word)
+    calibration = {}
+    if resolve_case:
+        explicit = (set(symbols) | {part for value in dotted for part in value.split(".")}
+                    | {word for value in paths for word in _WORD.findall(PurePosixPath(value).name.split(".")[0])})  # a named file
+        calibration = _calibrate(identifiers, explicit, raw, index, weights)
+        identifiers = [name for name in identifiers if name not in calibration or calibration[name]["defines"]]  # Else a concept.
     named = set(symbols) | set(identifiers) | {part for value in dotted for part in value.split(".")}
     concepts, generic = [], []
     for word in raw:
@@ -320,7 +387,7 @@ def analyze_query(task, config=None):
 
     def lexical(identifier, weight):
         # expand() puts the exact compound identifier first; its subtokens follow at reduced weight.
-        for position, term in enumerate(index["expand"](identifier)):
+        for position, term in enumerate(facts["expand"](identifier)):
             if position and term in GENERIC:
                 continue
             terms[term] = max(terms.get(term, 0.0), weight * (weights["subtoken_factor"] if position else 1.0))
@@ -329,8 +396,12 @@ def analyze_query(task, config=None):
         symbol_names[name] = max(symbol_names.get(name, 0.0), weights["symbol"])
         lexical(name, weights["symbol"])
     for name in identifiers:
-        symbol_names[name] = max(symbol_names.get(name, 0.0), weights["identifier"])
-        lexical(name, weights["identifier"])
+        weight = calibration[name]["weight"] if name in calibration else weights["identifier"]
+        symbol_names[name] = max(symbol_names.get(name, 0.0), weight)
+        lexical(name, weight)
+        if weight >= weights["identifier"] and calibration.get(name, {}).get("family"):  # MySQL -> the mysql file family.
+            stem = facts["normalize"](name.lower())
+            terms[stem] = max(terms.get(stem, 0.0), weights["concept"])
     for value in dotted:
         for part in value.split("."):
             symbol_names[part] = max(symbol_names.get(part, 0.0), weights["identifier"])
@@ -339,16 +410,20 @@ def analyze_query(task, config=None):
         for part in _WORD.findall(PurePosixPath(value).name.split(".")[0]):
             lexical(part, weights["identifier"])
     for word in concepts:
-        term = index["normalize"](word)
+        term = facts["normalize"](word)
         terms[term] = max(terms.get(term, 0.0), weights["concept"])
         symbol_names.setdefault(word, weights["concept"])
+    for name, row in calibration.items():  # No definition: the exact spelling stays a concept term, without its subtokens.
+        if not row["defines"]:
+            terms[name] = max(terms.get(name, 0.0), weights["concept"])
     phrases = [p.strip() for p in _QUOTED.findall(text) if not _WORD.fullmatch(p.strip()) and p.strip() not in paths]
     return {"raw_tokens": len(raw), "paths": paths[:12], "dotted": dotted[:12], "symbols": symbols[:24], "frames": frames,
             "qualified": qualified[:12], "identifiers": identifiers[:40], "concept_terms": concepts[:60],
             "generic_terms": generic, "phrases": phrases[:8], "terms": terms, "symbol_names": symbol_names,
             "wants": {"test": bool(re.search(r"\b(?:tests?|testing|pytest|unittest|spec|coverage)\b", text, re.I)),
                       "doc": bool(re.search(r"\b(?:docs?|documentation|readme|changelog|docstrings?|typos?)\b", text, re.I)),
-                      "config": bool(re.search(r"\b(?:config\w*|settings?|manifest|dependenc\w+|workflow|ci)\b", text, re.I))}}
+                      "config": bool(re.search(r"\b(?:config\w*|settings?|manifest|dependenc\w+|workflow|ci)\b", text, re.I))},
+            **({"calibration": calibration} if calibration else {})}
 
 
 def legacy_query(task):
@@ -828,6 +903,9 @@ def plan_retrieval(task, query, config, *, extra=(), reranker=None):
                                "candidates": config["graph"]["max_candidates"]},
                      "git": {"candidates": config["git"]["max_candidates"], "min_support": config["git"]["min_support"],
                              "statistic": config["git"].get("statistic", "jaccard")},
+                     "oversized": {"lexical": (config.get("oversized") or {}).get("lexical", True),
+                                   "references": (config.get("oversized") or {}).get("references", False)},
+                     "names": dict(config.get("names", DEFAULTS["names"])),
                      "reranker_candidates": tuning["candidate_limit"],
                      "packet": {"files": config["context"]["max_files"], "bytes": config["context"]["max_bytes"]}},
             "stop_conditions": ["each retriever answers once, capped", "expansion: seeds x hops x per-seed cap",
@@ -844,6 +922,17 @@ def _displacement(before, after, evidence, window, stage_sources):
             "moved": sum(1 for p in after_top if p in before_top and before_top.index(p) != after_top.index(p))}
 
 
+def _coverage(index):
+    """partial_coverage: files the index knows without complete lexical coverage. `unread_files` (no lexical coverage)
+    is kept for older readers; `by_state` counts every file's coverage and `paths` names the first affected ones."""
+    states = getattr(index, "coverage", None) or {}
+    affected = sorted(path for path, state in states.items() if state != "complete")
+    if not index.path_only and not affected:
+        return None
+    return {"condition": "partial_coverage", "unread_files": len(index.path_only),
+            "by_state": dict(sorted(Counter(states.values()).items())), "paths": affected[:8]}
+
+
 def _status(ranked, index, window, llm=None):
     """The result's standing, kept apart from its ranking: what kind of evidence backs the top files and
     which conditions a reader must know about. An empty index is unavailable; an empty ranking over a
@@ -856,9 +945,7 @@ def _status(ranked, index, window, llm=None):
     anchored, leader = anchors(top), anchors(top[:1])
     known = len(index.records) + len(index.path_only)
     status = "unavailable" if not known else "abstained_no_sufficient_local_evidence" if not top else "ok"
-    conditions = []
-    if index.path_only:
-        conditions.append({"condition": "partial_coverage", "unread_files": len(index.path_only)})
+    conditions = [condition for condition in (_coverage(index),) if condition]
     if llm and llm.get("error") and not llm.get("order"):
         conditions.append({"condition": "provider_failed", "detail": llm["error"]})
     return {"status": status, "evidence": "anchored" if anchored else "lexical" if top else "none",
@@ -875,7 +962,7 @@ def retrieve(task, index, config=None, *, named=(), role=None, extra=None, boost
     """
     config = config or STRATEGIES["full"]
     started = time.perf_counter()
-    query = analyze_query(task, config) if config["query_analysis"] else legacy_query(task)
+    query = analyze_query(task, config, index) if config["query_analysis"] else legacy_query(task)
     lists = {name: RETRIEVERS[name](query, index, config) for name in config["retrievers"]}
     found = {row["file"] for rows in lists.values() for row in rows}
     for name, rows in (extra or {}).items():
@@ -1090,7 +1177,8 @@ def explore(task, index, config, view_of, *, explorer=deterministic_explorer, **
 
 
 class LazyTexts(dict):
-    """Scanned texts plus files the deep index knows but this scan did not read (beyond its caps).
+    """Scanned texts plus files indexed without retained text: ones the deep index knows but this scan did not read
+    (beyond its caps), and lexically indexed files over the read limit (excerpts only).
 
     A loadable path counts as present; its text is read on first use through the caller's loader, which
     applies the same admission, redaction and fingerprint checks as the scan. `items()` covers only what
@@ -1133,8 +1221,12 @@ def build_index(texts, hashes, kind_of, *, cache=None, history=None, config=None
     parser-cache shards; `extended` adds records for verified files the scan could not read (their text is
     loaded on demand through `loader`); `partners` are precomputed co-change rows that replace `history`
     (`history_stats`, their event population, lets the evidence name its denominators);
-    `structural` adds definition-only records ({path: {"record", "sha256"}}) for admitted files over the read
-    limit, so they can be matched by symbol and relationship although their text is never retained.
+    `structural` adds records ({path: {"record", "sha256", "cap"}}, context._oversized_record) for admitted files over the
+    read limit: matched by term, symbol and relationship although their text is never retained, and loadable through
+    `loader` for excerpts, their terms adding no term-reference edges unless `oversized.references` is on. With
+    `oversized.lexical` off their terms are dropped (definitions only, never loaded). A path
+    without a record carries only its coverage state. `index.coverage` maps every known file to complete, partial_lexical,
+    structural_only or unreadable (stale is added when a load is rejected).
     """
     config = config or STRATEGIES["full"]
     facts = _sibling("repo_index")
@@ -1161,11 +1253,23 @@ def build_index(texts, hashes, kind_of, *, cache=None, history=None, config=None
                 records[path] = item["record"]
                 hashes[path] = item["sha256"]
         stats["extended_files"] = len(extended)
+    states, loadable = {}, set(extended or ())
     if structural and config.get("structural_records", True):
+        lexical = (config.get("oversized") or {}).get("lexical", True)
+        references = (config.get("oversized") or {}).get("references", False)
         for path, item in structural.items():
-            if path not in records and path not in texts:
-                records[path] = dict(item["record"], structural=True)
-                hashes[path] = item["sha256"]
+            if path in records or path in texts:
+                continue
+            record = item.get("record")
+            if record is None:
+                states[path] = item["coverage"]
+                continue
+            if lexical and not record.get("structural"):
+                records[path] = record if references else dict(record, reference_edges=False)
+                loadable.add(path)
+            else:
+                records[path] = dict(record, terms={}, len=0, structural=True, coverage="structural_only")
+            hashes[path] = item["sha256"]
         stats["structural_files"] = sum(1 for r in records.values() if r.get("structural"))
     history_stats = dict(history_stats or {})
     if partners is None and history and config["git"]["enabled"]:
@@ -1177,7 +1281,10 @@ def build_index(texts, hashes, kind_of, *, cache=None, history=None, config=None
         stats["history_commits"] = len(commits)
     index = facts["RepoIndex"](records, kind_of, partners if config["git"]["enabled"] else None, path_only)
     index.history_stats = history_stats if config["git"]["enabled"] else {}
-    index.texts = LazyTexts(texts, loader, extended or ()) if loader is not None and extended else texts
+    index.texts = LazyTexts(texts, loader, loadable) if loader is not None and loadable else texts
+    index.coverage = {path: record.get("coverage", "structural_only" if record.get("structural") else "complete")
+                      for path, record in records.items()}
+    index.coverage.update({path: states.get(path, "structural_only") for path in index.path_only})
     index.hashes = hashes
     index.extended = set(extended or ())
     stats["index_ms"] = round((time.perf_counter() - started) * 1000, 1)
@@ -1207,6 +1314,10 @@ def run(task, index, config=None, *, anchors=None, explorer=None, findings=None,
     result["trace"].update(context_files=len(result["packet"]["files"]), context_bytes=result["packet"]["bytes"],
                            context_tokens=result["packet"]["tokens"],
                            context_ms=round((time.perf_counter() - started) * 1000, 2))
+    stale = getattr(index.texts, "failed", ())
+    if stale and "status" in result:  # Indexed files whose current bytes no longer match were withheld while budgeting.
+        index.coverage = {**getattr(index, "coverage", {}), **dict.fromkeys(stale, "stale")}
+        result["status"]["conditions"] = [_coverage(index)] + [c for c in result["status"]["conditions"] if c["condition"] != "partial_coverage"]
     starved = [item["path"] for item in result["packet"]["dropped"] if item["reason"] == "byte budget"]
     if starved and "status" in result:
         result["status"]["conditions"].append({"condition": "budget_exhausted", "dropped_for_bytes": len(starved)})
@@ -1225,6 +1336,10 @@ def render_query(query):
     lines += ["", "IGNORED/LOW-WEIGHT TERMS"] + [f"  {v}" for v in query["generic_terms"]]
     if query["phrases"]:
         lines += ["", "QUOTED LITERALS"] + [f"  {v}" for v in query["phrases"]]
+    if query.get("calibration"):
+        lines += ["", "NAME CALIBRATION (capitalization-only names, weighed by what they denote)"]
+        lines += [f"  {name}: weight {c['weight']:.2f} ({c['reason']}; defines {c['defines']}, family {c['family']}, mentions {c['mentions']})"
+                  for name, c in query["calibration"].items()]
     return "\n".join(lines)
 
 
@@ -1242,7 +1357,8 @@ def render_explain(result, verbose=False, top=10):
                   f"                   expansion: graph {'on' if plan['families']['expansion']['graph'] else 'off'}, "
                   f"git {'on' if plan['families']['expansion']['git'] else 'off'} ({plan['caps']['git']['statistic']}, "
                   f"support >= {plan['caps']['git']['min_support']}); reranker {assistance['reranker']} ({assistance['reranker_policy']}); "
-                  f"explorer {assistance['explorer']}"]
+                  f"explorer {assistance['explorer']}",
+                  f"                   names: case-only {plan['caps']['names']['case_only']}, slash words {plan['caps']['names']['slash_words']}"]
     if status:
         conditions = "; ".join(", ".join(f"{k} {v}" for k, v in c.items()) for c in status["conditions"]) or "none"
         lines.append(f"STATUS             {status['status']} ({status['evidence']} evidence); conditions: {conditions}")

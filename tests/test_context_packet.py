@@ -1,6 +1,7 @@
 """Full serialization budgets, trusted guidance reads, and evidence trimming contracts."""
 import copy
 import hashlib
+import json
 import math
 import os
 from pathlib import Path
@@ -359,6 +360,188 @@ class ContextPacketTests(unittest.TestCase):
         self.assertEqual({node["id"] for node in graph["nodes"]}, {"a", "b"})
         self.assertEqual(graph["upstream"], [])
         self.assertEqual(graph["downstream"], [])
+
+    # Lean and evidence packets.
+
+    def full_result(self, rows=6, partial=("big/generated_parser.py",)):
+        self.role.write_text("---\nid: implementer\nskills_core: test-design\n---\n\n# Implementer\nKeep user changes.\n")
+        result = self.result()
+        result["excerpts"] = []
+        for n in range(rows):
+            path = f"src/module_{n}.py"
+            result["excerpts"] += [self.source(path, "1-20", f"# header {n}\n" * 20), self.source(path, "5-10", "# inner\n" * 6),
+                                   self.source(path, "30-45", f"value_{n} = '🐙 日本'\n" * 16)]
+        result["context"] = [{"path": f"src/module_{n}.py", "type": "source", "rank": n + 1, "lines": "1-20, 30-45",
+                              "reason": "defines function; lexical relevance (BM25); " + "long detail " * 30, "match": "symbol",
+                              "symbols": ["a", "b", "c", "d"], "relationships": ["imports x"]} for n in range(rows)]
+        result["excluded"] = [{"path": f"vendor/{n}.js", "reason": "artifact cap"} for n in range(7)]
+        result["excluded_summary"] = {"total": 7, "shown": 7, "by_reason": {"artifact cap": 7}}
+        result["project_graph"] = self.graph()
+        result["parser_cache"] = {"source_hits": 1, "source_misses": 2}
+        result["preferences"] = {"output": "eli5-succinct", "requested_effort": "low", "storage_path": "/home/x/prefs.json"}
+        result["change_focus"] = {"source": "git_uncommitted", "paths": [], "total": 0}
+        result["project_map"]["entries"] = [{"kind": "feature", "label": f"fact {n}"} for n in range(4)]
+        result["memory"] = {"status": "ok", "hits": [{"path": f"src/module_{n}.py", "note": "remembered " * 5} for n in range(3)]}
+        conditions = [{"condition": "partial_coverage", "unread_files": 0, "by_state": {"complete": 9, "partial_lexical": 1},
+                       "paths": list(partial)}] if partial else []
+        result["repository_intelligence"] = {"strategy": "full", "task_signals": {"concepts": ["x"]}, "telemetry": {"final": 9},
+                                             "index": {"status": "absent"}, "explain": "trace " * 400,
+                                             "retrieval_status": {"status": "ok", "evidence": "anchored", "leader": "anchored",
+                                                                  "conditions": conditions}}
+        return result
+
+    def slim(self, mode, result=None, explain=False, reuse="disabled"):
+        out = packet.slim_packet(self.compact(result or self.full_result()), mode, explain)
+        out["reuse"] = {"status": reuse, "emitted_count": 0, "reused_count": 0, "references": []}  # As prepare_reuse sets it.
+        return out
+
+    def test_measure_counts_code_points_utf8_bytes_and_utf16_units(self):
+        self.assertEqual(packet.measure("a🐙日\n"), {"chars": 4, "utf8_bytes": 9, "utf16_units": 5,
+                                                   "estimated_tokens": 5, "legacy_estimate": 1})
+
+    def test_lean_keeps_rows_coverage_and_role_body_and_drops_what_the_worker_does_not_act_on(self):
+        out = packet.fit_slim(self.slim("lean"), 100000, None)
+        self.assertNotIn("excerpts", out)
+        for key in ("resources", "project_graph", "parser_cache", "excluded", "change_focus", "repository_intelligence", "reuse",
+                    "project_map"):
+            self.assertNotIn(key, out)
+        self.assertEqual(out["packet_omissions"]["map_facts"], 4)  # Lean is navigation only: facts leave even with room.
+        self.assertEqual(len(packet.fit_slim(self.slim("evidence"), 100000, None)["project_map"]["entries"]), 4)
+        self.assertEqual(out["preferences"], {"output": "eli5-succinct", "requested_effort": "low"})
+        self.assertEqual(out["excluded_summary"], {"total": 7, "by_reason": {"artifact cap": 7}})
+        self.assertEqual(out["packet_omissions"]["excluded_paths"], 7)
+        self.assertEqual(out["context"][0], {"rank": 1, "path": "src/module_0.py", "lines": "1-20, 30-45",
+                                             "symbols": ["a", "b", "c"], "reason": "defines function", "match": "symbol"})
+        self.assertEqual(len(out["context"]), 6)
+        role = out["guidance"]["role"]
+        self.assertEqual(role["content"], "\n# Implementer\nKeep user changes.\n")
+        self.assertEqual((role["content_scope"], role["sha256"]), ("body", hashlib.sha256(self.role.read_bytes()).hexdigest()))
+        self.assertEqual(out["coverage"], {"status": "ok", "evidence": "anchored",
+                                           "conditions": self.full_result()["repository_intelligence"]["retrieval_status"]["conditions"]})
+        self.assertIn("big/generated_parser.py", out["next_action"])
+        self.assertEqual(out["limits"], packet.SLIM_LIMITS)
+        self.assertEqual((out["packet_mode"], out["format"]), ("lean", "compact"))
+        self.assertEqual(out["diagnostics"], ["One path could not be read; scan is incomplete."])
+
+    def test_evidence_spans_drop_contained_duplicates_keep_two_per_file_in_rank_order(self):
+        excerpts = [self.source("b.py", "1-20"), self.source("b.py", "5-10"), self.source("b.py", "30-40"),
+                    self.source("b.py", "30-40"), self.source("b.py", "50-60"), self.source("a.py", "3-8")]
+        kept = packet._evidence_spans(copy.deepcopy(excerpts), ["a.py", "b.py"])
+        # Without an admission order (legacy retrieval), the first two spans listed.
+        self.assertEqual([(e["path"], e["lines"]) for e in kept], [("a.py", "3-8"), ("b.py", "1-20"), ("b.py", "30-40")])
+        for item, order in zip(excerpts, (2, 3, 0, 0, 1, 0)):
+            item["order"] = order  # The engine's admission round: priority, then line.
+        kept = packet._evidence_spans(excerpts, ["a.py", "b.py"])
+        self.assertEqual([(e["path"], e["lines"]) for e in kept], [("a.py", "3-8"), ("b.py", "30-40"), ("b.py", "50-60")])
+        self.assertFalse(any("order" in item for item in kept))
+        # Two definitions (priority 1) and a reference (priority 2): the line-1 definition is a top span, never the first to go.
+        spans = [dict(self.source("t.py", lines), order=order) for lines, order in (("1-12", 0), ("55-67", 2), ("114-123", 1))]
+        self.assertEqual([e["lines"] for e in packet._evidence_spans(spans, ["t.py"])], ["1-12", "114-123"])
+        out = packet.fit_slim(self.slim("evidence"), 100000, None)
+        self.assertEqual([(e["path"], e["lines"]) for e in out["excerpts"][:2]], [("src/module_0.py", "1-20"), ("src/module_0.py", "30-45")])
+        self.assertEqual(len(out["excerpts"]), 12)
+        self.assertEqual(out["packet_omissions"]["excerpts"], 6)
+        self.assertEqual(set(out["excerpts"][0]), {"path", "lines", "content"})  # Ids and digests serve only active reuse.
+        prepared = packet.fit_slim(self.slim("evidence", reuse="prepared"), 100000, None)
+        self.assertEqual(set(prepared["excerpts"][0]), {"path", "lines", "content", "id", "source_sha256"})
+        self.assertEqual(prepared["reuse"]["emitted_count"], 12)
+
+    def test_shared_budget_counts_skill_router_and_the_packet_with_its_newline(self):
+        (self.pack / "SKILL.md").write_text("# Router 🐙\n" + "Route the request.\n" * 20, encoding="utf-8")
+        skill = packet.router_size(self.pack)
+        self.assertEqual(skill, {"source": "SKILL.md", **packet.measure((self.pack / "SKILL.md").read_text(encoding="utf-8"))})
+        out = packet.fit_slim(self.slim("evidence"), 100000, skill)
+        budget = out["budget"]
+        self.assertEqual(budget["packet"], packet.measure(packet.dumps(out) + "\n"))
+        self.assertEqual(budget["total"], {key: budget["packet"][key] + skill[key] for key in packet.SIZES})
+        self.assertTrue(budget["target_met"])
+        self.assertIn("not a tokenizer count", budget["estimator"])
+        self.assertEqual(budget["excluded"], ["host command envelope", "tool-result framing"])
+        self.assertEqual((budget["hard_limit"]["max"], budget["hard_limit"]["host_inline_limit"]), (28000, 30000))
+        (self.pack / "SKILL.md").unlink()
+        self.assertIsNone(packet.router_size(self.pack))
+        unknown = packet.fit_slim(self.slim("lean"), 100000, None)["budget"]
+        self.assertEqual(unknown["skill_router"], {"source": "unknown", **dict.fromkeys(packet.SIZES)})
+        self.assertEqual(unknown["total"], unknown["packet"])
+
+    def test_tiny_target_is_reported_unmet_and_drops_nothing_it_could_not_save(self):
+        full = packet.fit_slim(self.slim("evidence", explain=True), 100000, None)
+        out = packet.fit_slim(self.slim("evidence", explain=True), 256, None)
+        budget = out["budget"]
+        self.assertEqual((budget["target_met"], budget["reason"]), (False, "protected_content_exceeds_target"))
+        self.assertGreater(budget["protected_tokens"], 256)
+        self.assertEqual(budget["protected_tokens"], budget["total"]["estimated_tokens"])
+        for key in ("guidance", "coverage", "next_action", "limits", "context", "diagnostics"):
+            self.assertEqual(out[key], full[key])  # Protected content, navigation rows included, is intact ...
+        self.assertEqual(out["excerpts"], [])  # ... and the minimum packet carries no optional item.
+        self.assertNotIn("project_map", out)
+        self.assertNotIn("explain", out["repository_intelligence"])
+        self.assertEqual((out["memory"]["hits"], out["packet_omissions"]["memory_hits"]), ([], 3))
+
+    def test_feasible_target_trims_optional_items_in_order_and_keeps_every_row_deterministically(self):
+        floor = packet.fit_slim(self.slim("evidence", explain=True), 100000, None)
+        while packet._trim_slim(floor):
+            pass
+        tokens, _ = packet.account_slim(floor, 100000, None)
+        runs = [packet.fit_slim(self.slim("evidence", explain=True), tokens, None) for _ in range(2)]
+        self.assertEqual(runs[0], runs[1])
+        out = runs[0]
+        self.assertTrue(out["budget"]["target_met"])
+        self.assertEqual(out["context"], packet.fit_slim(self.slim("evidence", explain=True), 100000, None)["context"])
+        self.assertEqual(out["excerpts"], [])
+        self.assertNotIn("project_map", out)
+        self.assertNotIn("explain", out["repository_intelligence"])
+        self.assertEqual({key: out["packet_omissions"][key] for key in ("explain_trace", "map_facts", "excerpts")},
+                         {"explain_trace": 1, "map_facts": 4, "excerpts": 18})
+        self.assertNotIn("navigation_rows", out["packet_omissions"])
+        trimmed = packet.fit_slim(self.slim("evidence", explain=True), 100000, None)
+        packet._trim_slim(trimmed)
+        just_trace = packet.fit_slim(self.slim("evidence", explain=True), packet.account_slim(trimmed, 100000, None)[0] + 8, None)
+        self.assertNotIn("explain", just_trace["repository_intelligence"])  # The trace leaves first ...
+        self.assertEqual(len(just_trace["excerpts"]), 12)  # ... and evidence stays when that suffices.
+        self.assertEqual(just_trace["packet_omissions"]["map_facts"], 0)
+        full = packet.fit_slim(self.slim("evidence"), 100000, None)
+        middle = packet.fit_slim(self.slim("evidence"), packet.account_slim(full, 100000, None)[0] - 400, None)
+        omitted = middle["packet_omissions"]
+        self.assertEqual((omitted["map_facts"], omitted["memory_hits"]), (4, 3))  # Facts and memory hits go first ...
+        self.assertTrue(0 < len(middle["excerpts"]) < 12)  # ... then excerpts, from the lowest-ranked file up.
+        self.assertEqual(middle["excerpts"], full["excerpts"][:len(middle["excerpts"])])
+        self.assertEqual(middle["excerpts"][0]["path"], "src/module_0.py")
+
+    def test_slim_packets_keep_the_diagnostics_of_the_parts_they_reduce_or_drop(self):
+        result = self.full_result()
+        preferences = "Preferences unavailable or invalid; using defaults without changing saved settings."
+        result["preferences"]["diagnostics"] = [preferences]
+        result["project_map"]["diagnostics"] = ["Project map facts were stale and withheld."]
+        for mode in ("lean", "evidence"):
+            with self.subTest(mode=mode):
+                out = packet.fit_slim(self.slim(mode, result), 100000, None)
+                self.assertEqual(out["diagnostics"], ["One path could not be read; scan is incomplete.", preferences,
+                                                      "Project map facts were stale and withheld."])
+                self.assertEqual(out["preferences"], {"output": "eli5-succinct", "requested_effort": "low"})
+        self.assertNotIn("diagnostics", out["project_map"])  # Evidence keeps the facts; the diagnostic is not shown twice.
+
+    def test_hard_limit_counts_utf16_units_and_the_newline_and_fails_rather_than_truncating(self):
+        result = self.full_result(rows=8)
+        for n, excerpt in enumerate(result["excerpts"]):
+            excerpt["content"] = "🐙" * 1400  # One code point, two UTF-16 units and four UTF-8 bytes each.
+        out = packet.fit_slim(self.slim("evidence", result), 100000, None)
+        serialized = packet.dumps(out) + "\n"
+        self.assertLessEqual(len(serialized.encode("utf-16-le")) // 2, packet.MAX_INLINE_CHARS)
+        self.assertEqual(out["budget"]["packet"]["utf16_units"], len(serialized.encode("utf-16-le")) // 2)
+        self.assertGreater(out["packet_omissions"]["excerpts"], 8)
+        self.assertLess(len(serialized) + 1500, packet.MAX_INLINE_CHARS)  # Counting code points would have kept another.
+        self.assertEqual(json.loads(serialized)["context"][0]["path"], "src/module_0.py")
+        long_paths = self.full_result(rows=8)
+        for row in long_paths["context"]:
+            row["path"] = "deeply/" * 60 + row["path"]
+        out = packet.fit_slim(self.slim("lean", long_paths), 100000, None)
+        self.assertEqual(len(out["context"]), 8)
+        self.assertLessEqual(out["budget"]["packet"]["utf16_units"], packet.MAX_INLINE_CHARS)
+        self.role.write_text("mandatory role text " * 1500)
+        with self.assertRaisesRegex(packet.PacketError, "host inline limit") as caught:
+            packet.fit_slim(self.slim("lean", self.result()), 100000, None)
+        self.assertNotIn("mandatory role text", str(caught.exception))
 
 
 if __name__ == "__main__":

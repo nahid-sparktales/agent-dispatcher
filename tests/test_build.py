@@ -432,6 +432,21 @@ def main():
           "python3 -B PACK/context.py --project PROJECT --task='REQUEST' --role ID" in hook)
     rendered = sorted((build.ADAPTER / "roles").glob("*.md"))
     check("one rendered role per template", len(rendered) == len(roles))
+    unreplaced = [p.name for p in rendered if "{{" in p.read_text()]
+    check("no rendered role has an unreplaced placeholder", not unreplaced, str(unreplaced))
+    for rid in ("implementer", "tester", "debugger"):
+        check(f"{rid} carries the verification contract exactly once",
+              (build.ADAPTER / "roles" / f"{rid}.md").read_text().count(build.VERIFY_CONTRACT) == 1)
+    # The contract is inlined into role packets, so a word lifted from an evaluation fixture would teach
+    # the benchmark instead of the method. A literal guard cannot catch paraphrase; review the wording too.
+    leaked = re.findall(r"having|limit|offset|order by|group by|union|group_concat|json_|sqlglot|executor",
+                        build.VERIFY_CONTRACT, re.I)
+    check("the verification contract carries no fixture vocabulary", not leaked, str(leaked))
+    # guidance.role is never trimmed from a packet, so each role byte displaces an excerpt byte.
+    # 5253 is the implementer role before the contract.
+    size = (build.ADAPTER / "roles" / "implementer.md").stat().st_size
+    check("the implementer role stays within 700 bytes of its pre-contract size",
+          size <= 5253 + 700, f"{size} bytes")
 
     print("\ncontext engine")
     context = (build.ADAPTER / "CONTEXT.md").read_text()

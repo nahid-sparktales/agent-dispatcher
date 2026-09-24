@@ -80,9 +80,10 @@ byte-identical. After a `warm_experience` trial the runner records the edited pa
 category into that arm's store (`experience-record.json`); with the default
 `experience_outcome: harness_grader` the outcome is `grader_passed` when the hidden grader passed, which
 is oracle-adjacent and stated in the report; grader details, answers and traces are never recorded.
-The report groups every condition, pairs each treatment with `baseline` (`pairs_by_condition`), and
-adds setup time, setup model calls, amortized measured cost per task and cost per verified success
-(unknown stays unknown, a zero denominator is undefined). Live four-condition runs have not been
+The report groups every condition, pairs each treatment with `baseline` (`pairs_by_condition`) and
+with every other treatment (`pairs_between_treatments`), and adds setup time, setup model calls,
+amortized cost per attempt and cost per verified success (unknown stays unknown, a zero denominator
+is undefined). Live four-condition runs have not been
 performed for this change; the offline tests in `tests/e2e/test_conditions.py` exercise scheduling,
 setup, recording and reporting with the real helper and no model.
 
@@ -118,6 +119,89 @@ specification with `learning evaluate REVISION --spec SPEC.json --runner end_to_
 whose `arms` name the two conditions and whose `environment.batch_fingerprint` is the batch's configuration
 fingerprint. No live learned-arm run has been performed for this change; `tests/e2e/test_learning_conditions.py`
 exercises configuration, setup, import, observation recording and reporting offline with the real helper.
+
+### Packet-mode conditions (experiment A: lean versus evidence packets)
+
+`dispatcher_lean` and `dispatcher_evidence` are exactly the static `dispatcher` arm (same staged package,
+same explicitly disabled learning settings, dispatcher invocation required for a scored run) plus
+`AGENT_DISPATCHER_PACKET=lean` or `evidence` in the trial environment, which the context helper reads
+(`legacy|lean|evidence`; `dispatcher` sets no mode and gets the helper's default). `prepare --packet-tokens N`
+(256–100000, only with a packet arm) stores `packet_tokens` in `config.json`, which changes the fingerprint, and sets
+`AGENT_DISPATCHER_PACKET_TOKENS=N` for `dispatcher_lean` and `dispatcher_evidence` alike; without it both use the
+helper's default soft target (4000 estimated tokens for SKILL.md plus packet). The mode and the target are recorded in
+each trial's `effective_settings.index_env`, and the report's packet-mode limitation names the target.
+
+At the default target the two arms cannot differ for the implementer role: its protected content (SKILL.md, the role
+body, navigation rows and metadata) is already about 6.7–7.1k estimated tokens, so the helper delivers the minimum
+packet in both modes (`budget.target_met: false`, `reason: protected_content_exceeds_target`) and evidence carries no
+excerpts. Choose a target above that floor, for example `--packet-tokens 12000`, when the comparison needs excerpts.
+
+Baseline stays mandatory. Experiment A therefore schedules three arms per task:
+
+```sh
+python3 evals/end_to_end/run.py prepare --output dist/evals/packet-a --fixtures /path/to/manifest.json \
+  --clients claude --claude-model MODEL_ID --claude-effort EFFORT \
+  --conditions baseline dispatcher_lean dispatcher_evidence --packet-tokens 12000
+python3 evals/end_to_end/run.py doctor --config dist/evals/packet-a/config.json
+python3 evals/end_to_end/run.py run --config dist/evals/packet-a/config.json --suite smoke
+python3 evals/end_to_end/run.py run --config dist/evals/packet-a/config.json --suite pilot
+```
+
+`run` builds the schedule: each fixture/repetition gets all three conditions in a seeded random order
+(smoke: 2 fixtures × 3 = 6 trials per client; pilot: every fixture × 2 repetitions × 3). The report
+compares `dispatcher_evidence` with `dispatcher_lean` directly under
+`pairs_between_treatments["dispatcher_evidence_vs_dispatcher_lean"]` (the earlier canonical condition,
+`dispatcher_lean`, is the reference; deltas are evidence minus lean), paired by
+(client, fixture, repetition, condition) identity, and also pairs each with baseline.
+
+Keeping baseline was chosen over a baseline-free two-arm run because it changes nothing in
+configuration validation, `prepare`, or the baseline-anchored report; the report only adds
+treatment-versus-treatment pairs. It also keeps a stock anchor for each packet mode. The cost is a
+third arm: about 1.5× the model usage of a lean-versus-evidence-only run. For scale, one 10-trial arm
+of the ri-v1 sqlglot pilot (claude-opus-5, high effort) was a runtime-reported estimate of 30.05 to
+33.81 USD. Under subscription authentication that is rate-limit budget, not billed spend.
+
+#### Prepared experiment A: delivery ablation (not run)
+
+Prepared on 2026-09-23 and not executed; running it needs explicit approval of the spend and of the packet target.
+Everything except the packet mode is held fixed: one frozen package (its digest is in `config.json` provenance),
+default ranking, the shipped verification guidance, `claude-opus-5` at `high` effort, subscription auth, the runner's
+own permissions and sandbox, the five-task sqlglot suite, cold per-trial caches, seed `20260919`, and one
+`packet_tokens` value for both packet arms.
+
+```sh
+python3 evals/end_to_end/run.py prepare --output dist/evals/packet-a --fixtures /path/to/suites/big/manifest.json \
+  --clients claude --claude-model claude-opus-5 --claude-effort high --claude-auth subscription \
+  --conditions baseline dispatcher_lean dispatcher_evidence --packet-tokens 12000
+# The suite manifest sets timeout_seconds 1800, but the trial limit is min(config, fixture), so raise the config's 600 too:
+python3 -c "import json,sys; p=sys.argv[1]; c=json.load(open(p)); c['timeout_seconds']=1800; json.dump(c,open(p,'w'),indent=2)" dist/evals/packet-a/config.json
+env CLAUDE_CONFIG_DIR=/absolute/profile/from/config/claude claude auth login   # or point clients.claude.profile_dir at an owned, logged-in profile
+python3 evals/end_to_end/run.py doctor --config dist/evals/packet-a/config.json   # launches the claude CLI (version, auth status, --init-only); no model turn
+python3 evals/end_to_end/run.py run --config dist/evals/packet-a/config.json --suite smoke   # 6 model trials
+python3 evals/end_to_end/run.py run --config dist/evals/packet-a/config.json --suite pilot   # 30 model trials
+```
+
+Predeclared analysis: 2 repetitions per task; every task/repetition runs all three arms in the runner's seeded
+random order; comparisons pair trials by (client, fixture, repetition) identity; no retries for any arm; an invalid
+attempt (setup, authentication, infrastructure, startup mismatch) stays in the arm's cost and is reported separately,
+never replaced. Primary outcomes are acceptance success, cost per verified success and elapsed time. Verification
+completeness has no automatic measure; it stays unavailable unless human reviews are separately authorized. The suite is the development suite the helper was tuned on, ten paired
+identities cluster within five tasks, and no non-inferiority claim is made without a margin declared before the run.
+
+#### Prepared experiments B and C (not run)
+
+B, held-out validation: build a new suite from repositories the helper was never tuned on (pip, networkx, docutils,
+pygments were shortlisted) the way `suites/big` was built: pin the parent of a real upstream fix, keep each task's
+tree small enough that the suite stays under the runner's 64 MiB freeze limit, write a stdlib-only evaluator that
+finishes within the grader's 10-second limit, and check it with a passing and a failing reference before any trial.
+Then prepare it exactly like A. The stock baseline keeps its normal tools; judge or claim ratings stay unrated unless
+separately authorized.
+
+C, amortized reuse: `--conditions baseline dispatcher indexed` charges the deep-index build and each refresh to
+`deep-index-setup.json`, outside the task timer and model usage; the report shows setup time beside task cost, and
+setup makes no model calls. The index identity is per fixture, so one index serves the two repetitions of a task.
+`--warm-project-index` currently fails setup on the sqlglot suite before any model request: its read-only warm pass
+requires zero source reads, and the helper re-reads small binary files (the suite's compressed test data) on every pass.
 
 ### Evaluate with repository memory
 
@@ -219,6 +303,20 @@ forced. Automatic dispatcher activation, Jev, and task-observer are disabled.
 Other user skills, plugins, and MCP connections are excluded from both sides.
 The runner does not use `--bare` or bypass approval/sandbox controls.
 
+Every trial, in every condition, gets its own empty `XDG_CONFIG_HOME` (a temporary directory
+outside the audited trial directory, removed with the trial). Without it, the operator's
+`~/.config/agent-dispatcher/preferences.json` reaches dispatcher packets only; in ri-v1 it injected a
+requested effort of `low` and `eli5-succinct` output that the baseline never saw. `effective_settings.xdg_config_home` records
+`trial-owned empty directory`. Tools that read `$XDG_CONFIG_HOME` (for example Git's
+`~/.config/git/config`) see the same empty directory in both conditions. Batches recorded before this
+change could carry the operator's preferences in the treatment arm.
+
+`TMPDIR` is still the runner's own temporary directory, shared across trials and sessions. The
+shell sandbox's write rules for a per-trial `TMPDIR` cannot be verified offline, so it is left
+unchanged. This is a known confound: a trial can read or reuse files that earlier trials or sessions
+left there (in ri-v1, one baseline trial ran its tests with dependency stubs written by an earlier
+run). Treat reuse of `$TMPDIR` content seen in traces as a trial-independence caveat.
+
 ## Run smoke, then pilot
 
 These are the **only commands that start model-consuming tasks**:
@@ -254,6 +352,13 @@ client injects the expanded skill body internally and omits that body from
 replay output. Raw slash requests, unmarked envelopes, assistant claims, and
 quoted or partial envelopes do not establish invocation. Trivial tasks may
 legitimately finish without a subsequent role read.
+
+Treatment compliance is therefore close to 100% by construction for Claude: the
+harness injects the `/agent-dispatcher` envelope itself. It gates grading and is
+unchanged. The report adds a separate **helper execution** row: dispatcher-family
+trials whose native activity shows at least one successful helper call. Positive
+evidence counts even in a partial trace; absence counts only with complete activity
+evidence, and anything else is missing. Helper execution never changes a grade.
 
 Paired starting-file hashes, CLI versions and available native startup catalogs
 are compared. Unexpected differences invalidate both sides rather than giving
@@ -345,8 +450,64 @@ tasks can also identify shortcomings the automated checks missed.
 Reports distinguish automated artifact acceptance from dispatcher compliance and
 the combined task outcome. They never pool clients or select the best repetition. Invalid setup attempts,
 timeouts, task failures, unattempted schedule entries and pending reviews have
-distinct counts. Unknown usage/cost is unavailable, never zero. Monetary fields
-are provider-reported estimates where available, not subscription invoices.
+distinct counts. Unknown usage/cost is unavailable, never zero.
+
+### Cost and token accounting
+
+`usage.cost_usd` is Claude Code's `total_cost_usd`: a runtime-reported list-price estimate
+(`usage.cost_source: runtime_reported_estimate`; `usage.cost_basis` is the runtime's own
+`modelUsage[*].costBasis` label when every model agrees, for example `list`). It is not billed
+spend. Under subscription authentication it estimates the API-equivalent cost of the run; under
+API authentication an invoice can still differ. The report takes each client's billing basis
+from the batch configuration (`clients.<client>.auth`) and shows it beside the runtime's cost
+basis. Codex reports no cost.
+
+Per arm, `cost_accounting` and report.md show the arm total, amortized cost per attempt, cost
+per verified success, and invalid attempts with their known cost (0 with no invalid attempts, null
+when no invalid attempt's cost is known). Every attempt, invalid ones
+included, counts toward the arm's cost. If any attempt's cost is unknown, the total stays null
+and `known_partial_cost_usd_total` gives the known part, labelled a lower bound, with the number
+of unknown costs. Cost per verified success divides the arm total by the verified successes,
+which are counted with the same outcome rule as the Successful outcomes row (human ratings
+included). When it cannot be computed it is null with a reason, never 0: `outcomes_pending` (a
+valid attempt still has no outcome, such as an unimported required review, so the denominator is
+not final; checked first), `zero_verified_successes` or `cost_unknown`. report.json keeps unrounded values; report.md rounds USD to 4 decimals.
+
+For Claude, `input_tokens` is uncached input only and `cached_input_tokens` is cache reads only.
+Both keep that meaning. New trials also store `uncached_input_tokens`,
+`cache_creation_input_tokens` (with its 1-hour and 5-minute split),
+`cache_read_input_tokens`, and `runtime.duration_ms` (turn wall time), `runtime.duration_api_ms`
+(the session-wide sum of API request time, retries included, which can exceed wall time when
+requests overlap) and `runtime.num_turns`. `elapsed_seconds` remains the harness's own wall clock.
+Cache writes are a large share of cost (about a quarter in the ri-v1 pilot). The report's
+token-split median rows show `missing` for batches recorded before these fields existed. Codex
+token semantics are not assumed, so the split stays null for Codex.
+
+### Read-only audit
+
+```sh
+python3 evals/end_to_end/run.py audit --batch dist/evals/local/batches/BATCH_A [--batch .../BATCH_B ...]
+```
+
+The audit prints JSON to stdout and writes nothing into the batch or its prepared output (no report).
+For each trial it re-derives, from the last `result` event in `events.jsonl`: the token split,
+`total_cost_usd`, `costBasis`, `duration_ms`, `duration_api_ms` and `num_turns`. It adds the stored
+auth (`effective_settings.auth`), status, task success, failed check names and the scope failure
+reason. It also compares helper evidence three ways: calls joined to their own tool result by
+`tool_use_id` and judged by the attribution's rule (exit status, or the helper's versioned JSON
+when piped to `head`/`tail`), the stored activity count, and today's activity attribution replayed
+with a recorded binding. `events.jsonl` is saved redacted; when redaction leaves a piped helper
+result unparseable, the linked count is `unavailable` with reason `redacted` and no discrepancy is
+flagged. It flags discrepancies, including
+`treatment_invoked`. Per arm and per batch it gives unrounded totals (a total is null when any
+value is unknown, with the known part as a lower bound), counts, medians, cost per verified
+success with its reason, and identity pairs. With more than one batch, a `combined` block sums
+them and is labelled "sum across batches; not an experimental estimate".
+
+Each value carries a provenance label: `verified` (re-derived from saved (redacted) events and
+equal to the stored value), `derived` (computed by the audit), `stored_only` (saved events cannot
+re-derive it), or `unavailable`. The helper replay needs the prepared layout (`<output>/packages/<client>`
+beside `<output>/batches/`) and currently covers Claude only.
 
 ## Helper coverage and task scope
 
@@ -357,9 +518,17 @@ package; echoed commands and unrelated same-name scripts do not prove use. Missi
 traces remain unknown. Character counts estimate visible instruction loading, not the host's
 full context window or exact model tokens. Route agreement across repetitions is diagnostic,
 not a correctness score. Helper, routing and loading measurements stay outside anonymous
-review packets. Literal working-directory prefixes and task-text pipelines are recognized;
-ambiguous shell forms remain unknown. Retrospective attribution belongs in separate analysis
-artifacts with trace, frozen-package and parser fingerprints, never rewritten trial results.
+review packets. Literal working-directory prefixes and task-text pipelines are recognized, as is
+one output-only suffix (`2>&1` and/or `| head|tail -N` or `-n N`). A call piped to `head`/`tail` is a
+helper success only when its own tool result is the helper's JSON object with an integer
+`schema_version`; otherwise its outcome is unknown, because the exit status belongs to `head`/`tail`.
+A bare `2>&1` keeps the helper's own exit status.
+Every other trailing operator stays unattributed. Helper rows also record `payload_chars` (length of
+the linked tool result), `wall_ms` (tool call to tool result, from native event timestamps; null
+without them) and `helper_timing` (the helper's own top-level `timing` object reduced to numbers and
+short labels; null when the helper emits none). Ambiguous shell forms remain unknown.
+Retrospective attribution belongs in separate analysis artifacts with trace, frozen-package and
+parser fingerprints, never rewritten trial results (the read-only `audit` command prints one).
 
 Private preparation measurements compare matched helper completion with native workspace actions,
 including listings, searches, task-contract reads and writes. Role and detailed guide reads before

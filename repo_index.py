@@ -20,7 +20,7 @@ from pathlib import PurePosixPath
 import re
 import warnings
 
-SCHEMA = 1
+SCHEMA = 2  # 2: records of files over the read limit carry terms and a `coverage` state.
 SHARDS = 16  # Record cache granularity: one changed file rewrites 1/16 of the cached records.
 MAX_DEFS = 2000
 MAX_CALLS = 1500
@@ -265,7 +265,8 @@ class RepoIndex:
 
     def __init__(self, records, kind_of, partners=None, path_only=()):
         self.records = records
-        # Known files whose content was not indexed: named only, or structural (definitions without retained text).
+        # Known files whose content was not lexically indexed: named only, or structural (definitions without terms).
+        # A lexically indexed file over the read limit is a full record (its `coverage` says how much was read).
         self.path_only = set(path_only) - {p for p, r in records.items() if not r.get("structural")}
         self.paths = sorted(set(records) | self.path_only)
         self.kinds = {path: ("test" if is_test(path) else kind_of(path)) for path in self.paths}
@@ -372,7 +373,9 @@ class RepoIndex:
                 for target in sorted(t for t in targets if t):
                     self._edge(path, target, "imports", line)
             own = {row[0] for row in record["defs"]}  # A name this file defines resolves here, not elsewhere.
-            for kind, names in (("calls", record["calls"]), ("references", record["terms"])):
+            # A record may keep its terms for matching only (retrieval `oversized.references`): no term-reference edges.
+            referenced = record["terms"] if record.get("reference_edges", True) else ()
+            for kind, names in (("calls", record["calls"]), ("references", referenced)):
                 for name in names:
                     found = self.definitions.get(name) if name not in own else None
                     # Short all-lowercase names collide with ordinary words and subtokens.

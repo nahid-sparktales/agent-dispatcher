@@ -220,6 +220,55 @@ class PipelineIntegrationTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,'fixtures changed'):
             runner.load_config(self.config_path,live=True)
 
+    def test_packet_conditions_are_the_static_dispatcher_plus_a_packet_mode_with_empty_config_home(self):
+        launched, batch = [], self.root / 'packet-batch'
+        batch.mkdir()
+
+        def capture(client, spec, workspace, skill):
+            home = Path(spec['config_home'])
+            launched.append((spec.get('index_env') or {}, home, home.is_dir() and not any(home.iterdir()), home.is_relative_to(Path(workspace).parent)))
+            return self.fake_launch(client, spec, workspace, skill)
+        results = {}
+        with patch.object(adapters, 'doctor', side_effect=self.fake_doctor), patch.object(adapters, 'build_launch', side_effect=capture), contextlib.redirect_stdout(io.StringIO()):
+            for condition in ('baseline', 'dispatcher', 'dispatcher_lean', 'dispatcher_evidence'):
+                row = {'id': 'claude-greeting-1-' + condition, 'client': 'claude', 'condition': condition, 'fixture_id': 'greeting', 'repetition': 1}
+                results[condition] = runner.run_trial(self.config, batch, row, self.fixture_by_id['greeting'])
+        self.assertTrue(all(result['status'] == 'completed' and result['scope_check']['passed'] for result in results.values()), results)
+        self.assertTrue(all(result['treatment_invoked'] for condition, result in results.items() if condition != 'baseline'))
+        envs = [env for env, *_ in launched]
+        self.assertEqual([env.get('AGENT_DISPATCHER_PACKET') for env in envs], [None, None, 'lean', 'evidence'])
+        self.assertEqual({env.get('AGENT_DISPATCHER_LEARNING_CONFIG') for env in envs[1:]}, {envs[1]['AGENT_DISPATCHER_LEARNING_CONFIG']})
+        self.assertEqual([(empty, inside) for _, _, empty, inside in launched], [(True, False)] * 4)  # empty, and never scope residue
+        homes = [home for _, home, *_ in launched]
+        self.assertEqual(len(set(homes)), 4)
+        self.assertFalse(any(home.exists() for home in homes))  # removed with its trial
+        self.assertEqual(set(results['dispatcher_lean']['usage']), set(adapters.USAGE_KEYS))
+        self.assertEqual(set(results['dispatcher_lean']['runtime']), set(adapters.RUNTIME_KEYS))
+
+    def test_packet_tokens_reach_both_packet_arms_alike_and_are_recorded(self):
+        conditions = ['baseline', 'dispatcher', 'dispatcher_lean', 'dispatcher_evidence']
+        config = dict(self.config, conditions=conditions, packet_tokens=12000)
+        runner.validate_config(config, live=True)
+        real_launch, recorded, batch = adapters.build_launch, [], self.root / 'tokens-batch'
+        batch.mkdir()
+
+        def capture(client, spec, workspace, skill):
+            # The real launch builder records effective settings; only the native executable is substituted.
+            recorded.append(real_launch(client, dict(spec, executable=sys.executable), workspace, skill)['effective']['index_env'])
+            return self.fake_launch(client, spec, workspace, skill)
+        with patch.object(adapters, 'doctor', side_effect=self.fake_doctor), patch.object(adapters, 'build_launch', side_effect=capture), contextlib.redirect_stdout(io.StringIO()):
+            for condition in conditions:
+                row = {'id': 'claude-greeting-1-' + condition, 'client': 'claude', 'condition': condition, 'fixture_id': 'greeting', 'repetition': 1}
+                self.assertEqual(runner.run_trial(config, batch, row, self.fixture_by_id['greeting'])['status'], 'completed')
+        self.assertEqual([env.get('AGENT_DISPATCHER_PACKET_TOKENS') for env in recorded], [None, None, '12000', '12000'])
+        self.assertEqual([env.get('AGENT_DISPATCHER_PACKET') for env in recorded], [None, None, 'lean', 'evidence'])
+        output = self.root / 'cli-tokens'
+        with patch.object(runner, 'prepare', return_value=output / 'config.json') as prepare, contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(runner.main(['prepare', '--output', str(output), '--clients', 'claude', '--packet-tokens', '12000',
+                                          '--conditions', 'dispatcher_lean', 'dispatcher_evidence']), 0)
+        self.assertEqual(prepare.call_args.kwargs['packet_tokens'], 12000)
+        self.assertEqual(prepare.call_args.kwargs['conditions'], ['baseline', 'dispatcher_lean', 'dispatcher_evidence'])
+
     def test_treatment_cleanup_on_trial_failure(self):
         profile=Path(self.config['clients']['claude']['profile_dir'])
         with self.assertRaisesRegex(RuntimeError,'fake failure'):
