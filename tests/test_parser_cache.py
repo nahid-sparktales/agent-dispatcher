@@ -76,6 +76,61 @@ class ParserCacheTests(unittest.TestCase):
         self.assertEqual(cache.stats["source_hits"], 0)
         self.assertEqual(cache.stats["parsed_files"], 1)
 
+    def test_oversized_record_follows_a_same_size_edit_with_restored_mtime(self):
+        body = "def alpha_handler_one():\n    return 1\n" + "# filler line to pass the read limit\n" * 8000
+        source = self.write("big.py", body)
+
+        def record(writable=False):
+            cache, structural = self.cache(writable=writable), {}
+            context._scan_sources(self.project, ["big.py"], (), [], cache, lambda value: value, [], [], [], structural)
+            cache.finish()
+            return structural["big.py"]["record"]
+
+        self.assertEqual([row[0] for row in record(writable=True)["defs"]], ["alpha_handler_one"])
+        load = context._sibling
+        with mock.patch.object(context, "_sibling", lambda name: {"file_record": mock.Mock(side_effect=AssertionError("reparsed"))}
+                               if name == "repo_index" else load(name)):
+            self.assertEqual(record()["coverage"], "complete")  # Unchanged: the cached lexical record is reused, not reparsed.
+        before = source.stat()
+        source.write_text(body.replace("alpha_handler_one", "gamma_handler_two"))
+        os.utime(source, ns=(before.st_atime_ns, before.st_mtime_ns))
+        self.assertEqual(source.stat().st_size, before.st_size)
+        fresh = record()
+        self.assertEqual([row[0] for row in fresh["defs"]], ["gamma_handler_two"])
+        self.assertNotIn("alpha", fresh["terms"])
+        # With a coarse ctime the edit keeps the key: the digest of the bytes just read still refuses the cached record.
+        real = context._signature
+        with mock.patch.object(context, "_signature", lambda info: real(info)[:4] + [0] + real(info)[5:]):
+            self.assertEqual([row[0] for row in record(writable=True)["defs"]], ["gamma_handler_two"])
+            before = source.stat()
+            source.write_text(body.replace("alpha_handler_one", "delta_handler_six"))
+            os.utime(source, ns=(before.st_atime_ns, before.st_mtime_ns))
+            self.assertEqual([row[0] for row in record()["defs"]], ["delta_handler_six"])
+
+    def test_large_binary_is_named_binary_from_a_bounded_sniff(self):
+        (self.project / "blob.bin").write_bytes(b"\0" + b"x" * (300 * 1024))
+        (self.project / "big.txt").write_text("x\n" * (200 * 1024))
+        for cache in (self.cache(), self.cache(enabled=False)):  # The cache, then its fallback reader (context._read).
+            self.assertEqual(self.read(cache, "blob.bin")[1:3], (0, "binary file withheld"))  # Sniffed, never charged to the scan.
+            self.assertEqual(self.read(cache, "big.txt")[1:3], (0, "file exceeds 256 KiB limit"))
+        cache = self.cache()
+        self.read(cache, "blob.bin")
+        self.assertEqual(cache.stats["source_bytes_read"], parser_cache.SNIFF_BYTES)  # The bytes actually read are still reported.
+
+    def test_sniffs_of_large_files_never_spend_the_source_scan_budget(self):
+        (self.project / "assets").mkdir()
+        for number in range(4):
+            (self.project / f"assets/{number}.bin").write_bytes(b"\0" * (300 * 1024))
+        paths = [f"assets/{number}.bin" for number in range(4)] + ["main.py"]
+        for incremental in (None, self.cache()):  # context._read, then the parser cache's own read.
+            with self.subTest(cache=incremental is not None):
+                excluded, diagnostics = [], []
+                with mock.patch.object(context, "MAX_SCAN_BYTES", 3 * context.SNIFF_BYTES):
+                    texts = context._scan_sources(self.project, paths, (), [], incremental, lambda value: value, excluded, diagnostics)[0]
+                self.assertEqual(list(texts), ["main.py"])
+                self.assertEqual(diagnostics, [])
+                self.assertEqual([item["reason"] for item in excluded], ["binary file withheld"] * 4)
+
     def test_only_changed_source_is_read_again(self):
         self.write("other.py", "def other(): return 1\n")
         initial = self.cache(writable=True)
@@ -286,18 +341,39 @@ class ParserCacheTests(unittest.TestCase):
         self.assertNotIn("private-token-value", raw)
         self.assertIn("[redacted]", raw)
 
-    def test_invalid_utf8_and_binary_sources_are_not_cached(self):
-        for value in (b"invalid\xff", b"binary\0content"):
-            with self.subTest(value=value):
-                (self.project / "main.py").write_bytes(value)
-                cache = self.cache(writable=True)
-                text, used, reason, sha = self.read(cache)
-                self.assertIsNone(text)
-                self.assertEqual(used, len(value))
-                self.assertIsNotNone(reason)
-                self.assertIsNone(sha)
-                cache.finish()
-                self.assertFalse(self.directory.exists())
+    def test_invalid_utf8_sources_are_not_cached(self):
+        (self.project / "main.py").write_bytes(b"invalid\xff")
+        cache = self.cache(writable=True)
+        text, used, reason, sha = self.read(cache)
+        self.assertEqual((text, used, sha), (None, 8, None))
+        self.assertIsNotNone(reason)
+        cache.finish()
+        self.assertFalse(self.directory.exists())
+
+    def test_binary_verdicts_cost_no_read_when_warm_and_a_changed_binary_is_checked_again(self):
+        (self.project / "icon.png").write_bytes(b"\x89PNG\r\n\x1a\n\0\0\0\rIHDR" + b"\x01" * 4000)  # Small, NUL in the sniff.
+        (self.project / "late.bin").write_bytes(b"x" * (2 * parser_cache.SNIFF_BYTES) + b"\0")  # Small, NUL past it.
+        (self.project / "blob.bin").write_bytes(b"\0" * (300 * 1024))
+        (self.project / "big.txt").write_text("x\n" * (200 * 1024))
+        paths = ["main.py", "icon.png", "late.bin", "blob.bin", "big.txt"]
+        uncached = {path: self.read(self.cache(enabled=False), path)[1:3] for path in paths}  # context._read
+        self.assertEqual(uncached["icon.png"], (0, "binary file withheld"))  # Sniffed, not read whole, never charged.
+        self.assertEqual(uncached["late.bin"], (2 * parser_cache.SNIFF_BYTES + 1, "binary file withheld"))
+        cold = self.cache(writable=True)
+        self.assertEqual({path: self.read(cold, path)[1:3] for path in paths}, uncached)  # Same verdicts and charges.
+        self.assertEqual(cold.stats["source_misses"], 5)
+        small = sum((self.project / path).stat().st_size for path in ("main.py", "icon.png", "late.bin"))
+        self.assertEqual(cold.stats["source_bytes_read"], small + 2 * parser_cache.SNIFF_BYTES)  # Large files: sniffs only.
+        cold.finish()
+        self.assertNotIn("IHDR", (self.directory / cold.name).read_text())  # Verdicts only; binary bytes are never kept.
+        warm = self.cache()
+        with mock.patch.object(parser_cache.os, "read", side_effect=AssertionError("source reread")):
+            self.assertEqual({path: self.read(warm, path)[1:3] for path in paths}, uncached)
+        self.assertEqual([warm.stats[key] for key in ("source_hits", "source_misses", "source_bytes_read")], [5, 0, 0])
+        (self.project / "icon.png").write_text("now text\n")
+        changed = self.cache()
+        self.assertEqual(self.read(changed, "icon.png")[:3], ("now text\n", 9, None))  # Its old verdict is not served.
+        self.assertEqual([changed.stats[key] for key in ("source_hits", "source_misses")], [0, 1])
 
     def test_source_changing_during_read_is_withheld(self):
         cache = self.cache()

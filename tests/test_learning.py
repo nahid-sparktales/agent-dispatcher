@@ -273,8 +273,9 @@ class LifecycleTests(unittest.TestCase):
         cyclic["steps"][0]["requires"] = ["fix"]
         with self.assertRaisesRegex(lc.LearningValidationError, "no cycles"):
             lc.validate_workflow(cyclic)
-        # Retrieval profiles: the effective profile keeps caller caps and never touches provider settings.
-        profile = {"typed_payload": {"strategy": "full+deep", "overrides": {"rrf_weights": {"git": 1.5}, "context": {"max_files": 50, "radius": 8}}}, "revision_id": "b" * 64}
+        # Retrieval profiles: the effective profile keeps caller caps and never touches provider settings or benchmark switches.
+        profile = {"typed_payload": {"strategy": "full+deep", "overrides": {"rrf_weights": {"git": 1.5}, "context": {"max_files": 50, "radius": 8},
+                                                                            "names": {"case_only": "resolved"}, "oversized": {"lexical": False}}}, "revision_id": "b" * 64}
         effective, state = lc.effective_profile([profile], {}, caller_strategy_explicit=False)
         self.assertEqual(effective["overrides"], {"rrf_weights": {"git": 1.5}, "context": {"radius": 8}})
         explicit, _ = lc.effective_profile([profile], {}, caller_strategy_explicit=True)

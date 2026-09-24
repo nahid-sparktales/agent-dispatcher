@@ -348,6 +348,40 @@ class AdmissionAndTrustTests(IndexCase):
         self.assertNotIn("changed after", json.dumps(result["excerpts"]))
         self.assertGreater(result["repository_intelligence"]["index"]["extended"]["stale"], 0)
 
+    def test_a_file_ignored_after_the_build_or_an_unknown_listing_is_never_extended(self):
+        self.write("app/local_settings.py", "def local_override_value():\n    return 'machine specific setting'\n")  # Untracked.
+        self.build()
+        self.write(".gitignore", "app/local_settings.py\n")
+        result = self.select("local_override_value returns the wrong value", map_maintain=True)
+        self.assertNotIn("machine specific", json.dumps(result["context"]) + json.dumps(result["excerpts"]))
+        self.assertEqual(result["repository_intelligence"]["index"]["extended"]["candidates"], 0)
+        # Beyond the scan cap a file is extended only while the listing is known to be whole.
+        for number in range(6):
+            self.write(f"far/z{number}.py", f"def far_symbol_{number}():\n    return 'beyond the scan cap {number}'\n")
+        self.build()
+        listed = context._path_command
+        with mock.patch.object(context, "MAX_FILES", 4), \
+                mock.patch.object(context, "_path_command", lambda command, project: (*listed(command, project)[:2], True)):
+            result = self.select("far_symbol_5 returns the wrong value", map_maintain=True)
+        self.assertNotIn("beyond the scan cap 5", json.dumps(result["excerpts"]))  # z0-z1 are inside the cap and scanned.
+        self.assertEqual(result["repository_intelligence"]["index"]["extended"]["candidates"], 0)
+
+    def test_explain_applies_automatic_task_exclusions_to_files_beyond_the_scan_cap(self):
+        for name in "abc":
+            self.write(f"legacy/{name}.py", f"def legacy_{name}():\n    return 0\n")
+        self.write("legacy/zz_far.py", "def far_symbol_value():\n    return 'LEGACY-ONLY-CONTENT-7731'\n")
+        git(self.project, "add", "-A")
+        git(self.project, "commit", "-q", "-m", "legacy")
+        self.build()
+        task = "Fix far_symbol_value returning the wrong value."
+        with mock.patch.object(context, "MAX_FILES", 4):  # legacy/zz_far.py is past the scan: only the deep index extends to it.
+            reached = context.explain_retrieval(self.project, task, pack=str(ROOT), llm=False)
+            excluded = context.explain_retrieval(self.project, task + " Ignore legacy from the evidence.", pack=str(ROOT), llm=False)
+        self.assertIn("LEGACY-ONLY-CONTENT-7731", json.dumps(reached, default=str))
+        self.assertNotIn("LEGACY-ONLY-CONTENT-7731", json.dumps(excluded, default=str))
+        self.assertNotIn("legacy/zz_far.py", [row["path"] for row in excluded["ranked"]])
+        self.assertEqual(excluded["universe"]["extended"], reached["universe"]["extended"] - 1)  # Only the excluded file is left out.
+
     def test_corrupt_incompatible_or_locked_state_falls_back_without_a_build(self):
         self.build()
         with self.store(readonly=False) as store:

@@ -135,6 +135,38 @@ class LLMSettingsPassThrough(unittest.TestCase):
             run.validate_config(config(dict(base, llm_settings=str(settings), llm_network=["api.anthropic.com"])))
 
 
+class TrialEnvironmentTests(unittest.TestCase):
+    def test_trial_config_home_hides_operator_preferences_in_every_client(self):
+        import subprocess
+        import preferences
+        from evals.end_to_end import adapters
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            home, config_home, profile = root / "operator-home", root / "trial-config", root / "profile"
+            config_home.mkdir()
+            preferences.set_preferences(effort="low", state_dir=home / ".config/agent-dispatcher")  # the operator's global choice
+            base = {"executable": "claude", "model": "m", "effort": "high", "auth": "subscription", "profile_dir": str(profile)}
+            probe = "import json, preferences; p = preferences.get_preferences(); print(json.dumps([p['effort'], p['sources']['effort']]))"
+            for client in ("claude", "codex"):
+                with self.subTest(client=client), patch.dict(os.environ, {"HOME": str(home), "XDG_CONFIG_HOME": str(home / ".config"),
+                                                                          "AGENT_DISPATCHER_PACKET": "legacy"}):
+                    leaked = adapters._environment(client, base, profile)
+                    isolated = adapters._environment(client, dict(base, config_home=str(config_home), index_env={
+                        "AGENT_DISPATCHER_PACKET": "lean", "AGENT_DISPATCHER_PACKET_TOKENS": "6000", "UNLISTED": "x"}), profile)
+                    self.assertFalse({"XDG_CONFIG_HOME", "AGENT_DISPATCHER_PACKET"} & set(leaked))  # never inherited from the runner
+                    self.assertEqual(isolated["XDG_CONFIG_HOME"], str(config_home))
+                    self.assertEqual((isolated["AGENT_DISPATCHER_PACKET"], isolated["AGENT_DISPATCHER_PACKET_TOKENS"]), ("lean", "6000"))
+                    self.assertNotIn("UNLISTED", isolated)
+                    seen = {}
+                    for name, env in (("leaked", leaked), ("isolated", isolated)):
+                        done = subprocess.run([sys.executable, "-B", "-c", probe], cwd=ROOT, env=dict(env, PYTHONPATH=str(ROOT)),
+                                              capture_output=True, text=True, timeout=30)
+                        self.assertEqual(done.returncode, 0, done.stderr)
+                        seen[name] = json.loads(done.stdout)
+                    self.assertEqual(seen, {"leaked": ["low", "global"], "isolated": ["host", "default"]})
+            self.assertEqual(list(config_home.iterdir()), [])  # reading never populates the trial's config home
+
+
 class SchedulingTests(unittest.TestCase):
     fixtures = [{"id": f"task-{i}", "smoke": i < 2} for i in range(15)]
 

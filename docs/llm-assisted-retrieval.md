@@ -100,11 +100,13 @@ deterministic retriever still sees it. Partial coverage is normal and is never r
 | --- | --- | --- |
 | `llm_retrieval.py index` | per eligible file: its path, language, defined symbol names, names of project files it imports / is used by / is tested by, and its **redacted source** (whole when under `max_source_chars`, otherwise its head plus the start of definitions sampled across the file) | only when you run `index` |
 | reranking | your request text, candidate paths, their stored role summaries (or symbol names when none exists) and their retrieval evidence | once per retrieval, when `reranking.enabled` |
+| reranking with `reranking.content: "raw"` (or the benchmark's `llm_rerank.content`) | as above, but in place of summaries the **redacted source** of every candidate, truncated to its share of `max_prompt_chars`, including test, documentation and lexically indexed oversized files | a prompt experiment; only when you set it |
 | `role_summary` retrieval | nothing: it is a local BM25 search over stored summaries | every retrieval, free |
 
 With a local provider (`base_url` on localhost, or a local `command`) the data stays within that
-runtime. Excluded, credential, binary, oversized, vendored, generated, test, documentation and
-trivial files are never sent; redaction runs before anything is sent. There is no telemetry.
+runtime. `index` never sends excluded, credential, binary, oversized, vendored, generated, test,
+documentation or trivial files. Excluded and credential files never enter the retrieval index, so
+no reranking mode sends them. Redaction runs before anything is sent. There is no telemetry.
 Shadow mode (`"retrieval": {"llm_rerank": {"shadow": true}}` plus `"shadow_log"`) records what the
 reranker would have chosen (paths and a request hash, locally) without changing any ranking.
 

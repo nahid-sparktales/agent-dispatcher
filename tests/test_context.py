@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Offline behavior checks for bounded local context selection."""
 import hashlib
+import io
 import json
 import os
 from pathlib import Path
@@ -14,6 +15,7 @@ from unittest import mock
 import context
 import project_map
 import repo_index
+import retrieval
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -861,6 +863,150 @@ class ContextTests(unittest.TestCase):
         self.assertEqual(result["context"], [])
         self.assertTrue(any("32 MiB" in d for d in result["diagnostics"]))
 
+    def filler(self, count, newline="\n"):
+        return "".join(f"def filler_{n}(value):{newline}    return value + {n}  # é{newline}{newline}" for n in range(count))
+
+    def status(self, result):
+        return next((c for c in result["repository_intelligence"]["retrieval_status"]["conditions"]
+                     if c["condition"] == "partial_coverage"), None)
+
+    def test_oversized_file_is_indexed_lexically_and_excerpted_with_exact_line_numbers(self):
+        # CRLF, multibyte text and the only match on the last lines of a file over the whole-text limit.
+        (self.project / "big.py").write_bytes((self.filler(6000, "\r\n") + "def rare_target_handler(order):\r\n"
+                                               "    return sorted(order)  # ü\r\n").encode("utf-8"))
+        self.write("small.py", "def other():\n    return 1\n")
+        self.assertGreater((self.project / "big.py").stat().st_size, context.MAX_FILE_BYTES)
+        result = self.select("Fix rare_target_handler ordering")
+        self.assertEqual(self.paths(result), ["big.py"])
+        self.assertIn({"path": "big.py", "reason": "file exceeds 256 KiB limit"}, result["excluded"])  # Its whole text is still not kept.
+        excerpts = [e for e in result["excerpts"] if e["path"] == "big.py"]
+        self.assertTrue(0 < len(excerpts) <= 3)
+        start, end = map(int, excerpts[-1]["lines"].split("-"))
+        lines = excerpts[-1]["content"].split("\n")
+        self.assertEqual(len(lines), end - start + 1)
+        self.assertTrue(lines[18001 - start].startswith("def rare_target_handler"))  # Line 18001 of the file.
+        self.assertLessEqual(result["budget"]["estimated_tokens"], result["budget"]["target_tokens"])
+        self.assertIsNone(self.status(result))  # The whole file fit the per-file cap: complete coverage.
+
+    def test_prefix_cut_is_line_aligned_reported_partial_and_redacted_to_its_end(self):
+        key = "-----BEGIN " + "PRIVATE KEY-----\n" + "SENSITIVEKEYMATERIAL\n" * 5000 + "-----END PRIVATE KEY-----\n"
+        text = self.filler(4400) + "def near_key_handler():\n    return 1\n" + key + "def late_marker_function():\n    return 2\n"
+        self.write("big.py", text)
+        cap = 300 * 1024
+        data = text.encode("utf-8")
+        self.assertTrue(data.index(b"-----BEGIN") < cap < data.index(b"-----END"))  # The key block crosses the cut.
+        covered = data[:data[:cap].rfind(b"\n") + 1].count(b"\n")
+        with mock.patch.object(context, "MAX_STRUCTURAL_BYTES", cap):
+            result = self.select("Fix near_key_handler and late_marker_function")
+            structural = {}
+            context._scan_sources(self.project, ["big.py"], (), [], None, context._scrubber(context.find_pack(str(ROOT))),
+                                  [], [], [], structural)
+        self.assertEqual(self.paths(result)[0], "big.py")
+        self.assertIn(f"Over the per-file index cap, so searched and excerpted only in part: big.py (lines 1-{covered})", result["diagnostics"])
+        self.assertEqual(structural["big.py"]["record"]["covered_lines"], [1, covered])
+        self.assertTrue(any("def near_key_handler" in e["content"] for e in result["excerpts"]))
+        self.assertTrue(any("[redacted]" in e["content"] for e in result["excerpts"]))
+        self.assertNotIn("late_marker_function", json.dumps(result["excerpts"]))  # Beyond the cut: not indexed, not shown.
+        self.assertNotIn("sensitivekeymaterial", (json.dumps(result) + json.dumps(structural)).lower())
+        self.assertEqual(self.status(result)["by_state"], {"partial_lexical": 1})
+        self.assertEqual(self.status(result)["paths"], ["big.py"])
+
+    def test_large_binary_unreadable_long_line_and_budget_exhaustion_have_explicit_states(self):
+        (self.project / "blob.bin").write_bytes(b"\0" + b"x" * (300 * 1024))
+        (self.project / "latin.py").write_bytes(b"# \xff\n" + b"value = 1\n" * 30000)
+        self.write("line.py", "x" * (290 * 1024))
+        self.write("longline.py", "y" * (300 * 1024) + "\n")
+        # Sniffed for a NUL byte, never charged to the scan budget.
+        self.assertEqual(context._read(self.project, "blob.bin", context.MAX_SCAN_BYTES), (None, 0, "binary file withheld"))
+        excluded, structural = [], {}
+        with mock.patch.object(context, "MAX_STRUCTURAL_BYTES", 295 * 1024):
+            context._scan_sources(self.project, ["blob.bin", "latin.py", "line.py", "longline.py"], (), [], None, lambda v: v,
+                                  excluded, [], [], structural)
+        self.assertIn({"path": "blob.bin", "reason": "binary file withheld"}, excluded)
+        self.assertNotIn("blob.bin", structural)
+        self.assertEqual(structural["latin.py"], {"record": None, "coverage": "unreadable"})
+        self.assertEqual(structural["line.py"]["record"]["coverage"], "complete")  # One long line, within the cap.
+        self.assertEqual(structural["longline.py"], {"record": None, "coverage": "structural_only"})  # No whole line fits.
+        for name in ("a_big.py", "b_big.py"):
+            self.write(name, self.filler(6000).replace("filler", name[0] + "_filler"))
+        with mock.patch.object(context, "MAX_OVERSIZED_BYTES", 400 * 1024):
+            result = self.select("Fix a_filler_7 and b_filler_7")
+        self.assertIn("Oversized-file indexing reached its 16 MiB limit; later files over 256 KiB are ranked by name only.",
+                      result["diagnostics"])
+        self.assertEqual(self.paths(result), ["a_big.py"])
+        status = self.status(result)  # Every oversized file after the first is past the budget, readable or not.
+        self.assertEqual(status["by_state"], {"complete": 1, "structural_only": 4})
+        self.assertEqual(status["paths"], ["b_big.py", "latin.py", "line.py", "longline.py"])
+        structural = {}
+        with mock.patch.object(context, "MAX_OVERSIZED_BYTES", 300 * 1024):  # Below a_big.py's size, above the 256 KiB read limit.
+            context._scan_sources(self.project, ["a_big.py"], (), [], None, lambda v: v, [], [], [], structural)
+        record = structural["a_big.py"]["record"]
+        self.assertEqual(record["coverage"], "partial_lexical")  # One read of at most what the budget has left.
+        self.assertLess(record["covered_lines"][1], (self.project / "a_big.py").read_text().count("\n"))
+
+    def test_indexed_oversized_text_that_changes_before_its_excerpt_is_withheld_as_stale(self):
+        text = self.filler(6000) + "def rare_target_handler(order):\n    return sorted(order)\n"
+        scan = context._scan_sources
+        changes = {"modified": lambda path: path.write_text(text.replace("sorted(order)", "sorted(other)")),
+                   "deleted": lambda path: path.unlink(),
+                   "renamed": lambda path: path.rename(path.with_name("moved.py"))}
+        for label, change in changes.items():
+            target = self.write("big.py", text)
+            (self.project / "moved.py").unlink(missing_ok=True)
+
+            def scan_then_change(*args, **kwargs):
+                found = scan(*args, **kwargs)
+                change(target)
+                return found
+            with self.subTest(label), mock.patch.object(context, "_scan_sources", scan_then_change):
+                result = self.select("Fix rare_target_handler ordering")
+                self.assertNotIn("big.py", self.paths(result))
+                self.assertNotIn("rare_target_handler", json.dumps(result["excerpts"]))
+                self.assertIn({"path": "big.py", "reason": "stale index evidence"}, result["excluded"])
+                self.assertEqual((self.status(result)["by_state"]["stale"], self.status(result)["paths"]), (1, ["big.py"]))
+
+    def test_partially_indexed_file_is_excerpted_only_up_to_its_last_indexed_line(self):
+        head = self.filler(5400) + "def cut_edge_handler():\n    return 42\n"
+        self.write("big.py", head + "AFTER_CUT_LINE = 'content that was never read'\n" * 3000)
+        covered = head.count("\n")
+        with mock.patch.object(context, "MAX_STRUCTURAL_BYTES", len(head.encode("utf-8"))):  # The cut falls right after the match.
+            result = self.select("Fix cut_edge_handler")
+        self.assertIn(f"Over the per-file index cap, so searched and excerpted only in part: big.py (lines 1-{covered})",
+                      result["diagnostics"])
+        excerpts = [e for e in result["excerpts"] if e["path"] == "big.py"]
+        self.assertEqual(max(int(e["lines"].split("-")[1]) for e in excerpts), covered)  # Never the unread line after the cut.
+        self.assertTrue(excerpts[-1]["content"].endswith("    return 42"))
+
+    def test_stale_partially_indexed_file_is_labelled_withheld_not_excerptable(self):
+        text = "def zebra_marker_fn():\n    return 1\n" * 3
+        record = dict(repo_index.file_record("pkg/big.py", text), coverage="partial_lexical", covered_lines=[1, 6])
+        files = {"pkg/a.py": "def alpha():\n    return 1\n"}
+        hashes = {path: hashlib.sha256(value.encode()).hexdigest() for path, value in files.items()}
+        index = retrieval.build_index(files, hashes, context._kind, structural={"pkg/big.py": {"record": record, "sha256": "0" * 64}},
+                                      loader=lambda path: None)  # The bytes changed after indexing: the loader refuses them.
+        item = next(i for i in retrieval.run("zebra_marker_fn is wrong", index, retrieval.configure("full"))["packet"]["files"]
+                    if i["path"] == "pkg/big.py")
+        self.assertEqual((item["note"], item["excerpts"]), ("changed since it was indexed; excerpts withheld", []))
+
+    def test_evidence_mode_keeps_each_files_highest_priority_spans(self):
+        lines = ["import time", "def validate_token(token):", '    """Check a token signature and its expiry."""', "    if token is None:",
+                 "        return False", "    return token.expires_at > time.time()", ""]
+        lines += [f"FILLER_{n} = {n}" for n in range(8, 59)] + ["def refresh(token):", "    return validate_token(token)"]
+        lines += [f"OTHER_{n} = {n}" for n in range(61, 119)]
+        lines += ["def purge_expired(tokens):", "    # expired tokens are purged nightly",
+                  "    return [t for t in tokens if validate_token(t)]", ""]
+        self.write("pkg/tokens.py", "\n".join(lines))
+        task = "Fix validate_token and purge_expired so expired tokens are rejected"
+        legacy = self.select(task, role="implementer", compact=True, packet_tokens=20000)
+        evidence = self.select(task, role="implementer", compact=True, packet_mode="evidence", packet_tokens=20000)
+        spans = [tuple(map(int, e["lines"].split("-"))) for e in evidence["excerpts"]]
+        self.assertEqual(len(legacy["excerpts"]), 3)  # Two definitions and a call site.
+        self.assertEqual(len(spans), 2)
+        for line in (2, 119):  # Both named definitions; the lower-priority call site at line 60 is the one left out.
+            self.assertTrue(any(start <= line <= end for start, end in spans), (line, spans))
+        self.assertEqual(set(evidence["excerpts"][0]), {"path", "lines", "content"})
+        self.assertNotIn('"order"', json.dumps(legacy))
+
     def test_human_report_links_real_files_and_numbers_original_lines(self):
         self.write("auth.py", "# header\ndef validateLogin(): pass\n")
         rendered = context.render(self.select())
@@ -876,6 +1022,190 @@ class ContextTests(unittest.TestCase):
             self.assertTrue(set(definition["required"]) <= set(row))
             self.assertTrue(set(row) <= set(definition["properties"]))
             self.assertIn(row["match"], definition["properties"]["match"]["enum"])
+
+    # Lean and evidence packet modes.
+
+    def cli(self, *arguments, env=None, task="Fix validateLogin authentication"):
+        environment = {key: value for key, value in os.environ.items() if not key.startswith("AGENT_DISPATCHER_PACKET")}
+        environment.update(env or {})
+        return subprocess.run([sys.executable, "-B", str(ROOT / "context.py"), "--project", str(self.project), "--task-file", "-",
+                               "--pack", str(ROOT), *arguments], input=task, capture_output=True, text=True, cwd=self.root, env=environment)
+
+    def test_packet_mode_environment_legacy_equals_unset_and_other_modes_require_compact(self):
+        self.write("auth.py", 'def validateLogin():\n    return "naïve 🐙"\n')
+        unset = self.cli("--role", "reviewer", "--compact")
+        legacy = self.cli("--role", "reviewer", "--compact", env={"AGENT_DISPATCHER_PACKET": "legacy", "AGENT_DISPATCHER_PACKET_TOKENS": "300"})
+        self.assertEqual((unset.returncode, unset.stdout), (0, legacy.stdout))
+        self.assertNotIn('"timing"', unset.stdout)
+        # --map-maintain on a read-only task is where a slim mode would act (it skips the graph): non-compact output ignores it.
+        home, inspect = {"HOME": str(self.root / "home")}, "Inspect validateLogin; do not modify any files"
+        plain = self.cli("--json", "--map-maintain", env=home, task=inspect)
+        self.assertIn("project_graph", json.loads(plain.stdout))
+        for value in ("lean", "evidence", "bogus"):
+            child = self.cli("--json", "--map-maintain", env={**home, "AGENT_DISPATCHER_PACKET": value}, task=inspect)
+            self.assertEqual((child.returncode, child.stdout), (0, plain.stdout), value)
+        self.assertEqual(self.select(compact=True, packet_mode="legacy"), self.select(compact=True))
+        explained = self.select(compact=True, explain=True)["timing"]  # Legacy shows timing only in a trace.
+        self.assertNotIn("finish", explained["phases"])
+        marker, secret = "private-task-fragment-7702", "secret-mode-4417"
+        cases = ((["--packet-mode", "lean"], {}), (["--packet-mode", "evidence", "--json"], {}),
+                 (["--compact"], {"AGENT_DISPATCHER_PACKET": secret}),
+                 (["--compact"], {"AGENT_DISPATCHER_PACKET": "lean", "AGENT_DISPATCHER_PACKET_TOKENS": secret}))
+        for arguments, env in cases:
+            with self.subTest(arguments=arguments, env=sorted(env)):
+                child = self.cli(*arguments, env=env, task=marker)
+                self.assertEqual((child.returncode, child.stdout), (2, ""))
+                self.assertRegex(child.stderr, r" \[phase=setup, elapsed_ms=\d+\]\n\Z")
+                self.assertNotIn(marker, child.stderr)
+                self.assertNotIn(secret, child.stderr)
+
+    def test_lean_and_evidence_cli_payloads_are_exact_json_within_the_host_limit(self):
+        self.write("auth.py", 'def validateLogin(user):\n    """naïve 🐙 日本語"""\n    return check(user)\n')
+        self.write("tests/test_auth.py", "from auth import validateLogin\n\ndef test_login():\n    assert validateLogin(1)\n")
+        schema = json.loads((ROOT / "catalog/context-plan.schema.json").read_text())["properties"]["context"]["items"]
+        router = (ROOT / "skills/agent-dispatcher/SKILL.md").read_bytes()
+        for mode in ("lean", "evidence"):
+            with self.subTest(mode=mode):
+                # Evidence needs a target above its protected floor (~6.7k est. tokens with SKILL.md) to carry spans.
+                target = 4000 if mode == "lean" else 12000
+                child = self.cli("--role", "implementer", "--compact", "--json",
+                                 env={"AGENT_DISPATCHER_PACKET": mode, "AGENT_DISPATCHER_PACKET_TOKENS": str(target)})
+                self.assertEqual(child.returncode, 0, child.stderr)
+                packet = json.loads(child.stdout)
+                self.assertEqual(child.stdout, json.dumps(packet, ensure_ascii=False, separators=(",", ":")) + "\n")
+                units = len(child.stdout.encode("utf-16-le")) // 2
+                self.assertLessEqual(units, 28000)
+                self.assertEqual({key: packet["budget"]["packet"][key] for key in ("chars", "utf8_bytes", "utf16_units")},
+                                 {"chars": len(child.stdout), "utf8_bytes": len(child.stdout.encode()), "utf16_units": units})
+                self.assertEqual(packet["budget"]["skill_router"]["utf8_bytes"], len(router))
+                self.assertEqual(packet["budget"]["target_tokens"], target)
+                self.assertEqual(packet["packet_mode"], mode)
+                role = packet["guidance"]["role"]
+                full = Path(role["path"]).read_bytes()
+                self.assertTrue(full.decode().endswith(role["content"]) and not role["content"].startswith("---"))
+                self.assertEqual(role["sha256"], hashlib.sha256(full).hexdigest())
+                self.assertEqual(self.paths(packet)[0], "auth.py")
+                for row in packet["context"]:
+                    self.assertTrue(set(schema["required"]) <= set(row) <= set(schema["properties"]))
+                for key in ("resources", "project_graph", "parser_cache", "excluded", "reuse"):
+                    self.assertNotIn(key, packet)
+                self.assertEqual(set(packet["timing"]) - {"skipped"}, {"unit", "total", "phases", "unaccounted", "cache"})
+                self.assertTrue({"import", "discovery", "scan", "selection", "finish"} <= set(packet["timing"]["phases"]))
+                if mode == "lean":
+                    self.assertNotIn("excerpts", packet)
+                else:
+                    self.assertIn("🐙", packet["excerpts"][0]["content"])
+                    self.assertGreater(units, len(child.stdout))  # 🐙 is one code point but two UTF-16 units.
+                    self.assertEqual(set(packet["excerpts"][0]), {"path", "lines", "content"})
+        minimum = json.loads(self.cli("--role", "implementer", "--compact", "--json", env={"AGENT_DISPATCHER_PACKET": "evidence"}).stdout)
+        self.assertEqual((minimum["budget"]["target_tokens"], minimum["budget"]["target_met"], minimum["excerpts"]), (4000, False, []))
+        self.assertEqual(minimum["budget"]["reason"], "protected_content_exceeds_target")  # The default floor, said plainly.
+        self.assertEqual(self.paths(minimum)[0], "auth.py")  # Rows survive the minimum packet.
+
+    def test_empty_and_partially_covered_results_name_a_next_action(self):
+        self.write("auth.py", "def validateLogin(): pass\n")
+        empty = self.select("Fix nothingrelevantzz", compact=True, packet_mode="lean")
+        self.assertEqual(empty["context"], [])
+        self.assertIn("search the repository directly", empty["next_action"])
+        self.write("big.py", self.filler(4400) + "def near_key_handler():\n    return 1\n" + "def tail():\n    pass\n" * 30000)
+        with mock.patch.object(context, "MAX_STRUCTURAL_BYTES", 300 * 1024):
+            packet = self.select("Fix near_key_handler", compact=True, packet_mode="evidence")
+        condition = next(c for c in packet["coverage"]["conditions"] if c["condition"] == "partial_coverage")
+        self.assertEqual((condition["by_state"].get("partial_lexical"), condition["paths"]), (1, ["big.py"]))
+        self.assertIn("Coverage is partial (big.py)", packet["next_action"])
+        self.assertTrue(any("big.py (lines 1-" in line for line in packet["diagnostics"]))
+        self.assertEqual(self.paths(packet)[0], "big.py")
+
+    def test_phase_timing_is_structured_deterministic_under_a_fake_clock_and_never_double_counts(self):
+        self.graph_fixture()
+
+        def run():
+            ticks, seconds = iter(range(0, 10 ** 15, 10 ** 6)), iter(range(10 ** 9))  # Every reading advances 1 ms.
+            with mock.patch.object(context.time, "perf_counter_ns", lambda: next(ticks)), \
+                    mock.patch.object(context.time, "perf_counter", lambda: next(seconds) / 1000):
+                return self.select("Inspect validateLogin; do not modify any files", role="debugger", compact=True,
+                                   packet_mode="lean", map_maintain=True, parser_cache=False)
+        first, second = run(), run()
+        self.assertEqual(first, second)
+        timing = first["timing"]
+        top = {name: value for name, value in timing["phases"].items() if "." not in name}
+        self.assertEqual(list(top), ["discovery", "scan", "learning", "engine_setup", "deep_index", "selection", "map", "finish"])
+        self.assertTrue(all(value >= 1 for value in timing["phases"].values()))
+        self.assertTrue({"selection.index", "selection.rank", "selection.context"} <= set(timing["phases"]))
+        self.assertEqual(timing["total"], sum(top.values()) + timing["unaccounted"])  # Children are never added in.
+        self.assertEqual((timing["unit"], timing["skipped"]), ("ms", "graph"))  # Nothing to persist, nothing shown.
+        self.assertEqual(timing["cache"], {"state": "disabled", "hits": 0, "misses": 0, "writes": 0, "write_failures": 0,
+                                           "deep_index": "absent"})
+        for private in ("validateLogin", "auth.py", str(self.project), "modify"):
+            self.assertNotIn(private, json.dumps(timing))
+        persisted = self.select("Inspect validateLogin", role="debugger", compact=True, packet_mode="lean", map_maintain=True, parser_cache=False)
+        self.assertIn("graph", persisted["timing"]["phases"])  # A permitted graph write still runs.
+        legacy = self.select("Inspect validateLogin; do not modify any files", role="debugger", compact=True, map_maintain=True, parser_cache=False)
+        self.assertEqual(legacy["project_graph"]["maintenance"]["action"], "deferred")  # Legacy is unchanged.
+        graphed = self.select("Inspect validateLogin; do not modify any files", role="debugger", compact=True, packet_mode="lean",
+                              map_maintain=True, parser_cache=False, retrieval="legacy")
+        self.assertNotIn("skipped", graphed["timing"])  # Legacy retrieval takes candidate rows from the graph: it still runs.
+        self.assertIn("graph", graphed["timing"]["phases"])
+        self.assertTrue({"storage.py", "web.py"} <= set(self.paths(graphed)))
+
+    def test_timing_cache_state_follows_observed_parser_cache_hits_and_misses(self):
+        self.graph_fixture()
+        directory, cache = self.root / "parser-cache", context._sibling("parser_cache")["Cache"]
+        states = []
+        with mock.patch.object(context, "_parser_cache", lambda project, writable, policy_extra=None:
+                               cache(project, writable=writable, directory=directory, policy_extra=policy_extra)):
+            for edit in (False, False, True):
+                if edit:
+                    self.write("web.py", "from gateway import serve\n\ndef endpoint():\n    return serve() + 1\n")
+                observed = self.select("Inspect validateLogin", role="debugger", compact=True, packet_mode="lean", map_maintain=True)
+                states.append(tuple(observed["timing"]["cache"][key] for key in ("state", "hits", "misses")))
+        self.assertEqual(states, [("cold", 0, 4), ("warm", 4, 0), ("partial", 3, 1)])
+
+    def test_slim_budget_is_decided_on_the_delivered_packet_with_timing_and_reuse_fields(self):
+        for n in range(6):
+            self.write(f"auth_{n}.py", "".join(f"def validateLogin_{n}_{k}(user):\n    return check(user, {k})  # validateLogin\n\n"
+                                               for k in range(40)))
+
+        def run(mode, target, **options):
+            return self.select(role="implementer", compact=True, packet_mode=mode, packet_tokens=target, parser_cache=False, **options)
+        floor = run("evidence", 4000)["budget"]["protected_tokens"]  # The default target is below this role's protected floor.
+        for target in range(floor + 50, floor + 1050, 100):
+            # Fitting holds room for the timing block inserted last, so a feasible target is met by the delivered packet.
+            with self.subTest(target=target):
+                packet = run("evidence", target)
+                self.assertIn("timing", packet)
+                self.assertTrue(packet["budget"]["target_met"], packet["budget"].get("reason"))
+                self.assertLessEqual(packet["budget"]["total"]["estimated_tokens"], target)
+        # A pending reuse commit reserves room its printed packet never uses: that packet fits, so it is not the minimum packet.
+        reuse = dict(reuse_state=self.root / "ledger.json", reuse_scope="retained-A", _delivery=[])
+        lean_floor = run("lean", 4000, **reuse)["budget"]["protected_tokens"]
+        budget = run("lean", lean_floor + 100, **reuse)["budget"]
+        self.assertEqual((budget["target_met"], budget.get("reason"), budget.get("protected_tokens")), (True, None, None))
+
+    def test_evidence_mode_reuse_keeps_fingerprints_only_while_a_ledger_is_active(self):
+        self.write("auth.py", "def validateLogin():\n    return 'evidence'\n")
+        options = dict(compact=True, packet_mode="evidence", packet_tokens=12000, reuse_state=self.root / "evidence.json", reuse_scope="retained-A")
+        first = self.select(**options)
+        self.assertEqual((first["reuse"]["status"], first["read_only"]), ("committed", False))
+        self.assertTrue({"id", "source_sha256"} <= set(first["excerpts"][0]))
+        second = self.select(**options)
+        self.assertEqual((second["excerpts"], second["reuse"]["reused_count"], self.paths(second)), ([], 1, ["auth.py"]))
+        self.assertEqual(second["reuse"]["references"][0]["id"], first["excerpts"][0]["id"])
+        for packet in (first, second):
+            self.assertEqual(packet["budget"]["packet"]["chars"], len(json.dumps(packet, ensure_ascii=False, separators=(",", ":"))) + 1)
+        self.assertNotIn("reuse", self.select(compact=True, packet_mode="evidence"))
+
+    def test_failure_names_its_phase_and_elapsed_time_without_input(self):
+        marker = "private-task-fragment-5521"
+
+        def failing(*args, **kwargs):
+            raise OSError(marker)
+        with mock.patch.object(context, "_scan_sources", failing), mock.patch("sys.stderr", new_callable=io.StringIO) as stderr:
+            code = context.main(["--project", str(self.project), "--task", marker, "--pack", str(ROOT), "--compact", "--packet-mode", "lean"])
+        written = stderr.getvalue()
+        self.assertEqual(code, 2)
+        self.assertRegex(written, r"\AContext input could not be read; contents withheld\. \[phase=scan, elapsed_ms=\d+\]\n\Z")
+        self.assertNotIn(marker, written)
 
     def test_pack_layouts_produce_same_result_from_other_working_directory(self):
         self.write("auth.py", "def validateLogin(): pass\n")

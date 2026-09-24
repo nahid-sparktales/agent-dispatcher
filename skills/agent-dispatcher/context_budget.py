@@ -27,11 +27,19 @@ def _signals(query, index):
     return {key: value for key, value in signals.items() if value}
 
 
+def _lines(index, path):
+    """A file's lines. A partially indexed file ends at its last covered line: its text keeps that line's newline, so a
+    plain split would add an empty line N+1 where the real file has content that was never read."""
+    lines = index.texts[path].split("\n")
+    covered = index.records.get(path, {}).get("covered_lines")
+    return lines[:covered[1]] if covered else lines
+
+
 def _spans(row, index, query, config, anchor):
     """Candidate excerpt windows for one file, best first: (priority, start, end, center), 1-based lines."""
     tuning = config["context"]
     path = row["path"]
-    lines = index.texts[path].split("\n")
+    lines = _lines(index, path)
     record = index.records[path]
     radius, spans = tuning["radius"], []
 
@@ -178,8 +186,13 @@ def build_packet(ranked, index, query, config, anchors=None):
         item = {"path": path, "rank": row["rank"], "kind": row["kind"],
                 "why": [f"{e['reason']}: {e['value']} ({e['source']} #{e['rank']})" for e in row["evidence"][:4]],
                 "symbols": symbols, "relationships": _relationships(path, index, nearby), "excerpts": []}
+        covered = index.records.get(path, {}).get("covered_lines")
         if path in index.path_only:
             item["note"] = "over the file read limit: ranked by name, imports and history only; open it directly"
+        elif covered and path in index.texts:
+            item["note"] = f"over the file read limit: only lines {covered[0]}-{covered[1]} were indexed and can be excerpted"
+        elif covered:  # Its loader refused the bytes: stale, so nothing from the record's span is shown.
+            item["note"] = "changed since it was indexed; excerpts withheld"
         spans = _spans(row, index, query, config, anchors.get(path)) if path in index.texts else []
         cost = len(_section(item).encode("utf-8")) if whole else 0
         if whole and used + cost + MIN_USEFUL_BYTES > limit:
@@ -192,7 +205,7 @@ def build_packet(ranked, index, query, config, anchors=None):
         packet["files"].append(item)
         used += cost
         pending.append((item, spans))
-    lines_of = {item["path"]: index.texts[item["path"]].split("\n") for item, spans in pending if spans}
+    lines_of = {item["path"]: _lines(index, item["path"]) for item, spans in pending if spans}
 
     def line_cost(lines, start, end):
         content = "\n".join(lines[start - 1:end])
@@ -221,7 +234,8 @@ def build_packet(ranked, index, query, config, anchors=None):
                 continue
             if (start, end) != spans[round_number][1:3]:
                 packet["trimmed"] = True
-            item["excerpts"].append({"lines": f"{start}-{end}", "start": start, "end": end, "content": content})
+            # `order` is the admission round, so it follows the span's (priority, line); excerpts are shown by line below.
+            item["excerpts"].append({"lines": f"{start}-{end}", "start": start, "end": end, "content": content, "order": round_number})
             used += line_cost(lines, start, end)
     for item in list(packet["files"]):
         if not item["excerpts"] and item["path"] in index.texts:

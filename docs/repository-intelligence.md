@@ -86,6 +86,25 @@ in Python and first in JavaScript, counts double), anchors that file's excerpt o
 and the function name becomes a symbol. Frames are never pinned: a traceback lists the call path,
 not only the bug (`frames.enabled`, `full-frames` ablation).
 
+Two ablation switches under `names` change how prose earns identifier weight; both are off by
+default and used only through the benchmark's `--variant` until measured. `names.case_only:
+"resolved"` weighs a word that looks like code only by its capitalization (`MySQL`, `GraphQL`; not
+a call, backticked name, dotted name, `snake_case` word, all-caps word with a digit, frame function
+or the file name of a path the request gives) by what it denotes in the index: no definition makes
+it a concept, so its exact spelling (`GraphQL`, the form the index holds) and its lowercase form
+become concept-weight terms, without subtokens or symbol weight; a definition plus its same-stem
+non-test files (its *family*: `dialects/mysql.py`, `parsers/mysql.py`, ...) counted as n files
+gives full weight for n = 1 and `concept + (identifier - concept) / sqrt(n)` otherwise, except that
+the strictly most-mentioned of two or more such ambiguous names keeps full weight; a full-weight
+name with a family also adds its lowercase stem (`mysql`) as a concept term. A name is never
+dropped below concept weight, so a "keep X working" target stays in the query. `explain-query` has
+no index and is unaffected; `explain` lists each decision under NAME CALIBRATION.
+`names.slash_words: "resolved"` keeps an `A/B` token as a path only when it has a known file
+suffix, ends an indexed path (extension optional) or is a run of its directories, tested on the
+token as written less a trailing period and any leading `./` or `../` (`.github/workflows` keeps
+its dot); `MySQL/Hive` or `ROLLUP/WITH` in prose are read as words and no longer make the plan
+`exact`. The plan's caps report both switches.
+
 ## Candidate retrievers
 
 Each retriever is a function `(query, index, config) -> ranked candidates` registered in
@@ -131,11 +150,17 @@ constants) and relative JS/TS imports; they have no call or inheritance edges, a
 fails to parse is still indexed lexically. Nothing is guessed: an unknown relationship stays
 unknown.
 
-An admitted file over the 256 KiB read limit gets a *structural* record: it is read once (up to
-4 MiB), redacted, parsed with the same extractor, and only its definitions, imports, calls and base
-classes are kept, never its text or terms. Such a file can be found by the symbol it defines and
-takes part in edges, but it is never excerpted; the packet marks it "over the file read limit"
-(`structural_records`, `full-structure` ablation).
+An admitted file over the 256 KiB read limit is read once (up to 4 MiB, within a 16 MiB budget per
+scan), redacted, and parsed with the same extractor; its text is never retained. Its record keeps
+definitions, imports, calls, base classes and its terms, so it ranks by symbol, edge and word like
+any file (`index.coverage`: `complete`, or `partial_lexical` with the covered line span when the
+file is longer than the cap). Its terms add no `references` edges (`oversized.references: false`):
+a file that size mentions nearly every name in the repository, and as a graph seed it pulled
+unrelated files in; `full-oversized-references` is the ablation that restores them. When selected, only excerpt spans are served, re-read and checked
+against the indexed bytes; a file that changed since is withheld as stale. `oversized.lexical:
+false` (strategy `full-oversized-structural`) is the ablation that keeps only the definitions, never
+excerpted, the packet marking the file "over the file read limit"; `structural_records: false`
+(`full-structure`) drops the record and leaves only the name.
 
 From the records the index resolves edges: `imports`, `calls`, `references` (a distinctive name
 defined in at most three files), `inherits`, and `tested_by` (test naming such as

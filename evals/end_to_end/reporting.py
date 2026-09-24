@@ -9,6 +9,7 @@ Imports may contain a subset of packets and never erase ratings for other rows.
 from __future__ import annotations
 
 import hashlib
+from itertools import combinations
 import json
 import math
 from pathlib import Path
@@ -25,7 +26,9 @@ DIMENSIONS = (
     "unnecessary_intervention",
 )
 CONDITIONS = ("baseline", "dispatcher")
-ALL_CONDITIONS = ("baseline", "dispatcher", "indexed", "warm_experience", "learned_skills", "learned_recipes", "learned_global", "learned_full")
+ALL_CONDITIONS = ("baseline", "dispatcher", "dispatcher_lean", "dispatcher_evidence", "indexed", "warm_experience", "learned_skills", "learned_recipes", "learned_global", "learned_full")
+PACKET_CONDITIONS = ("dispatcher_lean", "dispatcher_evidence")
+SPLIT_USAGE = ("uncached_input_tokens", "cache_creation_input_tokens", "cache_read_input_tokens")
 LEARNED_CONDITIONS = ("learned_skills", "learned_recipes", "learned_global", "learned_full")
 
 
@@ -487,12 +490,17 @@ def _number(value: Any) -> bool:
     return type(value) in (int, float) and math.isfinite(value) and value >= 0
 
 
+def _sum(values: list) -> int | float:
+    """Exact integer sums; correctly rounded (unrounded for display) float sums."""
+    return sum(values) if all(type(value) is int for value in values) else math.fsum(values)
+
+
 def _measurement(values: list[Any]) -> dict:
     observed = [value for value in values if _number(value)]
     return {
         "observed": len(observed), "missing": len(values) - len(observed),
         "median": statistics.median(observed) if observed else None,
-        "total_observed": sum(observed) if observed else None,
+        "total_observed": _sum(observed) if observed else None,
     }
 
 
@@ -683,12 +691,23 @@ def _group(trials: list[dict], ratings: dict, scheduled: int) -> dict:
         "claim_accuracy": _rate([row.get("unsupported_claims") for row in human], success=False),
         "unnecessary_intervention": _rate([row.get("unnecessary_intervention") for row in human]),
         "human_dimensions": {name: _rate([row.get(name) for row in human]) for name in DIMENSIONS[:3]},
-        "treatment_compliance": _rate([trial.get("treatment_invoked") for trial in trials if trial["condition"] == "dispatcher"]),
+        "treatment_compliance": _rate([trial.get("treatment_invoked") for trial in trials if trial["condition"] != "baseline"]),
+        # Separate from compliance, which gates grading: did the trace show the helper run? Positive evidence survives a
+        # partial trace; absence counts only with complete activity evidence.
+        "helper_execution": _rate([_helper_ran(trial) for trial in trials if trial["condition"] != "baseline"]),
         "activity": _activity(trials),
         "scope_acceptance": _rate([(trial.get("scope_check") or {}).get("passed") for trial in trials]),
         "elapsed_seconds": _measurement([trial.get("elapsed_seconds") for trial in trials]),
-        "usage": {name: _measurement([(trial.get("usage") or {}).get(name) for trial in trials]) for name in ("input_tokens", "output_tokens", "cached_input_tokens", "cost_usd")},
+        "usage": {name: _measurement([(trial.get("usage") or {}).get(name) for trial in trials]) for name in ("input_tokens", "output_tokens", "cached_input_tokens", "cost_usd", *SPLIT_USAGE)},
     }
+
+
+def _helper_ran(trial: dict) -> bool | None:
+    record = trial.get("activity") or {}
+    successes = (record.get("summary") or {}).get("helper_successes") if record.get("schema_version") == 1 else None
+    if type(successes) is not int:
+        return None
+    return True if successes > 0 else False if record.get("availability") == "complete" else None
 
 
 def _setup(trials: list[dict]) -> dict:
@@ -709,25 +728,44 @@ def _setup(trials: list[dict]) -> dict:
                     "proposal, evaluation and rejected-candidate costs of the library's own history are reported by `learning evaluations`, not here."}
 
 
-def _cost(trials: list[dict]) -> dict:
-    """Amortized cost per attempted task and per verified success; unknown stays unknown, never zero."""
+def _cost(trials: list[dict], ratings: dict | None = None, auth: str | None = None) -> dict:
+    """Runtime-reported cost per attempt and per verified success; unknown stays unknown, never zero.
+
+    Every attempt, invalid ones included, counts toward the arm's cost; verified successes use the same outcome rule
+    as the Successful outcomes row. `auth` is the batch configuration's billing basis for this client.
+    """
     attempted = len(trials)
-    verified = sum(1 for trial in trials if trial.get("task_success") is True)
+    outcomes = [_outcome(trial, (ratings or {}).get(trial.get("id"))) for trial in trials]
+    verified = sum(outcome is True for outcome in outcomes)
+    # A valid attempt without an outcome yet (e.g. a required human review) could still be a success.
+    pending = sum(outcome is None and trial["status"] not in INVALID_STATUSES for trial, outcome in zip(trials, outcomes))
     costs = [(trial.get("usage") or {}).get("cost_usd") for trial in trials]
     known = [value for value in costs if _number(value)]
-    total = sum(known) if known and len(known) == attempted else None
+    total = _sum(known) if known and len(known) == attempted else None
+    invalid = [cost for trial, cost in zip(trials, costs) if trial["status"] in INVALID_STATUSES]
+    invalid_known = [value for value in invalid if _number(value)]
     setup = [(trial.get("deep_index_setup") or {}).get("elapsed_seconds") for trial in trials]
     setup += [(trial.get("learning_setup") or {}).get("elapsed_seconds") for trial in trials if trial.get("learning_setup")]
     setup_known = [value for value in setup if _number(value)]
+    basis = {"subscription": "under subscription auth they estimate API-equivalent cost, not a charge",
+             "api": "under API auth an invoice can still differ"}.get(auth, "billing basis unknown")
     return {"attempted": attempted, "verified_successes": verified,
             "measured_cost_usd_total": total, "cost_known_for": len(known), "cost_unknown_for": attempted - len(known),
+            "known_partial_cost_usd_total": _sum(known) if known and total is None else None,
+            "invalid_attempts": len(invalid), "invalid_known_cost_usd": _sum(invalid_known) if invalid_known or not invalid else None,
+            "invalid_cost_unknown_for": len(invalid) - len(invalid_known),
             "setup_seconds_total": sum(setup_known) if setup_known else 0.0, "setup_measured_for": len(setup_known),
             "amortized_cost_usd_per_task": (total / attempted) if total is not None and attempted else None,
-            "cost_usd_per_verified_success": (total / verified) if total is not None and verified else None,
-            "note": "Measured provider costs only; subscription usage and unreported calls are unknown. A null value is unknown or undefined (zero denominator), not zero."}
+            "cost_usd_per_verified_success": (total / verified) if total is not None and verified and not pending else None,
+            "cost_usd_per_verified_success_reason": ("outcomes_pending" if pending else "zero_verified_successes" if not verified
+                                                     else "cost_unknown" if total is None else None),
+            "billing_basis": auth, "cost_basis": sorted({value for trial in trials if isinstance(value := (trial.get("usage") or {}).get("cost_basis"), str)}),
+            "note": f"Runtime-reported list-price estimates (total_cost_usd), not billed spend; {basis}. A null value is unknown or undefined "
+                    "(zero denominator), never zero; a known partial total is a lower bound."}
 
 
-def _pairs(trials: list[dict], ratings: dict, schedule: list[dict], treatment: str = "dispatcher") -> dict:
+def _pairs(trials: list[dict], ratings: dict, schedule: list[dict], treatment: str = "dispatcher", reference: str = "baseline") -> dict:
+    """Identity pairs (fixture, repetition) within one client; `reference` is the left side (baseline unless comparing treatments)."""
     pairs: dict[tuple, dict] = defaultdict(dict)
     for trial in trials:
         pairs[(trial.get("fixture_id"), trial.get("repetition"))][trial["condition"]] = trial
@@ -736,7 +774,7 @@ def _pairs(trials: list[dict], ratings: dict, schedule: list[dict], treatment: s
     totals = Counter()
     details, deltas = [], defaultdict(list)
     for (fixture_id, repetition), pair in sorted(pairs.items(), key=lambda item: str(item[0])):
-        baseline, treated = pair.get("baseline"), pair.get(treatment)
+        baseline, treated = pair.get(reference), pair.get(treatment)
         left = _outcome(baseline, ratings.get(baseline["id"])) if baseline else None
         right = _outcome(treated, ratings.get(treated["id"])) if treated else None
         if not baseline or not treated:
@@ -756,22 +794,29 @@ def _pairs(trials: list[dict], ratings: dict, schedule: list[dict], treatment: s
         details.append({"fixture_id": fixture_id, "repetition": repetition, "classification": classification, "baseline_success": left, "dispatcher_success": right})
     comparable = sum(totals[name] for name in ("improved", "regressed", "both_pass", "both_fail"))
     return {
-        "treatment": treatment, "total": len(pairs), "comparable": comparable,
+        "treatment": treatment, "reference": reference, "total": len(pairs), "comparable": comparable,
         **{name: totals[name] for name in ("improved", "regressed", "both_pass", "both_fail", "missing_attempt", "invalid", "pending")},
         "deltas_dispatcher_minus_baseline": {name: {"observed_pairs": len(deltas[name]), "missing_pairs": comparable - len(deltas[name]), "median": statistics.median(deltas[name]) if deltas[name] else None} for name in ("elapsed_seconds", "input_tokens", "output_tokens", "cached_input_tokens", "cost_usd")},
         "details": details,
     }
 
 
+def _all_pairs(trials: list[dict], ratings: dict, schedule: list[dict], conditions: tuple) -> tuple[dict, dict]:
+    """Each treatment against baseline, and every treatment pair against each other (earlier canonical condition as reference)."""
+    treatments = [c for c in conditions if c != "baseline"]
+    return ({name: _pairs(trials, ratings, schedule, name) for name in treatments},
+            {f"{right}_vs_{left}": _pairs(trials, ratings, schedule, right, left) for left, right in combinations(treatments, 2)})
+
+
 def _display(value: Any) -> str:
     return "unavailable" if value is None else format(value, ".3f") if isinstance(value, float) else str(value)
 
 
-def report(batch_dir: Path) -> dict:
-    """Write JSON and Markdown without pooling clients or selecting best attempts."""
-    batch_dir = Path(batch_dir)
-    batch = _read(batch_dir / "batch.json")
-    trials = _trials(batch_dir)
+def _usd(value: Any) -> str:
+    return "unavailable" if value is None else format(value, ".4f")
+
+
+def _ratings(batch_dir: Path, trials: list[dict]) -> dict:
     ratings = _read(batch_dir / "review-ratings.json", {"ratings": {}})["ratings"]
     if ratings:
         mapping = _read(batch_dir / "review-map.json")["packets"]
@@ -781,6 +826,15 @@ def report(batch_dir: Path) -> dict:
             trial = by_id.get(trial_id)
             if not trial or evidence.get("trial_id") != trial_id or evidence.get("digest") != _digest(_packet(batch_dir, trial)):
                 raise ValueError("Reviewed evidence is missing or changed; cannot report stale ratings")
+    return ratings
+
+
+def report(batch_dir: Path) -> dict:
+    """Write JSON and Markdown without pooling clients or selecting best attempts."""
+    batch_dir = Path(batch_dir)
+    batch = _read(batch_dir / "batch.json")
+    trials = _trials(batch_dir)
+    ratings = _ratings(batch_dir, trials)
     schedule = batch.get("schedule", [])
     conditions = conditions_of(batch)
     treatments = [c for c in conditions if c != "baseline"]
@@ -811,7 +865,7 @@ def report(batch_dir: Path) -> dict:
             "Deep-index conditions: `indexed` builds or refreshes a deep repository index before each task outside the timer "
             "(deep-index-setup.json); `warm_experience` is the same plus experience its own earlier steps recorded, whose "
             "outcome is the hidden grader's verdict (`grader_passed`, oracle-adjacent) unless configured otherwise. "
-            "Paired comparisons are against baseline; treatments are not paired with each other. Setup cost and model "
+            "Paired comparisons are against baseline and, separately, between treatments (`pairs_between_treatments`). Setup cost and model "
             "calls are reported apart from task cost; a break-even is claimed only from measured recurring savings.")
     if any(c in LEARNED_CONDITIONS for c in conditions):
         result["limitations"].append(
@@ -820,21 +874,33 @@ def report(batch_dir: Path) -> dict:
             "grader's verdict (`hidden_grader`, oracle-adjacent) and unknown overlay exposure. The sequential ladder estimates incremental bundle "
             "effects in its order, not independent component effects; an experimental canary is never a stable measured win, and the library's "
             "own proposal and evaluation costs are outside this report.")
+    if any(c in PACKET_CONDITIONS for c in conditions):
+        tokens = batch.get("config", {}).get("packet_tokens")
+        target = (f"AGENT_DISPATCHER_PACKET_TOKENS={tokens} (config packet_tokens) for both packet arms" if tokens is not None
+                  else "not set; both packet arms use the helper's default target")
+        result["limitations"].append(
+            "Packet-mode conditions: `dispatcher_lean` and `dispatcher_evidence` are the static `dispatcher` arm with "
+            "AGENT_DISPATCHER_PACKET=lean or evidence. They are compared with each other by identity pairs "
+            "(`pairs_between_treatments`, the earlier condition as reference) and each with baseline. "
+            f"Soft packet target: {target}.")
     lines = ["# Agent dispatcher end-to-end evaluation", "", f"Suite: {batch.get('suite', 'unknown')}. Randomization seed: {batch.get('seed', 'unknown')}.", "", *["- " + item for item in result["limitations"]], ""]
     for client in clients:
         subset = [trial for trial in trials if trial["client"] == client]
         client_schedule = [entry for entry in schedule if entry["client"] == client]
         groups = {condition: _group([trial for trial in subset if trial["condition"] == condition], ratings, sum(entry.get("condition") == condition for entry in client_schedule)) for condition in conditions}
+        auth = ((batch.get("config") or {}).get("clients") or {}).get(client, {}).get("auth")
         for condition in conditions:
             groups[condition]["setup"] = _setup([trial for trial in subset if trial["condition"] == condition])
-            groups[condition]["cost_accounting"] = _cost([trial for trial in subset if trial["condition"] == condition])
-        pairs_by_condition = {name: _pairs(subset, ratings, client_schedule, name) for name in treatments}
+            groups[condition]["cost_accounting"] = _cost([trial for trial in subset if trial["condition"] == condition], ratings, auth)
+        pairs_by_condition, pairs_between = _all_pairs(subset, ratings, client_schedule, conditions)
         pairs = pairs_by_condition.get("dispatcher") or (pairs_by_condition[treatments[0]] if treatments else _pairs(subset, ratings, client_schedule))
         fixture_categories = {trial["fixture_id"]: trial.get("category", "unknown") for trial in subset}
         categories = {category: {condition: _group([trial for trial in subset if trial.get("category", "unknown") == category and trial["condition"] == condition], ratings, sum(entry.get("condition") == condition and fixture_categories.get(entry.get("fixture_id")) == category for entry in client_schedule)) for condition in conditions} for category in sorted(set(fixture_categories.values()))}
-        result["clients"][client] = {"conditions": groups, "pairs": pairs, "pairs_by_condition": pairs_by_condition, "categories": categories,
+        result["clients"][client] = {"conditions": groups, "pairs": pairs, "pairs_by_condition": pairs_by_condition,
+                                     "pairs_between_treatments": pairs_between, "categories": categories,
                                      "route_agreement": _route_agreement(subset), "helper_coverage": _helper_coverage(subset)}
-        titles = {"baseline": "Baseline", "dispatcher": "Dispatcher", "indexed": "Indexed", "warm_experience": "Warm-experience",
+        titles = {"baseline": "Baseline", "dispatcher": "Dispatcher", "dispatcher_lean": "Dispatcher-lean", "dispatcher_evidence": "Dispatcher-evidence",
+                  "indexed": "Indexed", "warm_experience": "Warm-experience",
                   "learned_skills": "Learned-skills", "learned_recipes": "Learned-recipes", "learned_global": "Learned-global", "learned_full": "Learned-full"}
         header = "| Metric | " + " | ".join(titles[c] for c in conditions) + " |"
         lines.extend(["## " + client, "", header, "| --- |" + " ---: |" * len(conditions)])
@@ -843,18 +909,26 @@ def report(batch_dir: Path) -> dict:
             lines.append(f"| {title} | " + " | ".join(_display(groups[c][key]) for c in conditions) + " |")
         for status in sorted(STATUSES):
             lines.append(f"| Status: {status} | " + " | ".join(str(groups[c]["statuses"][status]) for c in conditions) + " |")
-        for title, key in (("Automated artifact acceptance", "artifact_acceptance"), ("Claim accuracy", "claim_accuracy"), ("Unnecessary intervention", "unnecessary_intervention"), ("Treatment compliance", "treatment_compliance"), ("Owned-directory scope acceptance", "scope_acceptance")):
+        for title, key in (("Automated artifact acceptance", "artifact_acceptance"), ("Claim accuracy", "claim_accuracy"), ("Unnecessary intervention", "unnecessary_intervention"), ("Treatment compliance", "treatment_compliance"), ("Helper execution (activity helper successes)", "helper_execution"), ("Owned-directory scope acceptance", "scope_acceptance")):
             cells = [f"{groups[condition][key]['numerator']}/{groups[condition][key]['denominator']} observed; {groups[condition][key]['missing']} missing" for condition in conditions]
             lines.append(f"| {title} | " + " | ".join(cells) + " |")
-        for name in ("elapsed_seconds", "input_tokens", "output_tokens", "cached_input_tokens", "cost_usd"):
+        for name in ("elapsed_seconds", "input_tokens", "output_tokens", "cached_input_tokens", "cost_usd", *SPLIT_USAGE):
             measurements = [groups[condition][name] if name == "elapsed_seconds" else groups[condition]["usage"][name] for condition in conditions]
             cells = [f"{_display(value['median'])} ({value['observed']} observed; {value['missing']} missing)" for value in measurements]
             lines.append(f"| Median {name} | " + " | ".join(cells) + " |")
         for title, key in (("Deep-index setup seconds (median)", "deep_index_setup"), ("Setup model calls (median)", "setup_model_calls")):
             cells = [f"{_display(groups[c]['setup'][key]['median'])} ({groups[c]['setup'][key]['observed']} observed; {groups[c]['setup'][key]['missing']} missing)" for c in conditions]
             lines.append(f"| {title} | " + " | ".join(cells) + " |")
-        for title, key in (("Amortized measured cost per task (USD)", "amortized_cost_usd_per_task"), ("Measured cost per verified success (USD)", "cost_usd_per_verified_success")):
-            lines.append(f"| {title} | " + " | ".join(_display(groups[c]["cost_accounting"][key]) for c in conditions) + " |")
+        costs = [groups[c]["cost_accounting"] for c in conditions]
+        lines.extend([
+            "| Billing basis (auth; runtime costBasis) | " + " | ".join(f"{cost['billing_basis'] or 'unknown'}; {', '.join(cost['cost_basis']) or 'unknown'}" for cost in costs) + " |",
+            "| Arm total (USD, runtime-reported estimate) | " + " | ".join(
+                _usd(cost["measured_cost_usd_total"]) if cost["known_partial_cost_usd_total"] is None
+                else f"at least {_usd(cost['known_partial_cost_usd_total'])} (lower bound; {cost['cost_unknown_for']} unknown)" for cost in costs) + " |",
+            "| Amortized cost per attempt (USD, runtime-reported estimate) | " + " | ".join(_usd(cost["amortized_cost_usd_per_task"]) for cost in costs) + " |",
+            "| Cost per verified success (USD, runtime-reported estimate) | " + " | ".join(
+                _usd(cost["cost_usd_per_verified_success"]) + (f" ({cost['cost_usd_per_verified_success_reason']})" if cost["cost_usd_per_verified_success_reason"] else "") for cost in costs) + " |",
+            "| Invalid attempts (known cost USD) | " + " | ".join(f"{cost['invalid_attempts']} ({_usd(cost['invalid_known_cost_usd'])}; {cost['invalid_cost_unknown_for']} unknown)" for cost in costs) + " |"])
         lines.extend(["", groups["baseline"]["cost_accounting"]["note"], groups["baseline"]["setup"]["note"]])
         lines.extend(["", "### Private process measurements", "", groups["baseline"]["activity"]["note"], "",
                       "| Measurement | " + " | ".join(titles[c] for c in conditions) + " |", "| --- |" + " ---: |" * len(conditions)])
@@ -881,15 +955,195 @@ def report(batch_dir: Path) -> dict:
                       "Exclusion metadata: " + json.dumps(coverage["exclusions"]["counts"], sort_keys=True)])
         agreement = result["clients"][client]["route_agreement"]
         lines.extend(["", f"Route agreement: {agreement['groups_agreed']}/{agreement['groups_observed']} observed fixture/condition groups agreed; {agreement['groups_varied']} varied; {agreement['unknown_trials']} trials unknown.", agreement["note"]])
-        for name in treatments or ["dispatcher"]:
-            pairs = pairs_by_condition.get(name, pairs)
-            lines.extend(["", f"Paired outcomes ({name} versus baseline): {pairs['comparable']}/{pairs['total']} comparable; {pairs['improved']} improved, {pairs['regressed']} regressed, {pairs['both_pass']} both passed, {pairs['both_fail']} both failed. Incomplete: {pairs['missing_attempt']} missing attempts, {pairs['invalid']} invalid pairs, {pairs['pending']} pending.", "", f"| Paired metric ({name} − baseline) | Median difference | Observed pairs | Missing pairs |", "| --- | ---: | ---: | ---: |"])
+        for pairs, details in [(pairs_by_condition.get(name, pairs), True) for name in treatments or ["dispatcher"]] + [(item, False) for item in pairs_between.values()]:
+            name, reference = pairs["treatment"], pairs["reference"]
+            lines.extend(["", f"Paired outcomes ({name} versus {reference}): {pairs['comparable']}/{pairs['total']} comparable; {pairs['improved']} improved, {pairs['regressed']} regressed, {pairs['both_pass']} both passed, {pairs['both_fail']} both failed. Incomplete: {pairs['missing_attempt']} missing attempts, {pairs['invalid']} invalid pairs, {pairs['pending']} pending.", "", f"| Paired metric ({name} − {reference}) | Median difference | Observed pairs | Missing pairs |", "| --- | ---: | ---: | ---: |"])
             for metric, measurement in pairs["deltas_dispatcher_minus_baseline"].items():
                 lines.append(f"| {metric} | {_display(measurement['median'])} | {measurement['observed_pairs']} | {measurement['missing_pairs']} |")
+            if not details:
+                continue  # between-treatment details stay in report.json
             lines.extend(["", f"### Each paired outcome ({name})", "", "| Fixture | Repetition | Result |", "| --- | ---: | --- |"])
             for detail in pairs["details"]:
                 lines.append(f"| {detail['fixture_id']} | {detail['repetition']} | {detail['classification']} |")
         lines.append("")
     _write(batch_dir / "report.json", result)
     (batch_dir / "report.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return result
+
+
+# ---------------------------------------------------------------- read-only audit
+
+PROVENANCE = {"verified": "re-derived from saved (redacted) events and equal to the stored value",
+              "derived": "computed by this audit (from saved (redacted) events, or from stored values where noted)",
+              "stored_only": "stored result value; saved events cannot re-derive it",
+              "unavailable": "neither saved events nor stored results provide it"}
+# A helper path, or `cd <...>/agent-dispatcher[/scripts] && python3 [-B|-u] [scripts/]<helper>.py`.
+_HELPER_COMMAND = re.compile(r"(?:^|[/\\])agent-dispatcher[/\\](?:scripts[/\\])?(?:context|project_map|resources|doctor)\.py\b"
+                             r"|\bcd\s+([\"']?)(?:[^\"';&|\n]*[/\\])?agent-dispatcher(?:[/\\]scripts)?[/\\]?\1\s*&&\s*"
+                             r"python[\d.]*(?:\s+-[Bu])*\s+(?:scripts[/\\])?(?:context|project_map|resources|doctor)\.py\b")
+_OUTPUT_FILTER = re.compile(r"\|\s*(?:head|tail)\b")
+
+
+def _value(value: Any, provenance: str) -> dict:
+    return {"value": value, "provenance": provenance}
+
+
+def _checked(derived: Any, stored: Any) -> dict:
+    """The saved-event re-derivation wins; a different stored value is kept beside it and flagged."""
+    if derived is None:
+        return _value(stored, "stored_only") if stored is not None else _value(None, "unavailable")
+    if stored is None:
+        return _value(derived, "derived")
+    if derived == stored:
+        return _value(derived, "verified")
+    return {"value": derived, "stored": stored, "provenance": "derived", "discrepancy": True}
+
+
+def _events(text: str):
+    for line in text.splitlines():
+        try:
+            event = json.loads(line)
+        except ValueError:
+            continue
+        if isinstance(event, dict):
+            yield event
+
+
+def _linked_helpers(text: str) -> int | str:
+    """Claude helper calls joined to their own tool_result by tool_use_id, judged by the attribution's rule: a call
+    succeeds on its exit status, one piped to `head`/`tail` only on the helper's versioned JSON. "redacted" when the
+    saved events' redaction left such a result unparseable: no verdict either way."""
+    from evals.end_to_end.activity import _payload, _text
+    calls, successes = {}, 0
+    for event in _events(text):
+        message = event.get("message")
+        blocks = message.get("content") if isinstance(message, dict) else None
+        for block in blocks if isinstance(blocks, list) else []:
+            if not isinstance(block, dict):
+                continue
+            command = str(block["input"].get("command", "")) if isinstance(block.get("input"), dict) else ""
+            if block.get("type") == "tool_use" and _HELPER_COMMAND.search(command):
+                calls[block.get("id")] = bool(_OUTPUT_FILTER.search(command))
+            elif block.get("type") == "tool_result" and block.get("tool_use_id") in calls:
+                if not calls[block["tool_use_id"]]:
+                    successes += not block.get("is_error")
+                    continue
+                output = _text(block.get("content"))
+                payload = _payload(output)
+                if payload is None and "[redacted]" in output:
+                    return "redacted"
+                successes += payload is not None and type(payload.get("schema_version")) is int
+    return successes
+
+
+def _current_attribution(batch_dir: Path, batch: dict, trial: dict, text: str) -> int | None:
+    """Today's activity attribution replayed over saved events with a recorded binding (no live path resolution)."""
+    from evals.end_to_end import activity
+    package = batch_dir.parent.parent / "packages" / trial["client"]
+    profile = ((batch.get("config") or {}).get("clients") or {}).get(trial["client"], {}).get("profile_dir")
+    cwd = next((event.get("cwd") for event in _events(text) if event.get("type") == "system" and event.get("subtype") == "init"), None)
+    # ponytail: Claude only (Codex stages the package inside the removed workspace); add a Codex binding when a Codex batch needs auditing.
+    if trial["client"] != "claude" or trial["condition"] == "baseline" or not package.is_dir() or not isinstance(profile, str) or not isinstance(cwd, str):
+        return None
+    staged = activity.bind(package, package)
+    recorded = profile.rstrip("/") + "/skills/agent-dispatcher"
+    binding = activity.Bindings(cwd, recorded, {recorded + "/" + relative: relative for relative in staged.files.values()},
+                                staged.roles, staged.aliases, recorded=True)
+    return activity.analyze(trial["client"], text, binding)["summary"]["helper_successes"]
+
+
+def _audit_trial(batch_dir: Path, batch: dict, trial: dict, rating: dict | None) -> dict:
+    from evals.end_to_end.adapters import RUNTIME_KEYS, USAGE_KEYS, parse_events
+    raw = trial.get("artifact_dir")
+    path = batch_dir / raw / "events.jsonl" if isinstance(raw, str) and raw and not Path(raw).is_absolute() and ".." not in Path(raw).parts else None
+    text = path.read_text(encoding="utf-8", errors="replace") if path is not None and path.is_file() and not path.is_symlink() else None
+    parsed = parse_events(trial["client"], text) if text is not None else {"usage": {}, "runtime": {}, "treatment_invoked": None}
+    treated = trial["condition"] != "baseline"
+    record = trial.get("activity") or {}
+    stored_helpers = (record.get("summary") or {}).get("helper_successes") if record.get("schema_version") == 1 else None
+    linked = _linked_helpers(text) if text is not None and trial["client"] == "claude" else None
+    if linked == "redacted":  # no linked verdict, so no discrepancy or resolution flag either
+        linked, linked_events = None, {"value": None, "provenance": "unavailable", "reason": "redacted"}
+    else:
+        linked_events = _value(linked, "derived" if linked is not None else "unavailable")
+    current = _current_attribution(batch_dir, batch, trial, text) if text is not None else None
+    auto, scope = trial.get("auto_grade") or {}, trial.get("scope_check") or {}
+    row = {key: trial.get(key) for key in ("id", "client", "condition", "fixture_id", "repetition")}
+    row.update(
+        events="available" if text is not None else "unavailable",
+        usage={key: _checked(parsed["usage"].get(key), (trial.get("usage") or {}).get(key)) for key in USAGE_KEYS},
+        runtime={key: _checked(parsed["runtime"].get(key), (trial.get("runtime") or {}).get(key)) for key in RUNTIME_KEYS},
+        auth=_checked(None, (trial.get("effective_settings") or {}).get("auth")),
+        status=_value(trial.get("status"), "stored_only"), task_success=_value(trial.get("task_success"), "stored_only"),
+        outcome=_value(_outcome(trial, rating), "derived"),
+        auto_grade_failures=_value([check.get("name") for check in auto.get("checks", []) if isinstance(check, dict) and check.get("passed") is False], "stored_only"),
+        scope_failure_reason=_value(scope.get("reason") if scope and scope.get("passed") is not True else None, "stored_only"),
+        treatment_invoked=_checked(parsed["treatment_invoked"] if treated else None, trial.get("treatment_invoked")),
+        helper_successes={"linked_events": linked_events,
+                          "stored_activity": _checked(None, stored_helpers),
+                          "current_attribution": _value(current, "derived" if current is not None else "unavailable")})
+    helper = row["helper_successes"]
+    helper["discrepancy"] = linked is not None and stored_helpers is not None and linked != stored_helpers
+    helper["resolved_by_current_attribution"] = (current == linked) if helper["discrepancy"] and current is not None else None
+    row["discrepancies"] = ([f"usage.{key}" for key, item in row["usage"].items() if item.get("discrepancy")]
+                            + [f"runtime.{key}" for key, item in row["runtime"].items() if item.get("discrepancy")]
+                            + ["treatment_invoked"] * bool(row["treatment_invoked"].get("discrepancy")) + ["helper_successes"] * helper["discrepancy"])
+    return row
+
+
+def _totals(trials: list[dict]) -> dict:
+    """Unrounded totals; a total is null when any value is unknown, and the known part is then a lower bound."""
+    result = {}
+    for key in ("cost_usd", "uncached_input_tokens", "cache_creation_input_tokens", "cache_read_input_tokens", "output_tokens"):
+        values = [(trial.get("usage") or {}).get(key) for trial in trials]
+        known = [value for value in values if _number(value)]
+        result[key] = {"total": _sum(known) if known and len(known) == len(values) else None,
+                       "known_partial_total": _sum(known) if known else None, "unknown_for": len(values) - len(known)}
+    return result
+
+
+def audit(batch_dirs: list[Path]) -> dict:
+    """Re-derive accounting from saved (redacted) events and stored results. Reads only; never writes into a batch."""
+    from evals.end_to_end.adapters import RUNTIME_KEYS, USAGE_KEYS
+    batches, everything = [], []
+    for batch_dir in map(Path, batch_dirs):
+        batch = _read(batch_dir / "batch.json")
+        trials = _trials(batch_dir)
+        ratings = _ratings(batch_dir, trials)
+        rows = [_audit_trial(batch_dir, batch, trial, ratings.get(trial["id"])) for trial in trials]
+        # Stored trials with every re-derivable value replaced by the audited one, so shared report logic runs on it.
+        resolved = [dict(trial, usage={key: row["usage"][key]["value"] for key in USAGE_KEYS},
+                         runtime={key: row["runtime"][key]["value"] for key in RUNTIME_KEYS}) for trial, row in zip(trials, rows)]
+        everything += resolved
+        schedule, conditions = batch.get("schedule", []), conditions_of(batch)
+        clients = {}
+        for client in sorted({trial["client"] for trial in trials} | {entry["client"] for entry in schedule}):
+            subset = [trial for trial in resolved if trial["client"] == client]
+            planned = [entry for entry in schedule if entry["client"] == client]
+            auth = ((batch.get("config") or {}).get("clients") or {}).get(client, {}).get("auth")
+            arms = {}
+            for condition in conditions:
+                arm = [trial for trial in subset if trial["condition"] == condition]
+                arm_rows = [row for row in rows if row["client"] == client and row["condition"] == condition]
+                invalid = sum(trial["status"] in INVALID_STATUSES for trial in arm)
+                arms[condition] = {
+                    "scheduled": _value(sum(entry.get("condition") == condition for entry in planned), "stored_only"),
+                    "counts": {"provenance": "derived", "attempted": len(arm), "evaluable": len(arm) - invalid, "invalid": invalid,
+                               "verified_successes": sum(_outcome(trial, ratings.get(trial["id"])) is True for trial in arm)},
+                    "totals": {"provenance": "derived", "cost_input_provenance": dict(Counter(row["usage"]["cost_usd"]["provenance"] for row in arm_rows)), **_totals(arm)},
+                    "medians": {"provenance": "derived", **{key: _measurement([(trial.get("usage") or {}).get(key) for trial in arm])["median"] for key in USAGE_KEYS if key not in ("cost_source", "cost_basis")},
+                                **{key: _measurement([trial["runtime"][key] for trial in arm])["median"] for key in RUNTIME_KEYS},
+                                "elapsed_seconds": _measurement([trial.get("elapsed_seconds") for trial in arm])["median"]},
+                    "cost": {"provenance": "derived", **_cost(arm, ratings, auth)}}
+            by_condition, between = _all_pairs(subset, ratings, planned, conditions)
+            clients[client] = {"arms": arms, "pairs": {"provenance": "derived", "vs_baseline": by_condition, "between_treatments": between}}
+        batches.append({"batch": str(batch_dir), "suite": batch.get("suite"), "trials": rows, "clients": clients,
+                        "totals": {"provenance": "derived", **_totals(resolved)},
+                        "discrepancies": [{"trial": row["id"], "fields": row["discrepancies"]} for row in rows if row["discrepancies"]]})
+    result = {"schema_version": 1, "read_only": True, "provenance_labels": PROVENANCE,
+              "note": "Costs are runtime-reported list-price estimates (total_cost_usd), not billed spend; see each arm's cost.billing_basis. "
+                      "JSON numbers are unrounded.", "batches": batches}
+    if len(batches) > 1:
+        result["combined"] = {"label": "sum across batches; not an experimental estimate", "provenance": "derived",
+                              "batches": len(batches), "trials": len(everything), **_totals(everything)}
     return result

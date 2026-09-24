@@ -2,6 +2,27 @@
 
 ## Unreleased
 
+- Efficiency and reliability pass (audit and decisions in `docs/efficiency-reliability-audit.md`).
+  Admitted source files over 256 KiB are now searched lexically from their one bounded read (4 MiB
+  per file, 16 MiB per scan; a longer file is indexed as a line-aligned prefix, `partial_lexical`),
+  excerpted by span only after a hash check, and add no term-reference graph edges; coverage states
+  are reported, and `full-oversized-structural` / `full-oversized-references` restore the previous
+  behavior. Fixes: a large binary is named binary from an 8 KiB sniff that no longer spends the
+  scan budget; the oversized-record cache is keyed on the full file signature (a same-size,
+  same-mtime edit served stale definitions); deep-index evidence is limited to the current
+  ignore-aware listing, and explain applies automatic task exclusions to it. Opt-in packet modes
+  (`--packet-mode lean|evidence`, `AGENT_DISPATCHER_PACKET`): ranked rows with span references,
+  coverage and a next action, optional spans, a soft target over SKILL.md plus the packet
+  (`--packet-tokens`, `AGENT_DISPATCHER_PACKET_TOKENS`, default 4,000 estimated tokens at
+  `ceil(bytes/2)`), a hard limit of 28,000 UTF-16 units on the final payload, and helper phase
+  timing; legacy stays the default with an unchanged packet code path. Implementer, tester and
+  debugger roles share a short verification contract. `names.case_only` and `names.slash_words` exist as
+  development-split ablations, off. The end-to-end runner records the cache-creation/read split,
+  runtime fields and cost basis, labels costs as runtime list-price estimates, reports arm totals
+  and reasons for undefined cost per success, attributes helper calls with an output-only suffix,
+  isolates `XDG_CONFIG_HOME` per trial, adds `dispatcher_lean`/`dispatcher_evidence` arms with
+  `prepare --packet-tokens`, and gains a read-only `audit` command.
+
 - Evidence-backed repository intelligence iteration (audit and decisions in
   `docs/repository-intelligence-audit.md`). Retrieval results now carry a deterministic plan
   (profile, reason codes, families, caps, stop conditions; policy `observe`, no family is switched

@@ -60,7 +60,7 @@ SLOTS = {
         "workflow": {"anchor": r"^## Steps\s*$", "title": "Learned workflow additions"},
     },
 }
-PROTECTED_ROLE_SECTIONS = ("ROLE:", "WHEN TO USE", "DELIVERABLE", "DEFINITION OF DONE", "ROLE BOUNDARIES", "## Tool posture")
+PROTECTED_ROLE_SECTIONS = ("ROLE:", "WHEN TO USE", "DELIVERABLE", "DEFINITION OF DONE", "VERIFICATION", "ROLE BOUNDARIES", "## Tool posture")
 
 # Retrieval profiles: only strategies that call no model and parameters that already exist in retrieval.DEFAULTS,
 # each inside a trusted range. The effective profile is the intersection of this and the caller's own settings.
@@ -806,7 +806,8 @@ def effective_profile(revisions, base_settings, *, caller_strategy_explicit=Fals
     payload = revisions[0]["typed_payload"]
     strategy = None if caller_strategy_explicit else payload.get("strategy")
     overrides = copy.deepcopy(payload.get("overrides") or {})
-    for key in ("llm_rerank", "role_summary", "explorer", "retrievers", "query_weights", "pin_named_paths", "fusion", "frames", "structural_records"):
+    for key in ("llm_rerank", "role_summary", "explorer", "retrievers", "query_weights", "pin_named_paths", "fusion", "frames", "structural_records",
+                "oversized", "names"):
         overrides.pop(key, None)
     if "context" in overrides and base_settings is not None:
         # Caller caps (files, bytes, tokens) remain the caller's; a profile may only choose within them.

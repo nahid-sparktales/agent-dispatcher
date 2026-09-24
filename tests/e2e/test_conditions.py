@@ -54,6 +54,30 @@ class ConfigAndScheduleTests(unittest.TestCase):
         plain = runner.schedule([{"id": "a", "smoke": True}, {"id": "b", "smoke": True}], "smoke", 3, ("codex", "claude"))
         self.assertEqual(len(plain), 8)  # unchanged two-condition smoke shape
 
+    def test_packet_conditions_keep_baseline_mandatory_and_schedule_three_way_identity_groups(self):
+        packet = ["baseline", "dispatcher_lean", "dispatcher_evidence"]
+        runner.validate_config(self.config(conditions=packet))
+        runner.validate_config(self.config(conditions=["baseline", "dispatcher", "dispatcher_lean", "dispatcher_evidence", "indexed"]))
+        for bad in (["dispatcher_lean", "dispatcher_evidence"], ["baseline", "dispatcher_evidence", "dispatcher_lean"]):
+            with self.subTest(bad=bad), self.assertRaisesRegex(ValueError, "conditions"):
+                runner.validate_config(self.config(conditions=bad))
+        self.assertEqual(runner.PACKET_CONDITIONS, {"dispatcher_lean": "lean", "dispatcher_evidence": "evidence"})
+        runner.validate_config(self.config(conditions=packet, packet_tokens=12000))
+        for bad in (255, 100001, "12000", 12000.0, True):
+            with self.subTest(bad=bad), self.assertRaisesRegex(ValueError, "packet_tokens must be an integer"):
+                runner.validate_config(self.config(conditions=packet, packet_tokens=bad))
+        with self.assertRaisesRegex(ValueError, "packet_tokens is only meaningful"):
+            runner.validate_config(self.config(packet_tokens=12000))  # no packet arm to receive it
+        self.assertNotEqual(runner.fingerprint(self.config(conditions=packet)), runner.fingerprint(self.config(conditions=packet, packet_tokens=12000)))
+        with tempfile.TemporaryDirectory() as tmp:
+            with self.assertRaisesRegex(ValueError, "only meaningful"):
+                runner.prepare(Path(tmp) / "out", packet_tokens=12000)
+            self.assertFalse((Path(tmp) / "out").exists())  # refused before anything is staged
+        rows = runner.schedule([{"id": "a", "smoke": True}, {"id": "b", "smoke": True}], "smoke", 3, ("claude",), tuple(packet))
+        self.assertEqual(len(rows), 6)  # smoke_ready expects 2 * conditions * clients
+        for fixture in ("a", "b"):
+            self.assertEqual(sorted(row["condition"] for row in rows if row["fixture_id"] == fixture), sorted(packet))
+
 
 class ArmSetupTests(unittest.TestCase):
     """The real helper builds and refreshes an arm-scoped index and records experience; no model, no workspace writes."""
@@ -175,6 +199,8 @@ class ReportingTests(unittest.TestCase):
             client = result["clients"]["claude"]
             self.assertEqual(set(client["conditions"]), set(conditions))
             self.assertEqual(set(client["pairs_by_condition"]), {"dispatcher", "indexed", "warm_experience"})
+            self.assertEqual(set(client["pairs_between_treatments"]), {"indexed_vs_dispatcher", "warm_experience_vs_dispatcher", "warm_experience_vs_indexed"})
+            self.assertEqual(client["pairs_between_treatments"]["indexed_vs_dispatcher"]["improved"], 1)  # dispatcher failed, indexed passed
             self.assertEqual(client["pairs"]["treatment"], "dispatcher")
             self.assertEqual(client["pairs_by_condition"]["dispatcher"]["regressed"], 1)
             self.assertEqual(client["pairs_by_condition"]["indexed"]["both_pass"], 1)
@@ -197,7 +223,48 @@ class ReportingTests(unittest.TestCase):
             with patch.object(reporting, "_packet", return_value={}):
                 result = reporting.report(batch)
             self.assertEqual(set(result["clients"]["claude"]["conditions"]), {"baseline", "dispatcher"})
+            self.assertEqual(result["clients"]["claude"]["pairs_between_treatments"], {})
             self.assertIn("| Metric | Baseline | Dispatcher |", (batch / "report.md").read_text())
+
+    def test_packet_mode_report_pairs_lean_and_evidence_by_identity(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            batch = Path(tmp)
+            conditions = ["baseline", "dispatcher_lean", "dispatcher_evidence"]
+            trials, schedule = [], []
+            for repetition, lean_passes in ((1, False), (2, True)):
+                for condition in conditions:
+                    passed = condition != "dispatcher_lean" or lean_passes
+                    trials.append({"id": f"claude-fx-{repetition}-{condition}", "client": "claude", "condition": condition, "fixture_id": "fx",
+                                   "repetition": repetition, "category": "bug_fix", "status": "completed" if passed else "task_failure",
+                                   "task_success": passed, "auto_grade": {"passed": passed, "checks": [{"name": "behavior", "passed": passed}], "human_required": False},
+                                   "treatment_invoked": condition != "baseline", "elapsed_seconds": 10.0 + repetition,
+                                   "usage": {"input_tokens": 1, "output_tokens": 1, "cached_input_tokens": 1, "cost_usd": 1.0 if condition == "dispatcher_lean" else 1.5},
+                                   "final_answer": "", "prompt": "p", "acceptance": [], "rubric": {}, "diagnostics": []})
+                    schedule.append({"client": "claude", "condition": condition, "fixture_id": "fx", "repetition": repetition})
+            rt.write_json(batch / "batch.json", {"schema_version": 1, "suite": "pilot", "seed": 1, "schedule": schedule,
+                                                 "config": {"conditions": conditions, "clients": {"claude": {"auth": "subscription"}}}})
+            rt.write_json(batch / "results.json", {"schema_version": 1, "trials": trials})
+            with patch.object(reporting, "_packet", return_value={}):
+                result = reporting.report(batch)
+            client = result["clients"]["claude"]
+            between = client["pairs_between_treatments"]["dispatcher_evidence_vs_dispatcher_lean"]
+            self.assertEqual((between["reference"], between["treatment"]), ("dispatcher_lean", "dispatcher_evidence"))
+            self.assertEqual((between["comparable"], between["improved"], between["both_pass"]), (2, 1, 1))
+            self.assertEqual(between["deltas_dispatcher_minus_baseline"]["cost_usd"]["median"], 0.5)  # evidence minus lean, per identity pair
+            self.assertEqual(client["pairs"]["treatment"], "dispatcher_lean")
+            self.assertEqual(client["conditions"]["dispatcher_evidence"]["treatment_compliance"]["numerator"], 2)
+            text = (batch / "report.md").read_text()
+            self.assertIn("| Metric | Baseline | Dispatcher-lean | Dispatcher-evidence |", text)
+            self.assertIn("Paired outcomes (dispatcher_evidence versus dispatcher_lean): 2/2 comparable; 1 improved", text)
+            self.assertTrue(any("Packet-mode conditions" in line and "not set; both packet arms use the helper's default target" in line
+                                for line in result["limitations"]))
+            batch_json = rt.read_json(batch / "batch.json")
+            batch_json["config"]["packet_tokens"] = 12000
+            rt.write_json(batch / "batch.json", batch_json)
+            with patch.object(reporting, "_packet", return_value={}):
+                reporting.report(batch)
+            self.assertIn("Soft packet target: AGENT_DISPATCHER_PACKET_TOKENS=12000 (config packet_tokens) for both packet arms.",
+                          (batch / "report.md").read_text())
 
 
 if __name__ == "__main__":

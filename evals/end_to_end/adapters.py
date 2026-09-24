@@ -34,6 +34,12 @@ _ENV_KEYS = {
     "LANG", "LC_ALL", "LC_CTYPE", "TERM", "SYSTEMROOT", "WINDIR",
 }
 _CODEX_FEATURES = ("hooks", "memories", "plugins", "apps")
+# Result usage keys. The first four keep their original meaning (for Claude, cached_input_tokens is cache reads only);
+# the split is Claude's own accounting. cost_usd is the runtime's list-price estimate, not billed spend.
+USAGE_KEYS = ("input_tokens", "output_tokens", "cached_input_tokens", "cost_usd", "uncached_input_tokens",
+              "cache_creation_input_tokens", "cache_read_input_tokens", "cache_creation_1h_input_tokens",
+              "cache_creation_5m_input_tokens", "cost_source", "cost_basis")
+RUNTIME_KEYS = ("duration_ms", "duration_api_ms", "num_turns")
 _CLAUDE_FLAGS = (
     "--setting-sources", "--strict-mcp-config", "--mcp-config", "--settings",
     "--no-session-persistence", "--output-format", "--verbose", "--model",
@@ -101,9 +107,12 @@ def _environment(client: str, spec: dict, profile: Path) -> dict[str, str]:
     # conditions so their environments stay identical; only the staged dispatcher reads it.
     if spec.get("llm_settings"):
         env["AGENT_DISPATCHER_LLM_CONFIG"] = spec["llm_settings"]
-    # Deep-index arms: arm-scoped private state, a sequence identity and a settings path. Paths only, set by the runner.
+    # An empty trial-owned config home in every condition, so the operator's ~/.config (dispatcher preferences) never reaches a trial.
+    if spec.get("config_home"):
+        env["XDG_CONFIG_HOME"] = spec["config_home"]
+    # Deep-index arms: arm-scoped private state, a sequence identity and a settings path; packet arms: a packet mode. Set by the runner.
     for key in ("XDG_CACHE_HOME", "AGENT_DISPATCHER_INDEX_ID", "AGENT_DISPATCHER_INDEX_CONFIG", "AGENT_DISPATCHER_MEMORY_CONFIG",
-                "AGENT_DISPATCHER_LEARNING_CONFIG"):
+                "AGENT_DISPATCHER_LEARNING_CONFIG", "AGENT_DISPATCHER_PACKET", "AGENT_DISPATCHER_PACKET_TOKENS"):
         value = (spec.get("index_env") or {}).get(key)
         if isinstance(value, str) and value:
             env[key] = value
@@ -334,6 +343,7 @@ def build_launch(client: str, spec: dict, workspace: Path,
         "llm_retrieval_settings": spec.get("llm_settings"),
         "llm_network": list(spec.get("llm_network") or []),
         "memory_settings": spec.get("memory_settings"),
+        "xdg_config_home": "trial-owned empty directory" if spec.get("config_home") else "inherited",
     }
     if client == "codex":
         disabled, proof = _codex_isolation(executable, spec, env, workspace, skill)
@@ -444,6 +454,12 @@ def _number(value):
         return value if math.isfinite(value) else None
     except OverflowError:
         return None
+
+
+def _cost_basis(models) -> str | None:
+    """The runtime's own pricing label when every model row agrees; never inferred from prices."""
+    bases = {row.get("costBasis") if isinstance(row, dict) else None for row in models.values()} if isinstance(models, dict) else set()
+    return next(iter(bases)) if len(bases) == 1 and isinstance(next(iter(bases)), str) else None
 
 
 def _event_shape_errors(client: str, event: dict) -> list[str]:
@@ -566,8 +582,7 @@ def parse_events(client: str, stdout: str) -> dict:
     if client not in ("codex", "claude"):
         raise AdapterError(f"Unsupported client: {client}")
     result = {
-        "final_answer": "", "usage": {"input_tokens": None, "output_tokens": None,
-                                         "cached_input_tokens": None, "cost_usd": None},
+        "final_answer": "", "usage": dict.fromkeys(USAGE_KEYS), "runtime": dict.fromkeys(RUNTIME_KEYS),
         "treatment_invoked": False, "usage_observed": False, "diagnostics": [], "startup": {},
         "status": "infrastructure_error", "errors": [],
     }
@@ -651,13 +666,22 @@ def parse_events(client: str, stdout: str) -> dict:
                 seen_result = True
                 result["final_answer"] = event.get("result", "")
                 usage = event.get("usage", {})
+                cache = usage.get("cache_creation") if isinstance(usage.get("cache_creation"), dict) else {}
                 result["usage_observed"] = "usage" in event
                 result["usage"].update({
                     "input_tokens": _number(usage.get("input_tokens")),
                     "output_tokens": _number(usage.get("output_tokens")),
                     "cached_input_tokens": _number(usage.get("cache_read_input_tokens")),
                     "cost_usd": _number(event.get("total_cost_usd")),
+                    "uncached_input_tokens": _number(usage.get("input_tokens")),
+                    "cache_creation_input_tokens": _number(usage.get("cache_creation_input_tokens")),
+                    "cache_read_input_tokens": _number(usage.get("cache_read_input_tokens")),
+                    "cache_creation_1h_input_tokens": _number(cache.get("ephemeral_1h_input_tokens")),
+                    "cache_creation_5m_input_tokens": _number(cache.get("ephemeral_5m_input_tokens")),
+                    "cost_source": "runtime_reported_estimate" if _number(event.get("total_cost_usd")) is not None else None,
+                    "cost_basis": _cost_basis(event.get("modelUsage")),
                 })
+                result["runtime"] = {key: _number(event.get(key)) for key in RUNTIME_KEYS}
                 if event.get("is_error") or event.get("subtype") not in (None, "success"):
                     errors = event.get("errors", [])
                     result["errors"].extend(str(x) for x in errors)
@@ -695,7 +719,7 @@ def validate_startup(client: str, spec: dict, parsed: dict, condition: str) -> l
             errors.append(f"Native startup {key} contains a non-string entry")
     if errors:
         return errors
-    treatment = condition in ("dispatcher", "treatment", "on", "indexed", "warm_experience") or condition.startswith("learned_")
+    treatment = condition in ("treatment", "on", "indexed", "warm_experience") or condition.startswith(("dispatcher", "learned_"))
     if client == "codex":
         if not startup.get("thread_started"):
             errors.append("Missing Codex thread.started evidence")

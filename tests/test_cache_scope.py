@@ -199,14 +199,40 @@ class CacheScopeTests(unittest.TestCase):
 
     def test_oversized_text_file_is_skipped_without_blocking_persistence(self):
         self.write("pydoc_data/topics.py", "TOPICS = " + repr("x" * (300 * 1024)) + "\n")
+        (self.project / "data/table.csv.gz").parent.mkdir()
+        (self.project / "data/table.csv.gz").write_bytes(b"\x1f\x8b\x08\x00" + b"\0" * (300 * 1024))
         packet = self.select(role="debugger", map_maintain=True)
         for key in ("project_map", "project_graph"):
             self.assertIs(packet[key]["coverage"]["scan_complete"], True)
             self.assertEqual(packet[key]["maintenance"]["action"], "built")
         self.assertIn({"path": "pydoc_data/topics.py", "reason": "file exceeds 256 KiB limit"}, packet["excluded"])
+        self.assertIn({"path": "data/table.csv.gz", "reason": "binary file withheld"}, packet["excluded"])  # Named from a sniff, not read whole.
+        self.assertEqual((packet["parser_cache"]["write_failures"], packet["parser_cache"]["records_saved"]), (0, 1))  # Lexical record included.
         graph = json.loads(self.stored(GRAPH).read_text())
         self.assertNotIn("pydoc_data/topics.py", {source["path"] for source in graph["sources"]})
         self.assertIs(project_map.build_map(self.project, pack=ROOT, refresh=True)["status"], "fresh")
+
+    def test_warm_run_after_a_cold_run_has_no_misses_with_small_binaries_present(self):
+        (self.project / "assets").mkdir()
+        (self.project / "assets/logo.png").write_bytes(b"\x89PNG\r\n\x1a\n\0\0\0\rIHDR" + b"\x01" * 4000)
+        (self.project / "assets/table.bin").write_bytes(b"x" * 20000 + b"\0")  # NUL past the sniff: read whole once.
+        directory, cache = self.root / "parser-cache", context._sibling("parser_cache")["Cache"]
+        with mock.patch.object(context, "_parser_cache", lambda project, writable, policy_extra=None:
+                               cache(project, writable=writable, directory=directory, policy_extra=policy_extra)):
+            cold = self.select(map_maintain=True)
+            warm = self.select(map_preview=True)
+            lean = self.select(map_preview=True, compact=True, packet_mode="lean")
+            (self.project / "assets/logo.png").write_bytes(b"\x89PNG\r\n\x1a\n\0changed")
+            changed = self.select(map_preview=True)
+        for path in ("assets/logo.png", "assets/table.bin"):
+            self.assertIn({"path": path, "reason": "binary file withheld"}, warm["excluded"])
+        self.assertGreater(cold["parser_cache"]["source_misses"], 0)
+        # The warm-index setup check (evals/end_to_end/warmup.py): nothing read, parsed or written.
+        self.assertEqual([warm["parser_cache"][key] for key in ("source_misses", "source_bytes_read", "parsed_files", "writes")],
+                         [0, 0, 0, 0])
+        self.assertEqual(lean["timing"]["cache"]["state"], "warm")
+        self.assertEqual(changed["parser_cache"]["source_misses"], 1)  # Only the changed binary is checked again.
+        self.assertIn({"path": "assets/logo.png", "reason": "binary file withheld"}, changed["excluded"])
 
     def test_graph_stops_at_its_byte_limit_instead_of_failing_to_save(self):
         import parser_cache

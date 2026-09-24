@@ -61,6 +61,20 @@ context window or model usage. Normal preparation uses `--compact`; omit it with
 full inspection. Missing required evidence still needs investigation; a small packet is not
 proof of completeness.
 
+`--packet-mode lean|evidence` (or `AGENT_DISPATCHER_PACKET=lean|evidence`) slims a compact packet.
+Lean keeps the role body, ranked navigation rows with line spans, coverage, a `next_action` when
+coverage is partial or nothing ranked, and `timing`. Evidence adds up to two excerpts per file. The
+default `legacy` mode is unchanged, and the variable is ignored without `--compact`. In these modes
+`--packet-tokens` (or `AGENT_DISPATCHER_PACKET_TOKENS`, default 4000) is a soft target in estimated
+tokens for SKILL.md plus the packet, estimated as UTF-8 bytes / 2 rather than characters / 4. When
+required content alone exceeds it, the packet drops every optional item, excerpts included (counted
+in `packet_omissions`), and reports `target_met: false` with `protected_content_exceeds_target`; the
+rows' spans are then what to open. At the default 4000 that is the usual outcome, so evidence mode
+needs a larger target to carry excerpts. The printed payload always stays within 28,000 UTF-16
+units including its newline; if it cannot, the helper fails instead of truncating. See
+[context selection](context-engine.md#packet-modes-budgets-and-timing) for units, trimming order
+and timing fields.
+
 During substantial source work, `--map-maintain` uses the same scan to maintain the source-linked
 project map and structural graph when safe writes are permitted. Excluded or incomplete scans defer persistence;
 unsafe destinations leave a read-only result with diagnostics. Both writers veto recognized task

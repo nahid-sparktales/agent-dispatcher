@@ -3,12 +3,14 @@
 
 No models, network or project execution. Map maintenance and retained-context reuse
 write only when requested. Scores order candidates; they are not confidence values.
-Compact packets budget their complete serialized output (four chars/token).
+Compact packets budget their complete serialized output: legacy at four chars/token; lean and
+evidence (--packet-mode) against a soft target shared with SKILL.md and a hard host limit.
 """
 from __future__ import annotations
 
 import argparse
 from collections import Counter
+from contextlib import contextmanager
 import hashlib
 import json
 import math
@@ -23,9 +25,12 @@ import sys
 import time
 from urllib.parse import quote
 
+_MODULE_START_NS = time.perf_counter_ns()  # Phase timing's "import" span runs from here to main().
 MAX_FILES = 10000
 MAX_FILE_BYTES = 256 * 1024
-MAX_STRUCTURAL_BYTES = 4 * 1024 * 1024  # An admitted file over the read limit is parsed for its definitions up to this size.
+MAX_STRUCTURAL_BYTES = 4 * 1024 * 1024  # An admitted file over the read limit is indexed (terms and definitions) up to this size.
+MAX_OVERSIZED_BYTES = 16 * 1024 * 1024  # All such reads of one scan together; later oversized files are ranked by name only.
+SNIFF_BYTES = 8192  # Every file is checked for NUL bytes this far before it is read, so a binary is named as binary unread.
 MAX_SCAN_BYTES = 32 * 1024 * 1024
 MAX_LIST_BYTES = 4 * 1024 * 1024
 MAX_TASK_CHARS = 16000
@@ -36,6 +41,8 @@ MAX_EXCLUDED = 100
 MAX_EXCLUDE_PATHS = 64
 MAX_AUTO_CLAUSES = 128
 LIMITS = {"small": (5, 2000), "standard": (8, 6000), "complex": (12, 15000)}
+PACKET_MODES = ("legacy", "lean", "evidence")
+DEFAULT_PACKET_TOKENS = 4000  # Lean/evidence soft target for SKILL.md plus packet, in estimated tokens.
 SKIP_DIRS = {".git", "node_modules", "vendor", "dist", "build", "out", ".next", "target",
              "coverage", "__pycache__", ".venv", "venv", "Pods", ".terraform", "__snapshots__",
              ".cache", ".tox", ".mypy_cache", ".pytest_cache", "generated", "generated-clients",
@@ -264,7 +271,9 @@ def _path_command(command, project, max_bytes=MAX_LIST_BYTES):
     return sorted(set(paths)), code == 0 or limited or empty_rg, limited
 
 
-def _enumerate(project, diagnostics):
+def _enumerate(project, diagnostics, listing=None):
+    """Ignore-aware paths, capped at MAX_FILES. `listing`, when given, receives every path of a listing that was not
+    cut short by its byte or time limit, so membership beyond the cap stays known."""
     git = shutil.which("git")
     rg = shutil.which("rg")
     commands = []
@@ -287,6 +296,8 @@ def _enumerate(project, diagnostics):
             diagnostics.append("Path enumeration reached its byte or time limit; results are partial.")
         if len(paths) > MAX_FILES:
             diagnostics.append("Path enumeration reached the 10000-file limit; results are partial.")
+        if listing is not None and not limited:
+            listing.extend(paths)
         return paths[:MAX_FILES]
     diagnostics.append("Ignore-aware file enumeration unavailable (Git or ripgrep required); no files scanned.")
     return []
@@ -307,7 +318,14 @@ def _skip(path):
     return None
 
 
-def _read(project, relative, remaining, limit=MAX_FILE_BYTES):
+def _signature(info):
+    """The metadata identity parser_cache and repo_builder key on: an edit changes ctime even when size and mtime are restored."""
+    return [info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns, info.st_ctime_ns, info.st_mode, info.st_uid, info.st_nlink]
+
+
+def _read(project, relative, remaining, limit=MAX_FILE_BYTES, prefix=None):
+    """Policy read: (text, bytes consumed, refusal reason). `prefix`, a dict, turns a file over `limit` into its whole lines
+    within `limit` instead of a refusal, and receives the read descriptor's `signature` and whether the text stops early."""
     path = project / relative
     consumed = 0
     try:
@@ -324,52 +342,85 @@ def _read(project, relative, remaining, limit=MAX_FILE_BYTES):
             meta = os.fstat(handle.fileno())
             if not stat.S_ISREG(meta.st_mode):
                 return None, 0, "not a regular file"
-            if meta.st_size > limit:
-                return None, 0, "file exceeds 256 KiB limit"
-            if meta.st_size > remaining:
+            if meta.st_size > limit and prefix is None:
+                # Binary before oversize: a bounded sniff names a large binary for what it is without reading it. At most
+                # SNIFF_BYTES per listed file and never charged to the scan budget: 4,096 large assets would spend 32 MiB.
+                head = handle.read(SNIFF_BYTES)
+                return None, 0, "binary file withheld" if b"\0" in head else "file exceeds 256 KiB limit"
+            if min(meta.st_size, limit) > remaining:
                 return None, 0, "scan byte budget exhausted"
             read_limit = min(limit, remaining)
-            data = handle.read(read_limit)
+            # Small files are sniffed the same way, so a binary is not read whole; the sniff is never charged.
+            data = handle.read(min(SNIFF_BYTES, read_limit))
+            if b"\0" in data:
+                return None, 0, "binary file withheld"
+            data += handle.read(read_limit - len(data))
             consumed = len(data)
-            if os.fstat(handle.fileno()).st_size > read_limit:
+            after = os.fstat(handle.fileno())
+            if prefix is not None:
+                prefix.update(signature=_signature(after), partial=after.st_size > consumed)
+                if _signature(after) != _signature(meta):
+                    return None, consumed, "file changed or exceeds read budget"
+            elif after.st_size > read_limit:
                 return None, consumed, "file changed or exceeds read budget"
         if b"\0" in data:
-            return None, len(data), "binary file withheld"
-        return data.decode("utf-8"), len(data), None
+            return None, consumed, "binary file withheld"
+        if prefix is not None and prefix["partial"]:
+            data = data[:data.rfind(b"\n") + 1]  # Whole lines only; a newline byte never splits a UTF-8 sequence.
+            if not data:
+                return None, consumed, "file exceeds 256 KiB limit"
+        return data.decode("utf-8"), consumed, None
     except (OSError, UnicodeError, ValueError):
         return None, consumed, "unreadable or non-UTF-8 file"
 
 
-def _structural_record(root, relative, scrub, cache=None):
-    """Definitions, imports and calls of an admitted file over the read limit; its text and terms are not retained.
+def _oversized_record(root, relative, scrub, cache=None, cap=MAX_STRUCTURAL_BYTES):
+    """(facts, bytes read) for an admitted file over the read limit: its terms, definitions, imports and calls, never its text.
 
-    The file is read once, bounded by MAX_STRUCTURAL_BYTES, redacted like any other source, parsed with
-    the same extractor, and only the facts survive: a central module can then be found by the symbol it
-    defines instead of by its name alone, while it is still never excerpted.
+    One bounded read of at most `cap` bytes (whole lines only when the file is longer), redacted like any other source and
+    parsed by the same extractor. The record's `coverage` is `complete`, or `partial_lexical` with the `covered_lines`
+    span. Excerpts later re-read the same span through `_oversized_loader` and are served only while it hashes to `sha256`.
+    A failed read leaves no record, only a coverage state: `unreadable`, or `structural_only` (ranked by name).
     """
-    try:
-        info = (root / relative).lstat()
-        if not stat.S_ISREG(info.st_mode):
-            return None
-        key = [relative, info.st_size, info.st_mtime_ns]
-    except OSError:
-        return None
-    cached = cache.get("structural-record", key) if cache is not None else None
-    if (isinstance(cached, dict) and isinstance(cached.get("record"), dict) and cached["record"].get("structural")
-            and isinstance(cached.get("sha256"), str)):
-        return cached
-    text, _, reason = _read(root, relative, MAX_STRUCTURAL_BYTES, limit=MAX_STRUCTURAL_BYTES)
+    span = {}
+    text, used, reason = _read(root, relative, cap, limit=cap, prefix=span)
     if reason:
-        return None
+        return {"record": None, "coverage": "structural_only" if reason == "file exceeds 256 KiB limit" else "unreadable"}, used
+    sha = hashlib.sha256(text.encode("utf-8")).hexdigest()
+    # Keyed on the full metadata signature of the descriptor read (a size+mtime key served stale definitions after a
+    # same-size edit) and checked against the bytes just read; a new kind, so no old structural-only entry is reused.
+    key = [relative, span["signature"], cap]
+    cached = cache.get("oversized-record", key) if cache is not None else None
+    if isinstance(cached, dict) and isinstance(cached.get("record"), dict) and cached.get("sha256") == sha:
+        return cached, used
     try:
         record = _sibling("repo_index")["file_record"](relative, _redact_source(text, scrub))
     except (ValueError, RecursionError, MemoryError):
-        return None
-    record = {**{k: v for k, v in record.items() if k != "terms"}, "terms": {}, "len": 0, "structural": True}
-    result = {"record": record, "sha256": hashlib.sha256(text.encode("utf-8")).hexdigest()}
+        return {"record": None, "coverage": "unreadable"}, used
+    record["coverage"] = "partial_lexical" if span["partial"] else "complete"
+    if span["partial"]:
+        record["covered_lines"] = [1, text.count("\n")]
+    result = {"record": record, "sha256": sha, "cap": cap}
     if cache is not None:
-        cache.put("structural-record", key, result)
-    return result
+        cache.put("oversized-record", key, result)
+    return result, used
+
+
+def _oversized_loader(root, structural, exclusions, scrub, fallback=None):
+    """Text of a lexically indexed oversized file, for excerpts only: the same admission rules, bounded read and redaction
+    as its record, and None (stale, withheld) once the bytes no longer hash to it. Other paths go to `fallback`."""
+    def load(path):
+        item = structural.get(path)
+        if item is None or item.get("record") is None:
+            return fallback(path) if fallback is not None else None
+        if _excluded(path, exclusions) or _skip(path):
+            return None
+        # ponytail: re-reads the whole indexed span (<= MAX_STRUCTURAL_BYTES) per selected file; pread one chunk if IO shows up.
+        text, _, reason = _read(root, path, item["cap"], limit=item["cap"], prefix={})
+        if reason or hashlib.sha256(text.encode("utf-8")).hexdigest() != item["sha256"]:
+            return None
+        return _redact_source(text, scrub)
+    return load
 
 
 def _scan_sources(root, paths, manual_exclusions, automatic, incremental, scrub, excluded, diagnostics, oversized=None, structural=None):
@@ -377,10 +428,10 @@ def _scan_sources(root, paths, manual_exclusions, automatic, incremental, scrub,
 
     Everything downstream (legacy scoring, the repository index, symbols, graph, history,
     explorer requests, excerpts, explain output) sees only the texts admitted here. `structural`
-    collects definition-only records of admitted files over the read limit (never their text).
+    collects `_oversized_record` facts of admitted files over the read limit (never their text), within MAX_OVERSIZED_BYTES.
     """
     texts, hashes = {}, {}
-    scanned = 0
+    scanned = oversized_read = 0
     scan_complete = not any("partial" in d or "enumeration unavailable" in d for d in diagnostics)
     for path in paths:
         reason = ("explicit task exclusion" if _excluded(path, manual_exclusions) else
@@ -402,14 +453,22 @@ def _scan_sources(root, paths, manual_exclusions, automatic, incremental, scrub,
             if reason == "scan byte budget exhausted":
                 diagnostics.append("Text scanning reached the 32 MiB limit; results are partial.")
                 break
-            # Admitted by every exclusion and credential rule, only too large to read: its name may
-            # still be ranked (path, imports, history), its content is never opened.
+            # Admitted by every exclusion and credential rule, only too large to keep: its name is ranked (path, imports,
+            # history), its terms and definitions are indexed from one bounded read, its text is never retained.
             if oversized is not None and reason == "file exceeds 256 KiB limit" and scrub(path) == path:
                 oversized.append(path)
-                if structural is not None:
-                    facts = _structural_record(root, path, scrub, incremental)
-                    if facts is not None:
-                        structural[path] = facts
+                if structural is None:
+                    continue
+                left = MAX_OVERSIZED_BYTES - oversized_read
+                if left < MAX_FILE_BYTES:
+                    # ponytail: the budget goes to oversized files in path order; rank-aware allocation if it binds in practice.
+                    structural[path] = {"record": None, "coverage": "structural_only"}
+                    message = "Oversized-file indexing reached its 16 MiB limit; later files over 256 KiB are ranked by name only."
+                    if message not in diagnostics:
+                        diagnostics.append(message)
+                    continue
+                structural[path], used = _oversized_record(root, path, scrub, incremental, min(MAX_STRUCTURAL_BYTES, left))
+                oversized_read += used
             continue
         hashes[path] = raw_sha or hashlib.sha256(text.encode("utf-8")).hexdigest()
         if incremental is None:
@@ -977,12 +1036,13 @@ class _DeepIndex:
             self.store = None
 
 
-def _repository_index(root, scrub, paths, texts, excluded, exclusions, incremental, diagnostics, *, use, identity, maintain_allowed):
+def _repository_index(root, scrub, listing, texts, excluded, exclusions, incremental, diagnostics, *, use, identity, maintain_allowed):
     """Open the deep index (repository_intelligence.py) the user built, never create one, and verify what it adds.
 
     A normal task therefore never starts a build or a model session. Records are used only when their stored
-    fingerprint equals the scan's; files beyond the scan's caps join the ranking universe only after their
-    metadata signature matches and are read on demand through the same admission and redaction rules.
+    fingerprint equals the scan's; files beyond the scan's caps join the ranking universe only when the current
+    ignore-aware `listing` (`_enumerate`; empty when it was cut short) still has them, after their metadata signature
+    matches, and are read on demand through the same admission and redaction rules.
     """
     deep = _DeepIndex()
     if use == "off":
@@ -1021,11 +1081,11 @@ def _repository_index(root, scrub, paths, texts, excluded, exclusions, increment
             return deep
         deep.generation = generation
         rows = deep.store.file_rows(generation=generation["id"])
-        scanned = set(texts)
+        scanned, listed = set(texts), set(listing)  # A file ignored, deleted or renamed since the build is not listed.
         blocked = {item["path"] for item in excluded if item["reason"] != "scan byte budget exhausted"}
         candidates = [path for path, row in rows.items()
-                      if row["status"] == "indexed" and path not in scanned and path not in blocked and not _skip(path)
-                      and not _excluded(path, exclusions)]
+                      if row["status"] == "indexed" and path in listed and path not in scanned and path not in blocked
+                      and not _skip(path) and not _excluded(path, exclusions)]
         deadline = time.perf_counter() + settings["index"]["maintain"]["max_seconds"]
         verified, stale, pending = {}, 0, 0
         for path in candidates:
@@ -1153,8 +1213,12 @@ def _memory_layer(engine, settings, root, index, task, exclusions, scrub, diagno
 
 def _intelligent_selection(engine, settings, task, texts, hashes, explicit, role_id, changed, cache, root,
                            excluded, scrub, compact, diagnostics, explain, oversized=(), rerank_answer=None, deep=None,
-                           exclusions=(), pack=None, structural=None):
-    """Repository-intelligence selection over the already-filtered universe; same row/excerpt contract."""
+                           exclusions=(), pack=None, structural=None, span_order=False):
+    """Repository-intelligence selection over the already-filtered universe; same row/excerpt contract.
+
+    `span_order` keeps each excerpt's admission `order` (engine priority, then line) for evidence packets, which
+    choose a file's best spans with it and drop the field; no other output carries it.
+    """
     stats = {}
     deep = deep or _DeepIndex()
     partners = deep.partners
@@ -1162,7 +1226,8 @@ def _intelligent_selection(engine, settings, task, texts, hashes, explicit, role
                if settings["git"]["enabled"] and partners is None else None)
     index = engine["build_index"](texts, hashes, _kind, cache=cache, history=history, config=settings, stats=stats,
                                   path_only=oversized, store=deep.store, extended=deep.extended or None, partners=partners,
-                                  loader=deep.loader, structural=structural, history_stats=deep.history_stats)
+                                  loader=_oversized_loader(root, structural or {}, exclusions, scrub, deep.loader),
+                                  structural=structural, history_stats=deep.history_stats)
     hashes = index.hashes
     if deep.inferences:
         index.inferences = deep.inferences
@@ -1198,10 +1263,15 @@ def _intelligent_selection(engine, settings, task, texts, hashes, explicit, role
     stale = getattr(index.texts, "failed", set())
     unread = [item["path"] for item in packet["files"] if not item["excerpts"] and item["path"] not in stale]
     if unread:
-        diagnostics.append("Ranked as relevant but over the 256 KiB read limit, so not excerpted (definitions still indexed): "
+        diagnostics.append("Ranked as relevant but over the 256 KiB read limit and not lexically indexed, so not excerpted: "
                            + ", ".join(scrub(p) for p in unread[:3]))
     if stale:
         diagnostics.append("Indexed evidence no longer matches the current source and was withheld: " + ", ".join(scrub(p) for p in sorted(stale)[:3]))
+    partial = [(item["path"], index.records[item["path"]]["covered_lines"]) for item in packet["files"]
+               if item["excerpts"] and index.records.get(item["path"], {}).get("covered_lines")]
+    if partial:  # Its matches and excerpts come from these lines only; the rest of the file was not searched.
+        diagnostics.append("Over the per-file index cap, so searched and excerpted only in part: "
+                           + ", ".join(f"{scrub(p)} (lines {a}-{b})" for p, (a, b) in partial[:3]))
     for item in packet["files"]:
         path = item["path"]
         if path in stale:
@@ -1229,6 +1299,8 @@ def _intelligent_selection(engine, settings, task, texts, hashes, explicit, role
                 excerpt["source_sha256"] = index.hashes[path]
                 excerpt["id"] = hashlib.sha256(json.dumps(excerpt, sort_keys=True, ensure_ascii=True,
                                                          separators=(",", ":")).encode("utf-8")).hexdigest()
+            if span_order:
+                excerpt["order"] = part["order"]
             excerpts.append(excerpt)
     for item in packet["dropped"]:
         excluded.append({"path": scrub(item["path"]), "reason": "artifact cap" if item["reason"] == "file limit"
@@ -1239,9 +1311,13 @@ def _intelligent_selection(engine, settings, task, texts, hashes, explicit, role
     # Timings vary between identical calls, so they appear only when a trace was asked for.
     telemetry = {key: value for key, value in {**trace, **stats}.items()
                  if explain or not (key.endswith("_ms") or key == "overlap")}
+    status = outcome.get("status")
+    for condition in (status or {}).get("conditions", ()):
+        if condition.get("paths"):
+            condition["paths"] = [scrub(p) for p in condition["paths"]]
     report = {"strategy": settings["name"], "task_signals": {k: [scrub(v) for v in values] for k, values in packet["task_signals"].items()},
               "telemetry": dict(telemetry, seeds=[scrub(p) for p in trace["seeds"]]), "index": deep.report,
-              "retrieval_status": outcome.get("status")}  # ok | abstained_no_sufficient_local_evidence | unavailable, evidence label, conditions
+              "retrieval_status": status}  # ok | abstained_no_sufficient_local_evidence | unavailable, evidence label, conditions
     if memory is not None:
         report["memory"] = memory
     if (outcome.get("llm") or {}).get("request"):  # Host reranking: one bounded round, answered with --rerank-answer.
@@ -1457,21 +1533,94 @@ def _apply_learning(out, report, packet_tokens, *, force_omit=False):
             keys.pop()
 
 
-def _finish_packet(result, pack, packet_tokens, guide_ids, reuse_state, reuse_scope, _delivery=None, learning=None):
+def _new_timing(started=None):
+    return {"started": time.perf_counter_ns() if started is None else started, "phase": "setup",
+            "phases": {}, "open": {}, "children": {}}
+
+
+@contextmanager
+def _phase(timing, name):
+    """Accumulate one named phase in perf_counter_ns; a failure leaves the phase named for the error report."""
+    previous, timing["phase"], timing["open"][name] = timing["phase"], name, time.perf_counter_ns()
+    yield
+    timing["phases"][name] = timing["phases"].get(name, 0) + time.perf_counter_ns() - timing["open"].pop(name)
+    timing["phase"] = previous
+
+
+def _timing_block(timing, placeholder=False):
+    """Fixed names and numbers only. total is inclusive; dotted children are never added to it; the rest is unaccounted."""
+    now = time.perf_counter_ns()
+    phases = dict(timing["phases"])
+    for name, start in timing["open"].items():  # A phase still running (finish) counts up to now.
+        phases[name] = phases.get(name, 0) + now - start
+    total = now - timing["started"]
+
+    def ms(ns):
+        return 999999.9 if placeholder else round(ns / 1e6, 1)  # The placeholder is at least as wide as a real value.
+    block = {"unit": "ms", "total": ms(total), "phases": {name: ms(value) for name, value in phases.items()}}
+    block["phases"].update({name: 999999.9 if placeholder else round(value, 1)
+                            for name, value in timing["children"].items() if isinstance(value, (int, float))})
+    block["unaccounted"] = ms(total - sum(phases.values()))
+    if timing.get("skipped"):
+        block["skipped"] = timing["skipped"]
+    block["cache"] = timing.get("cache", {"state": "disabled"})
+    return block
+
+
+def _engine_timings(engine, timing):
+    """The engine's own index/rank/context timings become selection.* children of the selection phase."""
+    def build_index(*args, **kwargs):
+        index = engine["build_index"](*args, **kwargs)
+        timing["children"]["selection.index"] = (kwargs.get("stats") or {}).get("index_ms")
+        return index
+
+    def run(*args, **kwargs):
+        outcome = engine["run"](*args, **kwargs)
+        trace = outcome.get("trace") or {}
+        timing["children"].update({"selection.rank": trace.get("latency_ms"), "selection.context": trace.get("context_ms")})
+        return outcome
+    return dict(engine, build_index=build_index, run=run)
+
+
+def _finish_packet(result, pack, packet_tokens, guide_ids, reuse_state, reuse_scope, _delivery=None, learning=None,
+                   mode="legacy", explain=False, timing=None):
     try:
         packet = _sibling("context_packet")
         reuse = _sibling("context_reuse")
         prepared = packet["compact_packet"](result, pack, guide_ids)
+        slim = mode != "legacy"
+        if slim:
+            skill = packet["router_size"](pack)
+            # Timing is inserted last, so fitting holds room for its widest form (plus its comma).
+            allowance = len(packet["dumps"]({"timing": _timing_block(timing, placeholder=True)}))
 
         def fit(candidate):
+            if slim:
+                candidate = packet["slim_packet"](candidate, mode, explain)
             candidate, pending = reuse["prepare_reuse"](candidate, reuse_state, reuse_scope)
+            if slim:
+                return packet["fit_slim"](candidate, packet_tokens, skill, reserve_chars=allowance + (512 if pending else 0)), pending
             # Reserve space for commit diagnostics. No trimming after a successful commit:
             # only excerpts actually delivered may be recorded as retained evidence.
             return packet["fit_packet"](candidate, packet_tokens, reserve_chars=512 if pending else 0), pending
 
+        def finish(out, refit=True):
+            """The final payload, timing included, must meet the host limit: refit once, else fail; never truncate."""
+            out["timing"] = _timing_block(timing)
+            # Fitting reserved room (timing width, commit diagnostics) the final packet may not use: re-decide the minimum flag.
+            minimum = "protected_tokens" in out["budget"]
+            tokens, units = packet["account_slim"](out, packet_tokens, skill)
+            if minimum and tokens > packet_tokens:
+                units = packet["account_slim"](out, packet_tokens, skill, 0, True)[1]
+            if units > packet["MAX_INLINE_CHARS"]:
+                if not refit:  # ponytail: unreachable while the 512-char commit reserve holds; the ledger is already written.
+                    raise packet["PacketError"]("Committed packet exceeds the host inline limit; rerun with a new --reuse-scope.")
+                out = packet["fit_slim"](out, packet_tokens, skill)
+            return out
+
         def evidence(candidate):
             omissions = candidate["packet_omissions"]
-            return (len(candidate["excerpts"]) + len(candidate.get("reuse", {}).get("references", [])),
+            return (len(candidate.get("excerpts", [])) + len(candidate.get("reuse", {}).get("references", [])),
                     tuple(omissions.get(key, 0) for key in ("map_facts", "graph_items", "memory_hits", "excerpts")))
 
         attempts = [False, True] if learning else [None]
@@ -1491,14 +1640,16 @@ def _finish_packet(result, pack, packet_tokens, guide_ids, reuse_state, reuse_sc
             out["reuse"]["status"] = "delivery_pending"
             out["reuse"]["commit_policy"] = "after_stdout_flush"
             out["read_only"] = False
-            out = packet["account_packet"](out)
+            out = finish(out) if slim else packet["account_packet"](out)
             _delivery.append((reuse["commit_reuse"], out, pending))
             return out
         out = reuse["commit_reuse"](out, pending)
         if out.get("reuse", {}).get("status") == "commit_failed":
-            out = packet["fit_packet"](out, packet_tokens)
+            out = packet["fit_slim"](out, packet_tokens, skill, reserve_chars=allowance) if slim else packet["fit_packet"](out, packet_tokens)
         if out.get("reuse", {}).get("status") == "committed":
             out["read_only"] = False
+        if slim:
+            return finish(out, refit=out.get("reuse", {}).get("status") != "committed")
         return packet["account_packet"](out)
     except (OSError, UnicodeError, SyntaxError, ValueError, TypeError, KeyError) as exc:
         if exc.__class__.__name__ == "PacketError":
@@ -1511,7 +1662,7 @@ def select_context(project, task, role=None, size="standard", max_tokens=None, p
                    compact=False, packet_tokens=None, guide_ids=(), map_maintain=False,
                    reuse_state=None, reuse_scope=None, writable_paths=None, audit=False,
                    parser_cache=True, retrieval="auto", max_files=None, max_bytes=None, explain=False,
-                   rerank_answer=None, repository_index=None, index_identity=None, _delivery=None):
+                   rerank_answer=None, repository_index=None, index_identity=None, packet_mode=None, _delivery=None, _timing=None):
     """Prepare context; an explicit audit captures helper writes before they happen."""
     if type(audit) is not bool:
         raise ContextError("Task audit must be a boolean.")
@@ -1524,7 +1675,7 @@ def select_context(project, task, role=None, size="standard", max_tokens=None, p
                                writable_paths=writable_paths, parser_cache=parser_cache,
                                retrieval=retrieval, max_files=max_files, max_bytes=max_bytes, explain=explain,
                                rerank_answer=rerank_answer, repository_index=repository_index, index_identity=index_identity,
-                               _delivery=_delivery, _audit_pending=pending)
+                               packet_mode=packet_mode, _delivery=_delivery, _audit_pending=pending, _timing=_timing)
     except BaseException:
         if pending:
             cleanup = _discard_audit(pending[0])
@@ -1548,8 +1699,10 @@ def _select_context(project, task, role=None, size="standard", max_tokens=None, 
                     compact=False, packet_tokens=None, guide_ids=(), map_maintain=False,
                     reuse_state=None, reuse_scope=None, writable_paths=None, parser_cache=True,
                     retrieval="auto", max_files=None, max_bytes=None, explain=False,
-                    rerank_answer=None, repository_index=None, index_identity=None, _delivery=None, _audit_pending=None):
+                    rerank_answer=None, repository_index=None, index_identity=None, packet_mode=None, _delivery=None,
+                    _audit_pending=None, _timing=None):
     """Select evidence; opt-in maintenance/reuse writes only bounded owned state."""
+    timing = _timing if _timing is not None else _new_timing()
     if not isinstance(task, str) or not task.strip() or len(task) > MAX_TASK_CHARS:
         raise ContextError("Task must contain 1–16000 characters; task contents withheld.")
     if size not in LIMITS:
@@ -1576,6 +1729,17 @@ def _select_context(project, task, role=None, size="standard", max_tokens=None, 
         raise ContextError("Repository index must be auto, off or require.")
     if index_identity is not None and (not isinstance(index_identity, str) or not 0 < len(index_identity) <= 200 or "/" in index_identity):
         raise ContextError("Index identity must be a short name.")
+    if packet_mode not in (None, *PACKET_MODES) or (packet_mode not in (None, "legacy") and not compact):
+        raise ContextError("Packet mode must be legacy, lean or evidence; lean and evidence require --compact.")
+    # The environment switches a harness arm without editing SKILL.md; it never changes non-compact inspection output.
+    mode = (packet_mode or os.environ.get("AGENT_DISPATCHER_PACKET") or "legacy") if compact else "legacy"
+    if mode not in PACKET_MODES:
+        raise ContextError("AGENT_DISPATCHER_PACKET must be legacy, lean or evidence; value withheld.")
+    if mode != "legacy" and packet_tokens is None:
+        raw = os.environ.get("AGENT_DISPATCHER_PACKET_TOKENS") or str(DEFAULT_PACKET_TOKENS)
+        if not re.fullmatch(r"[0-9]{3,6}", raw) or not 256 <= int(raw) <= 100000:
+            raise ContextError("AGENT_DISPATCHER_PACKET_TOKENS must be an integer between 256 and 100000; value withheld.")
+        packet_tokens = int(raw)
     root = Path(project).expanduser().resolve()
     if not root.is_dir():
         raise ContextError("Project must be an existing readable directory.")
@@ -1594,9 +1758,10 @@ def _select_context(project, task, role=None, size="standard", max_tokens=None, 
     hints = {w.lower() for h in hint_phrases for w in WORD.findall(h) if w.lower() not in STOP}
     cap, default_budget = LIMITS[size]
     budget = min(max_tokens, default_budget) if max_tokens is not None else default_budget
-    diagnostics, excluded = [], []
-    paths = _enumerate(root, diagnostics)
-    automatic, unresolved = _automatic_exclusions(task, paths, root) if auto_exclude else ([], [])
+    diagnostics, excluded, listing = [], [], []
+    with _phase(timing, "discovery"):
+        paths = _enumerate(root, diagnostics, listing)
+        automatic, unresolved = _automatic_exclusions(task, paths, root) if auto_exclude else ([], [])
     excluded_paths = tuple(dict.fromkeys([*manual_exclusions, *automatic]))
     exclusion_policy = {
         "automatic_enabled": auto_exclude,
@@ -1617,23 +1782,28 @@ def _select_context(project, task, role=None, size="standard", max_tokens=None, 
     incremental = None
     cache_writable = (map_maintain and not map_preview and writable_paths is None
                       and not excluded_paths and all(s["allowed"] for s in cache_scope.values()))
-    if parser_cache and (map_preview or map_maintain):
-        incremental = _parser_cache(root, writable=cache_writable,
-                                    policy_extra=getattr(scrub, "_dispatcher_policy", None))
-    oversized, structural = [], {}
-    texts, hashes, scanned, scan_complete = _scan_sources(
-        root, paths, manual_exclusions, automatic, incremental, scrub, excluded, diagnostics, oversized, structural)
+    with _phase(timing, "scan"):
+        if parser_cache and (map_preview or map_maintain):
+            incremental = _parser_cache(root, writable=cache_writable,
+                                        policy_extra=getattr(scrub, "_dispatcher_policy", None))
+        oversized, structural = [], {}
+        texts, hashes, scanned, scan_complete = _scan_sources(
+            root, paths, manual_exclusions, automatic, incremental, scrub, excluded, diagnostics, oversized, structural)
     # Procedural learning reads its immutable active generation here, read-only; disabled means None and no trace.
-    learning = _learning_layer(root, base, task, role_id, diagnostics, identity=index_identity or os.environ.get("AGENT_DISPATCHER_INDEX_ID") or None,
-                               caller_strategy_explicit=retrieval != "auto")
-    engine, settings = _retrieval_engine(retrieval, cap, budget, max_files, max_bytes, diagnostics,
-                                         profile=(learning or {}).get("_retrieval") if learning and learning.get("mode") == "active" else None)
+    with _phase(timing, "learning"):
+        learning = _learning_layer(root, base, task, role_id, diagnostics, identity=index_identity or os.environ.get("AGENT_DISPATCHER_INDEX_ID") or None,
+                                   caller_strategy_explicit=retrieval != "auto")
+    with _phase(timing, "engine_setup"):
+        engine, settings = _retrieval_engine(retrieval, cap, budget, max_files, max_bytes, diagnostics,
+                                             profile=(learning or {}).get("_retrieval") if learning and learning.get("mode") == "active" else None)
     deep = None
     if engine is not None:
+        engine = _engine_timings(engine, timing)
         # The deep index is used only when the user built one (and settings allow it); it never starts a build.
-        deep = _repository_index(root, scrub, paths, texts, excluded, excluded_paths, incremental, diagnostics,
-                                 use=repository_index, identity=index_identity or os.environ.get("AGENT_DISPATCHER_INDEX_ID") or None,
-                                 maintain_allowed=cache_writable)
+        with _phase(timing, "deep_index"):
+            deep = _repository_index(root, scrub, listing, texts, excluded, excluded_paths, incremental, diagnostics,
+                                     use=repository_index, identity=index_identity or os.environ.get("AGENT_DISPATCHER_INDEX_ID") or None,
+                                     maintain_allowed=cache_writable)
     candidates = {}
     if engine is None:
         for path, text in texts.items():
@@ -1642,7 +1812,8 @@ def _select_context(project, task, role=None, size="standard", max_tokens=None, 
                 candidates[path] = candidate
     if not terms and not phrases and not explicit:
         diagnostics.append("No specific search terms found; only project conventions may be selected.")
-    changed = _changed_paths(root, texts) if compact else []
+    with _phase(timing, "discovery"):
+        changed = _changed_paths(root, texts) if compact else []
     for path in changed if engine is None else ():
         if path in candidates:
             candidates[path]["score"] += 1
@@ -1671,54 +1842,61 @@ def _select_context(project, task, role=None, size="standard", max_tokens=None, 
             detail = " " + str(exc) if exc.__class__.__name__ in {"AuditError", "VerificationError"} else ""
             raise ContextError("Task change audit could not start; no cache maintenance was attempted." + detail) from None
     graph_evidence = None
-    if map_preview or map_maintain:
-        try:
-            graph_evidence = _sibling("project_graph")["query_graph"](
-                root, task, role=role_id, pack=base, snapshot=snapshot, maintain=map_maintain,
-                preview=map_preview, writable_paths=writable_paths)
-            for path, priority in list(graph_evidence.get("source_priorities", {}).items())[:8] if engine is None else ():
-                if path not in texts:
-                    continue
-                centers = [line - 1 for line in priority.get("lines", [])
-                           if type(line) is int and 1 <= line <= len(texts[path].splitlines())][:3]
-                if path in candidates:
-                    candidates[path]["score"] += min(2, max(0, priority.get("score", 1)))
-                    candidates[path]["reason"] += "; task graph relationship"
-                    if not candidates[path].get("named"):
-                        candidates[path]["centers"] = list(dict.fromkeys(centers + candidates[path]["centers"]))[:3]
-                else:
-                    candidates[path] = {"path": path, "type": _kind(path), "reason": "task graph relationship (see evidence)",
-                                        "match": "expansion", "score": 1, "defined": False, "hint": False,
-                                        "text": texts[path], "centers": centers or [0], "symbols": []}
-        except (OSError, UnicodeError, SyntaxError, ValueError, TypeError, KeyError, RecursionError):
-            graph_evidence = {"status": "unavailable", "diagnostics": ["Structural graph unavailable; using source retrieval."]}
+    # Lean and evidence packets never show the graph; when it would not persist either, it is not built.
+    if (map_preview or map_maintain) and mode != "legacy" and engine is not None and not (
+            map_maintain and cache_scope[".agent-dispatcher/project-graph.json"]["allowed"]):
+        timing["skipped"] = "graph"
+    elif map_preview or map_maintain:
+        with _phase(timing, "graph"):
+            try:
+                graph_evidence = _sibling("project_graph")["query_graph"](
+                    root, task, role=role_id, pack=base, snapshot=snapshot, maintain=map_maintain,
+                    preview=map_preview, writable_paths=writable_paths)
+                for path, priority in list(graph_evidence.get("source_priorities", {}).items())[:8] if engine is None else ():
+                    if path not in texts:
+                        continue
+                    centers = [line - 1 for line in priority.get("lines", [])
+                               if type(line) is int and 1 <= line <= len(texts[path].splitlines())][:3]
+                    if path in candidates:
+                        candidates[path]["score"] += min(2, max(0, priority.get("score", 1)))
+                        candidates[path]["reason"] += "; task graph relationship"
+                        if not candidates[path].get("named"):
+                            candidates[path]["centers"] = list(dict.fromkeys(centers + candidates[path]["centers"]))[:3]
+                    else:
+                        candidates[path] = {"path": path, "type": _kind(path), "reason": "task graph relationship (see evidence)",
+                                            "match": "expansion", "score": 1, "defined": False, "hint": False,
+                                            "text": texts[path], "centers": centers or [0], "symbols": []}
+            except (OSError, UnicodeError, SyntaxError, ValueError, TypeError, KeyError, RecursionError):
+                graph_evidence = {"status": "unavailable", "diagnostics": ["Structural graph unavailable; using source retrieval."]}
     intelligence, order = None, None
-    if engine is not None:
-        try:
-            selected, excerpts, spent, intelligence, order = _intelligent_selection(
-                engine, settings, task, texts, hashes, explicit, role_id, changed, incremental, root,
-                excluded, scrub, compact, diagnostics, explain, oversized, rerank_answer, deep,
-                exclusions=excluded_paths, pack=base, structural=structural)
-        except (OSError, UnicodeError, SyntaxError, ValueError, TypeError, KeyError, AttributeError,
-                IndexError, RecursionError, ZeroDivisionError):
-            diagnostics.append("Repository intelligence failed; legacy retrieval used.")
-            engine = None
-            candidates = {path: c for path, text in texts.items()
-                          if (c := _candidate(path, text, terms, identifiers, phrases, explicit, hints, role_id))}
-        finally:
-            if deep is not None:
-                deep.close()
-    if engine is None:
-        selected, excerpts, spent = _legacy_selection(candidates, texts, cap, budget, excluded, scrub,
-                                                      compact, hashes, diagnostics)
+    with _phase(timing, "selection"):
+        if engine is not None:
+            try:
+                selected, excerpts, spent, intelligence, order = _intelligent_selection(
+                    engine, settings, task, texts, hashes, explicit, role_id, changed, incremental, root,
+                    excluded, scrub, compact, diagnostics, explain, oversized, rerank_answer, deep,
+                    exclusions=excluded_paths, pack=base, structural=structural, span_order=compact and mode == "evidence")
+            except (OSError, UnicodeError, SyntaxError, ValueError, TypeError, KeyError, AttributeError,
+                    IndexError, RecursionError, ZeroDivisionError):
+                diagnostics.append("Repository intelligence failed; legacy retrieval used.")
+                engine = None
+                candidates = {path: c for path, text in texts.items()
+                              if (c := _candidate(path, text, terms, identifiers, phrases, explicit, hints, role_id))}
+            finally:
+                if deep is not None:
+                    deep.close()
+        if engine is None:
+            selected, excerpts, spent = _legacy_selection(candidates, texts, cap, budget, excluded, scrub,
+                                                          compact, hashes, diagnostics)
     if not selected:
         diagnostics.append("No relevant readable excerpts selected; this is not evidence that the code does not exist.")
     exclusion_summary = {"total": len(excluded), "shown": min(len(excluded), MAX_EXCLUDED),
                          "by_reason": dict(sorted(Counter(item["reason"] for item in excluded).items()))}
     if len(excluded) > MAX_EXCLUDED:
         diagnostics.append("Excluded file details limited to the first 100 paths; counts include all exclusions.")
-    map_evidence = _project_map(root, task, base, snapshot, preview=map_preview, maintain=map_maintain,
-                                writable_paths=writable_paths, order=order, role=role_id)
+    with _phase(timing, "map"):
+        map_evidence = _project_map(root, task, base, snapshot, preview=map_preview, maintain=map_maintain,
+                                    writable_paths=writable_paths, order=order, role=role_id)
     # Indexes persist to private state outside the project: a helper write, never a project write.
     persisted = any(e and e.get("maintenance", {}).get("persisted") for e in (map_evidence, graph_evidence))
     result = {"schema_version": 1, "read_only": not persisted, "project": scrub(str(root)), "role": role_id, "size": size,
@@ -1757,12 +1935,22 @@ def _select_context(project, task, role=None, size="standard", max_tokens=None, 
         result["read_only"] = False
     if learning is not None and _learning_worth_reporting(learning):
         result["learning"] = {key: value for key, value in learning.items() if not key.startswith("_")}
+    # Cache state comes from observed parser-cache hits and misses, not from the flags that asked for it.
+    stats = incremental.stats if incremental is not None else {}
+    hits, misses = stats.get("source_hits", 0), stats.get("source_misses", 0)
+    timing["cache"] = {"state": "disabled" if not stats.get("cache_available") else "partial" if hits and misses else "warm" if hits else "cold",
+                       "hits": hits, "misses": misses, "writes": stats.get("writes", 0), "write_failures": stats.get("write_failures", 0),
+                       "deep_index": deep.report.get("status", "off") if deep is not None else "off"}
+    if explain and mode == "legacy":  # Legacy shows timing only in a trace; it ends before any packet finishing.
+        result["timing"] = _timing_block(timing)
     if compact:
         result["project_read_only"] = True
         result["change_focus"] = {"source": "git_uncommitted", "paths": [scrub(p) for p in changed[:12]],
                                   "total": len(changed), "scope": "allowed readable tracked files; relevance still required"}
-        return _finish_packet(result, base, packet_tokens, guide_ids, reuse_state, reuse_scope, _delivery,
-                              learning=learning if learning is not None and learning.get("mode") == "active" and _learning_worth_reporting(learning) else None)
+        with _phase(timing, "finish"):
+            return _finish_packet(result, base, packet_tokens, guide_ids, reuse_state, reuse_scope, _delivery,
+                                  learning=learning if learning is not None and learning.get("mode") == "active" and _learning_worth_reporting(learning) else None,
+                                  mode=mode, explain=explain, timing=timing)
     return result
 
 
@@ -1781,8 +1969,8 @@ def explain_retrieval(project, task, *, strategy="full", pack=None, exclude_path
     manual = _exclusions(root, exclude_paths)
     scrub = _scrubber(find_pack(pack))
     task = scrub(task)
-    diagnostics, excluded = [], []
-    paths = _enumerate(root, diagnostics)
+    diagnostics, excluded, listing = [], [], []
+    paths = _enumerate(root, diagnostics, listing)
     automatic, _ = _automatic_exclusions(task, paths, root)
     cache = _parser_cache(root, writable=False, policy_extra=getattr(scrub, "_dispatcher_policy", None))
     oversized, structural = [], {}
@@ -1792,20 +1980,22 @@ def explain_retrieval(project, task, *, strategy="full", pack=None, exclude_path
         settings = engine["configure"](strategy)
     except ValueError:
         raise ContextError("Unknown retrieval strategy.") from None
-    deep = _repository_index(root, scrub, paths, texts, excluded, manual, cache, diagnostics, use=repository_index,
+    exclusions = tuple(dict.fromkeys([*manual, *automatic]))  # As select_context: the deep index honors both kinds.
+    deep = _repository_index(root, scrub, listing, texts, excluded, exclusions, cache, diagnostics, use=repository_index,
                              identity=index_identity or os.environ.get("AGENT_DISPATCHER_INDEX_ID") or None, maintain_allowed=False)
     try:
         history = (_git_history(root, settings["git"]["max_commits"], cache)
                    if settings["git"]["enabled"] and deep.partners is None else None)
         index = engine["build_index"](texts, hashes, _kind, cache=cache, history=history, config=settings, path_only=oversized,
-                                      store=deep.store, extended=deep.extended or None, partners=deep.partners, loader=deep.loader,
+                                      store=deep.store, extended=deep.extended or None, partners=deep.partners,
+                                      loader=_oversized_loader(root, structural, exclusions, scrub, deep.loader),
                                       structural=structural, history_stats=deep.history_stats)
         if deep.inferences:
             index.inferences = deep.inferences
             if "inference" not in settings["retrievers"]:
                 settings["retrievers"] = [*settings["retrievers"], "inference"]
         explicit = _explicit_paths(task, index.kinds, root)
-        memory_extra, memory_boost, memory = _memory_layer(engine, settings, root, index, task, tuple(dict.fromkeys([*manual, *automatic])),
+        memory_extra, memory_boost, memory = _memory_layer(engine, settings, root, index, task, exclusions,
                                                            scrub, diagnostics, find_pack(pack))
         outcome = engine["run"](task, index, settings, named=list(explicit), findings=findings, iteration=iteration,
                                 reranker=_llm_layer(engine, settings, root, index, excluded, diagnostics, ranking) if llm else None,
@@ -1813,6 +2003,9 @@ def explain_retrieval(project, task, *, strategy="full", pack=None, exclude_path
     finally:
         deep.close()
     outcome["diagnostics"] = diagnostics
+    for item in outcome["packet"]["files"]:  # Excerpt admission order serves evidence packets only.
+        for excerpt in item["excerpts"]:
+            excerpt.pop("order", None)
     if memory is not None:
         outcome["memory"] = memory
     outcome["universe"] = {"files": len(texts), "withheld": len(excluded), "extended": len(deep.extended)}
@@ -1901,7 +2094,10 @@ def render(result):
     return "\n".join(lines)
 
 
-def main(argv=None):
+def main(argv=None, *, _started=None):
+    timing = _new_timing(_started)
+    if _started is not None:
+        timing["phases"]["import"] = time.perf_counter_ns() - _started
     parser = ContextArgumentParser(prog="context.py", description=__doc__)
     parser.add_argument("--project", default=".")
     task = parser.add_mutually_exclusive_group(required=True)
@@ -1918,7 +2114,10 @@ def main(argv=None):
     parser.add_argument("--no-parser-cache", action="store_true", help="Read and parse sources afresh; do not use or update the private incremental cache")
     parser.add_argument("--writable-path", action="append", help="Limit optional cache writes to literal relative files/subtrees (directory ends in /); repeatable, never overrides task restrictions")
     parser.add_argument("--compact", action="store_true", help="Supply role guidance and budget the entire context packet")
-    parser.add_argument("--packet-tokens", type=int, help="Compact packet limit, estimated at four characters per token")
+    parser.add_argument("--packet-tokens", type=int, help="Legacy: compact packet limit at four characters per token. Lean/evidence: "
+                        "soft target for SKILL.md plus packet in estimated tokens (else AGENT_DISPATCHER_PACKET_TOKENS, else 4000)")
+    parser.add_argument("--packet-mode", choices=PACKET_MODES, help="Compact packet shape (else AGENT_DISPATCHER_PACKET, else legacy): "
+                        "lean has navigation rows and coverage, evidence adds excerpts; both keep the host inline limit")
     parser.add_argument("--guide", action="append", default=[], help="Include a selected eligible guide's full body; repeatable, compact only")
     parser.add_argument("--reuse-state", help="Explicit private evidence ledger outside the project; compact only")
     parser.add_argument("--reuse-scope", help="Identity of context that still retains earlier evidence; compact only")
@@ -1951,9 +2150,11 @@ def main(argv=None):
                                 max_files=args.max_files, max_bytes=args.max_bytes, explain=args.explain,
                                 rerank_answer=json.loads(args.rerank_answer) if args.rerank_answer else None,
                                 repository_index=args.repository_index, index_identity=args.index_identity,
-                                _delivery=delivery)
+                                packet_mode=args.packet_mode, _delivery=delivery, _timing=timing)
     except (ContextError, OSError, UnicodeError) as exc:
-        print(str(exc) if isinstance(exc, ContextError) else "Context input could not be read; contents withheld.", file=sys.stderr)
+        elapsed = (time.perf_counter_ns() - timing["started"]) // 1000000
+        print((str(exc) if isinstance(exc, ContextError) else "Context input could not be read; contents withheld.")
+              + f" [phase={timing['phase']}, elapsed_ms={elapsed}]", file=sys.stderr)
         return 2
     try:
         if args.compact:
@@ -1977,4 +2178,4 @@ def main(argv=None):
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    raise SystemExit(main(_started=_MODULE_START_NS))

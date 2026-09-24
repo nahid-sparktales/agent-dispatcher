@@ -280,9 +280,10 @@ def evaluate(tasks, clone, strategies, overrides=None, variants=None, progress=T
         history = context._git_history(clone, retrieval.DEFAULTS["git"]["max_commits"])
 
         def index_for(config):
-            """One index per distinct co-change and structural setting; every other knob is applied at query time."""
+            """One index per distinct co-change, structural and oversized-coverage/reference setting; every other knob is applied at query time."""
             key = json.dumps([config["git"].get(k) for k in ("max_commit_files", "min_support", "half_life_days", "statistic", "shrinkage")]
-                             + [config.get("structural_records", True)])
+                             + [config.get("structural_records", True), (config.get("oversized") or {}).get("lexical", True),
+                                (config.get("oversized") or {}).get("references", False)])
             if key not in indexes:
                 indexes[key] = retrieval.build_index(texts, hashes, context._kind, cache=memo, history=history,
                                                      config=config, stats=stats if not indexes else {}, path_only=oversized,
@@ -291,7 +292,9 @@ def evaluate(tasks, clone, strategies, overrides=None, variants=None, progress=T
                     coverage.update(llm.prepare(indexes[key]))
             return indexes[key]
 
-        index_for(retrieval.STRATEGIES["full"])
+        # Coverage strata come from the default index: an oversized file indexed lexically is reachable, not name-only.
+        # ponytail: one stratum per task; an arm that turns oversized.lexical off is still read against it.
+        states = index_for(retrieval.STRATEGIES["full"]).coverage
         episodic = None
         if memory is not None:
             episodic, built = memory.prepare(clone, index_for(retrieval.STRATEGIES["full"]), scrub, task["base_commit"])
@@ -300,8 +303,8 @@ def evaluate(tasks, clone, strategies, overrides=None, variants=None, progress=T
         row = {key: task[key] for key in ("id", "repo", "split", "query_source", "names_target")}
         if memory is not None:
             row["memory_build"] = built
-        row.update(targets=task["target_files"], unreachable=[t for t in task["target_files"] if t not in texts],
-                   name_only=[t for t in task["target_files"] if t in oversized],
+        row.update(targets=task["target_files"], unreachable=[t for t in task["target_files"] if states.get(t) not in ("complete", "partial_lexical")],
+                   name_only=[t for t in task["target_files"] if states.get(t) in ("structural_only", "unreadable")],
                    universe=len(texts), scan_ms=scan_ms, index_ms=stats["index_ms"],
                    record_misses=stats["record_misses"], strategies={})
         if llm:
@@ -353,7 +356,7 @@ def table(results, strategies, title):
     if not results:
         return f"{title}: no tasks"
     lines = [f"{title}  ({len(results)} tasks, {sum(len(r['targets']) for r in results)} targets, "
-             f"{sum(len(r['unreachable']) for r in results)} with unread content, of which "
+             f"{sum(len(r['unreachable']) for r in results)} not lexically indexed, of which "
              f"{sum(len(r.get('name_only', ())) for r in results)} rankable by name only)",
              f"{'Strategy':<22}" + "".join(f"{m:>6}" for m in METRICS) + f"{'Cand':>6}{'Files':>6}{'KB':>7}{'Tok':>7}{'UCD':>6}{'CtxR':>6}{'ms':>8}",
              "-" * 117]
@@ -494,7 +497,7 @@ def failure_report(results, strategy, limit):
             elif target in result["unreachable"] and target not in result.get("name_only", ()):
                 cause = "unreachable: outside the scanned universe (skipped or unreadable)"
             elif target in result.get("name_only", ()):
-                cause = "name only: over the read limit, so only its path, imports and history can rank it"
+                cause = "name only: over the read limit and not lexically indexed, so only its path, definitions, imports and history can rank it"
             elif not sources:
                 cause = "candidate generation: no retriever found it (query extraction or vocabulary mismatch)"
             elif min(sources.values()) <= 8:

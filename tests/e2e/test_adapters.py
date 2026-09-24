@@ -107,6 +107,9 @@ else:
             self.assertNotIn(key, launch["env"])
         self.assertEqual(launch["env"]["CLAUDE_CONFIG_DIR"], str(self.profile))
         self.assertEqual(launch["env"]["HOME"], os.environ["HOME"])
+        self.assertEqual(launch["effective"]["xdg_config_home"], "inherited")
+        isolated = adapters.build_launch("claude", dict(self.spec, config_home=str(self.root)), self.workspace)
+        self.assertEqual((isolated["env"]["XDG_CONFIG_HOME"], isolated["effective"]["xdg_config_home"]), (str(self.root), "trial-owned empty directory"))
 
     def test_api_secret_only_in_process_environment(self):
         self.spec["auth"] = "api"
@@ -187,6 +190,10 @@ else:
         self.assertEqual(parsed["status"], "completed")
         self.assertEqual(parsed["usage"]["input_tokens"], 12)
         self.assertIsNone(parsed["usage"]["cost_usd"])
+        # Codex token semantics are not assumed: the Claude split stays unknown.
+        for key in ("uncached_input_tokens", "cache_creation_input_tokens", "cache_read_input_tokens", "cost_source", "cost_basis"):
+            self.assertIsNone(parsed["usage"][key], key)
+        self.assertEqual(parsed["runtime"], {"duration_ms": None, "duration_api_ms": None, "num_turns": None})
         self.assertTrue(parsed["treatment_invoked"])
         self.assertEqual(parsed["final_answer"], "Done")
 
@@ -215,10 +222,23 @@ else:
             {"type": "user", "message": {"content": [{"type": "tool_result", "tool_use_id": "t1",
                 "content": "Base directory for this skill: /skills/agent-dispatcher"}]}},
             {"type": "result", "subtype": "success", "result": "Done", "total_cost_usd": .02,
-                "usage": {"input_tokens": 100, "output_tokens": 8, "cache_read_input_tokens": 50}},
+                "duration_ms": 9000, "duration_api_ms": 7000, "num_turns": 3,
+                "modelUsage": {"model-a": {"costBasis": "list"}, "model-b": {"costBasis": "list"}},
+                "usage": {"input_tokens": 100, "output_tokens": 8, "cache_read_input_tokens": 50, "cache_creation_input_tokens": 30,
+                          "cache_creation": {"ephemeral_1h_input_tokens": 30, "ephemeral_5m_input_tokens": 0}}},
         ))
         self.assertTrue(parsed["treatment_invoked"])
-        self.assertEqual(parsed["usage"]["cost_usd"], .02)
+        self.assertEqual(parsed["usage"], {
+            "input_tokens": 100, "output_tokens": 8, "cached_input_tokens": 50, "cost_usd": .02,  # unchanged meaning
+            "uncached_input_tokens": 100, "cache_creation_input_tokens": 30, "cache_read_input_tokens": 50,
+            "cache_creation_1h_input_tokens": 30, "cache_creation_5m_input_tokens": 0,
+            "cost_source": "runtime_reported_estimate", "cost_basis": "list"})
+        self.assertEqual(parsed["runtime"], {"duration_ms": 9000, "duration_api_ms": 7000, "num_turns": 3})
+        mixed = adapters.parse_events("claude", lines({"type": "result", "subtype": "success", "result": "Done",
+            "modelUsage": {"a": {"costBasis": "list"}, "b": {"costBasis": "negotiated"}}, "usage": {"input_tokens": 1}}))
+        self.assertIsNone(mixed["usage"]["cost_basis"])  # never picks one of disagreeing labels
+        self.assertIsNone(mixed["usage"]["cost_source"])  # no numeric total_cost_usd
+        self.assertIsNone(mixed["usage"]["cache_creation_input_tokens"])  # missing is unknown, never 0
 
     def test_native_expansion_replay_differs_from_invocation_request(self):
         def trace(text):
@@ -351,7 +371,7 @@ else:
         self.assertGreaterEqual(len(errors), 5)
 
     def test_learned_conditions_are_treatments(self):
-        for condition in ("learned_skills", "learned_recipes", "learned_global", "learned_full"):
+        for condition in ("learned_skills", "learned_recipes", "learned_global", "learned_full", "dispatcher_lean", "dispatcher_evidence"):
             self.assertEqual(adapters.validate_startup("claude", self.spec, self.startup(True), condition), [], condition)
             self.assertTrue(adapters.validate_startup("claude", self.spec, self.startup(False), condition), condition)
 

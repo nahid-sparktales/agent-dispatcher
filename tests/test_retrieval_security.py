@@ -156,21 +156,32 @@ class ExcludedFilesStayUnreachable(unittest.TestCase):
 
     def test_only_policy_admitted_files_can_be_ranked_by_name_when_too_large_to_read(self):
         with tempfile.TemporaryDirectory() as directory:
-            project = Path(directory).resolve()
+            project = Path(directory).resolve() / "project"
             subprocess.run(["git", "init", "-q", str(project)], check=True)
             for name in (".env.production", "secrets_dump.py", "app/huge_excluded.py", "app/huge_allowed.py"):
                 (project / name).parent.mkdir(parents=True, exist_ok=True)
                 (project / name).write_text("TOKEN = 'oversized-secret-value'\n" * 12000, encoding="utf-8")
+            outside = project.parent / "outside.py"
+            outside.write_text("TOKEN = 'oversized-secret-value'\n" * 12000, encoding="utf-8")
+            (project / "app/huge_link.py").symlink_to(outside)  # An escape by link is refused before any size rule.
             scrub = context._scrubber(context.find_pack(str(ROOT)))
             oversized, withheld, diagnostics = [], [], []
             paths = context._enumerate(project, diagnostics)
             structural = {}
             context._scan_sources(project, paths, ("app/huge_excluded.py",), [], None, scrub, withheld, diagnostics, oversized, structural)
+            self.assertIn({"path": "app/huge_link.py", "reason": "symlink withheld"}, withheld)
             self.assertEqual(oversized, ["app/huge_allowed.py"])
-            self.assertEqual(list(structural), ["app/huge_allowed.py"])  # Excluded and credential-named files get no structural record.
-            self.assertEqual(structural["app/huge_allowed.py"]["record"]["terms"], {})
-            self.assertTrue(structural["app/huge_allowed.py"]["record"]["structural"])  # Redaction ran first: the credential-shaped lines parse to nothing.
+            self.assertEqual(list(structural), ["app/huge_allowed.py"])  # Excluded and credential-named files get no record.
+            # Redaction ran before indexing: the credential-shaped lines leave only the redaction marker as a term.
+            self.assertEqual(structural["app/huge_allowed.py"]["record"]["terms"], {"redacted": 12000})
+            self.assertEqual(structural["app/huge_allowed.py"]["record"]["coverage"], "complete")
             self.assertNotIn("oversized-secret-value", json.dumps(structural))
+            # The excerpt loader applies the same rules again: an excluded or credential-named path is never read.
+            load = context._oversized_loader(project, dict(structural, **{".env.production": structural["app/huge_allowed.py"]}),
+                                             ("app/huge_allowed.py",), scrub)
+            self.assertIsNone(load("app/huge_allowed.py"))
+            self.assertIsNone(load(".env.production"))
+            self.assertIn("[redacted]", context._oversized_loader(project, structural, (), scrub)("app/huge_allowed.py"))
             outcome = context.explain_retrieval(project, "Open .env.production, secrets_dump.py and app/huge_excluded.py; huge_allowed too",
                                                 pack=ROOT, exclude_paths=["app/huge_excluded.py"])
             self.assertEqual([row["path"] for row in outcome["ranked"]], ["app/huge_allowed.py"])
