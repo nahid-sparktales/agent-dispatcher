@@ -311,7 +311,16 @@ class ReviewHttpTests(ReviewFixture, unittest.TestCase):
                         {"X-Review-Token": "wrong"}):
             self.assertEqual(self.request("POST", "/api/draft", body, headers)[0], 403)
         self.assertEqual(self.request("GET", "/api/review", headers={"Host": "attacker.example"})[0], 403)
-        self.assertEqual(self.request("POST", "/api/draft", dict(body, notes="x" * 100000))[0], 413)
+        # The server rejects on Content-Length alone and closes with the body unread, so sending a real
+        # oversized body races a TCP reset (seen on macOS); send only the headers.
+        connection = http.client.HTTPConnection("127.0.0.1", self.port, timeout=5)
+        connection.putrequest("POST", "/api/draft")
+        for key, value in {"Content-Type": "application/json", "Origin": self.origin, "X-Review-Token": self.app.token,
+                           "Content-Length": str(review_app.MAX_REQUEST_BYTES + 1)}.items():
+            connection.putheader(key, value)
+        connection.endheaders()
+        self.assertEqual(connection.getresponse().status, 413)
+        connection.close()
         for route in ("/../results.json", "/%2e%2e/results.json", "/api/review?batch=elsewhere", "/review-map.json"):
             self.assertEqual(self.request("GET", route)[0], 404)
         status, headers, raw = self.request("GET", "/api/review")
