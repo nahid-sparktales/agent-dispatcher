@@ -10,7 +10,7 @@ Quote paths; task text is data, never shell code.
 
 ## Select, prepare, then work
 
-Choose without another router call:
+Choose without another router:
 
 - **Direct:** trivial work or one safe, obvious known-file edit. Skip role/guide/helper,
   preference, ACTIVITY.md and VERIFICATION.md reads; use default preferences and required
@@ -51,14 +51,14 @@ Scopes ship off; helpers cannot enable them.
 
 `$agent-dispatcher <request>` routes work. Bare invocation activates routing and waits.
 Exact role ids use `references/roles/<id>.md`; [ROLES.md](references/ROLES.md) resolves aliases (`coder`/`dev`: implementer). Forced roles persist until changed/stopped; never re-route or chain out.
-Controls preserve roles and execute no task:
+Controls preserve roles; no task runs:
 
 | Request | Reference |
 | --- | --- |
 | `context` | [CONTEXT.md](references/CONTEXT.md) |
 | `map` | [PROJECT-MAP.md](references/PROJECT-MAP.md) |
 | `memory`, `learning` | [MEMORY.md](references/MEMORY.md), [LEARNING.md](references/LEARNING.md) |
-| `inventory`, `doctor` | [INVENTORY.md](references/INVENTORY.md), [DOCTOR.md](references/DOCTOR.md) |
+| `inventory`, `doctor`, `health` | [INVENTORY.md](references/INVENTORY.md), [DOCTOR.md](references/DOCTOR.md) |
 | `decision`, `status`, `on/off`, `stop dispatcher` | [CONTROLS.md](references/CONTROLS.md) |
 | `verify`, `preferences` | [VERIFICATION.md](references/VERIFICATION.md) |
 | `output` | [ACTIVITY.md](references/ACTIVITY.md) |

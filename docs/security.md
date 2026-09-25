@@ -161,5 +161,13 @@ an agent's working context. All of it is **evidence**, and none of it is instruc
   rejected as a whole; a revoked parent revokes its descendants. Owner-only storage, hashes and
   approval records prove provenance, not that the prose is true or harmless.
 
+- A capability health record ([capability-intelligence.md](capability-intelligence.md)) is an
+  observation about named operations in one session, never a grant: current denials override older
+  successes, supplied snapshots cannot claim probe results, and only reviewed adapters approved in the
+  user's own settings may start a process or open a connection (no redirects, no private addresses
+  unless listed, credentials by reference only). Discovered skill packages sit inert in a quarantine
+  outside every host discovery root; static review is a filter, not a sandbox, and adoption requires an
+  active, human-approved `skill_selection` revision bound to the exact package digest and scope.
+
 None of this is a security boundary — it is a discipline. The boundary is the runtime's permission
 layer, which this repository does not touch.

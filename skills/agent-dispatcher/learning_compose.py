@@ -22,7 +22,11 @@ import math
 import re
 
 SCHEMA = 1
-KINDS = ("skill_overlay", "recipe_overlay", "role_method_overlay", "retrieval_profile", "verification_hint")
+KINDS = ("skill_overlay", "recipe_overlay", "role_method_overlay", "retrieval_profile", "verification_hint", "skill_selection")
+# A skill selection is a routing preference over a pinned, reviewed capability (capability intelligence); it has no text body,
+# grants nothing, and never installs or activates a package by itself.
+SELECTION_ACTIONS = ("adopt", "replace", "update", "prefer", "retire")
+SELECTION_PROFILES = ("instruction_only", "scripts_sandboxed")
 OPERATIONS = ("create", "refine", "specialize", "generalize", "merge", "split", "deprecate")
 SCOPES = ("repo", "global")
 PRIVACY = ("repo_private", "sanitized_general", "never_global")
@@ -340,6 +344,42 @@ def _validate_hint_payload(payload, registered_checks):
     return out
 
 
+def _validate_selection_payload(payload, scope):
+    _require(payload, ("action", "candidate_id", "content_digest", "source_identity", "revision", "skill_path", "incumbent",
+                       "execution_profile", "evaluation_ref", "target_scope", "note"),
+             ("action", "candidate_id", "content_digest", "source_identity", "execution_profile", "target_scope"), "Payload")
+    if payload["action"] not in SELECTION_ACTIONS:
+        raise LearningValidationError("Skill selection action must be adopt, replace, update, prefer or retire.")
+    if not isinstance(payload["candidate_id"], str) or not re.fullmatch(r"(?:sc|ci)-[0-9a-f]{20}", payload["candidate_id"]):
+        raise LearningValidationError("Skill selection names a candidate by its opaque id.")
+    if not isinstance(payload["content_digest"], str) or not HEX.fullmatch(payload["content_digest"]):
+        raise LearningValidationError("Skill selection binds an exact package digest.")
+    if not isinstance(payload["source_identity"], str) or not re.fullmatch(r"[a-z][a-z0-9_]{0,20}:[A-Za-z0-9_.@/+-]{1,200}", payload["source_identity"]):
+        raise LearningValidationError("Skill selection source identity is malformed.")
+    revision = payload.get("revision")
+    if revision is not None and (not isinstance(revision, str) or not re.fullmatch(r"[0-9a-f]{40}|[0-9a-f]{64}", revision)):
+        raise LearningValidationError("A pinned revision is an immutable commit or content digest, never a branch name.")
+    path = payload.get("skill_path")
+    if path is not None and (not isinstance(path, str) or len(path) > 200 or path.startswith("/") or ".." in path.split("/")):
+        raise LearningValidationError("skill_path must be a relative path inside the source.")
+    incumbent = payload.get("incumbent")
+    if incumbent is not None and (not isinstance(incumbent, str) or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.:@/+-]{0,159}", incumbent)):
+        raise LearningValidationError("incumbent must be a capability id.")
+    if payload["action"] == "replace" and incumbent is None:
+        raise LearningValidationError("A replacement names the incumbent it replaces.")
+    if payload["execution_profile"] not in SELECTION_PROFILES:
+        raise LearningValidationError("execution_profile must be instruction_only or scripts_sandboxed.")
+    reference = payload.get("evaluation_ref")
+    if reference is not None and (not isinstance(reference, str) or not re.fullmatch(r"[0-9a-f]{16,64}", reference)):
+        raise LearningValidationError("evaluation_ref must be an evaluation id.")
+    if payload["target_scope"] != scope:
+        raise LearningValidationError("Skill selection target scope must equal the revision scope; repository approval stays repository-local.")
+    out = {k: payload.get(k) for k in ("action", "candidate_id", "content_digest", "source_identity", "revision", "skill_path", "incumbent",
+                                        "execution_profile", "evaluation_ref", "target_scope")}
+    out["note"] = _text(payload["note"], "selection note", 400) if payload.get("note") is not None else None
+    return out
+
+
 def validate_candidate(document, catalog, *, policy=None, private_lexicon=()):
     """Tier A: a strict candidate document -> normalized candidate, or a bounded LearningValidationError.
 
@@ -395,6 +435,10 @@ def validate_candidate(document, catalog, *, policy=None, private_lexicon=()):
             raise LearningValidationError("Target recipe has no validated workflow sidecar; only recipes with stable step ids are evolvable.")
         normalized = _validate_recipe_payload(payload)
         validate_recipe_insertions(workflow, normalized["insert"], catalog.get("capabilities") or ())
+    elif kind == "skill_selection":
+        if artifact_id != "capabilities":
+            raise LearningValidationError("A skill selection targets the artifact id `capabilities`.")
+        normalized = _validate_selection_payload(payload, scope)
     elif kind == "retrieval_profile":
         if artifact_id != "retrieval":
             raise LearningValidationError("A retrieval profile targets the artifact id `retrieval`.")

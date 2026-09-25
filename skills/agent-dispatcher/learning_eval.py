@@ -518,6 +518,12 @@ def component_checks(store, revision_id, settings, *, pack, extra_tasks=()):
             check("profile_no_provider", not configured["llm_rerank"]["enabled"] and "role_summary" not in configured["retrievers"], "profile enables no model-assisted retriever")
         except (ValueError, KeyError, TypeError) as exc:
             check("profile_configures", False, type(exc).__name__)
+    elif kind == "skill_selection":
+        base = learning["base_body"](pack, kind, revision["artifact_id"])
+        payload = revision["typed_payload"]
+        check("catalog_binding", base["sha256"] == revision["base_artifact_digest"], "capability catalogs unchanged since validation")
+        check("selection_pinned", bool(payload["content_digest"]) and payload["target_scope"] == revision["scope"],
+              "the selection binds one exact package digest and its own scope")
     else:
         named = set(revision["typed_payload"].get("order_first", [])) | {c["check"] for c in revision["typed_payload"].get("add_checks", [])}
         check("hint_checks_registered", named <= catalog["checks"], "every named check is a registered verification capability; no command text")

@@ -403,7 +403,7 @@ def assert_no_authorization(payload):
 
 # ------------------------------------------------------------------ the whole decision
 
-def plan(service, task, forced_agent=None, stack=(), skill_limit=5):
+def plan(service, task, forced_agent=None, stack=(), skill_limit=5, ineligible=frozenset()):
     """Every decision the engine is allowed to make for one task, as one generic result.
 
     Order matters and so does what is *not* asked. When the user named a role
@@ -414,6 +414,11 @@ def plan(service, task, forced_agent=None, stack=(), skill_limit=5):
 
     The result is deliberately engine-agnostic: `selected_by` distinguishes forced, default and
     jev, and everything downstream reads that rather than knowing what Jev is.
+
+    `ineligible` holds capability ids a deterministic gate already refused (disabled, blocked,
+    quarantined, retired). They are removed from the candidate sets before any provider sees them,
+    and because validation only keeps offered ids, no answer can reintroduce them afterwards. Only
+    the ids leave this function's inputs; health details and account state never reach a provider.
     """
     registry = service.registry
     # The scrubbed form, not the raw one. This dict is rendered, serialised with `--json` and,
@@ -452,17 +457,23 @@ def plan(service, task, forced_agent=None, stack=(), skill_limit=5):
         return _stamp(out, service)
 
     # ---- skills and tools, in one request where the engine supports it
+    blocked = frozenset(ineligible)
+    skill_candidates = tuple(c for c in registry.skill_candidates(agent_id) if c.id not in blocked)
+    tool_candidates = tuple(c for c in registry.tool_candidates() if c.id not in blocked)
+    withheld = (len(registry.skill_candidates(agent_id)) - len(skill_candidates)
+                + len(registry.tool_candidates()) - len(tool_candidates))
+    if withheld:
+        out["diagnostics"].append(f"{withheld} candidate(s) withheld by capability policy before selection")
     skill_in = SkillDecisionInput(task=task, agent=agent_id, stack=tuple(stack),
-                                  candidates=registry.skill_candidates(agent_id),
-                                  limit=skill_limit)
+                                  candidates=skill_candidates, limit=skill_limit)
     tool_in = ToolDecisionInput(task=task, agent=agent_id, stack=tuple(stack),
-                                candidates=registry.tool_candidates())
+                                candidates=tool_candidates)
     skills, tools = service.choose_skills_and_tools(skill_in, tool_in)
 
     out["skills"] = [{"id": s.id, "selected_by": s.selected_by, "confidence": s.confidence,
-                      "reason": s.reason} for s in skills.selected]
+                      "reason": s.reason} for s in skills.selected if s.id not in blocked]
     out["tools"] = [{"id": s.id, "selected_by": s.selected_by, "confidence": s.confidence,
-                     "reason": s.reason} for s in tools.selected]
+                     "reason": s.reason} for s in tools.selected if s.id not in blocked]
     out["skill_ranked"] = [{"id": i, "relevance": v} for i, v in skills.ranked[:12]]
     out["tool_ranked"] = [{"id": i, "relevance": v} for i, v in tools.ranked[:12]]
     out["diagnostics"].extend(skills.diagnostics)

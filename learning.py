@@ -67,7 +67,7 @@ DEFAULTS = {
     "enabled": False,
     "mode": "shadow",
     "observation": {"record": False},
-    "kinds": ["skill_overlay", "recipe_overlay", "role_method_overlay", "retrieval_profile", "verification_hint"],
+    "kinds": ["skill_overlay", "recipe_overlay", "role_method_overlay", "retrieval_profile", "verification_hint", "skill_selection"],
     "review": {"due_after_observations": 20, "min_support_families": 5, "max_candidates": 3},
     "proposals": {"host_assisted": True,
                   "provider": {"enabled": False, "provider": None, "model": None, "base_url": None, "api_key_env": None, "command": None,
@@ -308,6 +308,10 @@ def base_body(pack, kind, artifact_id):
     if section is None:
         if kind == "retrieval_profile":
             return {"content": None, "sha256": hashlib.sha256(Path(__file__).resolve().with_name("retrieval.py").read_bytes()).hexdigest()}
+        if kind == "skill_selection":
+            # Binds to the capability catalogs a selection was evaluated against; a catalog change makes it stale.
+            return {"content": None, "sha256": _digest({name: hashlib.sha256((catalog / name).read_bytes()).hexdigest()
+                                                        for name in ("skills.json", "external-skills.json", "mcp.json")})}
         return {"content": None, "sha256": _digest(sorted(package_catalog(pack)["checks"]))}
     relative = (manifest.get(section) or {}).get(artifact_id)
     if relative is None:
@@ -1122,7 +1126,7 @@ def bundle_digest(store, pack, revision_ids, settings):
         grouped.setdefault((revision["artifact_kind"], revision["artifact_id"], (revision["editable_slot_ids"] or [None])[0]), []).append(revision)
     for (kind, artifact_id, slot), revisions in grouped.items():
         base = base_body(pack, kind, artifact_id)
-        if kind in ("retrieval_profile", "verification_hint"):
+        if kind in ("retrieval_profile", "verification_hint", "skill_selection"):
             parts["artifacts"][f"{kind}:{artifact_id}"] = _digest([base["sha256"], [r["typed_payload"] for r in sorted(revisions, key=lambda r: r["revision_id"])]])
             continue
         layers = [_layer(r) for r in sorted(revisions, key=lambda r: (r["scope"] != "global", r["revision_id"]))]
@@ -1522,7 +1526,7 @@ def export_patch(store, pack, revision_ids):
         if revision["scope"] == "global" and revision["privacy_classification"] != "sanitized_general":
             raise LearningError("Only sanitized_general revisions are exportable.")
         kind, artifact_id = revision["artifact_kind"], revision["artifact_id"]
-        if kind in ("retrieval_profile", "verification_hint"):
+        if kind in ("retrieval_profile", "verification_hint", "skill_selection"):
             out.append(f"# {kind} {artifact_id} ({ident[:12]}): typed payload, no text body\n" + json.dumps(revision["typed_payload"], indent=2, sort_keys=True) + "\n")
             continue
         base = base_body(pack, kind, artifact_id)
@@ -1793,6 +1797,7 @@ def resolve(project, pack, task, *, role=None, recipes=(), settings=None, identi
                 r.update(state=profile_state["state"], reason=profile_state["reason"])
         retrieval = None
     hints = [dict(r["_revision"]["typed_payload"], revision_id=r["revision_id"]) for r in live if r["kind"] == "verification_hint"]
+    selections = [dict(r["_revision"]["typed_payload"], revision_id=r["revision_id"], scope=r["scope"]) for r in live if r["kind"] == "skill_selection"]
     shadow = settings["mode"] == "shadow"
     if shadow:
         for row in rows:
@@ -1810,7 +1815,8 @@ def resolve(project, pack, task, *, role=None, recipes=(), settings=None, identi
     report["status"] = "shadow" if shadow else ("active" if emitted else "not_applicable")
     if not shadow and not emitted and rows:
         report["reason"] = "no admitted overlay applies to this request; baseline guidance"
-    return dict(report, _materials=materials if not shadow else {}, _retrieval=retrieval if not shadow else None, _hints=hints if not shadow else [])
+    return dict(report, _materials=materials if not shadow else {}, _retrieval=retrieval if not shadow else None, _hints=hints if not shadow else [],
+                _selections=selections if not shadow else [])
 
 
 # ---------------------------------------------------------------- command line

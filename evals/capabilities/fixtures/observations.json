@@ -1,0 +1,22 @@
+{
+  "schema_version": 2,
+  "host": {"name": "claude", "version": "fixture-1.0", "session": "demo-session",
+           "discovery": {"skills": "partial", "mcps": "complete", "tools": "partial", "plugins": "partial"}},
+  "capabilities": [
+    {"id": "prod-db", "kind": "mcp_server", "exposure": "callable",
+     "operations": [{"name": "database.read", "access": "read", "environment": "production", "resource": "signup-db", "identity": "svc-prod", "sensitivity": "confidential"}]},
+    {"id": "staging-db", "kind": "mcp_server", "exposure": "callable",
+     "operations": [{"name": "database.read", "access": "read", "environment": "staging", "resource": "signup-staging", "identity": "svc-staging", "sensitivity": "internal"}]},
+    {"id": "local-sql", "kind": "cli", "exposure": "callable",
+     "operations": [{"name": "database.read", "access": "read", "environment": "unknown"}]},
+    {"id": "design-service", "kind": "mcp_server", "exposure": "callable"},
+    {"id": "docs-service", "kind": "mcp_server", "exposure": "callable"},
+    {"id": "optional-chat", "kind": "mcp_server", "exposure": "callable"}
+  ],
+  "observations": [
+    {"capability": "prod-db", "type": "transport_negotiation", "operation": "database.read", "outcome": "failure", "reason": "TRANSPORT_TIMEOUT"},
+    {"capability": "staging-db", "type": "observed_task_call", "operation": "database.read", "outcome": "success"},
+    {"capability": "design-service", "type": "observed_task_call", "operation": "read", "outcome": "failure", "reason": "AUTHENTICATION_REQUIRED"}
+  ],
+  "disabled": []
+}
