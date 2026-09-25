@@ -84,6 +84,10 @@ Hand-edited, and the only things worth editing:
     repository_intelligence.py            Explorer, task experience, and their coordinator CLI
     learning.py, learning_compose.py      optional procedural learning (off by default): governed
     learning_eval.py                      overlays on bundled guidance, evaluated and human-approved
+    capability_health.py                  capability intelligence: normalized instances over the catalogs,
+    capability_resolver.py                scoped health receipts, approved probes, health-aware routing plans,
+    skill_intelligence.py                 skill discovery/quarantine/evaluation/recommendation (skill_selection
+                                          revisions are admitted through learning.py)
     recipes/<id>.workflow.json            a recipe's stable step ids and gates, validated by build.py
     evals/decision/                       routing, skill and tool fixtures, and the harness that
                                           compares engines on identical inputs

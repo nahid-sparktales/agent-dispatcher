@@ -520,6 +520,25 @@ def _learning_layer(root, pack, task, role_id, diagnostics, *, identity, caller_
         return None
 
 
+def _capability_layer(root, pack, task, role_id, diagnostics):
+    """Optional capability resolution (capability_resolver.py): a compact plan explanation read from a local snapshot.
+
+    None without the user's own capability settings file, so baseline packets are unchanged. Never refreshes, probes or
+    calls a model; failures become a diagnostic and guidance-only routing continues.
+    """
+    explicit = os.environ.get("AGENT_DISPATCHER_CAPABILITY_CONFIG")
+    config = os.environ.get("XDG_CONFIG_HOME")
+    location = Path(explicit).expanduser() if explicit else (Path(config) if config and Path(config).is_absolute() else Path.home() / ".config") \
+        / "agent-dispatcher" / "capability-intelligence.json"
+    if not location.exists():
+        return None  # the common case costs one stat, not a module load
+    try:
+        return _sibling("capability_resolver")["context_layer"](root, pack, task, role_id)
+    except (OSError, UnicodeError, SyntaxError, ValueError, TypeError, KeyError, AttributeError, RecursionError):
+        diagnostics.append("Capability resolution unavailable; guidance-only routing continues.")
+        return None
+
+
 def _learning_worth_reporting(report):
     """Ordinary output gains a `learning` section only when an admitted overlay was actually decided about."""
     if not report:
@@ -1793,6 +1812,8 @@ def _select_context(project, task, role=None, size="standard", max_tokens=None, 
     with _phase(timing, "learning"):
         learning = _learning_layer(root, base, task, role_id, diagnostics, identity=index_identity or os.environ.get("AGENT_DISPATCHER_INDEX_ID") or None,
                                    caller_strategy_explicit=retrieval != "auto")
+    # Capability intelligence: a compact, read-only explanation, present only when the user has capability settings.
+    capabilities = _capability_layer(root, base, task, role_id, diagnostics)
     with _phase(timing, "engine_setup"):
         engine, settings = _retrieval_engine(retrieval, cap, budget, max_files, max_bytes, diagnostics,
                                              profile=(learning or {}).get("_retrieval") if learning and learning.get("mode") == "active" else None)
@@ -1935,6 +1956,8 @@ def _select_context(project, task, role=None, size="standard", max_tokens=None, 
         result["read_only"] = False
     if learning is not None and _learning_worth_reporting(learning):
         result["learning"] = {key: value for key, value in learning.items() if not key.startswith("_")}
+    if capabilities is not None:
+        result["capabilities"] = capabilities
     # Cache state comes from observed parser-cache hits and misses, not from the flags that asked for it.
     stats = incremental.stats if incremental is not None else {}
     hits, misses = stats.get("source_hits", 0), stats.get("source_misses", 0)

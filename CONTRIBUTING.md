@@ -38,6 +38,11 @@ sources/shared/MEMORY.template.md    the repository memory guide shared by both 
 learning.py                          optional, off by default: procedural learning stores, observations, review, proposals, approval, publication, rollback, CLI
 learning_compose.py                  procedural learning, pure part: strict candidate schemas, slot contracts, applicability, composition
 learning_eval.py                     procedural learning evaluation: frozen specs, paired statistics, registered runners, component checks
+capability_health.py                 capability intelligence: definitions over catalogs, instances, receipts, scoped health, store, reviewed probes, CLI
+capability_resolver.py               health-aware, task-scoped capability plans (hot path: snapshot read only)
+skill_intelligence.py                skill sources, quarantine, static review, skill experiments, recommendations, governed adoption
+sources/shared/CAPABILITIES.template.md the capability intelligence guide shared by both hosts
+evals/capabilities/                  offline demonstration (demo.py) and hot-path microbenchmark (bench.py)
 recipes/<id>.workflow.json           optional machine-readable recipe sidecar (stable step ids, gates), validated against the Markdown by build.py
 sources/shared/LEARNING.template.md  the procedural learning guide shared by both hosts
 evals/learning/                      offline fixture demonstration of the whole learning lifecycle (demo.py)

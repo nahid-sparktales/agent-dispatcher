@@ -31,6 +31,7 @@ MODULES = (
     "tests.test_memory_lifecycle",
     "tests.test_learning",
     "tests.test_learning_security",
+    "tests.test_capability_intelligence",
     "tests.test_e2e",
     "tests.test_verification",
     "tests.test_change_audit",

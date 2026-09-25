@@ -13,6 +13,9 @@ activation state, output preference, and disabled-skill preferences.
 - Add a role id, alias, or name, such as `doctor all reviewer`, to focus recommendations.
   This does not switch the current role or hide other entries from the full inventory.
 - Claude also provides `/agent-doctor`; Codex uses `$agent-dispatcher doctor`.
+- `health`, `capabilities`, `skills`, `mcps` and `plugins` (scoped health dimensions, probe plans,
+  routing explanations, skill discovery and evaluation) follow CAPABILITIES.md beside this reference.
+  Both read the same inventory code; doctor keeps its version-1 evidence and output.
 
 ## Gather current evidence
 

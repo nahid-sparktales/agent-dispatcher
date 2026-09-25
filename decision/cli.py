@@ -130,12 +130,30 @@ def cmd_mode(args):
     return 0
 
 
+def _capability_gate(project):
+    """Disabled capability ids from the user's capability settings; empty when that optional file is absent."""
+    from pathlib import Path
+    base = Path(__file__).resolve().parent.parent
+    helper = next((c for c in (base / "capability_health.py", base.parent / "capability_health.py") if c.is_file()), None)
+    if helper is None:
+        return frozenset()
+    namespace = {"__name__": "_decision_capability_health", "__file__": str(helper)}
+    exec(compile(helper.read_text(encoding="utf-8"), str(helper), "exec"), namespace)
+    if not namespace["settings_path"]().exists():
+        return frozenset()
+    try:
+        settings = namespace["load_settings"](project=project)
+    except ValueError:
+        return frozenset()
+    return frozenset(i.split(":", 1)[-1] for i in settings["disabled"])
+
+
 def cmd_plan(args):
     stack = tuple(s.strip() for s in (args.stack or "").split(",") if s.strip())
     try:
         svc = service(project_root=args.project, mode=args.mode, provider=args.provider)
         result = build_plan(svc, args.task, forced_agent=args.agent, stack=stack,
-                            skill_limit=args.skill_limit)
+                            skill_limit=args.skill_limit, ineligible=_capability_gate(args.project))
     except BROKEN as exc:
         print(str(exc), file=sys.stderr)
         return 2

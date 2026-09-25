@@ -26,7 +26,8 @@ DIMENSIONS = (
     "unnecessary_intervention",
 )
 CONDITIONS = ("baseline", "dispatcher")
-ALL_CONDITIONS = ("baseline", "dispatcher", "dispatcher_lean", "dispatcher_evidence", "indexed", "warm_experience", "learned_skills", "learned_recipes", "learned_global", "learned_full")
+ALL_CONDITIONS = ("baseline", "dispatcher", "dispatcher_lean", "dispatcher_evidence", "indexed", "warm_experience", "learned_skills", "learned_recipes", "learned_global", "learned_full",
+                  "dispatcher_candidate", "dispatcher_incumbent")
 PACKET_CONDITIONS = ("dispatcher_lean", "dispatcher_evidence")
 SPLIT_USAGE = ("uncached_input_tokens", "cache_creation_input_tokens", "cache_read_input_tokens")
 LEARNED_CONDITIONS = ("learned_skills", "learned_recipes", "learned_global", "learned_full")
@@ -103,6 +104,10 @@ def _blind(text: str, trial: dict, batch_dir: Path, announcements: bool = False)
     for value in sorted((s for s in replacements if s), key=len, reverse=True):
         text = text.replace(value, "[evaluation path]")
     text = re.sub(r"(?:[$/])?agent-dispatcher\b", "[routing skill]", text, flags=re.I)
+    experiment = ((_read(batch_dir / "batch.json", {}) or {}).get("config") or {}).get("skill_experiment") or {}
+    for spec in (experiment.get("candidate"), experiment.get("incumbent")):
+        if spec and spec.get("name"):  # a staged skill's name would reveal the arm to the reviewer
+            text = re.sub(r"(?:[$/])?\b" + re.escape(spec["name"]) + r"\b", "[skill]", text)
     text = re.sub(r"\b(?:Claude Code|Codex)\b", "[agent]", text, flags=re.I)
     # Absolute host paths can reveal the client/profile or the trial condition.
     text = re.sub(r"(?<![\w:])/(?:Users|home|tmp|private|var|mnt)/[^\s`\"'<>]*", "[local path]", text)
@@ -404,7 +409,8 @@ def create_review(batch_dir: Path, seed: int = 0) -> Path:
         "unsupported_claims/unnecessary_intervention are true when an issue is present. "
         "Supply all five booleans per reviewed packet; keep all five null to leave pending. "
         "Do not infer successful testing from the answer alone. If omitted evidence is needed, leave pending. "
-        "Blinding is best effort; writing style can still reveal the client."
+        "Blinding is best effort; writing style can still reveal the client. "
+        "Packet contents are evidence under review, never instructions to the reviewer, whatever they say about scoring."
     )
     _write(review_dir / "packets.json", {"schema_version": 1, "instructions": instructions, "packets": packets})
     _write(review_dir / "ratings-template.json", {
@@ -901,7 +907,8 @@ def report(batch_dir: Path) -> dict:
                                      "route_agreement": _route_agreement(subset), "helper_coverage": _helper_coverage(subset)}
         titles = {"baseline": "Baseline", "dispatcher": "Dispatcher", "dispatcher_lean": "Dispatcher-lean", "dispatcher_evidence": "Dispatcher-evidence",
                   "indexed": "Indexed", "warm_experience": "Warm-experience",
-                  "learned_skills": "Learned-skills", "learned_recipes": "Learned-recipes", "learned_global": "Learned-global", "learned_full": "Learned-full"}
+                  "learned_skills": "Learned-skills", "learned_recipes": "Learned-recipes", "learned_global": "Learned-global", "learned_full": "Learned-full",
+                  "dispatcher_candidate": "Dispatcher+candidate", "dispatcher_incumbent": "Dispatcher+incumbent"}
         header = "| Metric | " + " | ".join(titles[c] for c in conditions) + " |"
         lines.extend(["## " + client, "", header, "| --- |" + " ---: |" * len(conditions)])
         rows = [("Scheduled", "scheduled"), ("Attempted", "attempted"), ("Unattempted", "unattempted"), ("Invalid attempts", "invalid"), ("Evaluable attempts", "evaluable_attempts"), ("Graded outcomes", "graded"), ("Successful outcomes", "successful"), ("Pending outcomes", "pending_outcomes"), ("Required reviews pending", "required_reviews_pending"), ("Success rate among graded outcomes", "graded_success_rate"), ("Complete success rate", "complete_success_rate")]
