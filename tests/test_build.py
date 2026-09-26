@@ -439,9 +439,9 @@ def main():
               (build.ADAPTER / "roles" / f"{rid}.md").read_text().count(build.VERIFY_CONTRACT) == 1)
     # The contract is inlined into role packets, so a word lifted from an evaluation fixture would teach
     # the benchmark instead of the method. A literal guard cannot catch paraphrase; review the wording too.
-    leaked = re.findall(r"having|limit|offset|order by|group by|union|group_concat|json_|sqlglot|executor",
-                        build.VERIFY_CONTRACT, re.I)
-    check("the verification contract carries no fixture vocabulary", not leaked, str(leaked))
+    leaked = re.findall(r"having|limit|offset|order by|group by|union|group_concat|json_|sqlglot|executor|fixture|"
+                        r"benchmark|\b\d+ of \d+\b|\d+ ?%", build.VERIFY_CONTRACT, re.I)
+    check("the verification contract carries no fixture vocabulary, task ids or statistics", not leaked, str(leaked))
     # guidance.role is never trimmed from a packet, so each role byte displaces an excerpt byte.
     # 5253 is the implementer role before the contract.
     size = (build.ADAPTER / "roles" / "implementer.md").stat().st_size

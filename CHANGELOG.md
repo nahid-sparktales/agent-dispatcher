@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+- Follow-ups from the live pilots (`docs/efficiency-reliability-audit.md` §8). The router tells the
+  worker to pass the request to the context helper verbatim, never a summary (pilot workers passed
+  shortened or garbled paraphrases). `verification.py` receipts now list up to ten failing test ids
+  with each first error line (redacted, bounded) and mark tests that already failed in an earlier
+  receipt, instead of only a count. The end-to-end runner gives every trial its own empty temporary
+  directory (`TMPDIR`, `TMP`, `TEMP`, and `CLAUDE_CODE_TMPDIR` for Claude, with a sandbox write
+  grant), so trials no longer share `/tmp/claude-<uid>`; pending one live smoke check. A `hubs`
+  retrieval switch exists as an ablation and stays off (failed its held-out confirmation). A
+  verification-contract rewrite (interaction isolation) was evaluated live against the old wording,
+  showed no benefit at slightly higher cost, and was reverted; the executor_offset regression
+  grader, a fixture-isolation test and a contract-delivery test remain.
+
 - Efficiency and reliability pass (audit and decisions in `docs/efficiency-reliability-audit.md`).
   Admitted source files over 256 KiB are now searched lexically from their one bounded read (4 MiB
   per file, 16 MiB per scan; a longer file is indexed as a line-aligned prefix, `partial_lexical`),

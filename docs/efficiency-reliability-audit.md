@@ -213,3 +213,114 @@ Commit the pass and rebuild before any `prepare`, and record the package digest.
 - `TMPDIR` is still shared across trials; preference isolation is verified only offline.
 - `_read` still checks intermediate path components with `is_symlink()` before opening, which is not
   race-free against concurrent writes to the project tree (pre-existing).
+
+## 8. Verification contract revision: interaction isolation (2026-09-24)
+
+Status: **evaluated live and reverted** (2026-09-25). The before/after experiment ran as prepared
+(each with its own stock baseline, same day, same CLI 2.1.267; every Dispatcher trial received the
+intended contract). Both Dispatcher versions solved 10/10, executor_offset included (2/2 each), so
+this run could not separate them on the targeted failure; the new wording cost more (+$1.09 over 10
+tasks, median +$0.24 per task, cheaper on 4/10; runtime list-price estimates). Stock solved 9/10
+(one 30-minute timeout) and 10/10. With no measured benefit and a small cost increase, the previous
+contract was restored. The strengthened executor_offset evaluator, the fixture-isolation test and
+the packet delivery test stay. Batches: `dist/evals/vi-before`, `dist/evals/vi-after` (local).
+
+**Provenance.** Reported to this change: runs exercising the unmasked combination 21/22 passed, runs
+not exercising it 0/15; exploratory scripts written by 15/15 stock and 1/15 Dispatcher runs.
+Re-derived locally, read-only, over 38 batch trials (one non-batch replay excluded; no trial stored
+twice), counting a probe only when its tool result was not a denial:
+
+| Measure | Stock | Dispatcher (plain) | Dispatcher variants |
+| --- | --- | --- | --- |
+| Trials | 16 | 15 | 7 |
+| HAVING check passed | 14 | 6 | 3 |
+| Executed an unmasked probe (`GROUP BY … HAVING … LIMIT`, no `ORDER BY`) → passed | 13/13 | 6/7 | 2/2 |
+| Never exercised it (neither executed nor in an executed test file) → passed | 0/2 | 0/8 | 0/4 |
+| Wrote any script file / a query probe script | 15 / 8 | 0 / 0 | 1 / 0 |
+
+With these rules the reported pair becomes 21/22 exposed-and-passed and 0/14 unexposed; the earlier
+count included denied heredocs as scripts and one replay. These are observational associations:
+exposure was not assigned, so they do not show that any instruction causes passing.
+
+**Mechanism (hypothesis).** A passing combined case (`HAVING` with `ORDER BY` and `LIMIT`) takes a
+different planner path; the path without `ORDER BY` holds the defect and was never executed by the
+failing runs. Alternatives not excluded: probing style is a marker rather than a cause; the
+Dispatcher's inline-only validator rule (0 script writers), although stock usually found the defect
+with inline probes; role scope wording (one run saw the defect and called it pre-existing); chance.
+
+**Change.** One source, `VERIFY_CONTRACT` in `build.py`, rendered into the implementer, tester and
+debugger roles (Claude pack and the Codex export, which copies the rendered roles).
+
+Before (682 B, sha256 `4c4ac16b…56e3d4`), item 3:
+> Check the riskiest behavior sharing the changed path; where filtering, ordering, pagination,
+> aggregation or early termination interact, vary each alone and combined.
+
+After (939 B, sha256 `01245402…613e3e`):
+> 2. Check the nearest way the change could still be wrong (a boundary, bad input, a case to reject)
+> and the riskiest behavior sharing the changed path.
+> 3. A passing combined case can hide a defect: after the direct check passes, remove or vary in the
+> test the likeliest masking condition, if any (e.g. filtering, ordering, pagination, aggregation,
+> early termination), and assert the path it exposes. Before stopping, run the smallest change to a
+> passing test that could take another path.
+> 4. Claim only what executed checks show; blocked checks are unverified. A pre-existing defect that
+> blocks a stated requirement is in scope; report others.
+
+The header now says "verify adversarially"; the requirement, compatibility, boundary, neighbor and
+scope rules are kept. Size: +257 bytes; the implementer role goes from 5,941 to 6,198 bytes. The
+role is inlined into every implementer packet: legacy packets trim excerpts to fit, so this
+displaces about 257 characters of excerpts there; lean and evidence packets count it as protected.
+The build test's role-size guard moved from +700 to +950 bytes over the pre-contract role.
+`docs/verification.md` gains a short "Masking conditions" section for developers (isolation varies
+the test, never a production control; any cheap probe is acceptable; remove only the task's own
+scratch files).
+
+**Known regression (evaluator side, gitignored `dist/suites/big`).** `sqlglot_executor_offset` is
+labelled `"evidence": "development known regression (in-sample)"` in the suite manifest (the prompt is
+byte-identical). Its evaluator (sha256 `c4fdfeec…` → `c9a27a1a…`) gains a masked control
+(`having_with_order_by_control`: `HAVING` with `ORDER BY` on unique keys and `LIMIT`/`OFFSET`, exact
+lists derived from the data and checked against SQLite), keeps the unmasked check's oracle (count and
+membership, no added ordering) but now reports every failing case, and adds two unmasked cases whose
+results the data fixes. Graded through the suite's own `grade()` on 27 candidate trees: every
+known-bad patch (and the upstream failing reference) passes the masked control and fails the unmasked
+check; every known-good patch passes both, whichever algorithm it uses (`math.inf` under `HAVING`, or
+`not step.condition and …`); old and new evaluators agree on every shared check and every overall
+verdict. The suite's `fixtures_digest` changes (`3aa11a9f…` → `1110a913…`), so runs prepared from now
+on do not share provenance with ri-v1 or eff-v1, although historical verdicts are unchanged. This
+task is permanently in-sample for this contract.
+
+**Contamination boundary.** The runner builds each trial workspace from the fixture's `source/` only
+and sends only the prompt; a new test (`tests/e2e/test_fixtures.py`,
+`test_trial_workspace_is_exactly_source_never_private`) checks the copy step itself. Packages come from
+tracked files, and `dist/` is ignored. This is not an OS boundary (a trial can read absolute paths);
+a search of all executor_offset event logs found no reads of evaluator or reference paths. The
+contract's build test rejects fixture vocabulary, task ids and statistics; that literal guard cannot
+catch paraphrase, so the wording was also reviewed.
+
+**Evaluation preparation (not run).** The runner installs one package per prepared experiment, so
+the comparison is two matched experiments, each with its own stock baseline: `vi-before` prepared from
+a clean clone of `main` (`453a81d`) and `vi-after` from this change, same suite, seed, model, effort,
+runner and fixtures (`runner_digest` `65cf23d4…`, `fixtures_digest` `1110a913…`, identical smoke and
+pilot schedules). The two packages differ only in the contract block of the three role files. Plan,
+run order (smoke before, smoke after, pilot after, pilot before, one at a time, on one day), outcomes,
+an evaluator-side annotation schema and a delivery check that reads the contract from each trial's
+packet are in `dist/evals/vi-plan/` (local, gitignored). Each experiment is 24 trials, about $75–100
+at earlier list prices (a planning figure, not authorization). The known regression is dataset A
+(in-sample); the other four sqlglot tasks are development set B; a held-out set C does not exist
+locally and stays pending.
+
+**Tests run.** `python3 build.py`, then `python3 -B -m tests`: all 29 groups pass (897 unittest cases)
+plus the build and routing checks. New or extended: the build checks that the contract keeps every
+required element, carries no fixture vocabulary, task ids or statistics, appears once per role, and
+that no role keeps the previous item-3 wording; a packet test that the implementer's packet carries the
+contract once in legacy, lean and evidence modes; the fixture-isolation test above. These check
+packaging and delivery, not whether a model follows the text.
+
+**Rollback.** Restore the previous `VERIFY_CONTRACT` text (sha256 `4c4ac16b…`) and the `+700` guard,
+then `python3 build.py`. Evaluator: copy the backed-up `evaluator.py.orig` and `manifest.json.orig`
+(kept outside the repository) back into the suite.
+
+**Evidence needed before promotion is claimed.** (1) The matched before/after run on the development
+suite shows the unmasked check executed more often in Dispatcher trials without lower acceptance or a
+material cost or time increase; (2) a frozen held-out suite from untuned repositories, evaluated once,
+shows no loss in acceptance or cost per verified success against a margin declared before the run.
+If held-out results are used to revise the wording again, those tasks become development evidence.
