@@ -28,7 +28,7 @@ wrapper. `--timeout` bounds execution, `--label` names checks, `--json` exposes 
 Pass inline code as `python3 -B -c 'CODE'` (each `'` written `'\''`): hosts refuse heredocs
 containing braces. `--stdin` reads a pipe (64 KiB maximum), takes no argument and goes before
 `-- python3 -B -`; Python `-` without explicit stdin is refused. Stored command
-details omit inline code/sensitive arguments; raw output is discarded.
+details omit inline code/sensitive arguments; failures are summarized.
 
 Unittest/pytest counts are runner reports, not coverage proof. Unsupported summaries have
 unknown counts; zero tests is not a pass. Generic success proves only a successful command exit.

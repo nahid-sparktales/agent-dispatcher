@@ -851,7 +851,7 @@ def effective_profile(revisions, base_settings, *, caller_strategy_explicit=Fals
     strategy = None if caller_strategy_explicit else payload.get("strategy")
     overrides = copy.deepcopy(payload.get("overrides") or {})
     for key in ("llm_rerank", "role_summary", "explorer", "retrievers", "query_weights", "pin_named_paths", "fusion", "frames", "structural_records",
-                "oversized", "names"):
+                "oversized", "names", "hubs"):
         overrides.pop(key, None)
     if "context" in overrides and base_settings is not None:
         # Caller caps (files, bytes, tokens) remain the caller's; a profile may only choose within them.

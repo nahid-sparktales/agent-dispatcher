@@ -295,6 +295,49 @@ class FusionTests(unittest.TestCase):
         self.assertEqual(sorted(order[1:]), ["pkg/alpha.py", "pkg/mid.py"])
 
 
+class HubTests(unittest.TestCase):
+    # emit.py holds most of the repository's distinct terms (a generator that names everything); paging.py is the precise file.
+    HUB = "".join(f"def emit_{w}{n}(node):\n    return node  # offset window\n\n" for n in range(10) for w in ("alpha", "beta", "gamma", "delta", "sigma"))
+    FILES = {"pkg/emit.py": HUB, "pkg/paging.py": "def skip(rows, count):\n    # OFFSET: skip the first rows\n    return rows[count:]\n",
+             "pkg/io.py": "def read_table(name):\n    return open(name).read()\n",
+             "pkg/util.py": "def flatten(items):\n    return [x for row in items for x in row]\n", "README.md": "A small query engine.\n"}
+    TASK = "the OFFSET window is ignored"
+    KEYS = ("query", "lists", "ranked", "first", "status")
+
+    def setUp(self):
+        self.index = build(self.FILES)
+
+    def test_hub_damping_is_off_by_default_and_the_ranking_is_unchanged(self):
+        self.assertEqual(retrieval.DEFAULTS["hubs"], {"damping": 0.0, "min_share": 0.15, "sources": ["bm25", "rare_terms", "symbol_references"]})
+        config = retrieval.configure("full")
+        lists = {"bm25": [{"file": "pkg/emit.py", "rank": 1, "score": 2.0}]}
+        self.assertIs(retrieval.damp_hubs(lists, self.index, config), lists)
+        before = {key: value for key, value in config.items() if key != "hubs"}  # The configuration before the switch existed.
+        default, old = (retrieval.retrieve(self.TASK, self.index, c) for c in (config, before))
+        self.assertEqual({k: default[k] for k in self.KEYS}, {k: old[k] for k in self.KEYS})
+        self.assertEqual(default["ranked"][0]["path"], "pkg/emit.py")  # Without the switch the hub wins on volume.
+        self.assertEqual(default["plan"]["caps"]["hubs"], retrieval.DEFAULTS["hubs"])
+        self.assertEqual(retrieval.retrieve(self.TASK, self.index, retrieval.configure("full+hubs"))["plan"]["caps"]["hubs"]["damping"], 0.5)
+
+    def test_the_switch_damps_a_hub_below_the_precise_small_file_and_leaves_other_files_alone(self):
+        default = retrieval.retrieve(self.TASK, self.index, retrieval.configure("full"))
+        damped = retrieval.retrieve(self.TASK, self.index, retrieval.configure("full", {"hubs": {"damping": 0.8}}))
+        self.assertEqual([row["path"] for row in damped["ranked"][:2]], ["pkg/paging.py", "pkg/emit.py"])
+        for source in ("bm25", "rare_terms"):
+            hub = next(row for row in damped["lists"][source] if row["file"] == "pkg/emit.py")
+            before = next(row for row in default["lists"][source] if row["file"] == "pkg/emit.py")
+            self.assertEqual(hub["score"], round(before["score"] * 0.2, 4), source)
+            self.assertIn("hub file: 77% of the repository's terms", hub["detail"])
+            # Every file below the threshold keeps its score and its order.
+            rest = lambda result: [(r["file"], r["score"]) for r in result["lists"][source] if r["file"] != "pkg/emit.py"]  # noqa: E731
+            self.assertEqual(rest(damped), rest(default), source)
+
+    def test_no_file_below_the_threshold_is_damped(self):
+        default = retrieval.retrieve(self.TASK, self.index, retrieval.configure("full"))
+        high = retrieval.retrieve(self.TASK, self.index, retrieval.configure("full", {"hubs": {"damping": 0.8, "min_share": 0.8}}))
+        self.assertEqual({k: high[k] for k in self.KEYS}, {k: default[k] for k in self.KEYS})
+
+
 class RegressionTests(unittest.TestCase):
     def test_central_file_with_every_term_loses_to_the_specific_file(self):
         words = "executor specialized table offset unsupported expression planner generator parser token"

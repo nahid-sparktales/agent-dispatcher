@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Offline behavior checks for bounded local context selection."""
 import hashlib
+import importlib.util
 import io
 import json
 import os
@@ -1206,6 +1207,18 @@ class ContextTests(unittest.TestCase):
         self.assertEqual(code, 2)
         self.assertRegex(written, r"\AContext input could not be read; contents withheld\. \[phase=scan, elapsed_ms=\d+\]\n\Z")
         self.assertNotIn(marker, written)
+
+    def test_verification_contract_reaches_the_worker_in_every_packet_mode(self):
+        # Delivery, not just packaging: the implementer's packet carries the shared contract once, in legacy and in
+        # the slim modes (whose role body drops only frontmatter). This checks delivery, not that a model follows it.
+        spec = importlib.util.spec_from_file_location("_contract_build", ROOT / "build.py")
+        contract = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(contract)
+        self.write("auth.py", "def validateLogin():\n    return True\n")
+        for mode in ("legacy", "lean", "evidence"):
+            with self.subTest(mode=mode):
+                packet = self.select(role="implementer", compact=True, packet_mode=mode, packet_tokens=12000)
+                self.assertEqual(packet["guidance"]["role"]["content"].count(contract.VERIFY_CONTRACT), 1)
 
     def test_pack_layouts_produce_same_result_from_other_working_directory(self):
         self.write("auth.py", "def validateLogin(): pass\n")

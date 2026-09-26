@@ -758,6 +758,28 @@ MRR by +.005 [-.013, +.024] and R@1 to .299.
 `before/after`, `and/or` and `n/a`. Resolving these tokens moves 11 requests out of the `exact`
 profile. On the validation part alone (117 tasks), `names-case` moves R@8 by -.026 [-.060, +.000].
 
+## Hub-file damping: development split and one held-out check (2026-09-25)
+
+`hubs` (default `{"damping": 0.0, "min_share": 0.15}`, strategy `full+hubs`) damps the bm25,
+rare-term and symbol-reference votes of a file whose distinct terms are at least `min_share` of the
+repository's vocabulary; definition, path, graph and git votes are untouched. It was written after
+`sqlglot/generator.py` appeared in every packet of an end-to-end pilot. Four settings were declared
+before the run, with the rule: adopt only if the development R@8 delta has a 95% interval above
+zero and no repository or profile drops by more than .02, then confirm once on the held-out split.
+
+| Setting | Dev R@8 | Δ R@8 vs `full` [95%] |
+| --- | --- | --- |
+| `full` | .727 | — |
+| share .15, damping .5 | .728 | +.001 [−.006, +.007] |
+| share .15, damping .8 | .734 | +.007 [+.001, +.015] |
+| share .10, damping .5 | .725 | −.002 [−.011, +.007] |
+| share .10, damping .8 | .731 | +.004 [−.006, +.014] |
+
+Only share .15 / damping .8 passed on development (all of its change in sqlglot, where it mostly
+demoted a 2 MB `CHANGELOG.md`). The single held-out run (126 tasks) gave Δ R@8 −.008 [−.024, .000],
+failing every confirmation check, so damping stays `0.0`. At share .10 the switch demotes
+`sqlglot/parser.py`, which is a target in 17 development tasks (Δ R@8 −.13 to −.16 there).
+
 ## Repository memory
 
 Measured on 2026-09-22 with `evals/retrieval/run.py --memory` (see
