@@ -30,8 +30,9 @@ Scopes ship off; helpers cannot enable them.
 2. **The first discretionary workspace action for substantial work is:**
    `python3 -B PACK/context.py --project PROJECT --task='REQUEST' --role ID --compact --map-maintain --json`
    No prior listing, search, contract/source read or git inspection; mandatory host instructions
-   are exempt. Pass the exact request as single-quoted REQUEST. Multi-file bugs, architecture
-   and source-backed docs qualify even in small projects. The helper gates cache writes; add
+   are exempt. REQUEST is the request verbatim, never a summary: keep every sentence, example
+   and quote (`'` as `'\''`). Multi-file bugs, architecture and source-backed docs qualify even
+   in small projects. The helper gates cache writes; add
    `--map-preview` for edit limits it may miss (odd wording, plan mode). Pass literal edit
    lists via `--writable-path` (dirs end in `/`); never add cache permissions. Deferral keeps
    fresh evidence; never bypass it via build/refresh. On failure, continue targeted investigation.
