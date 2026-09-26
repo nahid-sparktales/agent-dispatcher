@@ -14,6 +14,30 @@
   showed no benefit at slightly higher cost, and was reverted; the executor_offset regression
   grader, a fixture-isolation test and a contract-delivery test remain.
 
+- Capability intelligence (guide `docs/capability-intelligence.md`, audit `docs/capability-intelligence-audit.md`).
+  `capability_health.py` normalizes the existing catalogs and host observations into definitions and host
+  instances with nine independent health dimensions, scoped display states, policy and freshness badges,
+  session-bound evidence receipts in a private host store, dependency evaluation (`all_of`/`any_of`/optional/
+  operation-conditional, cycles), plugin aggregation without double counting, CLI trust (workspace PATH
+  shadowing, no package-manager launchers) and a probe planner with three reviewed adapters (approved CLI
+  version, MCP stdio negotiation/enumeration, exact-authority read-only HTTP) that run only when the user's own
+  settings approve them and the invocation asks. Doctor accepts the v2 host snapshot through an explicit v1
+  projection; its output is unchanged. `capability_resolver.py` builds task-scoped plans with deterministic
+  gates, operation-equivalent fallbacks or an explicit no-connection route, verification blockers and
+  `off`/`shadow`/`on` rollout (default shadow); the decision engine removes gated ids before any provider sees
+  candidates; `context.py` adds a compact block only when capability settings exist. `skill_intelligence.py`
+  adds local/curated/offline sources plus disabled-by-default GitHub (commit-pinned) and skills.sh (Vercel OIDC)
+  adapters, an inert quarantine outside host discovery roots, static review, frozen skill experiments over new
+  `dispatcher_candidate`/`dispatcher_incumbent` runner arms with trace-based exposure accounting, paired
+  task-level analysis with conservative intervals and preregistered gates, model/host-scoped recommendations
+  that can choose no additional skill, and a `skill_selection` learning kind that routes adoption, approval and
+  rollback through `learning.py`. New commands: `/agent-health`, `/agent-capabilities`, `/agent-skills`,
+  `/agent-mcps`, `/agent-plugins`, `/agent-setup`, which lists every installed MCP server and plugin that still needs sign-in, a missing program, an
+  environment variable, enabling or a fix, with the step for each; and `/agent-checkup`, which lists every MCP, skill and plugin individually as
+  working, needs attention, unsure or not in use with its next step (Codex: `$agent-dispatcher health`). Adding the learning kind changes the
+  learning policy digest, so existing learned overlays re-evaluate. No live provider, registry or model run
+  was performed; evaluation numbers in the offline demo are synthetic.
+
 - Efficiency and reliability pass (audit and decisions in `docs/efficiency-reliability-audit.md`).
   Admitted source files over 256 KiB are now searched lexically from their one bounded read (4 MiB
   per file, 16 MiB per scan; a longer file is indexed as a line-aligned prefix, `partial_lexical`),

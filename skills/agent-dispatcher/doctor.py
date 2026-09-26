@@ -68,6 +68,14 @@ def read_evidence(source=None):
             raise DoctorError("Session evidence is malformed or exceeds 2 MiB; contents withheld.") from None
     else:
         data = read_json(source)
+    if isinstance(data, dict) and data.get("schema_version") == 2:
+        # Host observation snapshot (capability_health.py): validated there, then read through its explicit v1 projection,
+        # in which `exposed` stays callable-but-untested.
+        health = _capability_health()
+        try:
+            data = health["project_v1"](health["read_snapshot"](data))
+        except health["CapabilityError"] as exc:
+            raise DoctorError(str(exc)) from None
     if (not isinstance(data, dict) or set(data) - {"schema_version", "skills", "mcps", "tools", "disabled", "host"}
             or type(data.get("schema_version")) is not int or data["schema_version"] != 1):
         raise DoctorError("Evidence needs schema_version 1 and only documented fields.")
@@ -107,6 +115,13 @@ def read_evidence(source=None):
         raise DoctorError("Evidence hook_trust is invalid.")
     out["host"] = host
     return out
+
+
+def _capability_health():
+    path = Path(__file__).resolve().with_name("capability_health.py")
+    namespace = {"__name__": "_dispatcher_doctor_capability_health", "__file__": str(path)}
+    exec(compile(path.read_text(encoding="utf-8"), str(path), "exec"), namespace)
+    return namespace
 
 
 def find_pack(requested=None):
@@ -652,12 +667,12 @@ def inspect(pack=None, project=None, host=None, config_dir=None, role=None, evid
     ref_base = pack / "references" if (pack / "references/INVENTORY.json").is_file() else pack
     required = [pack / "SKILL.md"] + [ref_base / name for name in (
         "INDEX.md", "CONTEXT.md", "CONTEXT-REFERENCE.md", "ROLES.md", "CONTROLS.md",
-        "DELEGATION.md", "PROJECT-MAP.md", "MEMORY.md", "VERIFICATION.md", "jev.md", "DOCTOR.md")]
+        "DELEGATION.md", "PROJECT-MAP.md", "MEMORY.md", "VERIFICATION.md", "jev.md", "DOCTOR.md", "CAPABILITIES.md")]
     required += [ref_base / "roles" / (name + ".md") for name in roles]
     required += [pack / "scripts" / name if ref_base != pack else pack / name
                  for name in ("doctor.py", "context.py", "context_packet.py", "context_reuse.py", "parser_cache.py", "project_map.py", "project_graph.py",
                  "repo_index.py", "retrieval.py", "context_budget.py", "llm_retrieval.py", "repo_store.py", "repo_builder.py", "exploration.py", "experience.py", "repository_intelligence.py",
-                 "repository_memory.py", "repo_history.py",
+                 "repository_memory.py", "repo_history.py", "capability_health.py", "capability_resolver.py", "skill_intelligence.py",
                               "resources.py", "verification.py", "preferences.py", "change_audit.py")]
     runtime = catalog.parent if catalog else (pack / "scripts/runtime" if ref_base != pack else pack)
     required += [runtime / "catalog/loadouts.json", runtime / "catalog/resource-paths.json", runtime / "decision/redact.py"]

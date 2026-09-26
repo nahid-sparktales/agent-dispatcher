@@ -78,6 +78,7 @@ Manual installs use `/agent-dispatcher` and `/agent-reviewer`.
 | `context explain` | Explain the current role, skills, and context selection. |
 | `context build <request>` | Find relevant source passages without executing the request. |
 | `doctor` | Check installation health and recommend relevant setup. |
+| `health` | Scoped capability health: configuration, exposure, tested operations, policy and freshness, without probes by default. |
 | `inventory setup` | List capabilities with missing setup or unresolved availability. |
 | `output verbose` / `output compact` | Change how much activity detail is shown. |
 | `status` | Show activation state and current settings. |
@@ -127,6 +128,7 @@ configuration and may send task or source information to the provider you select
 | [Model-assisted retrieval](docs/llm-assisted-retrieval.md) | Off; optionally generate file summaries and rerank a bounded candidate set. |
 | [Onboarding Explorer](docs/repository-index.md#onboarding-explorer) | Off; optionally use a model to investigate the index and save evidence-backed notes. |
 | [Jev decision engine](docs/jev.md) | All scopes off; optionally delegate catalog selection to an external API. |
+| [Capability intelligence](docs/capability-intelligence.md) | Passive health always available; health-aware routing and utility ranking in shadow; probes, remote skill sources and live skill evaluations off until your own settings approve them. |
 
 The [catalog](docs/catalog.md) lists bundled skills and referenced integrations. External
 skills and MCP servers are not installed by this pack. Your agent's usage costs still apply;

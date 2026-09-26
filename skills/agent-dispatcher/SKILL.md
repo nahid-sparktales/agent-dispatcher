@@ -55,7 +55,8 @@ Scopes ship off; helpers cannot enable them.
 `/agent-dispatcher <request>` routes work. Bare invocation activates routing and waits.
 Exact role ids use `roles/<id>.md`; [ROLES.md](ROLES.md) resolves aliases (`coder` / `dev`: implementer). Forced roles persist until changed/stopped; never re-route or chain out.
 Claude also accepts `/agent-<role>`, `/agent-context`, `/agent-map`, `/agent-memory`, `/agent-learning`,
-`/agent-inventory`, `/agent-doctor`, `/agent-decision`, `/agent-verify`, and `/agent-preferences`.
+`/agent-inventory`, `/agent-doctor`, `/agent-health`, `/agent-setup`, `/agent-checkup`, `/agent-capabilities`, `/agent-skills`, `/agent-mcps`, `/agent-plugins`,
+`/agent-decision`, `/agent-verify`, and `/agent-preferences`.
 
 Controls preserve roles and do not execute tasks:
 
@@ -67,6 +68,7 @@ Controls preserve roles and do not execute tasks:
 | `learning` | [LEARNING.md](LEARNING.md) (off by default) |
 | `inventory` | [INVENTORY.md](INVENTORY.md) |
 | `doctor` | [DOCTOR.md](DOCTOR.md) |
+| `health`, `setup`, `checkup`, `capabilities`, `skills`, `mcps`, `plugins` | [CAPABILITIES.md](CAPABILITIES.md) |
 | `decision`, `status`, `on/off`, `stop dispatcher` | [CONTROLS.md](CONTROLS.md) |
 | `verify`, `preferences` | [VERIFICATION.md](VERIFICATION.md) |
 | `output` | [ACTIVITY.md](ACTIVITY.md) |

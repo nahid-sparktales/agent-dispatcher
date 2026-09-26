@@ -387,7 +387,8 @@ def main():
     cmds = sorted(build.CMDS.glob("agent-*.md"))
     # Inspection and configuration commands do not force a specialist role.
     NON_ROLE_CMDS = ("agent-context.md", "agent-decision.md", "agent-inventory.md", "agent-doctor.md", "agent-map.md",
-                     "agent-memory.md", "agent-learning.md", "agent-verify.md", "agent-preferences.md")
+                     "agent-memory.md", "agent-learning.md", "agent-verify.md", "agent-preferences.md",
+                     "agent-health.md", "agent-checkup.md", "agent-setup.md", "agent-capabilities.md", "agent-skills.md", "agent-mcps.md", "agent-plugins.md")
     role_cmds = [c for c in cmds if c.name not in NON_ROLE_CMDS]
     check("one command per role, plus inspection and configuration commands",
           len(role_cmds) == len(roles)

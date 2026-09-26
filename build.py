@@ -44,13 +44,15 @@ SCHEMA_VERSION = "2.2.0"
 # Flat references have the same names in Claude's pack and Codex's references/.
 REFERENCE_FILES = ("ROLES.md", "CONTROLS.md", "DELEGATION.md", "CONTEXT.md",
                    "CONTEXT-REFERENCE.md", "SIGNALS.md", "INDEX.md", "ACTIVITY.md",
-                   "INVENTORY.md", "DOCTOR.md", "PROJECT-MAP.md", "MEMORY.md", "LEARNING.md", "VERIFICATION.md", "jev.md")
-TEMPLATED_REFERENCES = ("CONTROLS.md", "DELEGATION.md", "CONTEXT.md", "CONTEXT-REFERENCE.md", "PROJECT-MAP.md", "MEMORY.md", "LEARNING.md", "VERIFICATION.md")
+                   "INVENTORY.md", "DOCTOR.md", "PROJECT-MAP.md", "MEMORY.md", "LEARNING.md", "VERIFICATION.md", "CAPABILITIES.md", "jev.md")
+TEMPLATED_REFERENCES = ("CONTROLS.md", "DELEGATION.md", "CONTEXT.md", "CONTEXT-REFERENCE.md", "PROJECT-MAP.md", "MEMORY.md", "LEARNING.md", "VERIFICATION.md",
+                        "CAPABILITIES.md")
 # Runtime helpers copied verbatim into every host package; the installed-module loader reads siblings by file name.
 RUNTIME_MODULES = ("context.py", "context_packet.py", "context_reuse.py", "parser_cache.py", "project_map.py", "project_graph.py",
                    "repo_index.py", "retrieval.py", "context_budget.py", "llm_retrieval.py", "repo_store.py", "repo_builder.py", "exploration.py",
                    "experience.py", "repository_intelligence.py", "repository_memory.py", "repo_history.py",
                    "learning.py", "learning_compose.py", "learning_eval.py",
+                   "capability_health.py", "capability_resolver.py", "skill_intelligence.py",
                    "resources.py", "verification.py", "preferences.py", "change_audit.py")
 
 
@@ -76,6 +78,10 @@ def reference_text(name, d, host="claude"):
         "{{LEARNING_COMMAND}}": "python3 -B PACK/" + ("scripts/" if codex else "") + "learning.py",
         "{{LEARNING_INSPECT_COMMAND}}": "$agent-dispatcher learning" if codex else "/agent-learning",
         "{{VERIFICATION_COMMAND}}": "python3 -B PACK/" + ("scripts/" if codex else "") + "verification.py",
+        "{{HEALTH_COMMAND}}": "python3 -B PACK/" + ("scripts/" if codex else "") + "capability_health.py",
+        "{{RESOLVER_COMMAND}}": "python3 -B PACK/" + ("scripts/" if codex else "") + "capability_resolver.py",
+        "{{SKILLS_COMMAND}}": "python3 -B PACK/" + ("scripts/" if codex else "") + "skill_intelligence.py",
+        "{{HEALTH_CONTROL}}": "$agent-dispatcher health" if codex else "/agent-health",
         "{{AUDIT_COMMAND}}": "python3 -B PACK/" + ("scripts/" if codex else "") + "change_audit.py",
         "{{PREFERENCES_COMMAND}}": "python3 -B PACK/" + ("scripts/" if codex else "") + "preferences.py",
         "{{VERIFY_CONTROL}}": "$agent-dispatcher verify" if codex else "/agent-verify",
@@ -991,6 +997,27 @@ def write_commands(d):
         f'(`{SKILL_DIR}/DOCTOR.md` for a manual install, or inside the plugin). '
         'Follow its read-only procedure for `doctor $ARGUMENTS`, including current-session '
         'evidence and ranked recommendations. Do not install, connect accounts, or enable anything.\n')
+    capability_commands = {
+        "agent-health": ("Capability health: scoped, passive by default; explain one capability or show a probe plan.",
+                         "[--type skill|mcp|plugin|tool|cli|api|role|recipe] [--capability ID --explain] [--deep] [--json]", "health"),
+        "agent-setup": ("Installed MCP servers and plugins that are not set up yet (sign-in, missing program, variable, enablement), with the exact step for each.",
+                        "[--json]", "setup"),
+        "agent-checkup": ("Every MCP, skill and plugin, one per line: working, needs attention, unsure, not in use — with the next step for each.",
+                          "[--type mcp|skill|plugin|tool|cli] [--include-bundled] [--json]", "checkup"),
+        "agent-capabilities": ("List normalized capability instances, or explain one and its evidence.", "[explain <instance-id>] [--json]", "capabilities"),
+        "agent-skills": ("Skills: list, discover (metadata), inspect in quarantine, evaluate, recommend. Never installs or activates.",
+                         "[discover <query> | inspect <ref> | evaluate <stage> <id> | recommend <task>]", "skills"),
+        "agent-mcps": ("MCP servers and tools: registry, configuration, exposure, tested operations, gaps.", "[--json]", "mcps"),
+        "agent-plugins": ("Plugins and their components, aggregated without double counting; hooks are never run.", "[--json]", "plugins"),
+    }
+    for name, (description, hint, control) in capability_commands.items():
+        (CMDS / f"{name}.md").write_text(
+            f'---\ndescription: "{description}"\nargument-hint: "{hint}"\n---\n\n'
+            'Read CAPABILITIES.md beside the dispatcher SKILL.md '
+            f'(`{SKILL_DIR}/CAPABILITIES.md` for a manual install, or inside the plugin). '
+            f'Follow its `{control}` control for `$ARGUMENTS` with the bundled helper; do not assemble an inventory from memory. '
+            'Nothing here installs, connects, logs in, enables, activates or changes a permission, and a recommendation is not '
+            'approval. Keep the active role, output style, and activation state unchanged.\n')
     # Also not a role: configuration for the optional decision engine.
     (CMDS / "agent-decision.md").write_text(sub(DECISION_CMD, "{{SKILL_DIR}}", SKILL_DIR))
 

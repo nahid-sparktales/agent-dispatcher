@@ -28,12 +28,17 @@ CONDITIONS = ("baseline", "dispatcher")
 # Every condition the runner can schedule, in canonical order. `indexed` and `warm_experience` add the deep
 # repository index (built or refreshed before each task, outside timing) and, for the warm arm only, the
 # experience its own earlier tasks recorded. A configuration selects a subset that must include baseline.
-ALL_CONDITIONS = ("baseline", "dispatcher", "dispatcher_lean", "dispatcher_evidence", "indexed", "warm_experience", "learned_skills", "learned_recipes", "learned_global", "learned_full")
+ALL_CONDITIONS = ("baseline", "dispatcher", "dispatcher_lean", "dispatcher_evidence", "indexed", "warm_experience", "learned_skills", "learned_recipes", "learned_global", "learned_full",
+                  "dispatcher_candidate", "dispatcher_incumbent")
 # Packet-mode arms: exactly the static `dispatcher` arm plus the helper's packet mode (AGENT_DISPATCHER_PACKET).
 PACKET_CONDITIONS = {"dispatcher_lean": "lean", "dispatcher_evidence": "evidence"}
 # Learned arms: warm_experience plus a frozen, explicitly authorized overlay library of increasing kinds (skills, recipes,
 # a frozen user-global library, the full bundle). Each arm keeps its own library, learning store and observations.
 LEARNED_CONDITIONS = ("learned_skills", "learned_recipes", "learned_global", "learned_full")
+# Skill arms (capability intelligence): exactly the static `dispatcher` arm (the control) plus one staged skill package.
+# `dispatcher_incumbent` stages the incumbent instead, so candidate and incumbent share one common base and the comparison
+# measures replacement, not stacking. Tools and permissions are identical across the three arms.
+SKILL_CONDITIONS = {"dispatcher_candidate": "candidate", "dispatcher_incumbent": "incumbent"}
 
 
 def conditions_of(config):
@@ -71,6 +76,70 @@ def check_packet_tokens(tokens, conditions):
         raise ValueError("packet_tokens is only meaningful with dispatcher_lean or dispatcher_evidence")
 
 
+def check_skill_experiment(experiment, conditions):
+    """A skill arm needs the control arm, a staged package whose digest is frozen, and an incumbent only for replacement."""
+    wanted = [c for c in conditions if c in SKILL_CONDITIONS]
+    if not wanted:
+        if experiment is not None:
+            raise ValueError("skill_experiment is only meaningful with dispatcher_candidate or dispatcher_incumbent")
+        return
+    if "dispatcher" not in conditions:
+        raise ValueError("skill arms need the dispatcher condition as their control")
+    if not isinstance(experiment, dict) or set(experiment) - {"experiment_id", "mode", "candidate", "incumbent"}:
+        raise ValueError("skill_experiment must be {experiment_id, mode, candidate, incumbent}")
+    if experiment.get("mode") not in ("controlled", "natural"):
+        raise ValueError("skill_experiment.mode must be controlled or natural")
+    for role in ("candidate", "incumbent"):
+        spec = experiment.get(role)
+        if role == "incumbent" and spec is None:
+            if "dispatcher_incumbent" in conditions:
+                raise ValueError("dispatcher_incumbent needs skill_experiment.incumbent")
+            continue
+        if (not isinstance(spec, dict) or set(spec) != {"name", "dir", "digest"} or not isinstance(spec["name"], str)
+                or not re.fullmatch(r"[a-z0-9][a-z0-9-]{0,63}", spec["name"]) or spec["name"] == "agent-dispatcher"
+                or not isinstance(spec["dir"], str) or not Path(spec["dir"]).is_absolute() or not (Path(spec["dir"]) / "SKILL.md").is_file()):
+            raise ValueError(f"skill_experiment.{role} must name a staged skill directory (absolute, with SKILL.md) and its digest")
+        if rt.digest_tree(Path(spec["dir"]), {"__pycache__"}) != spec["digest"]:
+            raise ValueError(f"staged {role} skill changed since preparation; prepare a new experiment")
+
+
+def skill_names(config):
+    experiment = config.get("skill_experiment") or {}
+    return tuple(spec["name"] for spec in (experiment.get("candidate"), experiment.get("incumbent")) if spec)
+
+
+def skill_exposure(client, stdout, name, staged):
+    """What the trace establishes about one staged skill: listed at startup, and its body loaded (host invocation or a read of
+    the staged SKILL.md). The agent saying it used the skill is not evidence; unknown stays unknown."""
+    out = {"skill": name, "metadata_exposed": None, "body_loaded": False, "mechanism": None}
+    target = str(Path(staged) / "SKILL.md") if staged else None
+    for line in stdout.splitlines():
+        try:
+            event = json.loads(line)
+        except ValueError:
+            continue
+        if not isinstance(event, dict):
+            continue
+        if client == "claude" and event.get("type") == "system" and event.get("subtype") == "init":
+            skills = event.get("skills")
+            if isinstance(skills, list):
+                out["metadata_exposed"] = any(str(item).split(":")[-1] == name for item in skills)
+        blocks = ((event.get("message") or {}).get("content") or []) if client == "claude" else []
+        for block in blocks if isinstance(blocks, list) else []:
+            if not isinstance(block, dict) or block.get("type") != "tool_use":
+                continue
+            inputs = block.get("input") or {}
+            if block.get("name") == "Skill" and str(inputs.get("skill", "")).split(":")[-1] == name:
+                out.update(body_loaded=True, mechanism="host_skill_invocation")
+            elif block.get("name") == "Read" and target and str(inputs.get("file_path", "")) == target:
+                out.update(body_loaded=True, mechanism=out["mechanism"] or "staged_file_read")
+        if client == "codex":
+            item = event.get("item") or {}
+            if item.get("type") == "command_execution" and target and target in str(item.get("command", "")):
+                out.update(body_loaded=True, mechanism="staged_file_read")
+    return out
+
+
 def validate_config(config, live=False):
     if config.get("schema_version") != 1:
         raise ValueError("unsupported evaluation configuration version")
@@ -103,6 +172,7 @@ def validate_config(config, live=False):
     elif config.get("learning_library") or config.get("learning_global_library"):
         raise ValueError("learning_library is only meaningful with a learned condition")
     check_packet_tokens(config.get("packet_tokens"), chosen)
+    check_skill_experiment(config.get("skill_experiment"), chosen)
     eligible = config.get("warm_experience_eligible", ["grader_passed"])
     if not isinstance(eligible, list) or any(not isinstance(v, str) for v in eligible):
         raise ValueError("warm_experience_eligible must be a list of outcome names")
@@ -184,11 +254,12 @@ def stage_packages(destination, clients=CLIENTS):
 
 
 def prepare(output, suite_path=None, models=None, efforts=None, auth=None, seed=20260919, clients=CLIENTS,
-            warm_project_index=False, conditions=CONDITIONS, packet_tokens=None):
+            warm_project_index=False, conditions=CONDITIONS, packet_tokens=None, skill_experiment=None):
     from evals.end_to_end.grading import load_suite
     if type(warm_project_index) is not bool:
         raise ValueError("warm_project_index must be a boolean")
     check_packet_tokens(packet_tokens, conditions)  # before the output directory exists
+    check_skill_experiment(skill_experiment, list(conditions))
     clients = selected_clients(clients)
     output = Path(output).absolute()
     if output.exists():
@@ -221,6 +292,8 @@ def prepare(output, suite_path=None, models=None, efforts=None, auth=None, seed=
               "warm_project_index": warm_project_index, "conditions": list(conditions),
               "experience_outcome": "harness_grader", "warm_experience_eligible": ["grader_passed"],
               "output_dir": str(output), "provenance": provenance, "clients": {}}
+    if skill_experiment is not None:
+        config["skill_experiment"] = skill_experiment  # absent otherwise; changes the fingerprint, so smoke runs again
     if packet_tokens is not None:
         config["packet_tokens"] = packet_tokens  # absent otherwise, so configurations without it keep their shape
     for client in clients:
@@ -304,6 +377,7 @@ def workspace_for(config, client, condition, fixture=None):
                 raise ValueError("Claude evaluation profile already contains a dispatcher skill; inspect leftover staging")
         else:
             target = workspace / ".agents/skills/agent-dispatcher"
+        staged_skill, staged_target = None, None
         try:
             if condition != "baseline":
                 source = Path(config["output_dir"]) / "packages" / client
@@ -311,15 +385,30 @@ def workspace_for(config, client, condition, fixture=None):
                 expected_digest = rt.digest_files(files)
                 rt.copy_files(files, target)
                 skill = target
+            if condition in SKILL_CONDITIONS:
+                spec = config["skill_experiment"][SKILL_CONDITIONS[condition]]
+                staged_target = (Path(config["clients"][client]["profile_dir"]) / "skills" / spec["name"] if client == "claude"
+                                 else workspace / ".agents/skills" / spec["name"])
+                if staged_target.exists() or staged_target.is_symlink():
+                    raise ValueError("evaluation profile already contains the staged skill; inspect leftover staging")
+                rt.copy_files(rt.tree_files(Path(spec["dir"]), {"__pycache__"}), staged_target)
+                staged_skill = (spec["name"], staged_target, spec["digest"])
             yield workspace, skill
             if skill is not None and rt.digest_tree(skill, {"__pycache__"}) != expected_digest:
                 raise ValueError("trial modified its dispatcher package")
+            if staged_skill is not None and rt.digest_tree(staged_skill[1], {"__pycache__"}) != staged_skill[2]:
+                raise ValueError("trial modified its staged skill package")
         finally:
             if client == "claude" and skill is not None:
                 if target.is_symlink():
                     target.unlink()
                 elif target.exists():
                     shutil.rmtree(target)
+            if client == "claude" and staged_target is not None:
+                if staged_target.is_symlink():
+                    staged_target.unlink()
+                elif staged_target.exists():
+                    shutil.rmtree(staged_target)
 
 
 def doctor(config):
@@ -462,7 +551,7 @@ def run_trial(config, batch, row, fixture):
                     rt.write_json(artifacts / "learning-setup.json", learning)
                     if not learning["ok"]:
                         raise ValueError("Learning library setup failed; no model task started. " + " ".join(learning["diagnostics"]))
-            elif condition == "dispatcher" or condition in PACKET_CONDITIONS:
+            elif condition == "dispatcher" or condition in PACKET_CONDITIONS or condition in SKILL_CONDITIONS:
                 # The static arms never read the user's own learning configuration or stores; packet arms add only the packet mode.
                 index_env = {"AGENT_DISPATCHER_LEARNING_CONFIG": str(warmup.disabled_learning_settings(config))}
                 if condition in PACKET_CONDITIONS:
@@ -487,6 +576,9 @@ def run_trial(config, batch, row, fixture):
             result["effective_settings"] = launch["effective"]
             rt.write_json(artifacts / "settings.json", rt.sanitize(launch["effective"]))
             prompt = launch["stdin_prefix"] + fixture["prompt"]
+            if condition in SKILL_CONDITIONS and config["skill_experiment"]["mode"] == "controlled":
+                # Controlled efficacy: the declared treatment is intentional activation of exactly this staged package.
+                prompt += "\n\nUse the " + config["skill_experiment"][SKILL_CONDITIONS[condition]]["name"] + " skill for this task."
             if launch["effective"].get("input_format") == "stream-json":
                 prompt = json.dumps({"type": "user", "message": {"role": "user", "content": prompt}}) + "\n"
             activity_binding = activity.bind(workspace, skill)
@@ -511,6 +603,10 @@ def run_trial(config, batch, row, fixture):
                 result["startup"] = parsed.get("startup", {})
                 result["final_answer"] = rt.scrub_text(parsed["final_answer"], launch["env"])
                 result["treatment_invoked"] = parsed["treatment_invoked"] if condition != "baseline" else None
+                if config.get("skill_experiment"):
+                    # Every arm records exposure for every staged name: the control must show none, a treatment its own.
+                    staged_root = (Path(spec["profile_dir"]) / "skills") if client == "claude" else workspace / ".agents/skills"
+                    result["skill_exposure"] = [skill_exposure(client, execution["stdout"], name, staged_root / name) for name in skill_names(config)]
                 result["diagnostics"] = parsed.get("diagnostics", []) + parsed.get("errors", [])
                 if execution.get("cleanup_warning"):
                     result["diagnostics"].append(execution["cleanup_warning"])
@@ -593,7 +689,7 @@ def smoke_ready(batch, results):
                     for t in trials))
 
 
-def reconcile_pair(trials):
+def reconcile_pair(trials, ignore=()):
     """Flag every side when native startup catalogs differ beyond the dispatcher within one task's group."""
     if len(trials) < 2:
         return
@@ -614,7 +710,8 @@ def reconcile_pair(trials):
         if not isinstance(value, list):
             return value
         return sorted(json.dumps(item, sort_keys=True) for item in value
-                      if "agent-dispatcher" not in json.dumps(item).lower())
+                      if "agent-dispatcher" not in json.dumps(item).lower()
+                      and str(item).split(":")[-1] not in ignore)  # a staged skill is the declared treatment difference
 
     errors = []
     if current.get("starting_files_digest") != previous.get("starting_files_digest"):
@@ -660,7 +757,7 @@ def run(config, suite):
         print(f"[{index}/{len(batch['schedule'])}] {row['id']}", flush=True)
         result = run_trial(config, batch_dir, row, by_id[row["fixture_id"]])
         results["trials"].append(result)
-        reconcile_pair(results["trials"])
+        reconcile_pair(results["trials"], skill_names(config))
         rt.write_json(batch_dir / "results.json", results)
         for recent in results["trials"][-2:]:
             rt.write_json(batch_dir / recent["artifact_dir"] / "result.json", recent)
@@ -691,6 +788,8 @@ def main(argv=None):
                         "dispatcher_lean and dispatcher_evidence set the helper's packet mode")
     p.add_argument("--packet-tokens", type=int,
                    help="soft packet target (AGENT_DISPATCHER_PACKET_TOKENS, 256-100000) for both packet-mode arms; default: the helper's own")
+    p.add_argument("--skill-experiment", type=Path,
+                   help="JSON written by `skill_intelligence.py evaluate prepare`: staged candidate/incumbent skills for the skill arms")
     for client in CLIENTS:
         p.add_argument(f"--{client}-model")
         p.add_argument(f"--{client}-effort")
@@ -716,7 +815,8 @@ def main(argv=None):
                                   {c: getattr(args, c + "_auth") for c in CLIENTS}, args.seed, clients=args.clients,
                                   warm_project_index=args.warm_project_index,
                                   conditions=[c for c in ALL_CONDITIONS if c in args.conditions or c == "baseline"],
-                                  packet_tokens=args.packet_tokens)
+                                  packet_tokens=args.packet_tokens,
+                                  skill_experiment=rt.read_json(args.skill_experiment) if args.skill_experiment else None)
             print(f"Prepared {config_path}; no model runs started.")
             print("Use native login with the dedicated profile directories in this configuration, or provider API environment variables.")
         elif args.command in ("doctor", "run"):
