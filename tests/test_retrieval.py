@@ -514,6 +514,9 @@ class PlanAndStatusTests(unittest.TestCase):
             plan = retrieval.retrieve(task, index, config)["plan"]
             self.assertEqual((plan["profile"], plan["policy"]), (profile, "observe"), task)
             self.assertIn(reason, plan["reasons"], task)
+        # Test intent is read from the request's lead sentence; a trailing acceptance note does not lift test files.
+        wants = retrieval.analyze_query("Make PythonExecutor faster. Keep changes to library code and tests.")["wants"]
+        self.assertFalse(wants["test"])
         plan = retrieval.retrieve("Fix sqlglot/planner.py", index, config, extra={"worktree": []})["plan"]
         self.assertEqual(plan["families"]["deterministic"], config["retrievers"])
         self.assertEqual(plan["families"]["expansion"], {"graph": True, "git": True})
