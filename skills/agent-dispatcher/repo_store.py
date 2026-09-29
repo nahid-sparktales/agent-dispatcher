@@ -157,13 +157,20 @@ class _Base:
     def transaction(self):
         if self.readonly:
             raise StoreError("Store opened read-only.")
-        self.connection.execute("BEGIN IMMEDIATE")
         try:
+            self.connection.execute("BEGIN IMMEDIATE")
             yield
-        except BaseException:
-            self.connection.execute("ROLLBACK")
+            self.connection.execute("COMMIT")
+        except BaseException as exc:
+            try:
+                self.connection.execute("ROLLBACK")
+            except sqlite3.Error:
+                pass
+            if isinstance(exc, sqlite3.Error):
+                # A write the environment refuses (a sandbox that forbids the journal file, a full or read-only
+                # volume) is a bounded store failure for the caller to report, never a crash of the whole helper.
+                raise StoreError("Repository index write failed: " + type(exc).__name__) from None
             raise
-        self.connection.execute("COMMIT")
 
     def meta(self, key, default=None):
         row = self.connection.execute("SELECT value FROM meta WHERE key=?", (key,)).fetchone()
