@@ -225,6 +225,9 @@ _DOTTED = re.compile(r"(?<![\w.])[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)+(?![\w])")
 # `name(` is a call; `name (` is prose with a parenthetical ("in this checkout (see planner.py)"), never a symbol.
 _CALL = re.compile(r"(?<![\w.])([A-Za-z_][\w.]*)\(")
 _CODE_SPAN = re.compile(r"`([^`\n]{2,120})`")
+# The request's first sentence (or paragraph): where it says what it asks for. Test, doc and config intent is read
+# only there, so a later "keep changes to library code and tests" or "all tests pass" does not lift those kinds.
+_LEAD = re.compile(r"(?<=[.!?])\s+|\n\s*\n")
 _QUOTED = re.compile(r"[`\"']([^`\"'\n]{6,160})[`\"']")
 _WORD = re.compile(r"[A-Za-z_][A-Za-z0-9_]{1,79}")
 _PY_FRAME = re.compile(r"File \"([^\"\n]{1,400})\", line (\d{1,7})(?:, in ([A-Za-z_][\w.<>]*))?")
@@ -423,12 +426,13 @@ def analyze_query(task, config=None, index=None):
         if not row["defines"]:
             terms[name] = max(terms.get(name, 0.0), weights["concept"])
     phrases = [p.strip() for p in _QUOTED.findall(text) if not _WORD.fullmatch(p.strip()) and p.strip() not in paths]
+    lead = _LEAD.split(text.strip(), maxsplit=1)[0]
     return {"raw_tokens": len(raw), "paths": paths[:12], "dotted": dotted[:12], "symbols": symbols[:24], "frames": frames,
             "qualified": qualified[:12], "identifiers": identifiers[:40], "concept_terms": concepts[:60],
             "generic_terms": generic, "phrases": phrases[:8], "terms": terms, "symbol_names": symbol_names,
-            "wants": {"test": bool(re.search(r"\b(?:tests?|testing|pytest|unittest|spec|coverage)\b", text, re.I)),
-                      "doc": bool(re.search(r"\b(?:docs?|documentation|readme|changelog|docstrings?|typos?)\b", text, re.I)),
-                      "config": bool(re.search(r"\b(?:config\w*|settings?|manifest|dependenc\w+|workflow|ci)\b", text, re.I))},
+            "wants": {"test": bool(re.search(r"\b(?:tests?|testing|pytest|unittest|spec|coverage)\b", lead, re.I)),
+                      "doc": bool(re.search(r"\b(?:docs?|documentation|readme|changelog|docstrings?|typos?)\b", lead, re.I)),
+                      "config": bool(re.search(r"\b(?:config\w*|settings?|manifest|dependenc\w+|workflow|ci)\b", lead, re.I))},
             **({"calibration": calibration} if calibration else {})}
 
 
