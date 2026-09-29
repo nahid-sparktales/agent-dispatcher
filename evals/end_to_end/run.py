@@ -525,9 +525,11 @@ def run_trial(config, batch, row, fixture):
         result.update(sequence=row["sequence"], step=row["step"])
     try:
         with workspace_for(config, client, condition, fixture) as (workspace, skill), \
-                tempfile.TemporaryDirectory(prefix="dispatcher-eval-config-") as config_home:
-            # Outside the audited trial directory, so it is never scope residue; identical (empty) for every condition.
-            spec = dict(spec, config_home=config_home)
+                tempfile.TemporaryDirectory(prefix="dispatcher-eval-config-") as config_home, \
+                tempfile.TemporaryDirectory(prefix="de-tmp-", dir="/tmp") as tmpdir:
+            # Outside the audited trial directory, so never scope residue; identical (empty) for every condition. The temp
+            # directory sits directly under /tmp because Claude only honors a short one (see adapters.build_launch).
+            spec = dict(spec, config_home=config_home, tmpdir=os.path.realpath(tmpdir))
             if config.get("warm_project_index", False):
                 from evals.end_to_end.warmup import warm_project_indexes
                 result["index_setup"] = warm_project_indexes(config, client, workspace)

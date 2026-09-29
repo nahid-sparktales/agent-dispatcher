@@ -311,11 +311,18 @@ requested effort of `low` and `eli5-succinct` output that the baseline never saw
 `~/.config/git/config`) see the same empty directory in both conditions. Batches recorded before this
 change could carry the operator's preferences in the treatment arm.
 
-`TMPDIR` is still the runner's own temporary directory, shared across trials and sessions. The
-shell sandbox's write rules for a per-trial `TMPDIR` cannot be verified offline, so it is left
-unchanged. This is a known confound: a trial can read or reuse files that earlier trials or sessions
-left there (in ri-v1, one baseline trial ran its tests with dependency stubs written by an earlier
-run). Treat reuse of `$TMPDIR` content seen in traces as a trial-independence caveat.
+Every trial, in every condition, also gets its own empty temp directory (`/tmp/de-tmp-*`, outside the
+audited trial directory, removed with the trial) as `TMPDIR`, `TMP` and `TEMP`. Earlier batches shared
+one: stock trials reused scripts and dependency stubs that earlier sessions left in `/tmp/claude-<uid>`.
+Claude Code ignores `TMPDIR` for its own temp root and gives sandboxed commands
+`$CLAUDE_CODE_TMPDIR/claude-<uid>`, so Claude trials also get `CLAUDE_CODE_TMPDIR` set to the trial
+directory and a `sandbox.filesystem.allowWrite` grant for it. Claude only honors that path when it fits
+44 bytes (it silently falls back to the shared directory otherwise); the adapter refuses a longer one,
+which is why the directory sits directly under `/tmp`. `effective_settings.tmpdir` records
+`trial-owned empty directory`. **Pending live verification:** the sandbox write grant and the child
+`$TMPDIR` were read from the Claude Code 2.1.267 binary and Codex's `workspace-write` defaults, not
+observed in a run; the smoke run should confirm a trial's Bash `echo $TMPDIR` names the trial's own
+directory and that writing there succeeds. Batches recorded before this change carry the shared-temp caveat.
 
 ## Run smoke, then pilot
 

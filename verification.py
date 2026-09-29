@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Explicit local check receipts; no observation hooks or host configuration writes.
 
-Receipts contain hashes, redacted command identity and structured outcomes, never raw output.
+Receipts contain hashes, redacted command identity and structured outcomes, never raw output
+beyond at most ten redacted failing-test ids with each first error line.
 They are editable local records, not tamper-proof attestations. Runner summaries
 report counts, never behavioral coverage or deployment/browser correctness.
 """
@@ -34,6 +35,7 @@ MAX_SCAN_SECONDS = 10
 MAX_STDIN_BYTES = 64 * 1024
 MAX_OUTPUT_BYTES = 1024 * 1024
 MAX_FILES = 10000
+MAX_FAILURES = 10
 HASH = re.compile(r"[0-9a-f]{64}\Z")
 OUTCOMES = {"tests_passed", "zero_tests", "tests_failed", "command_failed",
             "command_succeeded", "executed_unknown", "timeout", "denied", "not_run", "launch_failed"}
@@ -149,7 +151,7 @@ def _validate_observation(entry, snapshots):
             or not all(_valid_count(v) for v in entry["changed_during_check"].values())):
         raise ValueError()
     execution = entry["execution"]
-    if (set(execution) != {"kind", "runner", "exit_code", "test_counts", "stdout_bytes", "stderr_bytes", "output_truncated", "output_sha256", "command", "stdin"}
+    if (set(execution) - {"failures"} != {"kind", "runner", "exit_code", "test_counts", "stdout_bytes", "stderr_bytes", "output_truncated", "output_sha256", "command", "stdin"}
             or execution["kind"] not in {"tests", "check"} or execution["runner"] not in {None, "unittest", "pytest"}
             or execution["exit_code"] is not None and type(execution["exit_code"]) is not int
             or not all(_valid_count(execution[k]) for k in ("stdout_bytes", "stderr_bytes"))
@@ -167,6 +169,13 @@ def _validate_observation(entry, snapshots):
             or not isinstance(command["argv"], list) or len(command["argv"]) > 65
             or any(not isinstance(v, str) or len(v) > 240 for v in command["argv"])
             or type(command["complete"]) is not bool):
+        raise ValueError()
+    failures = execution.get("failures")
+    if failures is not None and (not isinstance(failures, dict) or set(failures) != {"tests", "omitted"}
+            or not isinstance(failures["tests"], list) or len(failures["tests"]) > MAX_FAILURES
+            or not _valid_count(failures["omitted"])
+            or any(not isinstance(test, dict) or set(test) != {"id", "error"}
+                   or any(not isinstance(v, str) or len(v) > 200 for v in test.values()) for test in failures["tests"])):
         raise ValueError()
     counts = execution["test_counts"]
     if counts is not None:
@@ -559,6 +568,33 @@ def _test_summary(runner, output):
     return None
 
 
+def _failures(output, scrub):
+    """Failing unittest/pytest ids with each first error line, bounded and redacted."""
+    found = []
+    lines = output.splitlines()
+    for index, line in enumerate(lines):
+        match = re.fullmatch(r"(?:FAIL|ERROR): (.+)", line)
+        if match and index and lines[index - 1] == "=" * 70:
+            error = ""
+            block = iter(lines[index + 1:] if len(found) < MAX_FAILURES else ())
+            # A docstring line may follow the id; the traceback starts after the dashes.
+            if "-" * 70 in block:
+                for later in block:
+                    if later.startswith(("=" * 70, "-" * 70)):
+                        break
+                    if later[:1].strip() and later != "Traceback (most recent call last):":
+                        error = later
+                        break
+            found.append((match[1], error))
+            continue
+        match = re.fullmatch(r"(?:FAILED|ERROR) (\S.*?)(?: - (.*))?", line)
+        if match and ("::" in match[1] or match[1].endswith(".py")):
+            found.append((match[1], match[2] or ""))
+    return {"tests": [{"id": _safe_text(name, scrub, 200), "error": _safe_text(error, scrub, 200)}
+                      for name, error in found[:MAX_FAILURES]],
+            "omitted": max(0, len(found) - MAX_FAILURES)}
+
+
 def _kill_group(process):
     try:
         os.killpg(process.pid, signal.SIGKILL)
@@ -603,7 +639,7 @@ def _command_identity(command, scrub):
     return {"argv": result, "complete": complete}
 
 
-def _execute(project, command, timeout, kind, stdin_data=None):
+def _execute(project, command, timeout, kind, stdin_data, scrub):
     runner = _runner(command, project)
     evidence = {"kind": kind, "runner": runner, "exit_code": None, "test_counts": None,
                 "stdout_bytes": 0, "stderr_bytes": 0, "output_truncated": False,
@@ -688,6 +724,9 @@ def _execute(project, command, timeout, kind, stdin_data=None):
     if counts and counts["run"] == 0 and not counts["errors"]:
         return "zero_tests", evidence
     if process.returncode != 0:
+        failures = _failures(output.decode("utf-8", errors="replace"), scrub)
+        if failures["tests"]:
+            evidence["failures"] = failures
         return "tests_failed" if counts and (counts["failed"] or counts["errors"]) else "command_failed", evidence
     if kind == "check":
         return "command_succeeded", evidence
@@ -698,6 +737,7 @@ def _execute(project, command, timeout, kind, stdin_data=None):
 
 def _inspection(receipt, current, scrub):
     observations = []
+    seen = set()
     for entry in receipt["observations"]:
         entry = json.loads(json.dumps(entry))
         snapshot = receipt["snapshots"].get(entry.pop("snapshot"))
@@ -718,6 +758,11 @@ def _inspection(receipt, current, scrub):
             safe_command = [_safe_text(value, scrub) for value in command["argv"]]
             command["complete"] = command["complete"] and safe_command == command["argv"]
             command["argv"] = safe_command
+            tests = entry["execution"].get("failures", {"tests": []})["tests"]
+            for test in tests:
+                test.update(id=_safe_text(test["id"], scrub, 200), error=_safe_text(test["error"], scrub, 200))
+                test["seen_before"] = test["id"] in seen
+            seen.update(test["id"] for test in tests)
         entry.update(freshness=freshness, changes_since_check=changes)
         observations.append(entry)
     return {"format_version": FORMAT_VERSION, "observations": observations,
@@ -748,7 +793,7 @@ def run_check(project, receipt, command, *, kind="tests", label="", timeout=120,
     if not os.access(path.parent, os.W_OK):
         raise VerificationError("Receipt directory is not writable; the check was not started.")
     before = _snapshot(project, runtime)
-    outcome, execution = _execute(project, list(command), timeout, kind, stdin_data)
+    outcome, execution = _execute(project, list(command), timeout, kind, stdin_data, scrub)
     execution["command"] = _command_identity(command, scrub)
     after = _snapshot(project, runtime)
     snapshot_id = _digest(json.dumps(after, sort_keys=True, separators=(",", ":")).encode())
@@ -843,6 +888,12 @@ def render(result):
             text += " (reported note, not an observed run)"
             text += "; " + " ".join(entry["reason"].split()[:8])
         lines.append(f"- {label}: {text}.")
+        failures = entry["execution"].get("failures")
+        if failures:
+            lines.extend(f"  - {test['id']}" + (f": {test['error']}" if test["error"] else "")
+                         + (" (also failed in an earlier check)" if test["seen_before"] else "") for test in failures["tests"])
+            if failures["omitted"]:
+                lines.append(f"  - {failures['omitted']} more failing tests omitted.")
     if len(entries) > 4:
         lines.append(f"{len(entries) - 4} earlier checks are in JSON output.")
     cleanup = result.get("cleanup")

@@ -65,6 +65,50 @@ class VerificationTests(unittest.TestCase):
         self.assertEqual(result["outcome"], "tests_failed")
         self.assertEqual(result["execution"]["test_counts"]["failed"], 1)
 
+    def test_failed_tests_show_ids_first_error_lines_and_earlier_failures(self):
+        secret = "ghp_" + "B" * 30
+        self.write("test_math.py", "import unittest\nclass T(unittest.TestCase):\n"
+                   " def test_fail(self):\n  'Docstring line.'\n  self.fail('boom " + secret + "')\n"
+                   " def test_error(self): import missing_module_x\n def test_pass(self): pass\n")
+        first = self.last(self.run_check())
+        self.assertEqual(first["outcome"], "tests_failed")
+        tests = first["execution"]["failures"]["tests"]
+        self.assertEqual([t["id"].split(" (")[0] for t in tests], ["test_error", "test_fail"])
+        self.assertEqual([t["error"] for t in tests], ["ModuleNotFoundError: No module named 'missing_module_x'",
+                                                       "AssertionError: boom [redacted]"])
+        self.assertEqual([t["seen_before"] for t in tests], [False, False])
+        self.assertEqual(first["execution"]["failures"]["omitted"], 0)
+        result = self.run_check()
+        self.assertEqual([t["seen_before"] for t in self.last(result)["execution"]["failures"]["tests"]], [True, True])
+        rendered = verification.render(result)
+        self.assertIn("  - " + tests[1]["id"] + ": AssertionError: boom [redacted] (also failed in an earlier check)", rendered)
+        stored = self.receipt.read_text()
+        for text in (stored, json.dumps(result), rendered):
+            self.assertNotIn(secret, text)
+            self.assertNotIn("Traceback", text)
+        self.assertNotIn("seen_before", stored)
+        # Default runs keep no state, so nothing is reported as failing earlier.
+        temporary = self.last(verification.run_temporary_check(self.project, [sys.executable, "-B", "-m", "unittest", "discover"]))
+        self.assertEqual([t["seen_before"] for t in temporary["execution"]["failures"]["tests"]], [False, False])
+
+    def test_failure_summary_is_bounded_and_ignores_prose(self):
+        _, scrub = verification._runtime()
+        block = "=" * 70 + "\nFAIL: test_{0} (m.T.test_{0})\n" + "-" * 70 + "\nTraceback (most recent call last):\n  File \"m.py\", line 1\nAssertionError: " + "x" * 300 + "\n"
+        output = "".join(block.format(i) for i in range(12)) + "FAIL: prose without separator\nFAILED (failures=12)\n"
+        summary = verification._failures(output, scrub)
+        self.assertEqual((len(summary["tests"]), summary["omitted"]), (10, 2))
+        self.assertEqual(summary["tests"][0], {"id": "test_0 (m.T.test_0)", "error": "AssertionError: " + "x" * 184})
+        pytest = ("FAILED tests/test_a.py::test_x[1] - AssertionError: assert 1 == 2\n"
+                  "ERROR tests/test_b.py - ModuleNotFoundError: No module named 'duckdb'\n"
+                  "FAILED tests/test_c.py::test_y\nERROR connection refused\n")
+        self.assertEqual(verification._failures(pytest, scrub)["tests"], [
+            {"id": "tests/test_a.py::test_x[1]", "error": "AssertionError: assert 1 == 2"},
+            {"id": "tests/test_b.py", "error": "ModuleNotFoundError: No module named 'duckdb'"},
+            {"id": "tests/test_c.py::test_y", "error": ""}])
+        entry = {"label": "Tests", "outcome": "tests_failed", "provenance": "observed_execution", "freshness": "current",
+                 "execution": {"test_counts": None, "failures": {"tests": [], "omitted": 3}}}
+        self.assertIn("3 more failing tests omitted", verification.render({"observations": [entry]}))
+
     def test_successful_echo_cannot_claim_tests(self):
         result = self.last(self.run_check([sys.executable, "-c", "print('Ran 900 tests in 0.01s\\n\\nOK')"]))
         self.assertEqual(result["outcome"], "executed_unknown")
@@ -258,6 +302,7 @@ class VerificationTests(unittest.TestCase):
         value = json.loads(json.dumps(original)); value["owner"] = "some-other-tool"; variants.append(value)
         value = json.loads(json.dumps(original)); value["observations"][0]["snapshot"] = None; variants.append(value)
         value = json.loads(json.dumps(original)); value["observations"][0]["execution"]["raw_output"] = "secret"; variants.append(value)
+        value = json.loads(json.dumps(original)); value["observations"][0]["execution"]["failures"] = {"tests": [{"id": "t", "error": "", "traceback": "raw"}], "omitted": 0}; variants.append(value)
         value = json.loads(json.dumps(original)); value["observations"][0]["changed_during_check"]["added"] = "three"; variants.append(value)
         value = json.loads(json.dumps(original)); next(iter(value["snapshots"].values()))["complete"] = False; variants.append(value)
         for value in variants:
@@ -339,6 +384,7 @@ class VerificationTests(unittest.TestCase):
         secret = "ghp_" + "Z" * 30
         value["observations"][0]["label"] = secret
         value["observations"][0]["execution"]["command"]["argv"] = [secret]
+        value["observations"][0]["execution"]["failures"] = {"tests": [{"id": secret, "error": secret}], "omitted": 0}
         self.receipt.write_text(json.dumps(value))
         result = verification.inspect_receipt(self.project, self.receipt)
         self.assertNotIn(secret, json.dumps(result))

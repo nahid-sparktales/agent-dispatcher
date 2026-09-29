@@ -77,6 +77,11 @@ DEFAULTS = {
     # every name in the repository, so as a graph seed it expanded into unrelated files; off, its terms still match requests
     # and its imports, calls and definitions keep their edges (strategy `full-oversized-references` turns it back on).
     "oversized": {"lexical": True, "references": False},
+    # Hub files: a file whose distinct terms are at least `min_share` of the repository's vocabulary shares words with
+    # almost any request, so the lexical voters in `sources` find it for unrelated tasks (sqlglot/generator.py, 17% of the
+    # vocabulary, was in every pilot packet). Query-independent. Ablation switch, off at 0.0 (strategy `full+hubs`): those
+    # votes are scaled by (1 - damping); a definition, path or graph vote is never damped.
+    "hubs": {"damping": 0.0, "min_share": 0.15, "sources": ["bm25", "rare_terms", "symbol_references"]},
     # Fused scores within this relative distance of their group's leader count as a tie, settled by evidence
     # (definition, then named path, then identifier, then structure) instead of by a hair of lexical rank.
     # Benchmark-neutral at 0.05 (0.10 and 0.20 cost recall); 0 compares exact scores only.
@@ -154,6 +159,7 @@ def _strategies():
     out["full-structure"] = _merge(full, {"structural_records": False})
     out["full-oversized-structural"] = _merge(full, {"oversized": {"lexical": False}})
     out["full-oversized-references"] = _merge(full, {"oversized": {"references": True}})
+    out["full+hubs"] = _merge(full, {"hubs": {"damping": 0.5}})
     # Representation experiments: raw source (`+query-analysis`) against role summaries, alone and fused.
     out["role-only"] = _merge(out["+query-analysis"], {"retrievers": ["role_summary"]})
     out["bm25+role"] = _merge(out["+query-analysis"], {"retrievers": ["bm25", "role_summary"], "fusion": "rrf"})
@@ -658,6 +664,27 @@ RETRIEVERS = {"path": path_retriever, "rare_terms": rare_term_retriever, "bm25":
               "experience": experience_retriever, "inference": inference_retriever}
 
 
+def damp_hubs(lists, index, config):
+    """Scale hub files' votes in the `hubs.sources` lists by (1 - damping) and re-rank those lists (stable, so
+    every other file keeps its order). A hub's distinct terms are at least `min_share` of the repository's vocabulary."""
+    tuning = config.get("hubs") or {}
+    if not tuning.get("damping"):
+        return lists
+    vocabulary = set()
+    for record in index.records.values():
+        vocabulary.update(record["terms"])
+    shares = {path: len(record["terms"]) / len(vocabulary) for path, record in index.records.items() if vocabulary}
+    hubs = {path for path, share in shares.items() if share >= tuning["min_share"]}
+    factor, out = 1.0 - tuning["damping"], dict(lists)
+    for source in [name for name in tuning["sources"] if name in lists] if hubs else ():
+        rows = [dict(row, score=round(row["score"] * factor, 4),
+                     detail=f"hub file: {shares[row['file']]:.0%} of the repository's terms; vote x{factor:g}")
+                if row["file"] in hubs else row for row in lists[source]]
+        rows = sorted((row for row in rows if row["score"] > 0), key=lambda row: -row["score"])
+        out[source] = [dict(row, rank=rank) for rank, row in enumerate(rows, 1)]
+    return out
+
+
 # ---------------------------------------------------------------- fusion and expansion
 
 
@@ -906,6 +933,7 @@ def plan_retrieval(task, query, config, *, extra=(), reranker=None):
                      "oversized": {"lexical": (config.get("oversized") or {}).get("lexical", True),
                                    "references": (config.get("oversized") or {}).get("references", False)},
                      "names": dict(config.get("names", DEFAULTS["names"])),
+                     "hubs": copy.deepcopy(config.get("hubs", DEFAULTS["hubs"])),
                      "reranker_candidates": tuning["candidate_limit"],
                      "packet": {"files": config["context"]["max_files"], "bytes": config["context"]["max_bytes"]}},
             "stop_conditions": ["each retriever answers once, capped", "expansion: seeds x hops x per-seed cap",
@@ -963,7 +991,7 @@ def retrieve(task, index, config=None, *, named=(), role=None, extra=None, boost
     config = config or STRATEGIES["full"]
     started = time.perf_counter()
     query = analyze_query(task, config, index) if config["query_analysis"] else legacy_query(task)
-    lists = {name: RETRIEVERS[name](query, index, config) for name in config["retrievers"]}
+    lists = damp_hubs({name: RETRIEVERS[name](query, index, config) for name in config["retrievers"]}, index, config)
     found = {row["file"] for rows in lists.values() for row in rows}
     for name, rows in (extra or {}).items():
         lists[name] = [row for row in rows if name not in boost_only or row["file"] in found]

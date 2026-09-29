@@ -110,6 +110,12 @@ def _environment(client: str, spec: dict, profile: Path) -> dict[str, str]:
     # An empty trial-owned config home in every condition, so the operator's ~/.config (dispatcher preferences) never reaches a trial.
     if spec.get("config_home"):
         env["XDG_CONFIG_HOME"] = spec["config_home"]
+    # Likewise an empty trial-owned temp directory, so no trial reuses what earlier trials or sessions left in a shared temp.
+    # Claude Code ignores TMPDIR for its own temp root: sandboxed commands get $CLAUDE_CODE_TMPDIR/claude-<uid> as $TMPDIR.
+    if spec.get("tmpdir"):
+        env.update(TMPDIR=spec["tmpdir"], TMP=spec["tmpdir"], TEMP=spec["tmpdir"])
+        if client == "claude":
+            env["CLAUDE_CODE_TMPDIR"] = spec["tmpdir"]
     # Deep-index arms: arm-scoped private state, a sequence identity and a settings path; packet arms: a packet mode. Set by the runner.
     for key in ("XDG_CACHE_HOME", "AGENT_DISPATCHER_INDEX_ID", "AGENT_DISPATCHER_INDEX_CONFIG", "AGENT_DISPATCHER_MEMORY_CONFIG",
                 "AGENT_DISPATCHER_LEARNING_CONFIG", "AGENT_DISPATCHER_PACKET", "AGENT_DISPATCHER_PACKET_TOKENS"):
@@ -344,6 +350,7 @@ def build_launch(client: str, spec: dict, workspace: Path,
         "llm_network": list(spec.get("llm_network") or []),
         "memory_settings": spec.get("memory_settings"),
         "xdg_config_home": "trial-owned empty directory" if spec.get("config_home") else "inherited",
+        "tmpdir": "trial-owned empty directory" if spec.get("tmpdir") else "inherited",
     }
     if client == "codex":
         disabled, proof = _codex_isolation(executable, spec, env, workspace, skill)
@@ -364,6 +371,13 @@ def build_launch(client: str, spec: dict, workspace: Path,
                         # own model calls); both conditions get the same list, and it stays empty otherwise.
                         "network": {"allowedDomains": list(spec.get("llm_network") or [])}},
         }
+        if spec.get("tmpdir"):
+            # Claude Code (2.1.x) hands sandboxed commands $CLAUDE_CODE_TMPDIR/claude-<uid> only while that path fits 44 bytes
+            # (AF_UNIX socket limit); a longer one silently falls back to the shared /tmp/claude-<uid>, so refuse it.
+            if len(os.fsencode(os.path.join(spec["tmpdir"], f"claude-{os.getuid()}"))) > 44:
+                raise AdapterError("Trial temp directory path is too long; Claude would fall back to the shared temp")
+            # Grant the trial's own temp explicitly so temp writes stay possible wherever the sandbox puts its default grant.
+            settings["sandbox"]["filesystem"] = {"allowWrite": [spec["tmpdir"]]}
         argv = [executable, "--print", "--output-format", "stream-json", "--verbose",
                 "--input-format", "stream-json", "--replay-user-messages",
                 "--no-session-persistence", "--setting-sources", "user",

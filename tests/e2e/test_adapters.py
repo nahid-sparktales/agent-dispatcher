@@ -111,6 +111,22 @@ else:
         isolated = adapters.build_launch("claude", dict(self.spec, config_home=str(self.root)), self.workspace)
         self.assertEqual((isolated["env"]["XDG_CONFIG_HOME"], isolated["effective"]["xdg_config_home"]), (str(self.root), "trial-owned empty directory"))
 
+    def test_trial_tmpdir_reaches_every_temp_variable_and_the_claude_sandbox(self):
+        stock = adapters.build_launch("claude", self.spec, self.workspace)
+        self.assertEqual(stock["effective"]["tmpdir"], "inherited")
+        self.assertNotIn("CLAUDE_CODE_TMPDIR", stock["env"])
+        self.assertNotIn("filesystem", json.loads(stock["argv"][stock["argv"].index("--settings") + 1])["sandbox"])
+        tmp = "/tmp/de-tmp-abcdefgh"
+        launch = adapters.build_launch("claude", dict(self.spec, tmpdir=tmp), self.workspace)
+        self.assertEqual({launch["env"][k] for k in ("TMPDIR", "TMP", "TEMP", "CLAUDE_CODE_TMPDIR")}, {tmp})
+        self.assertEqual(launch["effective"]["tmpdir"], "trial-owned empty directory")
+        settings = json.loads(launch["argv"][launch["argv"].index("--settings") + 1])
+        self.assertEqual(settings["sandbox"]["filesystem"], {"allowWrite": [tmp]})
+        codex = adapters._environment("codex", dict(self.spec, tmpdir=tmp), self.profile)
+        self.assertEqual(({codex[k] for k in ("TMPDIR", "TMP", "TEMP")}, "CLAUDE_CODE_TMPDIR" in codex), ({tmp}, False))
+        with self.assertRaisesRegex(adapters.AdapterError, "too long"):  # Claude would silently use the shared temp
+            adapters.build_launch("claude", dict(self.spec, tmpdir="/" + "x" * 40), self.workspace)
+
     def test_api_secret_only_in_process_environment(self):
         self.spec["auth"] = "api"
         with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "secret-not-for-artifacts"}):

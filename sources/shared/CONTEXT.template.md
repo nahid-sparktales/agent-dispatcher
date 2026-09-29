@@ -17,7 +17,7 @@ Skip preparation without workspace evidence; rebuild for changed focus/sources.
 ```
 
 PACK is the dispatcher directory, PROJECT the workspace. Quote absolute paths; single-quote the
-exact REQUEST (' as '\''); python3 first, no cd/pipe/heredoc. Preserve scope/exclusions.
+verbatim REQUEST (' as '\''); python3 first, no cd/pipe/heredoc. Preserve scope/exclusions.
 Small for narrow work, complex for broad. Maintenance defers for task limits and read-only
 roles; add --map-preview (wins) for limits it may miss: odd wording, plan mode. Omit both
 without source investigation.

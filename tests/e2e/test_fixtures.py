@@ -72,6 +72,19 @@ class FixtureTests(unittest.TestCase):
                     self.assertFalse(Path(check['script']).is_relative_to(source))
             self.assertFalse(any(p.name in ('ratings.json', 'evaluator.py', 'final_answer.txt') for p in source.rglob('*')))
 
+    def test_trial_workspace_is_exactly_source_never_private(self):
+        # The runner's own copy step, not just the manifest layout: evaluators and references never reach the agent.
+        from evals.end_to_end import run as runner, runtime as rt
+        for fixture in self.fixtures:
+            with self.subTest(fixture=fixture['id']), \
+                    runner.workspace_for({}, 'codex', 'baseline', fixture) as (workspace, skill):
+                files = rt.tree_files(workspace, rt.EXCLUDED)
+                self.assertIsNone(skill)
+                self.assertEqual(files, rt.tree_files(fixture['source_dir']))
+                for check in fixture['checks']:
+                    if check['kind'] == 'python':
+                        self.assertNotIn(Path(check['script']).read_bytes(), files.values())
+
     def test_starting_files_are_copied_identically_between_conditions(self):
         with tempfile.TemporaryDirectory() as tmp:
             for fixture in self.fixtures:

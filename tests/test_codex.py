@@ -241,6 +241,9 @@ print(json.dumps([module.resolve_resources(sys.argv[2], role) for role in json.l
             self.assertIn("If a user enabled an optional decision scope", entry)
             self.assertIn("--agent", entry)
             self.assertIn("CONTEXT-REFERENCE.md", entry)
+            # Workers passed paraphrases to the helper, so ranking varied between repetitions of one task.
+            self.assertIn("REQUEST is the request verbatim, never a summary", entry)
+            self.assertIn("verbatim REQUEST", (refs / "CONTEXT.md").read_text())
 
     def test_context_selection_matches_source_manual_and_codex_without_writes(self):
         project = self.root / "selector-project"

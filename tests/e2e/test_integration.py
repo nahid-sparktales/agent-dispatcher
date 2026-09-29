@@ -245,6 +245,37 @@ class PipelineIntegrationTests(unittest.TestCase):
         self.assertEqual(set(results['dispatcher_lean']['usage']), set(adapters.USAGE_KEYS))
         self.assertEqual(set(results['dispatcher_lean']['runtime']), set(adapters.RUNTIME_KEYS))
 
+    def test_every_trial_gets_its_own_empty_tmpdir_removed_afterwards(self):
+        # The child leaves a stub in its temp directory, as the reused scripts in /tmp/claude-<uid> were left.
+        self.fake.write_text(FAKE_CLIENT + "\nimport os\nPath(os.environ['TMPDIR'], 'stub.py').write_text('left behind')\n")
+        seen, results, batch = [], [], self.root / 'tmp-batch'
+        batch.mkdir()
+
+        def capture(client, spec, workspace, skill):
+            env = adapters._environment(client, spec, Path(spec['profile_dir']))  # the real environment builder
+            temp = {key: env.get(key) for key in ('TMPDIR', 'TMP', 'TEMP', 'CLAUDE_CODE_TMPDIR')}
+            seen.append((client, temp, os.listdir(temp['TMPDIR']), Path(temp['TMPDIR']).is_relative_to(Path(workspace).parent)))
+            launch = self.fake_launch(client, spec, workspace, skill)
+            launch['env'] = dict(launch['env'], TMPDIR=temp['TMPDIR'])
+            return launch
+        with patch.object(adapters, 'doctor', side_effect=self.fake_doctor), patch.object(adapters, 'build_launch', side_effect=capture), contextlib.redirect_stdout(io.StringIO()):
+            for client in ('codex', 'claude'):
+                for condition in ('baseline', 'dispatcher'):
+                    row = {'id': f'{client}-greeting-1-{condition}', 'client': client, 'condition': condition, 'fixture_id': 'greeting', 'repetition': 1}
+                    results.append(runner.run_trial(self.config, batch, row, self.fixture_by_id['greeting']))
+        self.assertTrue(all(r['status'] == 'completed' and r['scope_check']['passed'] for r in results), results)  # temp is never scope residue
+        dirs = [temp['TMPDIR'] for _, temp, *_ in seen]
+        self.assertEqual(len(set(dirs)), 4)  # one per trial, in both arms of both clients
+        shared = {os.path.realpath(tempfile.gettempdir()), os.environ.get('TMPDIR')}
+        shared_claude = Path(os.path.realpath('/tmp')) / f'claude-{os.getuid()}'
+        for client, temp, listing, inside in seen:
+            self.assertEqual((listing, inside), ([], False))  # empty at launch, outside the audited trial directory
+            self.assertEqual({temp['TMP'], temp['TEMP']}, {temp['TMPDIR']})
+            self.assertEqual(temp['CLAUDE_CODE_TMPDIR'], temp['TMPDIR'] if client == 'claude' else None)
+            self.assertNotIn(temp['TMPDIR'], shared)
+            self.assertFalse(Path(temp['TMPDIR']).is_relative_to(shared_claude))
+        self.assertFalse(any(Path(d).exists() for d in dirs))  # removed with its trial
+
     def test_packet_tokens_reach_both_packet_arms_alike_and_are_recorded(self):
         conditions = ['baseline', 'dispatcher', 'dispatcher_lean', 'dispatcher_evidence']
         config = dict(self.config, conditions=conditions, packet_tokens=12000)
